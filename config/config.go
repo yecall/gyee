@@ -23,7 +23,7 @@ package config
 import (
 	"fmt"
 	"github.com/urfave/cli"
-	"github.com/ychain/gyee/utils"
+	"github.com/yeeco/gyee/utils"
 	"os"
 	"path/filepath"
 	"runtime"

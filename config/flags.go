@@ -22,7 +22,7 @@ package config
 
 import (
 	"github.com/urfave/cli"
-	"github.com/ychain/gyee/utils"
+	"github.com/yeeco/gyee/utils"
 )
 
 var (

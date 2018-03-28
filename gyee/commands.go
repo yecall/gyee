@@ -25,7 +25,7 @@ import (
 	"net/rpc"
 
 	"github.com/urfave/cli"
-	"github.com/YeeFoundation/gyee/config"
+	"github.com/yeeco/gyee/config"
 )
 
 type Args struct {

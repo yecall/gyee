@@ -21,10 +21,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/urfave/cli"
-	"github.com/ychain/gyee/config"
-	"github.com/ychain/gyee/node"
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/node"
 	"log"
 	"os"
 	"path/filepath"

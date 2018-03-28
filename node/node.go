@@ -23,7 +23,7 @@ package node
 import (
 	"errors"
 	"github.com/theckman/go-flock"
-	"github.com/ychain/gyee/config"
+	"github.com/yeeco/gyee/config"
 	"log"
 	"net"
 	"net/rpc"
