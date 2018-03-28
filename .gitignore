@@ -12,3 +12,15 @@
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+
+# ide
+.idea/
+
+# vendor dir
+vendor/
+
+# test dir
+test/
+
+# doc dir
+doc/
