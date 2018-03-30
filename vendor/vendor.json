@@ -1,0 +1,21 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "mwxKE/vRvDwvlIgHnkQDBowQ5Z0=",
+			"path": "github.com/robertkrimen/otto",
+			"revision": "3b44b4dcb6c00477273595c312908e2412d07da6",
+			"revisionTime": "2017-11-30T10:32:05Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "tSqudW9OyE/9woHLxDJ0+Gvvao4=",
+			"path": "github.com/theckman/go-flock",
+			"revision": "b139a2487364247d91814e4a7c7b8fdc69e342b2",
+			"revisionTime": "2018-01-24T01:19:07Z",
+			"tree": true
+		}
+	],
+	"rootPath": "github.com/yeeco/gyee"
+}
