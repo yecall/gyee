@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
-	"path/filepath"
 	"os"
 	"os/user"
+	"path/filepath"
 	"runtime"
 )
 

@@ -1,0 +1,58 @@
+/*
+ *  Copyright (C) 2017 gyee authors
+ *
+ *  This file is part of the gyee library.
+ *
+ *  the gyee library is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  the gyee library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+//protoc -I . rpc.proto --go_out=plugins=grpc:.
+
+syntax = "proto3";
+
+package rpcpb;
+
+service AdminService{
+    rpc NewAccount(NewAccountRequest) returns (NewAccountResponse){};
+}
+
+service ApiService{
+    rpc NodeInfo (NonParamsRequest) returns (NodeInfoResponse){};
+
+}
+
+// Request message of non params.
+message NonParamsRequest {
+}
+
+// Response message of node info.
+message NodeInfoResponse {
+    // the node ID.
+    string id = 1;
+
+    // the node version.
+    uint32 version = 2;
+}
+
+
+message NewAccountRequest {
+    string passphrase = 1;
+}
+
+message NewAccountResponse {
+    string address = 1;
+}
+
