@@ -24,10 +24,10 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/node"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 var (
@@ -61,7 +61,7 @@ func init() {
 
 func main() {
 	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
+		logging.Logger.Fatal(err)
 	}
 }
 

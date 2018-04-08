@@ -3,10 +3,38 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "Pl3umuMJV7AMpfIwohduGJO49R4=",
+			"path": "github.com/lestrrat-go/file-rotatelogs",
+			"revision": "31912ebef06aac4686da7aea6c11cdf430285a0f",
+			"revisionTime": "2018-03-19T02:39:37Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "FY6IHxte0b2P9GmuYWzfdB97FuQ=",
+			"path": "github.com/lestrrat-go/strftime",
+			"revision": "9948d03c6207ada6a27c7b43405f8dee04a8439e",
+			"revisionTime": "2018-02-20T09:15:53Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "/jrPYC6jxg8mtWFFhMT5TyOowEM=",
+			"path": "github.com/rifflock/lfshook",
+			"revision": "62f5e0662816a462697d29f396fd19376d17f65b",
+			"revisionTime": "2018-03-13T18:34:24Z",
+			"tree": true
+		},
+		{
 			"checksumSHA1": "mwxKE/vRvDwvlIgHnkQDBowQ5Z0=",
 			"path": "github.com/robertkrimen/otto",
 			"revision": "3b44b4dcb6c00477273595c312908e2412d07da6",
 			"revisionTime": "2017-11-30T10:32:05Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "kW1G3g0Ou9MQKDTJrEHUjTfwDcU=",
+			"path": "github.com/sirupsen/logrus",
+			"revision": "778f2e774c725116edbc3d039dc0dfc1cc62aae8",
+			"revisionTime": "2018-03-29T22:59:52Z",
 			"tree": true
 		},
 		{

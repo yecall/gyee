@@ -21,11 +21,11 @@
 package main
 
 import (
-	"log"
 	"net/rpc"
 
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Args struct {
@@ -50,9 +50,9 @@ var (
 			args := Args{S: "test"}
 			err = client.Call("JSService.Hello", args, &reply)
 			if err != nil {
-				log.Println(err)
+				logging.Logger.Info(err)
 			}
-			log.Println(reply)
+			logging.Logger.Info(reply)
 			return nil
 		},
 	}

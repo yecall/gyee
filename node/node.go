@@ -24,7 +24,6 @@ import (
 	"errors"
 	"github.com/theckman/go-flock"
 	"github.com/yeeco/gyee/config"
-	"log"
 	"net"
 	"net/rpc"
 	"os"
@@ -32,6 +31,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Node struct {
@@ -46,7 +46,7 @@ func New(conf *config.Config) (*Node, error) {
 	if conf.DataDir != "" {
 		absdatadir, err := filepath.Abs(conf.DataDir)
 		if err != nil {
-			log.Panic(err)
+			logging.Logger.Panic(err)
 			return nil, err
 		}
 		conf.DataDir = absdatadir
@@ -60,7 +60,7 @@ func New(conf *config.Config) (*Node, error) {
 func (n *Node) Start() error {
 	n.lock.Lock()
 	if err := n.lockDataDir(); err != nil {
-		log.Println(err)
+		logging.Logger.Println(err)
 		return err
 	}
 
@@ -71,7 +71,7 @@ func (n *Node) Start() error {
 		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigc)
 		<-sigc
-		log.Println("Got interrupt, shutting down...")
+		logging.Logger.Println("Got interrupt, shutting down...")
 		go n.Stop()
 	}()
 
@@ -86,7 +86,7 @@ func (n *Node) Stop() error {
 	defer n.lock.Unlock()
 
 	if err := n.unlockDataDir(); err != nil {
-		log.Println(err)
+		logging.Logger.Println(err)
 	}
 	close(n.stop)
 	return nil
@@ -101,12 +101,12 @@ func (n *Node) lockDataDir() error {
 	filelock := flock.NewFlock(filepath.Join(instDir, "LOCK"))
 	locked, err := filelock.TryLock()
 	if err != nil {
-		log.Println(err)
+		logging.Logger.Println(err)
 	}
 	if locked {
-		log.Println("locked")
+		logging.Logger.Println("locked")
 	} else {
-		log.Println("can not lock")
+		logging.Logger.Println("can not lock")
 		return errors.New("can not lock")
 	}
 	return nil
@@ -115,7 +115,7 @@ func (n *Node) lockDataDir() error {
 func (n *Node) unlockDataDir() error {
 	if n.filelock != nil {
 		if err := n.filelock.Unlock(); err != nil {
-			log.Println(err)
+			logging.Logger.Println(err)
 		}
 		n.filelock = nil
 	}
@@ -138,7 +138,7 @@ func (n *Node) startIPC() error {
 	os.Remove(endpoint)
 	listener, err := net.Listen("unix", endpoint)
 	if err != nil {
-		log.Println(err)
+		logging.Logger.Println(err)
 		return err
 	}
 
@@ -146,7 +146,7 @@ func (n *Node) startIPC() error {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.Println(err)
+				logging.Logger.Println(err)
 				continue
 			}
 			go handler.ServeConn(conn)
@@ -163,7 +163,7 @@ type Args struct {
 }
 
 func (js *JSService) Hello(args *Args, reply *string) error {
-	log.Println(args.S)
+	logging.Logger.Println(args.S)
 	*reply = args.S + "how are you"
 	return nil
 }
