@@ -40,7 +40,7 @@ func init() {
 
 func SetFileRotationHooker(path string, count uint) {
 	frHook := newFileRotateHooker(path, count)
-    Logger.Hooks.Add(frHook)
+	Logger.Hooks.Add(frHook)
 }
 
 func newFileRotateHooker(path string, count uint) logrus.Hook {

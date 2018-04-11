@@ -24,10 +24,10 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/node"
+	"github.com/yeeco/gyee/utils/logging"
 	"os"
 	"path/filepath"
 	"sort"
-	"github.com/yeeco/gyee/utils/logging"
 )
 
 var (

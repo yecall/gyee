@@ -21,10 +21,9 @@
 
 package common
 
-type Node interface {
 
+type Node interface {
 }
 
 type AccountManager interface {
-
 }

@@ -1,13 +1,13 @@
 package accounts
 
 import (
+	"bytes"
+	"crypto/elliptic"
+	"encoding/gob"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
-	"io/ioutil"
-	"encoding/gob"
-	"crypto/elliptic"
-	"bytes"
-	"fmt"
 )
 
 const keystoreFile = "keystore.dat"
@@ -16,8 +16,7 @@ type Accounts struct {
 	Accounts map[string]*Account
 }
 
-
-func AccountsManager() (*Accounts){
+func AccountsManager() *Accounts {
 	accounts := Accounts{}
 	accounts.Accounts = make(map[string]*Account)
 	err := accounts.LoadFromFile()
@@ -27,7 +26,7 @@ func AccountsManager() (*Accounts){
 	return &accounts
 }
 
-func (acc *Accounts)NewAccount() (*Account) {
+func (acc *Accounts) NewAccount() *Account {
 	account := NewAccount()
 	address := fmt.Sprintf("%s", account.GetAddress())
 	acc.Accounts[address] = account
@@ -35,11 +34,11 @@ func (acc *Accounts)NewAccount() (*Account) {
 	return account
 }
 
-func (acc *Accounts)GetAccount(address string) (*Account) {
+func (acc *Accounts) GetAccount(address string) *Account {
 	return acc.Accounts[address]
 }
 
-func (acc *Accounts)GetAddresses() []string {
+func (acc *Accounts) GetAddresses() []string {
 	var addresses []string
 	for address := range acc.Accounts {
 		addresses = append(addresses, address)
@@ -47,9 +46,9 @@ func (acc *Accounts)GetAddresses() []string {
 	return addresses
 }
 
-func (acc *Accounts)LoadFromFile() error {
-    if _, err := os.Stat(keystoreFile); os.IsNotExist(err) {
-    	return err
+func (acc *Accounts) LoadFromFile() error {
+	if _, err := os.Stat(keystoreFile); os.IsNotExist(err) {
+		return err
 	}
 
 	fileContent, err := ioutil.ReadFile(keystoreFile)
@@ -69,7 +68,7 @@ func (acc *Accounts)LoadFromFile() error {
 	return nil
 }
 
-func (acc *Accounts)SaveToFile() {
+func (acc *Accounts) SaveToFile() {
 	var content bytes.Buffer
 
 	gob.Register(elliptic.P256())

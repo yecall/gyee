@@ -4,10 +4,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"log"
 	"crypto/sha256"
-	"golang.org/x/crypto/ripemd160"
 	"github.com/mr-tron/base58/base58"
+	"golang.org/x/crypto/ripemd160"
+	"log"
 )
 
 const version = byte(0x00)
@@ -15,7 +15,7 @@ const addressChecksumLen = 4
 
 type Account struct {
 	PrivateKey ecdsa.PrivateKey
-	PublicKey []byte
+	PublicKey  []byte
 }
 
 func NewAccount() *Account {
@@ -35,13 +35,13 @@ func newKeyPair() (ecdsa.PrivateKey, []byte) {
 }
 
 func (a Account) GetAddress() []byte {
-    pubKeyHash := HashPubKey(a.PublicKey)
-    versionedPayload := append([]byte{version}, pubKeyHash...)
-    checksum := checksum(versionedPayload)
-    fullPayload := append(versionedPayload, checksum...)
-    address := base58.Encode(fullPayload)
+	pubKeyHash := HashPubKey(a.PublicKey)
+	versionedPayload := append([]byte{version}, pubKeyHash...)
+	checksum := checksum(versionedPayload)
+	fullPayload := append(versionedPayload, checksum...)
+	address := base58.Encode(fullPayload)
 
-    return []byte(address)
+	return []byte(address)
 }
 
 func HashPubKey(pubKey []byte) []byte {
@@ -56,7 +56,7 @@ func HashPubKey(pubKey []byte) []byte {
 	return publicRIPEMD160
 }
 
-func checksum(payload []byte) []byte{
+func checksum(payload []byte) []byte {
 	firstSHA := sha256.Sum256(payload)
 	secondSHA := sha256.Sum256(firstSHA[:])
 	return secondSHA[:addressChecksumLen]

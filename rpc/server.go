@@ -21,8 +21,8 @@
 package rpc
 
 import (
-	"google.golang.org/grpc"
 	"github.com/yeeco/gyee/rpc/pb"
+	"google.golang.org/grpc"
 )
 
 //rpc include services module such as admin, api, etc. and listen&accept on IPC, tcp, http-json with the different access right.
@@ -42,19 +42,18 @@ func NewServer() *Server {
 	rpc := grpc.NewServer()
 	srv := &Server{rpcServer: rpc}
 	admin := &AdminService{server: srv}
-    api := &APIService{server: srv}
-    rpcpb.RegisterAdminServiceServer(rpc, admin)
-    rpcpb.RegisterApiServiceServer(rpc, api)
+	api := &APIService{server: srv}
+	rpcpb.RegisterAdminServiceServer(rpc, admin)
+	rpcpb.RegisterApiServiceServer(rpc, api)
 
-    return srv
+	return srv
 }
-
 
 func (s *Server) Start() error {
 
-    return nil
+	return nil
 }
 
-func (s *Server)Stop() {
+func (s *Server) Stop() {
 
 }

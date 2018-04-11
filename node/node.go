@@ -24,6 +24,7 @@ import (
 	"errors"
 	"github.com/theckman/go-flock"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/utils/logging"
 	"net"
 	"net/rpc"
 	"os"
@@ -31,7 +32,6 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
-	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Node struct {
