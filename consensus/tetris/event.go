@@ -18,12 +18,31 @@
  *
  */
 
-package vbft
+package tetris
 
-type Vbft struct {
-	MembersID  map[string] int  //[address] -> id
-	MembersAddr map[int] string  //[id] -> address
+type EventBody struct {
+	H uint64 //Block Height
+	M uint  //MemberID
+	N uint64 //Sequence Number, M和N唯一决定一个Event
+	T int64 //Timestamps, 用unixNano时间, 一秒等于10的9次方nano，只能表示到1678-2262年
+    Tx [][]byte //Transactions List
+    E [][]byte //Parents Events, 0 for self parent
+    F [][]byte //Fork Events, as Invalid
+}
+
+type Event struct {
+    Body EventBody
+    Hash [][]byte
+    Signature string
 
 }
 
+func NewEvent() Event {
+	body := EventBody{
 
+	}
+
+	return Event{
+		Body: body,
+	}
+}
