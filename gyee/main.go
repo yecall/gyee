@@ -19,6 +19,11 @@
  */
 
 package main
+/*
+1. 命令行及参数处理
+2. 创建节点并启动
+3. console，寻找已启动节点，ipc连接打开admin console
+ */
 
 import (
 	"github.com/urfave/cli"
@@ -69,7 +74,10 @@ func main() {
 func gyee(ctx *cli.Context) error {
 	//start the node
 	config := config.GetConfig(ctx)
-	nd, _ := node.New(config)
+	nd, err := node.New(config)
+	if err != nil {
+		logging.Logger.Fatal(err)
+	}
 	nd.Start()
 
 	return nil

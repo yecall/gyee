@@ -19,6 +19,22 @@
  */
 
 package node
+/*
+   节点主要功能
+   第一次启动的话，初始化node：生成node id，
+   启停p2p
+   启停core，控制core的状态
+   启停rpc接口，http json api
+   启停console ipc接口， js解释器
+
+1. 不同节点以datadir来区分，缺省./Library/YeeChain (Mac OS)
+   datadir下存放：链数据，文件锁，keystore，node id，ipc通道文件等
+2. 启动时，如果节点还没有创建，创建一个node id，
+3. 启动core，core加载本地数据，如果本地没有数据，创建创始块
+4. 启动p2p，进入区块同步状态
+5. 启动rpc， ipc接口
+
+ */
 
 import (
 	"errors"
@@ -32,10 +48,14 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"github.com/yeeco/gyee/core"
 )
 
 type Node struct {
 	config      *config.Config
+	core        *core.Core
+
+
 	lock        sync.RWMutex
 	filelock    *flock.Flock
 	stop        chan struct{}
@@ -47,13 +67,18 @@ func New(conf *config.Config) (*Node, error) {
 		absdatadir, err := filepath.Abs(conf.DataDir)
 		if err != nil {
 			logging.Logger.Panic(err)
-			return nil, err
 		}
 		conf.DataDir = absdatadir
 	}
 
+	ncore, err := core.NewCore()
+	if err != nil {
+		logging.Logger.Panic(err)
+	}
+
 	return &Node{
 		config: conf,
+		core: ncore,
 	}, nil
 }
 
@@ -63,6 +88,8 @@ func (n *Node) Start() error {
 		logging.Logger.Println(err)
 		return err
 	}
+
+	n.core.Start()
 
 	n.startIPC()
 
@@ -84,6 +111,8 @@ func (n *Node) Start() error {
 func (n *Node) Stop() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
+
+	n.core.Stop()
 
 	if err := n.unlockDataDir(); err != nil {
 		logging.Logger.Println(err)

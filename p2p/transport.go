@@ -18,49 +18,14 @@
  *
  */
 
-package core
+package p2p
 /*
-   blockchain的主要内容
-   创世块
-   数据同步
-   交易验证
-   block验证，blockchain维护
-   db管理
-   state？
-   VM
-
-1. 创建的时候，如果本地没有数据，先创建创世块
-2. 启动先进入同步状态，同步区块高度
-3. 进入到正常状态后，收取区块数据及验证
-4. 如果开启了挖矿：
-   如果进入到candidate状态，需要同步上一个state及之后所有的区块内容。
-   如果进入到validator状态，开启tetris
-5.
+   写一个内存测试版
+   一个tcp版，直接连接
+   一个全网广播版
+   一个dht版，匿名连接, tor或者garlic routing
 
  */
-import (
-	"github.com/yeeco/gyee/consensus/tetris"
-)
+type Transport interface {
 
-type Core struct {
-	tetris  *tetris.Tetris
-}
-
-func NewCore() (*Core, error) {
-
-	core := Core{
-
-	}
-
-	return &core, nil
-}
-
-func (c *Core) Start() error {
-
-	return nil
-}
-
-func (c *Core) Stop() error {
-
-	return nil
 }
