@@ -83,7 +83,10 @@ import (
 	"github.com/yeeco/gyee/utils"
 )
 
+
 type Tetris struct {
+	core ICore
+
 	H uint64 //Current Block Height
 	M uint  //My MemberID
 	N uint64 //Current Sequence Number for processing
@@ -96,6 +99,8 @@ type Tetris struct {
 
     UnsettledEvents map[string] string  //Events with their parents has not arrived
 
+	OutputCh chan ConsensusOutput
+
     superMajority  int
     maxTxPerEvent  int
     minTxPerEvent  int
@@ -103,10 +108,10 @@ type Tetris struct {
     minPeriodForEvent  int
 }
 
-func NewTetris() (*Tetris, error) {
+func NewTetris(core ICore) (*Tetris, error) {
 
 	tetris := Tetris{
-
+        core: core,
 	}
 
 	return &tetris, nil

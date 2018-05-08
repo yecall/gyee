@@ -19,6 +19,7 @@
  */
 
 package node
+
 /*
    节点主要功能
    第一次启动的话，初始化node：生成node id，
@@ -26,7 +27,7 @@ package node
    启停core，控制core的状态
    启停rpc接口，http json api
    启停console ipc接口， js解释器
-
+   node的状态：启动，同步区块，各类服务状态，账户状态：候选，validator
 1. 不同节点以datadir来区分，缺省./Library/YeeChain (Mac OS)
    datadir下存放：链数据，文件锁，keystore，node id，ipc通道文件等
 2. 启动时，如果节点还没有创建，创建一个node id，
@@ -34,12 +35,13 @@ package node
 4. 启动p2p，进入区块同步状态
 5. 启动rpc， ipc接口
 
- */
+*/
 
 import (
 	"errors"
 	"github.com/theckman/go-flock"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/utils/logging"
 	"net"
 	"net/rpc"
@@ -48,13 +50,11 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
-	"github.com/yeeco/gyee/core"
 )
 
 type Node struct {
-	config      *config.Config
-	core        *core.Core
-
+	config *config.Config
+	core   *core.Core
 
 	lock        sync.RWMutex
 	filelock    *flock.Flock
@@ -71,15 +71,16 @@ func New(conf *config.Config) (*Node, error) {
 		conf.DataDir = absdatadir
 	}
 
-	ncore, err := core.NewCore()
+	node := &Node{
+		config: conf,
+	}
+	core, err := core.NewCore(node, conf)
 	if err != nil {
 		logging.Logger.Panic(err)
 	}
 
-	return &Node{
-		config: conf,
-		core: ncore,
-	}, nil
+	node.core = core
+	return node, nil
 }
 
 func (n *Node) Start() error {
@@ -88,6 +89,8 @@ func (n *Node) Start() error {
 		logging.Logger.Println(err)
 		return err
 	}
+
+	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
 
 	n.core.Start()
 

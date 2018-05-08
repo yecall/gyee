@@ -19,6 +19,7 @@
  */
 
 package core
+
 /*
    blockchain的主要内容
    创世块
@@ -37,26 +38,42 @@ package core
    如果进入到validator状态，开启tetris
 5.
 
- */
+*/
 import (
+	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus/tetris"
 )
 
 type Core struct {
-	tetris  *tetris.Tetris
+	node  INode
+	config *config.Config
+	tetris *tetris.Tetris
+	tetrisOutputCh chan tetris.ConsensusOutput
 }
 
-func NewCore() (*Core, error) {
+func NewCore(node INode, conf *config.Config) (*Core, error) {
 
-	core := Core{
-
+    core := Core{
+    	node: node,
+    	config: conf,
 	}
 
 	return &core, nil
 }
 
 func (c *Core) Start() error {
+    //
 
+    //如果开启挖矿
+    if true {
+		tetris, err := tetris.NewTetris(c)
+		if err != nil {
+			return err
+		}
+		c.tetris = tetris
+		c.tetrisOutputCh = tetris.OutputCh
+
+	}
 	return nil
 }
 
