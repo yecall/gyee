@@ -18,8 +18,8 @@
  *
  */
 
-package core
+package persistent
 
-type BlockChain struct {
-	chainID uint32
+type Storage interface {
+
 }

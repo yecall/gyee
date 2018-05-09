@@ -42,31 +42,35 @@ package core
 import (
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus/tetris"
+	"github.com/yeeco/gyee/persistent"
+	"github.com/yeeco/gyee/core/yvm"
 )
 
 type Core struct {
-	node  INode
-	config *config.Config
-	tetris *tetris.Tetris
+	node           INode
+	config         *config.Config
+	tetris         *tetris.Tetris
 	tetrisOutputCh chan tetris.ConsensusOutput
-
+	storage        persistent.Storage
+	blockChain     *BlockChain
+	yvm            yvm.YVM
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
 
-    core := Core{
-    	node: node,
-    	config: conf,
+	core := Core{
+		node:   node,
+		config: conf,
 	}
 
 	return &core, nil
 }
 
 func (c *Core) Start() error {
-    //
+	//
 
-    //如果开启挖矿
-    if true {
+	//如果开启挖矿
+	if true {
 		tetris, err := tetris.NewTetris(c)
 		if err != nil {
 			return err
@@ -82,3 +86,5 @@ func (c *Core) Stop() error {
 
 	return nil
 }
+
+// implements of interface

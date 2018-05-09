@@ -18,8 +18,10 @@
  *
  */
 
-package core
+package rpc
 
-type BlockChain struct {
-	chainID uint32
+type RPCServer interface {
+	Start() error
+	Stop()
 }
+

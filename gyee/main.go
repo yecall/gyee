@@ -44,7 +44,7 @@ func init() {
 	app.Author = ""
 	app.Email = ""
 	app.Version = ""
-	app.Usage = "the gyee command line interface"
+	app.Usage = "The gyee command line interface"
 	app.HideVersion = true
 	app.Copyright = "Copyright 2017-2018 The gyee Authors"
 	app.Flags = []cli.Flag{

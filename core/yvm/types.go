@@ -18,8 +18,8 @@
  *
  */
 
-package core
+package yvm
 
-type BlockChain struct {
-	chainID uint32
+type YVM interface {
+
 }

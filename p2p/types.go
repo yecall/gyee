@@ -18,8 +18,10 @@
  *
  */
 
-package core
+package p2p
 
-type BlockChain struct {
-	chainID uint32
+type Service interface {
+	Start() error
+	Stop()
+
 }

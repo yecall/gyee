@@ -18,8 +18,8 @@
  *
  */
 
-package core
+package accounts
 
-type BlockChain struct {
-	chainID uint32
+type Manager struct {
+	Accounts map[string]*Account
 }

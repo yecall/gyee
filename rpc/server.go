@@ -29,10 +29,7 @@ import (
 //Admin service can only access via IPC on console, admin can config the access right of other services.
 //All the service function related to other YeeChain modules, using Yeelet to organize.
 
-type GRPCServer interface {
-	Start() error
-	Stop()
-}
+
 
 type Server struct {
 	rpcServer *grpc.Server
