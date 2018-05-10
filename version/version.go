@@ -18,19 +18,40 @@
  *
  */
 
-package rpc
+package version
 
 import (
-	"context"
-
-	"github.com/yeeco/gyee/rpc/pb"
+	"fmt"
+	"runtime"
+	"os"
 )
 
-type APIService struct {
-	server RPCServer
+const Maj = "0"
+const Min = "0"
+const Fix = "1"
+
+var (
+	// The full version string
+	Version = "0.0.1"
+
+	// GitCommit is set with --ldflags "-X main.gitCommit=$(git rev-parse HEAD)"
+	GitCommit string
+)
+
+func init() {
+	if GitCommit != "" {
+		Version += "-" + GitCommit[:8]
+	}
 }
 
-func (s *APIService) NodeInfo(ctx context.Context, req *rpcpb.NonParamsRequest) (*rpcpb.NodeInfoResponse, error) {
-
-	return &rpcpb.NodeInfoResponse{Id: "123", Version: 1}, nil
+func PrintVersion() {
+	fmt.Println("Version:", Version)
+	if GitCommit != "" {
+		fmt.Println("Git Commit:", GitCommit)
+	}
+	//fmt.Println("Network Id:", c.GlobalInt(utils.NetworkIdFlag.Name))
+	fmt.Println("Go Version:", runtime.Version())
+	fmt.Println("OS:", runtime.GOOS)
+	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
+	fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
 }

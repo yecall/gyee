@@ -33,6 +33,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"github.com/yeeco/gyee/version"
+	"runtime"
 )
 
 var (
@@ -43,7 +45,7 @@ func init() {
 	app.Name = filepath.Base(os.Args[0])
 	app.Author = ""
 	app.Email = ""
-	app.Version = ""
+	app.Version = version.Version
 	app.Usage = "The gyee command line interface"
 	app.HideVersion = true
 	app.Copyright = "Copyright 2017-2018 The gyee Authors"
@@ -65,6 +67,8 @@ func init() {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	if err := app.Run(os.Args); err != nil {
 		logging.Logger.Fatal(err)
 	}
@@ -72,13 +76,13 @@ func main() {
 
 //gyee is the main entry point
 func gyee(ctx *cli.Context) error {
-	//start the node
+	//create and start the node
 	config := config.GetConfig(ctx)
-	nd, err := node.New(config)
+	node, err := node.New(config)
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}
-	nd.Start()
+	node.Start()
 
 	return nil
 }

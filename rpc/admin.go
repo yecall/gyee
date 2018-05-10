@@ -27,7 +27,7 @@ import (
 )
 
 type AdminService struct {
-	server GRPCServer
+	server RPCServer
 }
 
 func (s *AdminService) NewAccount(ctx context.Context, req *rpcpb.NewAccountRequest) (*rpcpb.NewAccountResponse, error) {
