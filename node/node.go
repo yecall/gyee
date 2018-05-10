@@ -40,8 +40,11 @@ package node
 import (
 	"errors"
 	"github.com/theckman/go-flock"
+	"github.com/yeeco/gyee/accounts"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/p2p"
+	grpc "github.com/yeeco/gyee/rpc"
 	"github.com/yeeco/gyee/utils/logging"
 	"net"
 	"net/rpc"
@@ -50,17 +53,14 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
-	"github.com/yeeco/gyee/accounts"
-	"github.com/yeeco/gyee/p2p"
-	grpc "github.com/yeeco/gyee/rpc"
 )
 
 type Node struct {
-	config *config.Config
-	core   *core.Core
+	config         *config.Config
+	core           *core.Core
 	accountManager *accounts.Manager
-	p2p    p2p.Service
-	rpc    grpc.RPCServer
+	p2p            p2p.Service
+	rpc            grpc.RPCServer
 
 	lock        sync.RWMutex
 	filelock    *flock.Flock

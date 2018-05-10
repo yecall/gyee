@@ -38,6 +38,13 @@
 			"tree": true
 		},
 		{
+			"checksumSHA1": "V0TGIpD87Ykl5sSLiaVhA5FG2XA=",
+			"path": "github.com/syndtr/goleveldb",
+			"revision": "c7a14d4b00e222eab6111b4cd1af829c13f53ec2",
+			"revisionTime": "2018-02-28T04:01:45Z",
+			"tree": true
+		},
+		{
 			"checksumSHA1": "tSqudW9OyE/9woHLxDJ0+Gvvao4=",
 			"path": "github.com/theckman/go-flock",
 			"revision": "b139a2487364247d91814e4a7c7b8fdc69e342b2",

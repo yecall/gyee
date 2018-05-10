@@ -20,6 +20,17 @@
 
 package persistent
 
-type Storage interface {
+import "errors"
 
+var (
+	ErrKeyNotFound = errors.New("not found")
+)
+
+type Storage interface {
+	Get(key []byte) ([]byte, error)
+	Put(key []byte, value []byte) error
+	Del(key []byte) error
+	EnableBatch()
+	DisableBatch()
+	Flush() error
 }
