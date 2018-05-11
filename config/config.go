@@ -22,14 +22,15 @@ package config
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
-	"github.com/yeeco/gyee/utils"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"io/ioutil"
-	"github.com/sirupsen/logrus"
+
+	"github.com/BurntSushi/toml"
+	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/utils"
+	"github.com/yeeco/gyee/res"
 )
 
 type Config struct {
@@ -81,12 +82,32 @@ var DefaultConfig = Config{
 }
 
 func GetConfig(ctx *cli.Context) *Config {
-	config := DefaultConfig
+	//config := DefaultConfig
+	config := GetDefaultConfig()
 	//TODO: 这个地方如果Flag用了datadir，d形式的alternate，貌似都找不到
 	if ctx.GlobalIsSet(DataDirFlag.Name) {
 		config.DataDir = ctx.GlobalString(DataDirFlag.Name)
 	}
 	fmt.Println(config.DataDir)
+	fmt.Println(config.Name)
+	fmt.Println(config.Rpc.IpcPath)
+	return config
+}
+
+func GetDefaultConfig() *Config {
+	var config Config
+	config.DataDir = utils.DefaultDataDir()
+
+	cdata, err := res.Asset("config/config.toml")
+	if err != nil {
+		// Asset was not found.
+	}
+
+	if _, err := toml.Decode(string(cdata), &config); err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
 	return &config
 }
 
@@ -116,4 +137,5 @@ func CreateDefaultConfigFile(filename string) {
 	//if err := ioutil.WriteFile(filename, []byte(defaultConfig()), 0644); err != nil {
 	//
 	//}
+
 }
