@@ -19,22 +19,18 @@
  */
 
 package main
-/*
-1. 命令行及参数处理
-2. 创建节点并启动
-3. console，寻找已启动节点，ipc连接打开admin console
- */
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/utils/logging"
-	"os"
-	"path/filepath"
-	"sort"
 	"github.com/yeeco/gyee/version"
-	"runtime"
 )
 
 var (
@@ -83,6 +79,6 @@ func gyee(ctx *cli.Context) error {
 		logging.Logger.Fatal(err)
 	}
 	node.Start()
-    node.WaitForShutdown()
+	node.WaitForShutdown()
 	return nil
 }
