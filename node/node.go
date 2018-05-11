@@ -91,6 +91,7 @@ func New(conf *config.Config) (*Node, error) {
 
 func (n *Node) Start() error {
 	n.lock.Lock()
+	defer n.lock.Unlock()
 	if err := n.lockDataDir(); err != nil {
 		logging.Logger.Println(err)
 		return err
@@ -102,18 +103,6 @@ func (n *Node) Start() error {
 
 	n.startIPC()
 
-	go func() {
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(sigc)
-		<-sigc
-		logging.Logger.Println("Got interrupt, shutting down...")
-		go n.Stop()
-	}()
-
-	n.stop = make(chan struct{})
-	n.lock.Unlock()
-	<-n.stop
 	return nil
 }
 
@@ -127,6 +116,24 @@ func (n *Node) Stop() error {
 		logging.Logger.Println(err)
 	}
 	close(n.stop)
+	return nil
+}
+
+func (n* Node) WaitForShutdown() error {
+	n.lock.Lock()
+	n.stop = make(chan struct{})
+	n.lock.Unlock()
+
+	go func() {
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(sigc)
+		<-sigc
+		logging.Logger.Println("Got interrupt, shutting down...")
+		go n.Stop()
+	}()
+
+	<-n.stop
 	return nil
 }
 

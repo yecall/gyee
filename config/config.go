@@ -28,6 +28,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"io/ioutil"
+	"github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -108,4 +110,10 @@ func (c *Config) IPCEndpoint() string {
 		return filepath.Join(c.DataDir, c.Rpc.IpcPath)
 	}
 	return c.Rpc.IpcPath
+}
+
+func CreateDefaultConfigFile(filename string) {
+	//if err := ioutil.WriteFile(filename, []byte(defaultConfig()), 0644); err != nil {
+	//
+	//}
 }

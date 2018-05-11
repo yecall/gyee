@@ -18,33 +18,4 @@
  *
  */
 
-package config
-
-import (
-	"github.com/urfave/cli"
-	"github.com/yeeco/gyee/utils"
-)
-
-var (
-	TestnetFlag = cli.BoolFlag{
-		Name:  "testnet, t",
-		Usage: "test network: pre-configured proof-of-work test network",
-	}
-
-	DataDirFlag = cli.StringFlag{
-		Name:  "datadir",
-		Usage: "gyee data directory",
-		Value: utils.DefaultDataDir(),
-	}
-)
-
-func MergeFlags(action func(ctx *cli.Context) error) func(*cli.Context) error {
-	return func(ctx *cli.Context) error {
-		for _, name := range ctx.FlagNames() {
-			if ctx.IsSet(name) {
-				ctx.GlobalSet(name, ctx.String(name))
-			}
-		}
-		return action(ctx)
-	}
-}
+package main

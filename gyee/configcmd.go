@@ -18,33 +18,43 @@
  *
  */
 
-package config
+package main
 
 import (
+	"fmt"
+
 	"github.com/urfave/cli"
-	"github.com/yeeco/gyee/utils"
+	"github.com/yeeco/gyee/config"
 )
 
 var (
-	TestnetFlag = cli.BoolFlag{
-		Name:  "testnet, t",
-		Usage: "test network: pre-configured proof-of-work test network",
-	}
+	configCommand = cli.Command{
+		Name:     "config",
+		Usage:    "Manage config",
+		Category: "CONFIG COMMANDS",
+		Description: `
+Manage gyee config, generate a default config file.`,
 
-	DataDirFlag = cli.StringFlag{
-		Name:  "datadir",
-		Usage: "gyee data directory",
-		Value: utils.DefaultDataDir(),
+		Subcommands: []cli.Command{
+			{
+				Name:      "new",
+				Usage:     "Generate a default config file",
+				Action:    config.MergeFlags(createDefaultConfig),
+				ArgsUsage: "<filename>",
+				Description: `
+Generate a a default config file.`,
+			},
+		},
 	}
 )
 
-func MergeFlags(action func(ctx *cli.Context) error) func(*cli.Context) error {
-	return func(ctx *cli.Context) error {
-		for _, name := range ctx.FlagNames() {
-			if ctx.IsSet(name) {
-				ctx.GlobalSet(name, ctx.String(name))
-			}
-		}
-		return action(ctx)
+func createDefaultConfig(ctx *cli.Context) error {
+	fileName := ctx.Args().First()
+	if len(fileName) == 0 {
+		fmt.Println("please give a config file arg!!!")
+		return nil
 	}
+	config.CreateDefaultConfigFile(fileName)
+	fmt.Printf("create default config %s\n", fileName)
+	return nil
 }
