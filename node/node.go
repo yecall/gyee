@@ -39,13 +39,6 @@ package node
 
 import (
 	"errors"
-	"github.com/theckman/go-flock"
-	"github.com/yeeco/gyee/accounts"
-	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/core"
-	"github.com/yeeco/gyee/p2p"
-	grpc "github.com/yeeco/gyee/rpc"
-	"github.com/yeeco/gyee/utils/logging"
 	"net"
 	"net/rpc"
 	"os"
@@ -53,6 +46,14 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+
+	"github.com/theckman/go-flock"
+	"github.com/yeeco/gyee/accounts"
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/p2p"
+	grpc "github.com/yeeco/gyee/rpc"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Node struct {
@@ -119,7 +120,7 @@ func (n *Node) Stop() error {
 	return nil
 }
 
-func (n* Node) WaitForShutdown() error {
+func (n *Node) WaitForShutdown() error {
 	n.lock.Lock()
 	n.stop = make(chan struct{})
 	n.lock.Unlock()

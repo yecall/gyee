@@ -21,3 +21,6 @@ test/
 
 # doc dir
 doc/
+
+# the core consensus package will open source after finished
+consensus/tetris
