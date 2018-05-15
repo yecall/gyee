@@ -21,5 +21,5 @@
 package core
 
 type INode interface {
-
+    NodeID() string
 }

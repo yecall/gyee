@@ -202,6 +202,11 @@ func (n *Node) startIPC() error {
 	return nil
 }
 
+//get the node id of self
+func (n *Node) NodeID() string{
+	return "aaaa"
+}
+
 //TODO:for test, remove later
 type JSService int
 type Args struct {

@@ -1,3 +1,3 @@
 # Consensus
 
-The core consensus package will open source after finished
+The core consensus package will be open sourced after finished

@@ -54,37 +54,60 @@ type Core struct {
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
+	quitCh         chan int
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
 
-	core := Core{
+	core := &Core{
 		node:   node,
 		config: conf,
+		quitCh: make(chan int, 1),
 	}
+	bc, err := NewBlockChain(core)
+	if err != nil {
 
-	return &core, nil
+	}
+	core.blockChain = bc
+
+	return core, nil
 }
 
 func (c *Core) Start() error {
 	//
 
+    c.blockChain.Start()
+
 	//如果开启挖矿
 	if true {
-		tetris, err := tetris.NewTetris(c)
+		members := c.blockChain.GetValidators()
+		blockHeight := c.blockChain.CurrentBlockHeight()
+		mid := c.node.NodeID()
+		tetris, err := tetris.NewTetris(c, members, blockHeight, mid)
 		if err != nil {
 			return err
 		}
 		c.tetris = tetris
 		c.tetrisOutputCh = tetris.OutputCh
-
+		go c.loop()
 	}
 	return nil
 }
 
 func (c *Core) Stop() error {
-
+	c.blockChain.Stop()
+    c.quitCh <- 0
 	return nil
 }
 
+func (c *Core) loop() {
+	for {
+		select {
+		case <- c.quitCh:
+			return
+		case <- c.tetrisOutputCh:
+
+		}
+	}
+}
 // implements of interface

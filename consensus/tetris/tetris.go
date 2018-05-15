@@ -92,7 +92,7 @@ type Tetris struct {
 	N uint64 //Current Sequence Number for processing
 	LN uint64  //Latest Sequence Number of Event
 
-	MembersID  map[string] int  //[address] -> id
+	MembersID  map[string] uint  //[address] -> id
 	MembersAddr map[int] string  //[id] -> address
     MemberEvents []list.List
     EventCache  *utils.LRU
@@ -108,11 +108,18 @@ type Tetris struct {
     minPeriodForEvent  int
 }
 
-func NewTetris(core ICore) (*Tetris, error) {
+func NewTetris(core ICore, members map[string] uint, blockHeight uint64, mid string) (*Tetris, error) {
 
 	tetris := Tetris{
         core: core,
+        MembersID: members,
+        H: blockHeight,
+        M: members[mid],
+        N: blockHeight,
+        LN: blockHeight,
+        OutputCh: make(chan ConsensusOutput, 1),
 	}
+
 
 	return &tetris, nil
 }

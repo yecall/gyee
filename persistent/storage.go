@@ -18,42 +18,21 @@
  *
  */
 
-package core
+package persistent
 
-type BlockChain struct {
-	core *Core
-	chainID uint32
-	genesis  *Block
+import "errors"
 
+var (
+	ErrKeyNotFound = errors.New("not found")
+)
+
+type Storage interface {
+	Get(key []byte) ([]byte, error)
+	Put(key []byte, value []byte) error
+	Del(key []byte) error
+	EnableBatch()
+	DisableBatch()
+	Flush() error
+	Close() error
 }
 
-func NewBlockChain(core *Core) (*BlockChain, error) {
-	bc := &BlockChain{
-		core: core,
-		chainID:0,
-	}
-	return bc, nil
-}
-
-func (b *BlockChain) Start() {
-
-}
-
-func (b *BlockChain) Stop() {
-
-}
-
-func (b *BlockChain) CurrentBlockHeight() uint64 {
-	return 0
-}
-
-func (b *BlockChain) GetValidators() map[string] uint {
-	//从state取
-	//测试先取一个固定的
-	return  map[string] uint{
-		"aaaa":1,
-		"bbbb":2,
-		"cccc":3,
-		"dddd":4,
-	}
-}

@@ -18,42 +18,25 @@
  *
  */
 
-package core
+package crypto
 
-type BlockChain struct {
-	core *Core
-	chainID uint32
-	genesis  *Block
+import (
+	"bytes"
+	"encoding/hex"
 
+	"github.com/mr-tron/base58/base58"
+)
+
+type Hash []byte
+
+func (h Hash) Hex() string {
+	return hex.EncodeToString(h)
 }
 
-func NewBlockChain(core *Core) (*BlockChain, error) {
-	bc := &BlockChain{
-		core: core,
-		chainID:0,
-	}
-	return bc, nil
+func (h Hash) Base58() string {
+	return base58.Encode(h)
 }
 
-func (b *BlockChain) Start() {
-
-}
-
-func (b *BlockChain) Stop() {
-
-}
-
-func (b *BlockChain) CurrentBlockHeight() uint64 {
-	return 0
-}
-
-func (b *BlockChain) GetValidators() map[string] uint {
-	//从state取
-	//测试先取一个固定的
-	return  map[string] uint{
-		"aaaa":1,
-		"bbbb":2,
-		"cccc":3,
-		"dddd":4,
-	}
+func (h Hash) Equals(b Hash) bool {
+	return bytes.Compare(h, b) == 0
 }
