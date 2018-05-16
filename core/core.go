@@ -40,10 +40,13 @@ package core
 
 */
 import (
+	"sync"
+
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus/tetris"
 	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/core/yvm"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Core struct {
@@ -54,15 +57,16 @@ type Core struct {
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
-	quitCh         chan int
+	lock           sync.RWMutex
+	quitCh         chan struct{}
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
-
+    logging.Logger.Info("Create new core")
 	core := &Core{
 		node:   node,
 		config: conf,
-		quitCh: make(chan int, 1),
+		quitCh: make(chan struct{}),
 	}
 	bc, err := NewBlockChain(core)
 	if err != nil {
@@ -75,7 +79,7 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 
 func (c *Core) Start() error {
 	//
-
+    logging.Logger.Info("Core Start...")
     c.blockChain.Start()
 
 	//如果开启挖矿
@@ -89,18 +93,22 @@ func (c *Core) Start() error {
 		}
 		c.tetris = tetris
 		c.tetrisOutputCh = tetris.OutputCh
+		c.tetris.Start()
 		go c.loop()
 	}
 	return nil
 }
 
 func (c *Core) Stop() error {
+	logging.Logger.Info("Core Stop...")
+	c.tetris.Stop()
 	c.blockChain.Stop()
-    c.quitCh <- 0
+	close(c.quitCh)
 	return nil
 }
 
 func (c *Core) loop() {
+	logging.Logger.Info("Core loop...")
 	for {
 		select {
 		case <- c.quitCh:

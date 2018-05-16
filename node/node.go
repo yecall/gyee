@@ -70,6 +70,7 @@ type Node struct {
 }
 
 func New(conf *config.Config) (*Node, error) {
+	logging.Logger.Info("Create new node")
 	if conf.DataDir != "" {
 		absdatadir, err := filepath.Abs(conf.DataDir)
 		if err != nil {
@@ -93,6 +94,7 @@ func New(conf *config.Config) (*Node, error) {
 func (n *Node) Start() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
+	logging.Logger.Info("Node Start...")
 	if err := n.lockDataDir(); err != nil {
 		logging.Logger.Println(err)
 		return err
@@ -110,7 +112,7 @@ func (n *Node) Start() error {
 func (n *Node) Stop() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-
+	logging.Logger.Info("Node Stop...")
 	n.core.Stop()
 
 	if err := n.unlockDataDir(); err != nil {
@@ -124,7 +126,7 @@ func (n *Node) WaitForShutdown() error {
 	n.lock.Lock()
 	n.stop = make(chan struct{})
 	n.lock.Unlock()
-
+    logging.Logger.Info("Node Wait for shutdown...")
 	go func() {
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
@@ -150,10 +152,10 @@ func (n *Node) lockDataDir() error {
 		logging.Logger.Println(err)
 	}
 	if locked {
-		logging.Logger.Println("locked")
+		logging.Logger.Println("filelock locked")
 	} else {
-		logging.Logger.Println("can not lock")
-		return errors.New("can not lock")
+		logging.Logger.Println("filelock can not lock")
+		return errors.New("filelock can not lock")
 	}
 	return nil
 }

@@ -20,6 +20,8 @@
 
 package core
 
+import "github.com/yeeco/gyee/utils/logging"
+
 type BlockChain struct {
 	core *Core
 	chainID uint32
@@ -28,6 +30,7 @@ type BlockChain struct {
 }
 
 func NewBlockChain(core *Core) (*BlockChain, error) {
+	logging.Logger.Info("Create New Blockchain")
 	bc := &BlockChain{
 		core: core,
 		chainID:0,
@@ -36,11 +39,11 @@ func NewBlockChain(core *Core) (*BlockChain, error) {
 }
 
 func (b *BlockChain) Start() {
-
+    logging.Logger.Info("BlockChain Start...")
 }
 
 func (b *BlockChain) Stop() {
-
+    logging.Logger.Info("BlockChain Stop...")
 }
 
 func (b *BlockChain) CurrentBlockHeight() uint64 {
