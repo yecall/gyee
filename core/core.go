@@ -59,6 +59,7 @@ type Core struct {
 	yvm            yvm.YVM
 	lock           sync.RWMutex
 	quitCh         chan struct{}
+	wg             sync.WaitGroup
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
@@ -78,7 +79,8 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 }
 
 func (c *Core) Start() error {
-	//
+	c.lock.Lock()
+	defer c.lock.Unlock()
     logging.Logger.Info("Core Start...")
     c.blockChain.Start()
 
@@ -100,18 +102,25 @@ func (c *Core) Start() error {
 }
 
 func (c *Core) Stop() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	logging.Logger.Info("Core Stop...")
 	c.tetris.Stop()
 	c.blockChain.Stop()
+	//c.quitCh <- struct{}{}
 	close(c.quitCh)
+	c.wg.Wait()
 	return nil
 }
 
 func (c *Core) loop() {
+	c.wg.Add(1)
+	defer c.wg.Done()
 	logging.Logger.Info("Core loop...")
 	for {
 		select {
 		case <- c.quitCh:
+			logging.Logger.Info("Core loop end.")
 			return
 		case <- c.tetrisOutputCh:
 

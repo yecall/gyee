@@ -132,7 +132,7 @@ func (n *Node) WaitForShutdown() error {
 		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigc)
 		<-sigc
-		logging.Logger.Println("Got interrupt, shutting down...")
+		logging.Logger.Info("Got interrupt, shutting down...")
 		go n.Stop()
 	}()
 
