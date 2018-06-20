@@ -3,6 +3,13 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "D/+LVrC6OTE6gcR4esZlYiO6B+0=",
+			"path": "github.com/BurntSushi/toml",
+			"revision": "a368813c5e648fee92e5f6c30e3944ff9d5e8895",
+			"revisionTime": "2017-06-26T11:06:00Z",
+			"tree": true
+		},
+		{
 			"checksumSHA1": "Pl3umuMJV7AMpfIwohduGJO49R4=",
 			"path": "github.com/lestrrat-go/file-rotatelogs",
 			"revision": "31912ebef06aac4686da7aea6c11cdf430285a0f",
@@ -49,6 +56,13 @@
 			"path": "github.com/theckman/go-flock",
 			"revision": "b139a2487364247d91814e4a7c7b8fdc69e342b2",
 			"revisionTime": "2018-01-24T01:19:07Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "j54meZeo6unAe79SA9U5Q+uT2Ag=",
+			"path": "github.com/urfave/cli",
+			"revision": "8e01ec4cd3e2d84ab2fe90d8210528ffbb06d8ff",
+			"revisionTime": "2018-02-26T03:02:53Z",
 			"tree": true
 		}
 	],
