@@ -20,43 +20,72 @@
 
 package core
 
-import "github.com/yeeco/gyee/utils/logging"
+import (
+	"sync"
+
+	"github.com/yeeco/gyee/utils/logging"
+)
 
 type BlockChain struct {
-	core *Core
+	core    *Core
 	chainID uint32
-	genesis  *Block
+	genesis *Block
 
+	lock   sync.RWMutex
+	quitCh chan struct{}
+	wg     sync.WaitGroup
 }
 
 func NewBlockChain(core *Core) (*BlockChain, error) {
 	logging.Logger.Info("Create New Blockchain")
 	bc := &BlockChain{
-		core: core,
-		chainID:0,
+		core:    core,
+		chainID: 0,
+		quitCh: make(chan struct{}),
 	}
 	return bc, nil
 }
 
 func (b *BlockChain) Start() {
-    logging.Logger.Info("BlockChain Start...")
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	logging.Logger.Info("BlockChain Start...")
+	go b.loop()
 }
 
 func (b *BlockChain) Stop() {
-    logging.Logger.Info("BlockChain Stop...")
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	logging.Logger.Info("BlockChain Stop...")
+	close(b.quitCh)
+	b.wg.Wait()
+}
+
+func (b *BlockChain) loop() {
+	logging.Logger.Info("BlockChain loop...")
+	b.wg.Add(1)
+	defer b.wg.Done()
+
+	for {
+		select {
+		case <-b.quitCh:
+			logging.Logger.Info("BlockChain loop end.")
+			return
+		}
+	}
 }
 
 func (b *BlockChain) CurrentBlockHeight() uint64 {
 	return 0
 }
 
-func (b *BlockChain) GetValidators() map[string] uint {
+func (b *BlockChain) GetValidators() map[string]uint {
 	//从state取
 	//测试先取一个固定的
-	return  map[string] uint{
-		"aaaa":1,
-		"bbbb":2,
-		"cccc":3,
-		"dddd":4,
+	return map[string]uint{
+		"aaaa": 1,
+		"bbbb": 2,
+		"cccc": 3,
+		"dddd": 4,
 	}
 }

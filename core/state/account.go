@@ -18,15 +18,4 @@
  *
  */
 
-package tetris
-
-type ICore interface {
-
-}
-
-//type ConsensusOutput string
-type ConsensusOutput struct{
-	Tx     [][]byte
-	h      uint64
-	output string
-}
+package state

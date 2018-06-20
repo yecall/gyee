@@ -57,6 +57,7 @@ type Core struct {
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
+
 	lock           sync.RWMutex
 	quitCh         chan struct{}
 	wg             sync.WaitGroup
@@ -96,8 +97,9 @@ func (c *Core) Start() error {
 		c.tetris = tetris
 		c.tetrisOutputCh = tetris.OutputCh
 		c.tetris.Start()
-		go c.loop()
 	}
+
+	go c.loop()
 	return nil
 }
 

@@ -26,42 +26,45 @@ import (
 	"github.com/yeeco/gyee/utils/logging"
 )
 
-type TransactionPool struct {
+type BlockPool struct {
 	lock   sync.RWMutex
 	quitCh chan struct{}
 	wg     sync.WaitGroup
 }
 
-func NewTransactionPool() (*TransactionPool, error) {
-	logging.Logger.Info("Create New TransactionPool")
-	bp := &TransactionPool{}
+func NewBlockPool() (*BlockPool, error) {
+	logging.Logger.Info("Create New BlockPool")
+	bp := &BlockPool{
+
+	}
 	return bp, nil
 }
 
-func (tp *TransactionPool) Start() {
-	tp.lock.Lock()
-	defer tp.lock.Unlock()
-	logging.Logger.Info("TransactionPool Start...")
-	go tp.loop()
+
+func (bp *BlockPool) Start() {
+	bp.lock.Lock()
+	defer bp.lock.Unlock()
+	logging.Logger.Info("BlockPool Start...")
+	go bp.loop()
 }
 
-func (tp *TransactionPool) Stop() {
-	tp.lock.Lock()
-	defer tp.lock.Unlock()
-	logging.Logger.Info("TransactionPool Stop...")
-	close(tp.quitCh)
-	tp.wg.Wait()
+func (bp *BlockPool) Stop() {
+	bp.lock.Lock()
+	defer bp.lock.Unlock()
+	logging.Logger.Info("BlockPool Stop...")
+	close(bp.quitCh)
+	bp.wg.Wait()
 }
 
-func (tp *TransactionPool) loop() {
-	logging.Logger.Info("TransactionPool loop...")
-	tp.wg.Add(1)
-	defer tp.wg.Done()
+func (bp *BlockPool) loop() {
+	logging.Logger.Info("BlockPool loop...")
+	bp.wg.Add(1)
+	defer bp.wg.Done()
 
 	for {
 		select {
-		case <-tp.quitCh:
-			logging.Logger.Info("TransactionPool loop end.")
+		case <-bp.quitCh:
+			logging.Logger.Info("BlockPool loop end.")
 			return
 		}
 	}
