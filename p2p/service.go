@@ -20,4 +20,14 @@
 
 package p2p
 
+/*
+inmem_service: 测试用inmem network
+p2p_service: 全广播p2p network
+osn_service: overlay sub-network
+ */
+ 
+type Service interface {
+	Start() error
+	Stop()
 
+}

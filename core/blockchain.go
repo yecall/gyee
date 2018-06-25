@@ -31,6 +31,9 @@ type BlockChain struct {
 	chainID uint32
 	genesis *Block
 
+	blockPool *BlockPool
+	txPool *TransactionPool
+
 	lock   sync.RWMutex
 	quitCh chan struct{}
 	wg     sync.WaitGroup
@@ -38,9 +41,21 @@ type BlockChain struct {
 
 func NewBlockChain(core *Core) (*BlockChain, error) {
 	logging.Logger.Info("Create New Blockchain")
+	bp, err := NewBlockPool()
+	if err != nil {
+
+	}
+
+	tp, err := NewTransactionPool()
+	if err != nil {
+
+	}
+
 	bc := &BlockChain{
 		core:    core,
 		chainID: 0,
+		blockPool: bp,
+		txPool:tp,
 		quitCh: make(chan struct{}),
 	}
 	return bc, nil
@@ -50,6 +65,9 @@ func (b *BlockChain) Start() {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	logging.Logger.Info("BlockChain Start...")
+	b.blockPool.Start()
+	b.txPool.Start()
+
 	go b.loop()
 }
 
@@ -58,6 +76,8 @@ func (b *BlockChain) Stop() {
 	defer b.lock.Unlock()
 	logging.Logger.Info("BlockChain Stop...")
 	close(b.quitCh)
+	b.blockPool.Stop()
+	b.txPool.Stop()
 	b.wg.Wait()
 }
 

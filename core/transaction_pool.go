@@ -18,6 +18,14 @@
  *
  */
 
+ /*
+ 接收tx
+ 验证
+ 提交给共识模块
+ 拉取tx
+
+  */
+
 package core
 
 import (
@@ -34,7 +42,9 @@ type TransactionPool struct {
 
 func NewTransactionPool() (*TransactionPool, error) {
 	logging.Logger.Info("Create New TransactionPool")
-	bp := &TransactionPool{}
+	bp := &TransactionPool{
+		quitCh: make(chan struct{}),
+	}
 	return bp, nil
 }
 

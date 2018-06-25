@@ -18,6 +18,5 @@
  *
  */
 
-package p2p
-
+package core
 

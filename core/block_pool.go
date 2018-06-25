@@ -18,6 +18,15 @@
  *
  */
 
+ /*
+ 接收peer发布出来的block header，如果是minor，需要同步块数据
+ block验证
+ block收到足够数量的签名，即最终确认
+ block确认后，在新的高度开始共识计算
+ 自己签名发布的block也要进入这里？还是直接在blockchain中处理？
+
+  */
+
 package core
 
 import (
@@ -35,7 +44,7 @@ type BlockPool struct {
 func NewBlockPool() (*BlockPool, error) {
 	logging.Logger.Info("Create New BlockPool")
 	bp := &BlockPool{
-
+		quitCh: make(chan struct{}),
 	}
 	return bp, nil
 }
