@@ -1,0 +1,104 @@
+/*
+ *  Copyright (C) 2017 gyee authors
+ *
+ *  This file is part of the gyee library.
+ *
+ *  the gyee library is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  the gyee library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+//
+// The description about ycp2p Peer To Peer Protocol messages in protobuf
+// specification.
+//
+
+syntax = "proto2";
+package tcpmsg.pb;
+
+
+//
+// Protocol identities
+//
+
+enum ProtocolId {
+    PID_P2P = 0;        // p2p internal
+    PID_EXT = 0xff;     // external, for p2p users
+}
+
+//
+// Message identities
+//
+
+enum MessageId {
+
+    //
+    // PID_P2P section
+    //
+
+    MID_HANDSHAKE   = 0;
+    MID_PING        = 1;
+    MID_PONG        = 2;
+
+    //
+    // PID_EXT section
+    //
+}
+
+//
+// The package for all messages
+//
+
+message P2PPackage {
+    required ProtocolId Pid         = 1;    // protocol identity
+    required uint32 PayloadLength   = 2;    // payload length
+    optional bytes Payload          = 3;    // payload
+}
+
+//
+// Handlshake message
+//
+
+message P2PMessage {
+
+    message Protocol {
+        required ProtocolId Pid = 1;    // protocol identity
+        required bytes      Ver = 2;    // protocol version: M.m0.m1.m2
+    }
+
+    message Handshake {
+        required bytes      NodeId      = 1;    // node identity
+        required bytes      IP          = 2;    // ip address
+        required uint32     UDP         = 3;    // udp port number
+        required uint32     TCP         = 4;    // tcp port number
+        required uint32     ProtoNum    = 5;    // number of protocols
+        repeated Protocol   Protocols   = 6;    // protocol table
+        optional bytes      Extra       = 7;    // extra info, reserved
+    }
+
+    message Ping {
+        required uint64     seq     = 1;    // sequence number
+        optional bytes      Extra   = 2;    // extra info, reserved
+    }
+
+    message Pong {
+        required uint64     seq     = 1;    // sequence number
+        optional bytes      Extra   = 2;    // extra info, reserved
+    }
+
+    required MessageId  mid         = 1;    // message identity
+    optional Handshake  handshake   = 2;    // handshake message
+    optional Ping       ping        = 3;    // ping message
+    optional Pong       pong        = 4;    // pong message
+}

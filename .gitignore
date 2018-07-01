@@ -16,6 +16,9 @@
 # ide
 .idea/
 
+# .iml file created by IDEA for module 
+*.iml
+
 # test dir
 test/
 

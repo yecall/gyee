@@ -1,0 +1,84 @@
+/*
+ *  Copyright (C) 2017 gyee authors
+ *
+ *  This file is part of the gyee library.
+ *
+ *  the gyee library is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  the gyee library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+//
+// The description about ycp2p Neighbor Discovering Protocol messages in protobuf
+// specification.
+//
+
+syntax = "proto2";
+package udpmsg.pb;
+
+message UdpMessage {
+    enum MessageType {
+        PING        = 0;
+        PONG        = 1;
+        FINDNODE    = 2;
+        NEIGHBORS   = 3;
+    }
+
+    message Node {
+        required bytes IP  = 1;
+        required uint32 UDP = 2;
+        required uint32 TCP = 3;
+        required bytes NodeId = 4;
+    }
+
+    message Ping {
+        required Node From = 1;
+        required Node To = 2;
+        required uint64 Id = 3;
+        optional uint64 Expiration = 4;
+        optional bytes Extra = 5;
+    }
+
+    message Pong {
+        required Node From = 1;
+        required Node To = 2;
+        required uint64 Id = 3;
+        optional uint64 Expiration = 4;
+        optional bytes Extra = 5;
+    }
+
+    message FindNode {
+        required Node From = 1;
+        required Node To = 2;
+        required uint64 Id = 3;
+        required bytes Target = 4;
+        optional uint64 Expiration = 5;
+        optional bytes Extra = 6;
+    }
+
+    message Neighbors {
+        required Node From = 1;
+        required Node To = 2;
+        required uint64 Id = 3;
+        repeated Node Nodes = 4;
+        optional uint64 Expiration = 5;
+        optional bytes Extra = 6;
+    }
+
+    required MessageType msgType = 1;
+    optional Ping ping = 2;
+    optional Pong pong = 3;
+    optional FindNode findNode = 4;
+    optional Neighbors neighbors = 5;
+}
