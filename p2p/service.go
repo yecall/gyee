@@ -24,10 +24,20 @@ package p2p
 inmem_service: 测试用inmem network
 p2p_service: 全广播p2p network
 osn_service: overlay sub-network
+还有一个做法是hash全网广播，内容接收者自己去dht取？
+消息类型：
+1. tx，node发出，临时dht存储，发往validator group
+2. block header：validator发出，发往全体。
+3. block：dht存储
+4. event：validator发出，临时dht存储，发往validator group
+
  */
- 
+
 type Service interface {
 	Start() error
 	Stop()
-
+	BroadcastMessage() error
+	BroadcastMessageOsn() error
+	Register()
+	UnRegister()
 }
