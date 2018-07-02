@@ -82,12 +82,20 @@ func New(conf *config.Config) (*Node, error) {
 	node := &Node{
 		config: conf,
 	}
+
 	core, err := core.NewCore(node, conf)
 	if err != nil {
 		logging.Logger.Panic(err)
 	}
 
+	p2p, err := p2p.NewInmemService()
+	if err != nil {
+		logging.Logger.Panic(err)
+	}
+
 	node.core = core
+	node.p2p = p2p
+
 	return node, nil
 }
 
@@ -103,6 +111,7 @@ func (n *Node) Start() error {
 	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
 
 	n.core.Start()
+	n.p2p.Start()
 
 	n.startIPC()
 

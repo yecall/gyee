@@ -20,3 +20,64 @@
 
 package p2p
 
+import (
+	"github.com/yeeco/gyee/utils"
+	"sync"
+)
+
+type InmemService struct {
+}
+
+func NewInmemService() (*InmemService, error) {
+
+	is := &InmemService{}
+	return is, nil
+}
+
+func (is *InmemService) Start() error {
+	return nil
+}
+
+func (is *InmemService) Stop() {
+
+}
+
+func (is *InmemService) BroadcastMessage() error {
+	return nil
+}
+
+func (is *InmemService) BroadcastMessageOsn() error {
+	return nil
+}
+
+func (is *InmemService) Register() {
+
+}
+
+func (is *InmemService) UnRegister() {
+
+}
+
+//Inmem Hub for all InmemService
+//模拟消息的延迟，丢失，dht检索
+type InmemHub struct {
+	nodes []*InmemService
+	dht   *utils.LRU
+}
+
+var instance *InmemHub
+var once sync.Once
+
+func GetInmemHub() *InmemHub {
+	once.Do(func() {
+		instance = &InmemHub{
+			nodes: nil,
+			dht: utils.NewLRU(10000, nil),
+		}
+	})
+	return instance
+}
+
+func (ih *InmemHub) AddNode(node *InmemService) {
+	ih.nodes = append(ih.nodes, node)
+}
