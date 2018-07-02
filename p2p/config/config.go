@@ -42,7 +42,7 @@ import (
 
 	//ethereum "github.com/ethereum/go-ethereum/crypto"
 
-	yclog "github.com/yeeco/p2p/logger"
+	yclog "github.com/yeeco/gyee/p2p/logger"
 )
 
 
@@ -156,9 +156,19 @@ type Config struct {
 }
 
 //
+// Configuration about neighbor manager on UDP
+//
+type Cfg4UdpNgbManager struct {
+	IP		net.IP		// ip address
+	UDP		uint16		// udp port numbers
+	TCP		uint16		// tcp port numbers
+	ID		NodeID		// the node's public key
+}
+
+//
 // Configuration about neighbor listener on UDP
 //
-type Cfg4UdpListener struct {
+type Cfg4UdpNgbListener struct {
 	IP		net.IP		// ip address
 	UDP		uint16		// udp port numbers
 	TCP		uint16		// tcp port numbers
@@ -304,9 +314,11 @@ func P2pSetConfig(cfg *Config) P2pCfgErrno {
 		config.MaxOutbounds == 0 ||
 		config.MaxInbounds == 0	||
 		config.MaxPeers < config.MaxInbounds + config.MaxOutbounds {
+
 		yclog.LogCallerFileLine("P2pSetConfig: " +
 			"invalid peer number constraint, MaxPeers: %d, MaxOutbounds: %d, MaxInbounds: %d",
 			config.MaxPeers, config.MaxOutbounds, config.MaxInbounds)
+
 		return PcfgEnoParameter
 	}
 
@@ -650,10 +662,22 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 }
 
 //
+// Get configuration of neighbor discovering manager
+//
+func P2pConfig4UdpNgbManager() *Cfg4UdpNgbManager {
+	return &Cfg4UdpNgbManager {
+		IP:		config.Local.IP,
+		UDP:	config.Local.UDP,
+		TCP:	config.Local.TCP,
+		ID:		config.Local.ID,
+	}
+}
+
+//
 // Get configuration of neighbor discovering listener
 //
-func P2pConfig4UdpListener() *Cfg4UdpListener {
-	return &Cfg4UdpListener {
+func P2pConfig4UdpNgbListener() *Cfg4UdpNgbListener {
+	return &Cfg4UdpNgbListener {
 		IP:		config.Local.IP,
 		UDP:	config.Local.UDP,
 		TCP:	config.Local.TCP,

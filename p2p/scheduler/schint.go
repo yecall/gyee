@@ -34,7 +34,8 @@ type schMessage SchMessage
 //
 // User task entry point
 //
-type schUserTaskEp SchUserTaskEp
+type schUserTaskEp = SchUserTaskEp
+type schUserTaskInf = SchUserTaskInf
 
 //
 // max mail box size
@@ -113,8 +114,9 @@ const schInvalidTid		= SchInvalidTid			// invalid timer identity
 
 type schTask struct {
 	lock		sync.Mutex						// lock to protect task control block
+	sdl			*scheduler						// pointer to scheduler
 	name		string							// task name
-	utep		schUserTaskEp					// user task entry point
+	utep		schUserTaskInf					// user task entry point
 	mailbox		schMailBox						// mail box
 	done		chan SchErrno					// done with errno
 	stopped		chan bool						// stopped signal
@@ -136,49 +138,33 @@ type schTaskNode struct {
 }
 
 //
-// Task group
-//
-const schMaxGroupSize = SchMaxGroupSize				// max number of group members
-type schTaskGroupName	string							// group name as string
-type schTaskGroup map[schTaskGroupName][]*schTaskNode	// group map group-name to task node array
-
-//
 // The ycp2p scheduler struct: since it's only planed to invoke the scheduler
 // internal modle ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
-const schInvalidTaskIndex		= -1					// invalid index
 const schTaskNodePoolSize		= 1024					// task node pool size, must be (2^n)
 type schTaskName 	string								// task name
-type schTaskIndex	int									// index of task node in pool
 var schTaskNodePool	[schTaskNodePoolSize]schTaskNode	// task node pool
 
 type scheduler struct {
-
 	//
 	// Notice: SYNC-IPC liked mode is not supported now, a task can not send a message to other
 	// and then blocked until the message receiver task ACK it. If the SYNC-IPC is necessary in
 	// practice really, we might take it into account future ...
 	//
 
-	lock 		sync.Mutex						// lock to protect the scheduler
-	tkFree		*schTaskNode					// free task queue
-	freeSize	int								// number of nodes in free
-	tkBusy		*schTaskNode					// busy task queue in scheduling
-	tkMap		map[schTaskName] *schTaskNode	// map task name to pointer of running task node
-	busySize	int								// number of nodes in busy
-	tmFree		*schTmcbNode					// free timer node queue
-	tmFreeSize	int								// free timer node queue size
-	tmMap		map[*schTmcbNode] *schTaskNode	// map busy timer node pointer to its' owner task node pointer
-	grpMap		schTaskGroup					// group name to group member map
-	grpCnt		int								// group counter
+	lock             sync.Mutex                        // lock to protect the scheduler
+	tkFree           *schTaskNode                      // free task queue
+	freeSize         int                               // number of nodes in free
+	tkBusy           *schTaskNode                      // busy task queue in scheduling
+	tkMap            map[schTaskName]*schTaskNode      // map task name to pointer of running task node
+	busySize         int                               // number of nodes in busy
+	tmFree           *schTmcbNode                      // free timer node queue
+	tmFreeSize       int                               // free timer node queue size
+	tmMap            map[*schTmcbNode]*schTaskNode     // map busy timer node pointer to its' owner task node pointer
+	schTaskNodePool  [schTaskNodePoolSize]schTaskNode  // task node pool
+	schTimerNodePool [schTimerNodePoolSize]schTmcbNode // timer node pool
 }
-
-//
-// Scheduler task entry point
-//
-type schCommonTaskEp func(ptn *schTaskNode) SchErrno
-
 
 //
 // static tasks name

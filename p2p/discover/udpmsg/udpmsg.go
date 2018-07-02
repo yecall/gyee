@@ -22,9 +22,9 @@ package udpmsg
 
 import (
 	"net"
-	yclog	"github.com/yeeco/p2p/logger"
-	ycfg	"github.com/yeeco/p2p/config"
-	pb		"github.com/yeeco/p2p/discover/udpmsg/pb"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
+	pb		"github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
 )
 
 //
@@ -431,7 +431,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 }
 
 //
-// Encode from UDP messages
+// Encode for UDP messages
 //
 func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 

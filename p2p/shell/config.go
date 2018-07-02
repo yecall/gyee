@@ -23,8 +23,8 @@ package shell
 
 import (
 	"fmt"
-	ycfg	"github.com/yeeco/p2p/config"
-	yclog	"github.com/yeeco/p2p/logger"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //

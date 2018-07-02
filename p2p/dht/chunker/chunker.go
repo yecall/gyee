@@ -22,29 +22,43 @@
 package chunker
 
 import (
-	sch 	"github.com/yeeco/p2p/scheduler"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
-// Provider manager
+// Chunker manager
 //
 const DhtchMgrName = "DhtchMgr"
 
-type dhtChunkerManager struct {
+type DhtChunkerManager struct {
+	sdl		*sch.Scheduler		// pointer to scheduler
 	name	string				// name
 	tep		sch.SchUserTaskEp	// entry
 }
 
-var dhtchMgr = dhtChunkerManager{
-	name:	DhtchMgrName,
-	tep:	DhtchMgrProc,
+//
+// Create chunker manager
+//
+func NewDhtchMgr() *DhtChunkerManager {
+	var dhtchMgr = DhtChunkerManager {
+		name: DhtchMgrName,
+	}
+	dhtchMgr.tep = dhtchMgr.dhtchMgrProc
+	return &dhtchMgr
+}
+
+//
+// Entry point exported to shceduler
+//
+func (dhtchMgr *DhtChunkerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return dhtchMgr.tep(ptn, msg)
 }
 
 //
 // Table manager entry
 //
-func DhtchMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dhtchMgr *DhtChunkerManager)dhtchMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	yclog.LogCallerFileLine("DhtchMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }

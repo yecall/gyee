@@ -8,8 +8,8 @@
 package route
 
 import (
-	sch 	"github.com/yeeco/p2p/scheduler"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //

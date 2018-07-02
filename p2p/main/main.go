@@ -27,11 +27,11 @@ import (
 	"time"
 	"fmt"
 	"os/signal"
-	"github.com/yeeco/p2p/shell"
-	"github.com/yeeco/p2p/peer"
-	ycfg	"github.com/yeeco/p2p/config"
-	yclog	"github.com/yeeco/p2p/logger"
-	sch		"github.com/yeeco/p2p/scheduler"
+	"github.com/yeeco/gyee/p2p/shell"
+	"github.com/yeeco/gyee/p2p/peer"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
 )
 
 
@@ -184,9 +184,8 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		eno != shell.P2pInfEnoNone {
 
 			yclog.LogCallerFileLine("p2pIndProc: " +
-				"P2pInfRegisterCallback failed, eno: %d, task: %s",
-				eno,
-				sch.SchinfGetTaskName(pap.Ptn))
+				"P2pInfRegisterCallback failed, eno: %d",
+				eno)
 		}
 
 		go txProc(peer.PeerId(pap.PeerInfo.NodeId))
@@ -310,7 +309,8 @@ func main() {
 	// init underlying p2p logic and then start
 	//
 
-	if eno := shell.P2pInit(); eno != sch.SchEnoNone {
+	sdl, eno := shell.P2pInit();
+	if eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("main: SchinfSchedulerInit failed, eno: %d", eno)
 		return
 	}
@@ -329,7 +329,7 @@ func main() {
 		return
 	}
 
-	eno, _ := shell.P2pStart()
+	eno, _ = shell.P2pStart(sdl)
 
 	yclog.LogCallerFileLine("main: ycp2p started, eno: %d", eno)
 

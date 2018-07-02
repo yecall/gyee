@@ -22,8 +22,8 @@
 package dht
 
 import (
-	sch 	"github.com/yeeco/p2p/scheduler"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -31,20 +31,35 @@ import (
 //
 const DhtMgrName = "DhtMgr"
 
-type dhtManager struct {
+type DhtManager struct {
+	sdl		*sch.Scheduler		// pointer to scheduler
 	name	string				// name
 	tep		sch.SchUserTaskEp	// entry
 }
 
-var dhtMgr = dhtManager{
-	name:	DhtMgrName,
-	tep:	DhtMgrProc,
+//
+// Create DHT manager
+//
+func NewDhtMgr() *DhtManager {
+	var dhtMgr = DhtManager{
+		name: DhtMgrName,
+	}
+
+	dhtMgr.tep = dhtMgr.dhtMgrProc
+	return &dhtMgr
+}
+
+//
+// Entry point exported to shceduler
+//
+func (dhtMgr *DhtManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return dhtMgr.tep(ptn, msg)
 }
 
 //
 // Table manager entry
 //
-func DhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dhtMgr *DhtManager)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	yclog.LogCallerFileLine("DhtMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }

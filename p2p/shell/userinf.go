@@ -23,9 +23,9 @@ package shell
 
 import (
 	"fmt"
-	"github.com/yeeco/p2p/peer"
-	yclog "github.com/yeeco/p2p/logger"
-	"github.com/yeeco/p2p/scheduler"
+	"github.com/yeeco/gyee/p2p/peer"
+	yclog "github.com/yeeco/gyee/p2p/logger"
+	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
 

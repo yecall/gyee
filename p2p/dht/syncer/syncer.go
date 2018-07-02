@@ -21,8 +21,8 @@
 package syncer
 
 import (
-	sch 	"github.com/yeeco/p2p/scheduler"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -30,20 +30,34 @@ import (
 //
 const DhtsyMgrName = "DhtsyMgr"
 
-type dhtSyncerManager struct {
+type DhtSyncerManager struct {
+	sdl		*sch.Scheduler		// pointer to scheduler
 	name	string				// name
 	tep		sch.SchUserTaskEp	// entry
 }
 
-var dhtsyMgr = dhtSyncerManager{
-	name:	DhtsyMgrName,
-	tep:	DhtsyMgrProc,
+//
+// Create syncer manager
+//
+func NewDhtsyMgr() *DhtSyncerManager {
+	var dhtsyMgr = DhtSyncerManager {
+		name: DhtsyMgrName,
+	}
+	dhtsyMgr.tep = dhtsyMgr.dhtsyMgrProc
+	return &dhtsyMgr
+}
+
+//
+// Entry point exported to shceduler
+//
+func (dhtsyMgr *DhtSyncerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return dhtsyMgr.tep(ptn, msg)
 }
 
 //
 // sync manager entry
 //
-func DhtsyMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dhtsyMgr *DhtSyncerManager)dhtsyMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	yclog.LogCallerFileLine("DhtsyMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }

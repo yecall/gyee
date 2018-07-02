@@ -54,7 +54,7 @@ import (
 	//
 
 	//"github.com/ethereum/go-ethereum/log"
-	yclog "github.com/yeeco/p2p/logger"
+	yclog "github.com/yeeco/gyee/p2p/logger"
 
 	//
 	// Modified: 20180503, yeeco

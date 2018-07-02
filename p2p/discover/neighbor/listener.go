@@ -26,10 +26,10 @@ import (
 	"net"
 	"fmt"
 	"time"
-	sch		"github.com/yeeco/p2p/scheduler"
-	cfg		"github.com/yeeco/p2p/config"
-	umsg	"github.com/yeeco/p2p/discover/udpmsg"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	cfg		"github.com/yeeco/gyee/p2p/config"
+	umsg	"github.com/yeeco/gyee/p2p/discover/udpmsg"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -44,7 +44,8 @@ type listenerConfig struct {
 	ID	cfg.NodeID	// node identity: the public key
 }
 
-type listenerManager struct {
+type ListenerManager struct {
+	sdl			*sch.Scheduler		// pointer to scheduler
 	name		string				// name
 	tep			sch.SchUserTaskEp	// entry
 	cfg			listenerConfig		// configuration
@@ -65,28 +66,34 @@ const (
 	LmsStopped				// stopped, configurations are still validate
 )
 
-var lsnMgr = listenerManager{
-	name:		LsnMgrName,
-	tep:		nil,
-	conn:		nil,
-	state:		LmsNull,
-	ptnMe:		nil,
-	ptnReader:	nil,
+//
+// Create listener manager
+//
+func NewLsnMgr() *ListenerManager {
+	var lsnMgr = ListenerManager{
+		name:      LsnMgrName,
+		tep:       nil,
+		conn:      nil,
+		state:     LmsNull,
+		ptnMe:     nil,
+		ptnReader: nil,
+	}
+
+	lsnMgr.tep			= lsnMgr.lsnMgrProc
+	return &lsnMgr
 }
 
 //
-// To escape the compiler "initialization loop" error
+// Entry point exported to shceduler
 //
-func init() {
-	lsnMgr.tep			= LsnMgrProc
-	udpReader.tep		= udpReaderLoop
-	udpReader.desc.Ep	= udpReaderLoop
+func (lsnMgr *ListenerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return lsnMgr.tep(ptn, msg)
 }
 
 //
 // Listen manager entry
 //
-func LsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	yclog.LogCallerFileLine("LsnMgrProc: " +
 		"scheduled, sender: %s, recver: %s, msg: %d",
@@ -97,7 +104,7 @@ func LsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	switch msg.Id {
 
 	case sch.EvSchPoweron:
-		eno = lsnMgr.procPoweron()
+		eno = lsnMgr.procPoweron(ptn)
 
 	case sch.EvSchPoweroff:
 		eno = lsnMgr.procPoweroff()
@@ -107,6 +114,9 @@ func LsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	case sch.EvNblStop:
 		eno = lsnMgr.procStop()
+
+	case sch.EvNblDataReq:
+		eno = lsnMgr.nblDataReq(ptn, msg.Body)
 
 	default:
 		yclog.LogCallerFileLine("LsnMgrProc: unknow message: %d", msg.Id)
@@ -119,12 +129,12 @@ func LsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 //
 //Setup configuraion
 //
-func (mgr *listenerManager) setupConfig() sch.SchErrno {
+func (lsnMgr *ListenerManager) setupConfig() sch.SchErrno {
 
-	var ptCfg *cfg.Cfg4UdpListener = nil
+	var ptCfg *cfg.Cfg4UdpNgbListener = nil
 
-	if ptCfg = cfg.P2pConfig4UdpListener(); ptCfg == nil {
-		yclog.LogCallerFileLine("setupConfig: P2pConfig4UdpListener failed")
+	if ptCfg = cfg.P2pConfig4UdpNgbListener(); ptCfg == nil {
+		yclog.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbListener failed")
 		return sch.SchEnoConfig
 	}
 
@@ -139,7 +149,7 @@ func (mgr *listenerManager) setupConfig() sch.SchErrno {
 //
 // Setup manager configuration, UDP conection
 //
-func (mgr *listenerManager)setupUdpConn() sch.SchErrno {
+func (lsnMgr *ListenerManager)setupUdpConn() sch.SchErrno {
 
 	var conn		*net.UDPConn = nil
 	var realAddr	*net.UDPAddr = nil
@@ -168,8 +178,8 @@ func (mgr *listenerManager)setupUdpConn() sch.SchErrno {
 	yclog.LogCallerFileLine("setupUdpConn: real address: %s", realAddr.String())
 
 	// backup connection and real address
-	mgr.addr = *realAddr
-	mgr.conn = conn
+	lsnMgr.addr = *realAddr
+	lsnMgr.conn = conn
 
 	return sch.SchEnoNone
 }
@@ -177,7 +187,7 @@ func (mgr *listenerManager)setupUdpConn() sch.SchErrno {
 //
 // Start
 //
-func (mgr *listenerManager) start() sch.SchErrno {
+func (lsnMgr *ListenerManager) start() sch.SchErrno {
 
 	var eno sch.SchErrno
 	var msg sch.SchMessage
@@ -186,7 +196,7 @@ func (mgr *listenerManager) start() sch.SchErrno {
 	// check if we can start
 	//
 
-	if eno = mgr.canStart(); eno != sch.SchEnoNone {
+	if eno = lsnMgr.canStart(); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("start: could not start")
 		return eno
 	}
@@ -195,7 +205,7 @@ func (mgr *listenerManager) start() sch.SchErrno {
 	// send ourself a "start" message
 	//
 
-	eno = sch.SchinfMakeMessage(&msg, mgr.ptnMe, mgr.ptnMe, sch.EvNblStart, nil)
+	eno = lsnMgr.sdl.SchinfMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnMe, sch.EvNblStart, nil)
 	if eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("start: " +
 			"SchinfMakeMessage failed, sender: %s, recver: %s, eno: %d",
@@ -205,7 +215,7 @@ func (mgr *listenerManager) start() sch.SchErrno {
 		return eno
 	}
 
-	eno = sch.SchinfSendMessage(&msg)
+	eno = lsnMgr.sdl.SchinfSendMessage(&msg)
 	if eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("start: " +
 			"SchinfSendMessage failed, sender: %s, recver: %s, eno: %d",
@@ -217,7 +227,7 @@ func (mgr *listenerManager) start() sch.SchErrno {
 
 	yclog.LogCallerFileLine("start: " +
 		"send EvNblStart ok, target: %s",
-		sch.SchinfGetTaskName(mgr.ptnMe))
+		lsnMgr.sdl.SchinfGetTaskName(lsnMgr.ptnMe))
 
 	return sch.SchEnoNone
 }
@@ -225,7 +235,7 @@ func (mgr *listenerManager) start() sch.SchErrno {
 //
 // Transfer to next state
 //
-func (mgr *listenerManager) nextState(s int) sch.SchErrno {
+func (lsnMgr *ListenerManager) nextState(s int) sch.SchErrno {
 	yclog.LogCallerFileLine("nextState: transfer from %d to %d", lsnMgr.state, s)
 	lsnMgr.state = s
 	return sch.SchEnoNone
@@ -234,8 +244,8 @@ func (mgr *listenerManager) nextState(s int) sch.SchErrno {
 //
 // Check if we can start
 //
-func (mgr *listenerManager) canStart() sch.SchErrno {
-	if mgr.state == LmsInited || mgr.state == LmsStopped {
+func (lsnMgr *ListenerManager) canStart() sch.SchErrno {
+	if lsnMgr.state == LmsInited || lsnMgr.state == LmsStopped {
 		return sch.SchEnoNone
 	}
 	return sch.SchEnoMismatched
@@ -244,15 +254,15 @@ func (mgr *listenerManager) canStart() sch.SchErrno {
 //
 // Check if we can stop
 //
-func (mgr *listenerManager) canStop() sch.SchErrno {
+func (lsnMgr *ListenerManager) canStop() sch.SchErrno {
 
 	//
 	// check state, ptnReader, conn to allow a stop
 	//
 
-	if mgr.state == LmsStarted &&
-		mgr.ptnReader != nil &&
-		mgr.conn != nil	{
+	if lsnMgr.state == LmsStarted &&
+		lsnMgr.ptnReader != nil &&
+		lsnMgr.conn != nil	{
 		return sch.SchEnoNone
 	}
 
@@ -262,30 +272,18 @@ func (mgr *listenerManager) canStop() sch.SchErrno {
 //
 // Poweron event handler
 //
-func (mgr *listenerManager) procPoweron() sch.SchErrno {
+func (lsnMgr *ListenerManager) procPoweron(ptn interface{}) sch.SchErrno {
 
 	var eno sch.SchErrno
 
-	//
-	// get pointer to myself
-	//
-
-	if eno, mgr.ptnMe = sch.SchinfGetTaskNodeByName(mgr.name); eno != sch.SchEnoNone || mgr.ptnMe == nil {
-		if eno == sch.SchEnoNone {
-			yclog.LogCallerFileLine("procPoweron: internal errors, eno mismatched")
-			eno = sch.SchEnoInternal
-		}
-		yclog.LogCallerFileLine("procPoweron: " +
-			"SchinfGetTaskNodeByName failed, name: %s, eno: %d",
-			eno, mgr.name)
-		return eno
-	}
+	lsnMgr.ptnMe = ptn
+	lsnMgr.sdl = sch.SchinfGetScheduler(ptn)
 
 	//
 	// update state
 	//
 
-	mgr.nextState(LmsNull)
+	lsnMgr.nextState(LmsNull)
 
 	//
 	// fetch configurations
@@ -300,7 +298,7 @@ func (mgr *listenerManager) procPoweron() sch.SchErrno {
 	// update state
 	//
 
-	mgr.nextState(LmsInited)
+	lsnMgr.nextState(LmsInited)
 
 	//
 	// start listening(reading on udp)
@@ -317,13 +315,13 @@ func (mgr *listenerManager) procPoweron() sch.SchErrno {
 //
 // Poweroff event handler
 //
-func (mgr *listenerManager) procPoweroff() sch.SchErrno {
+func (lsnMgr *ListenerManager) procPoweroff() sch.SchErrno {
 
 	//
 	// Stop reader task
 	//
 
-	if eno := mgr.procStop(); eno != sch.SchEnoNone {
+	if eno := lsnMgr.procStop(); eno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("procPoweroff: " +
 			"procStop failed, eno: %d",
@@ -334,13 +332,13 @@ func (mgr *listenerManager) procPoweroff() sch.SchErrno {
 	// Done ourselves
 	//
 
-	return sch.SchinfTaskDone(mgr.ptnMe, sch.SchEnoKilled)
+	return lsnMgr.sdl.SchinfTaskDone(lsnMgr.ptnMe, sch.SchEnoKilled)
 }
 
 //
 // Start reading event handler
 //
-func (mgr *listenerManager) procStart() sch.SchErrno {
+func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 
 	//
 	// here we create a task for udp reading loop, notice that udp connection
@@ -363,8 +361,13 @@ func (mgr *listenerManager) procStart() sch.SchErrno {
 	// create the reader task
 	//
 
-	udpReader.conn = mgr.conn
-	eno, ptnLoop = sch.SchinfCreateTask(&udpReader.desc)
+	var udpReader = NewUdpReader()
+
+	udpReader.lsnMgr = lsnMgr
+	udpReader.sdl = lsnMgr.sdl
+	udpReader.conn = lsnMgr.conn
+
+	eno, ptnLoop = lsnMgr.sdl.SchinfCreateTask(&udpReader.desc)
 
 	if eno != sch.SchEnoNone || ptnLoop == nil {
 
@@ -381,7 +384,7 @@ func (mgr *listenerManager) procStart() sch.SchErrno {
 
 	yclog.LogCallerFileLine("procStart: " +
 		"udp reader task created ok, task: %s",
-		sch.SchinfGetTaskName(ptnLoop))
+		lsnMgr.sdl.SchinfGetTaskName(ptnLoop))
 
 	//
 	// we believe reader is working, update the state. more better is to
@@ -389,15 +392,15 @@ func (mgr *listenerManager) procStart() sch.SchErrno {
 	// loop.
 	//
 
-	mgr.ptnReader = ptnLoop
+	lsnMgr.ptnReader = ptnLoop
 
-	return mgr.nextState(LmsStarted)
+	return lsnMgr.nextState(LmsStarted)
 }
 
 //
 // stop reading event handler
 //
-func (mgr *listenerManager) procStop() sch.SchErrno {
+func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
 
 	var eno sch.SchErrno
 
@@ -405,7 +408,7 @@ func (mgr *listenerManager) procStop() sch.SchErrno {
 	// check if we can stop
 	//
 
-	if eno = mgr.canStop(); eno != sch.SchEnoNone {
+	if eno = lsnMgr.canStop(); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("procStop: we can't stop, eno: %d", eno)
 		return eno
 	}
@@ -417,8 +420,8 @@ func (mgr *listenerManager) procStop() sch.SchErrno {
 	// it's is closed by the manager.
 	//
 
-	mgr.conn = nil
-	mgr.conn.Close()
+	lsnMgr.conn.Close()
+	lsnMgr.conn = nil
 
 	//
 	// stop task after connection had been closed. notice that the reader
@@ -426,7 +429,7 @@ func (mgr *listenerManager) procStop() sch.SchErrno {
 	// see scheduler for details pls.
 	//
 
-	if eno = sch.SchinfStopTask(mgr.ptnReader); eno != sch.SchEnoNone {
+	if eno = lsnMgr.sdl.SchinfStopTask(lsnMgr.ptnReader); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("procStop: SchinfStopTask failed, eno: %d", eno)
 		return eno
 	}
@@ -435,7 +438,15 @@ func (mgr *listenerManager) procStop() sch.SchErrno {
 	// update manager state
 	//
 
-	return mgr.nextState(LmsStopped)
+	return lsnMgr.nextState(LmsStopped)
+}
+
+//
+// data request handler
+//
+func (lsnMgr *ListenerManager)nblDataReq(ptn interface{}, msg interface{}) sch.SchErrno {
+	var req = msg.(*sch.NblDataReq)
+	return lsnMgr.sendUdpMsg(req.Payload, req.TgtAddr)
 }
 
 //
@@ -448,7 +459,9 @@ var noDog = sch.SchWatchDog {
 	HaveDog:false,
 }
 
-type udpReaderTask struct {
+type UdpReaderTask struct {
+	sdl			*sch.Scheduler			// pointer to scheduler
+	lsnMgr		*ListenerManager		// pointer to listener manager
 	name		string					// name
 	tep			sch.SchUserTaskEp		// entry
 	conn		*net.UDPConn			// udp connection
@@ -456,28 +469,6 @@ type udpReaderTask struct {
 	ptnNgbMgr	interface{}				// pointer to neighbor manager task
 	desc		sch.SchTaskDescription	// description
 }
-
-var udpReader  = udpReaderTask {
-	name:	udpReaderName,
-	tep:	nil,
-	conn:	nil,
-
-	//
-	// description: notice that this task would going in a dead loop, so
-	// it has no chance to deal with any scheduling messages sent to it,
-	// no mailbox needed for it.
-	//
-
-	desc:	sch.SchTaskDescription{
-		Name:	udpReaderName,
-		MbSize: 0,
-		Ep:		nil,
-		Wd:		&noDog,
-		Flag:	sch.SchCreatedGo,
-		DieCb:	nil,
-	},
-}
-
 
 //
 // EvNblMsgInd message body
@@ -488,9 +479,47 @@ type UdpMsgInd struct {
 }
 
 //
+// Create udp reader
+//
+func NewUdpReader() *UdpReaderTask {
+	var udpReader = UdpReaderTask{
+		name: udpReaderName,
+		tep:  nil,
+		conn: nil,
+
+		//
+		// description: notice that this task would going in a dead loop, so
+		// it has no chance to deal with any scheduling messages sent to it,
+		// no mailbox needed for it.
+		//
+
+		desc: sch.SchTaskDescription{
+			Name:   udpReaderName,
+			MbSize: 0,
+			Ep:     nil,
+			Wd:     &noDog,
+			Flag:   sch.SchCreatedGo,
+			DieCb:  nil,
+		},
+	}
+
+	udpReader.tep		= udpReader.udpReaderLoop
+	udpReader.desc.Ep	= &udpReader
+
+	return &udpReader
+}
+
+//
+// Entry point exported to shceduler
+//
+func (udpReader *UdpReaderTask)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return udpReader.tep(ptn, msg)
+}
+
+//
 // Reader task entry
 //
-func udpReaderLoop(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	yclog.LogCallerFileLine("udpReaderLoop: the reader loop entered")
 
@@ -508,7 +537,7 @@ func udpReaderLoop(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	//
 
 	udpReader.ptnMe = ptn
-	eno, udpReader.ptnNgbMgr = sch.SchinfGetTaskNodeByName(NgbMgrName)
+	eno, udpReader.ptnNgbMgr = udpReader.sdl.SchinfGetTaskNodeByName(NgbMgrName)
 
 	if eno != sch.SchEnoNone {
 
@@ -584,7 +613,7 @@ _loop:
 	// need to make it done.
 	//
 
-	if lsnMgr.conn == nil {
+	if udpReader.lsnMgr.conn == nil {
 
 		yclog.LogCallerFileLine("udpReaderLoop: seems we are closed by manager task")
 
@@ -592,7 +621,7 @@ _loop:
 
 		yclog.LogCallerFileLine("udpReaderLoop: abnormal case, stop the task")
 
-		(&lsnMgr).procStop()
+		udpReader.lsnMgr.procStop()
 	}
 
 	//
@@ -610,7 +639,7 @@ _loop:
 //
 // Check if an error can be ignored while reading
 //
-func (rd udpReaderTask) canErrIgnored(err error) bool {
+func (rd *UdpReaderTask) canErrIgnored(err error) bool {
 	const WSAEMSGSIZE = syscall.Errno(10040)
 	if opErr, ok := err.(*net.OpError); ok {
 		return opErr.Temporary() || opErr.Err.(*os.SyscallError).Err == WSAEMSGSIZE
@@ -621,7 +650,7 @@ func (rd udpReaderTask) canErrIgnored(err error) bool {
 //
 // Decode message
 //
-func (rd udpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch.SchErrno {
+func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch.SchErrno {
 
 	//
 	// We need not to interprete the message, we jsut decode it and
@@ -658,7 +687,7 @@ func (rd udpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch
 		return sch.SchEnoUserTask
 	}
 
-	schEno = sch.SchinfMakeMessage(&msg, rd.ptnMe, rd.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
+	schEno = rd.sdl.SchinfMakeMessage(&msg, rd.ptnMe, rd.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
 	if schEno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("msgHandler: " +
@@ -670,7 +699,7 @@ func (rd udpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch
 		return schEno
 	}
 
-	schEno = sch.SchinfSendMessage(&msg)
+	schEno = rd.sdl.SchinfSendMessage(&msg)
 
 	if schEno != sch.SchEnoNone {
 
@@ -693,9 +722,9 @@ func (rd udpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch
 //
 // Send message: we might need a singal task to handle the sending later.
 //
-func sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
+func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 
-	if udpReader.conn == nil {
+	if lsnMgr.conn == nil {
 		yclog.LogCallerFileLine("sendUdpMsg: invalid UDP connection")
 		return sch.SchEnoInternal
 	}
@@ -705,12 +734,12 @@ func sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 		return sch.SchEnoParameter
 	}
 
-	if err := udpReader.conn.SetWriteDeadline(time.Now().Add(NgbProtoWriteTimeout)); err != nil {
+	if err := lsnMgr.conn.SetWriteDeadline(time.Now().Add(NgbProtoWriteTimeout)); err != nil {
 		yclog.LogCallerFileLine("sendUdpMsg: SetDeadline failed, err: %s", err.Error())
 		return sch.SchEnoOS
 	}
 
-	sent, err := udpReader.conn.WriteToUDP(buf, toAddr)
+	sent, err := lsnMgr.conn.WriteToUDP(buf, toAddr)
 
 	if err != nil {
 		yclog.LogCallerFileLine("sendUdpMsg: WriteToUDP failed, err: %s", err.Error())
@@ -729,3 +758,38 @@ func sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// Send message with specific scheduler
+//
+func sendUdpMsg(sdl *sch.Scheduler, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
+
+	eno, receiver := sdl.SchinfGetTaskNodeByName(sch.NgbLsnName);
+	if eno != sch.SchEnoNone {
+		yclog.LogCallerFileLine("SendUdpMsg: SchinfMakeMessage failed, eno: %d", eno)
+		return eno
+	}
+
+	var schMsg = sch.SchMessage{}
+
+	req := sch.NblDataReq {
+		Payload:	buf,
+		TgtAddr:	toAddr,
+	}
+
+	if eno = sdl.SchinfMakeMessage(&schMsg, sender, receiver, sch.EvNblDataReq, &req);
+	eno != sch.SchEnoNone {
+		yclog.LogCallerFileLine("SendUdpMsg: SchinfMakeMessage failed, eno: %d", eno)
+		return eno
+	}
+
+	if eno = sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+
+		yclog.LogCallerFileLine("SendUdpMsg: " +
+			"SchinfSendMessage failed, eno: %d, target: %s",
+			eno, sdl.SchinfGetTaskName(receiver))
+
+		return eno
+	}
+
+	return sch.SchEnoNone
+}

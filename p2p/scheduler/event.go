@@ -29,8 +29,9 @@
 package scheduler
 
 import (
-	ycfg	"github.com/yeeco/p2p/config"
-	um		"github.com/yeeco/p2p/discover/udpmsg"
+	"net"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
+	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 )
 
 
@@ -193,9 +194,18 @@ type NblQueriedInd struct {
 const (
 	EvNblListennerBase	= 1500
 	EvNblMsgInd			= EvNblListennerBase + 1
-	EvNblStop			= EvNblListennerBase + 2
-	EvNblStart			= EvNblListennerBase + 3
+	EvNblStart			= EvNblListennerBase + 2
+	EvNblStop			= EvNblListennerBase + 3
+	EvNblDataReq		= EvNblListennerBase + 4
 )
+
+//
+// EvNblDataReq
+//
+type NblDataReq struct {
+	Payload	[]byte			// payload
+	TgtAddr	*net.UDPAddr	// target address
+}
 
 //
 // Peer manager event

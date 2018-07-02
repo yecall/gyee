@@ -24,7 +24,7 @@ package scheduler
 import(
 	"fmt"
 	"time"
-	yclog "github.com/yeeco/p2p/logger"
+	yclog "github.com/yeeco/gyee/p2p/logger"
 	"sync"
 )
 
@@ -81,6 +81,11 @@ func SchErrnoString(eno SchErrno) string {
 }
 
 //
+// Export scheduler type
+//
+type Scheduler = scheduler
+
+//
 // User task entry point: notice, parameter ptn would be type of pointer to schTaskNode,
 // the user task should never try to access the field directly, instead, interface func
 // provide by scheduler module should by applied. for example, when user task try to set
@@ -88,7 +93,14 @@ func SchErrnoString(eno SchErrno) string {
 // user task should try to interpret the msg.body by msg.id, which is defined by user
 // task than scheduler itself, of course, timer event is an exception.
 //
-type SchUserTaskEp func(ptn interface{}, msg *SchMessage) SchErrno
+type SchUserTaskEp = func(ptn interface{}, msg *SchMessage) SchErrno
+
+//
+// User task inteface for scheduler
+//
+type SchUserTaskInf interface {
+	TaskProc4Scheduler(ptn interface{}, msg *SchMessage) SchErrno
+}
 
 //
 // message type for scheduling between user tasks
@@ -127,11 +139,6 @@ const (
 )
 
 //
-// Descriptor for a user tack to be created
-//
-const SchMaxGroupSize = 64			// max number of group members
-
-//
 // max mail box size
 //
 const SchMaxMbSize	 = 256
@@ -139,7 +146,7 @@ const SchMaxMbSize	 = 256
 type SchTaskDescription struct {
 	Name	string						// user task name
 	MbSize	int							// mailbox size
-	Ep		SchUserTaskEp				// user task entry point
+	Ep		SchUserTaskInf				// user task entry point
 	Wd		*SchWatchDog				// watchdog
 	Flag	int							// flag: start at once or to be suspended
 	DieCb	func(interface{}) SchErrno	// callbacked when going to die
@@ -175,7 +182,7 @@ type TimerDescription struct {
 //
 type TaskStaticDescription struct {
 	Name	string								// task name
-	Tep		SchUserTaskEp						// task entry point
+	Tep		SchUserTaskInf						// task inteface, it's the user control block which exports its' entry point
 	MbSize	int									// mailbox size, if less than zero, default value applied
 	Wd		SchWatchDog							// watchdog
 	DieCb	func(task interface{}) SchErrno		// callbacked when going to die
@@ -185,61 +192,40 @@ type TaskStaticDescription struct {
 //
 // Scheduler initilization
 //
-func SchinfSchedulerInit() SchErrno {
+func SchinfSchedulerInit() (*Scheduler, SchErrno) {
 	return schimplSchedulerInit()
 }
 
 //
 // Start scheduler
 //
-func SchinfSchedulerStart(tsd []TaskStaticDescription, tpo []string) (SchErrno, *map[string]interface{}){
-	return schimplSchedulerStart(tsd, tpo)
+func (sdl *Scheduler)SchinfSchedulerStart(tsd []TaskStaticDescription, tpo []string) (SchErrno, *map[string]interface{}){
+	return sdl.schimplSchedulerStart(tsd, tpo)
 }
 
 //
 // Create a single task
 //
-func SchinfCreateTask(taskDesc *SchTaskDescription)(SchErrno, interface{}) {
-	return schimplCreateTask((*schTaskDescription)(taskDesc))
-}
-
-//
-// Start a single task
-//
-func SchinfStartTask(name string) SchErrno {
-	return schimplStartTask(name)
+func (sdl *Scheduler)SchinfCreateTask(taskDesc *SchTaskDescription)(SchErrno, interface{}) {
+	return sdl.schimplCreateTask((*schTaskDescription)(taskDesc))
 }
 
 //
 // Start task by task node pointer
 //
-func SchinfStartTaskEx(ptn interface{}) SchErrno {
-	return schimplStartTaskEx(ptn.(*schTaskNode))
-}
-
-//
-// Stop a single task by name
-//
-func SchinfStopTaskByName(name string) SchErrno {
-	return schimplStopTask(name)
+func (sdl *Scheduler)SchinfStartTaskEx(ptn interface{}) SchErrno {
+	return sdl.schimplStartTaskEx(ptn.(*schTaskNode))
 }
 
 //
 // Stop a single task by task node pointer
 //
-func SchinfStopTask(ptn interface{}) SchErrno {
-	if eno := SchinfTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
+func (sdl *Scheduler)SchinfStopTask(ptn interface{}) SchErrno {
+	if eno := sdl.SchinfTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
 		yclog.LogCallerFileLine("SchinfStopTask: SchinfTaskDone failed, eno: %d", eno)
 		return eno
 	}
 	return SchEnoNone
-}
-
-//
-// Delete a single task
-//
-func SchinfDeleteTask(name string) SchErrno {
-	return schimplDeleteTask(name)
 }
 
 //
@@ -248,23 +234,23 @@ func SchinfDeleteTask(name string) SchErrno {
 // by that pointer returned. any actions to the task should be carried out by calling funcs
 // exported here in this file, which would call into the core of the scheduler.
 //
-func SchinfGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
-	return schimplGetTaskNodeByName(name)
+func (sdl *Scheduler)SchinfGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
+	return sdl.schimplGetTaskNodeByName(name)
 }
 
 //
 // Send message to a specific task
 //
-func SchinfSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
+func (sdl *Scheduler)SchinfSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
 
-	eno, src := SchinfGetTaskNodeByName(srcTask)
+	eno, src := sdl.SchinfGetTaskNodeByName(srcTask)
 	if eno != SchEnoNone || src == nil {
 		yclog.LogCallerFileLine("SchinfSendMessageByName: " +
 			"SchinfGetTaskNodeByName failed, name: %s, eno: %d", srcTask, eno)
 		return eno
 	}
 
-	eno, dst := SchinfGetTaskNodeByName(dstTask)
+	eno, dst := sdl.SchinfGetTaskNodeByName(dstTask)
 	if eno != SchEnoNone || dst == nil {
 		yclog.LogCallerFileLine("SchinfSendMessageByName: " +
 			"SchinfGetTaskNodeByName failed, name: %s, eno: %d", dstTask, eno)
@@ -274,17 +260,17 @@ func SchinfSendMessageByName(dstTask string, srcTask string, msg *SchMessage) Sc
 	msg.sender = src.(*schTaskNode)
 	msg.recver = dst.(*schTaskNode)
 
-	return SchinfSendMessage(msg)
+	return sdl.SchinfSendMessage(msg)
 }
 
-func SchinfSendMessage(msg *SchMessage) SchErrno {
-	return schimplSendMsg((*schMessage)(msg))
+func (sdl *Scheduler)SchinfSendMessage(msg *SchMessage) SchErrno {
+	return sdl.schimplSendMsg((*schMessage)(msg))
 }
 
 //
 // Make scheduling message
 //
-func SchinfMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
+func (sdl *Scheduler)SchinfMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
 	if msg == nil || s == nil || r == nil {
 		yclog.LogCallerFileLine("SchinfMakeMessage: invalid parameter(s)")
 		return SchEnoParameter
@@ -297,31 +283,24 @@ func SchinfMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface
 }
 
 //
-// Send message to a specific task group
-//
-func SchinfSendMessageGroup(grp string, msg *SchMessage) (eno SchErrno, failedCount int) {
-	return schimplSendMsg2TaskGroup(grp, (*schMessage)(msg))
-}
-
-//
 // Set a timer
 //
-func SchInfSetTimer(ptn interface{}, tdc *TimerDescription) (eno SchErrno, tid int) {
-	return schimplSetTimer(ptn.(*schTaskNode), (*timerDescription)(tdc))
+func (sdl *Scheduler)SchInfSetTimer(ptn interface{}, tdc *TimerDescription) (eno SchErrno, tid int) {
+	return sdl.schimplSetTimer(ptn.(*schTaskNode), (*timerDescription)(tdc))
 }
 
 //
 // Kill a timer
 //
-func SchinfKillTimer(ptn interface{}, tid int) SchErrno {
-	return schimplKillTimer(ptn.(*schTaskNode), tid)
+func (sdl *Scheduler)SchinfKillTimer(ptn interface{}, tid int) SchErrno {
+	return sdl.schimplKillTimer(ptn.(*schTaskNode), tid)
 }
 
 //
 // Done a task
 //
-func SchinfTaskDone(ptn interface{}, eno SchErrno) SchErrno {
-	return schimplTaskDone(ptn.(*schTaskNode), eno)
+func (sdl *Scheduler)SchinfTaskDone(ptn interface{}, eno SchErrno) SchErrno {
+	return sdl.schimplTaskDone(ptn.(*schTaskNode), eno)
 }
 
 //
@@ -345,29 +324,43 @@ func SchinfGetMessageRecver(msg *SchMessage) string {
 }
 
 //
+// Get scheduler by task node
+//
+func SchinfGetScheduler(ptn interface{}) *Scheduler {
+	return ptn.(*schTaskNode).task.sdl
+}
+
+//
+// Get user task interface exported to scheduler
+//
+func (sdl *Scheduler)SchinfGetUserTaskInf(tn string) interface{} {
+	eno, ptn := sdl.SchinfGetTaskNodeByName(tn)
+	if eno != SchEnoNone {
+		yclog.LogCallerFileLine("SchinfGetUserTaskInf: " +
+			"SchinfGetTaskNodeByName failed, eno: %d, task: %s",
+			eno, tn)
+		return nil
+	}
+	return ptn.(schTaskNode).task.utep
+}
+
+//
 // Get user data area pointer
 //
-func SchinfGetUserDataArea(ptn interface{}) interface{} {
-	return schimplGetUserDataArea(ptn.(*schTaskNode))
+func (sdl *Scheduler)SchinfGetUserDataArea(ptn interface{}) interface{} {
+	return sdl.schimplGetUserDataArea(ptn.(*schTaskNode))
 }
 
 //
 // Set user data area pointer
 //
-func SchinfSetUserDataArea(ptn interface{}, uda interface{}) SchErrno {
-	return schimplSetUserDataArea(ptn.(*schTaskNode), uda)
-}
-
-//
-// Remove user data area pointer
-//
-func SchinfDelUserDataArea(ptn interface{}) SchErrno {
-	return SchinfSetUserDataArea(ptn.(*schTaskNode), nil)
+func (sdl *Scheduler)SchinfSetUserDataArea(ptn interface{}, uda interface{}) SchErrno {
+	return sdl.schimplSetUserDataArea(ptn.(*schTaskNode), uda)
 }
 
 //
 // Get task name
 //
-func SchinfGetTaskName(ptn interface{}) string {
-	return schimplGetTaskName(ptn.(*schTaskNode))
+func (sdl *Scheduler)SchinfGetTaskName(ptn interface{}) string {
+	return sdl.schimplGetTaskName(ptn.(*schTaskNode))
 }

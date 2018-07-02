@@ -22,8 +22,8 @@
 package storer
 
 import (
-	sch 	"github.com/yeeco/p2p/scheduler"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -31,20 +31,34 @@ import (
 //
 const DhtstMgrName = "DhtstMgr"
 
-type dhtStorerManager struct {
+type DhtStorerManager struct {
+	sdl		*sch.Scheduler		// pointer to scheduler
 	name	string				// name
 	tep		sch.SchUserTaskEp	// entry
 }
 
-var dhtstMgr = dhtStorerManager{
-	name:	DhtstMgrName,
-	tep:	DhtstMgrProc,
+//
+// Create storer manager
+//
+func NewDhtstMgr() *DhtStorerManager {
+	var dhtstMgr = DhtStorerManager{
+		name: DhtstMgrName,
+	}
+	dhtstMgr.tep = dhtstMgr.dhtstMgrProc
+	return &dhtstMgr
+}
+
+//
+// Entry point exported to shceduler
+//
+func (dhtstMgr *DhtStorerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return dhtstMgr.tep(ptn, msg)
 }
 
 //
 // store manager entry
 //
-func DhtstMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dhtstMgr *DhtStorerManager)dhtstMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	yclog.LogCallerFileLine("DhtstMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }

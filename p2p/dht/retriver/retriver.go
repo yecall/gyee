@@ -22,8 +22,8 @@
 package retriver
 
 import (
-	sch 	"github.com/yeeco/p2p/scheduler"
-	yclog	"github.com/yeeco/p2p/logger"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -31,20 +31,34 @@ import (
 //
 const DhtreMgrName = "DhtreMgr"
 
-type dhtRetriverManager struct {
+type DhtRetriverManager struct {
+	sdl		*sch.Scheduler		// pointer to scheduler
 	name	string				// name
 	tep		sch.SchUserTaskEp	// entry
 }
 
-var dhtreMgr = dhtRetriverManager{
-	name:	DhtreMgrName,
-	tep:	DhtreMgrProc,
+//
+// Create retriver manager
+//
+func NewDhtreMgr() *DhtRetriverManager {
+	var dhtreMgr = DhtRetriverManager{
+		name: DhtreMgrName,
+	}
+	dhtreMgr.tep = dhtreMgr.dhtreMgrProc
+	return &dhtreMgr
+}
+
+//
+// Entry point exported to shceduler
+//
+func (dhtreMgr *DhtRetriverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return dhtreMgr.tep(ptn, msg)
 }
 
 //
 // retrive manager entry
 //
-func DhtreMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dhtreMgr *DhtRetriverManager)dhtreMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	yclog.LogCallerFileLine("DhtreMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
