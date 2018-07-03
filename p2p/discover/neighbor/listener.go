@@ -133,7 +133,7 @@ func (lsnMgr *ListenerManager) setupConfig() sch.SchErrno {
 
 	var ptCfg *cfg.Cfg4UdpNgbListener = nil
 
-	if ptCfg = cfg.P2pConfig4UdpNgbListener(); ptCfg == nil {
+	if ptCfg = cfg.P2pConfig4UdpNgbListener(lsnMgr.sdl.SchinfGetP2pCfgName()); ptCfg == nil {
 		yclog.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbListener failed")
 		return sch.SchEnoConfig
 	}
@@ -468,6 +468,7 @@ type UdpReaderTask struct {
 	ptnMe		interface{}				// pointer to myself task
 	ptnNgbMgr	interface{}				// pointer to neighbor manager task
 	desc		sch.SchTaskDescription	// description
+	udpMsg		*umsg.UdpMsg			// decode/encode wrapper
 }
 
 //
@@ -501,6 +502,8 @@ func NewUdpReader() *UdpReaderTask {
 			Flag:   sch.SchCreatedGo,
 			DieCb:  nil,
 		},
+
+		udpMsg: umsg.NewUdpMsg(),
 	}
 
 	udpReader.tep		= udpReader.udpReaderLoop
@@ -662,12 +665,12 @@ func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sc
 	var msg sch.SchMessage
 	var eno umsg.UdpMsgErrno
 
-	if eno := umsg.PtrUdpMsg.SetRawMessage(pbuf, len, from); eno != umsg.UdpMsgEnoNone {
+	if eno := rd.udpMsg.SetRawMessage(pbuf, len, from); eno != umsg.UdpMsgEnoNone {
 		yclog.LogCallerFileLine("msgHandler: SetRawMessage failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
-	if eno = umsg.PtrUdpMsg.Decode(); eno != umsg.UdpMsgEnoNone {
+	if eno = rd.udpMsg.Decode(); eno != umsg.UdpMsgEnoNone {
 		yclog.LogCallerFileLine("msgHandler: Decode failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
@@ -677,12 +680,12 @@ func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sc
 	//
 
 	var udpMsgInd = UdpMsgInd {
-		msgType:umsg.PtrUdpMsg.GetDecodedMsgType(),
-		msgBody:umsg.PtrUdpMsg.GetDecodedMsg(),
+		msgType:rd.udpMsg.GetDecodedMsgType(),
+		msgBody:rd.udpMsg.GetDecodedMsg(),
 	}
 
 	// check this message agaigst the endpoint sent it
-	if umsg.PtrUdpMsg.CheckUdpMsgFromPeer(from) != true {
+	if rd.udpMsg.CheckUdpMsgFromPeer(from) != true {
 		yclog.LogCallerFileLine("msgHandler: invalid udp message, CheckUdpMsg failed")
 		return sch.SchEnoUserTask
 	}
@@ -763,7 +766,7 @@ func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.Sc
 //
 func sendUdpMsg(sdl *sch.Scheduler, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 
-	eno, receiver := sdl.SchinfGetTaskNodeByName(sch.NgbLsnName);
+	eno, receiver := sdl.SchinfGetTaskNodeByName(sch.NgbLsnName)
 	if eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("SendUdpMsg: SchinfMakeMessage failed, eno: %d", eno)
 		return eno

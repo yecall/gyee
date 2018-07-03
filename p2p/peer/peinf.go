@@ -19,9 +19,10 @@
  */
 
 package peer
-import "sync"
 
-
+import (
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // Package passed into user's callback
@@ -37,13 +38,14 @@ type P2pPackage4Callback struct {
 // Message from user
 //
 type P2pPackage2Peer struct {
-	IdList			[]PeerId		// peer identity list
-	ProtoId			int				// protocol identity
-	PayloadLength	int				// payload length
-	Payload			[]byte			// payload
-	Extra			interface{}		// extra info: user this field to tell p2p more about this message,
-									// for example, if broadcasting is wanted, then set IdList to nil
-									// and setup thie extra info field.
+	P2pInst			*sch.Scheduler	// p2p network instance
+	IdList			[]PeerId				// peer identity list
+	ProtoId			int						// protocol identity
+	PayloadLength	int						// payload length
+	Payload			[]byte					// payload
+	Extra			interface{}				// extra info: user this field to tell p2p more about this message,
+											// for example, if broadcasting is wanted, then set IdList to nil
+											// and setup thie extra info field.
 }
 
 //
@@ -86,6 +88,7 @@ type P2pIndConnStatusPara struct {
 }
 
 type P2pIndPeerClosedPara struct {
+	Ptn			interface{}			// task node pointer
 	PeerId		PeerId				// peer identity
 }
 
@@ -96,14 +99,5 @@ type P2pInfIndCallback func(what int, para interface{}) interface{}
 //
 type P2pInfPkgCallback func(msg *P2pPackage4Callback) interface{}
 
-//
-// Indication handler
-//
-var P2pIndHandler P2pInfIndCallback = nil
-
-//
-// Lock for syncing callbacks
-//
-var Lock4Cb sync.Mutex
 
 

@@ -22,6 +22,7 @@
 package shell
 
 import (
+	ycfg	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
@@ -44,43 +45,47 @@ var noDog = sch.SchWatchDog {
 	HaveDog:false,
 }
 
-var TaskStaticTab = []sch.TaskStaticDescription {
+//
+// Create description about static tasks
+//
+func P2pCreateStaticTaskTab() []sch.TaskStaticDescription {
 
-	//
-	// Following are static tasks for ycp2p module internal. Notice that fields of struct
-	// sch.TaskStaticDescription like MbSize, Wd, Flag will be set to default values internal
-	// scheduler, please see function schimplSchedulerStart for details pls.
-	//
+	return []sch.TaskStaticDescription {
 
-	{	Name:dcv.DcvMgrName,		Tep:dcv.NewDcvMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:tab.TabMgrName,		Tep:tab.NewTabMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:tab.NdbcName,			Tep:tab.NewNdbCleaner(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:ngb.LsnMgrName,		Tep:ngb.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:ngb.NgbMgrName,		Tep:ngb.NewNgbMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:peer.PeerLsnMgrName,	Tep:peer.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:peer.PeerMgrName,		Tep:peer.NewPeerMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		//
+		// Following are static tasks for ycp2p module internal. Notice that fields of struct
+		// sch.TaskStaticDescription like MbSize, Wd, Flag will be set to default values internal
+		// scheduler, please see function schimplSchedulerStart for details pls.
+		//
 
-	{	Name:dht.DhtMgrName,		Tep:dht.NewDhtMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:dhtro.DhtroMgrName,	Tep:dhtro.NewDhtrMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:dhtch.DhtchMgrName,	Tep:dhtch.NewDhtchMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:dhtre.DhtreMgrName,	Tep:dhtre.NewDhtreMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:dhtst.DhtstMgrName,	Tep:dhtst.NewDhtstMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-	{	Name:dhtsy.DhtsyMgrName,	Tep:dhtsy.NewDhtsyMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:dcv.DcvMgrName,		Tep:dcv.NewDcvMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:tab.TabMgrName,		Tep:tab.NewTabMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:tab.NdbcName,			Tep:tab.NewNdbCleaner(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:ngb.LsnMgrName,		Tep:ngb.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:ngb.NgbMgrName,		Tep:ngb.NewNgbMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:peer.PeerLsnMgrName,	Tep:peer.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:peer.PeerMgrName,		Tep:peer.NewPeerMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
 
-	//
-	// More static tasks outside ycp2p can be appended bellow
-	// handly or by calling function AppendStaticTasks. When
-	// function SchinfSchedulerStart called, currently, all
-	// tasks registered here would be created and scheduled
-	// to go in order.
-	//
-	// Since static tasks might depend each other, the order
-	// to be scheduled to go might have to be taken into account
-	// in the future, we leave this possible work later.
-	//
+		{	Name:dht.DhtMgrName,		Tep:dht.NewDhtMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:dhtro.DhtroMgrName,	Tep:dhtro.NewDhtrMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:dhtch.DhtchMgrName,	Tep:dhtch.NewDhtchMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:dhtre.DhtreMgrName,	Tep:dhtre.NewDhtreMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:dhtst.DhtstMgrName,	Tep:dhtst.NewDhtstMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+		{	Name:dhtsy.DhtsyMgrName,	Tep:dhtsy.NewDhtsyMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+
+		//
+		// More static tasks outside ycp2p can be appended bellow
+		// handly or by calling function AppendStaticTasks. When
+		// function SchinfSchedulerStart called, currently, all
+		// tasks registered here would be created and scheduled
+		// to go in order.
+		//
+		// Since static tasks might depend each other, the order
+		// to be scheduled to go might have to be taken into account
+		// in the future, we leave this possible work later.
+		//
+	}
 }
-
-var taskName2TasNode *map[string]interface{} = nil
 
 //
 // Poweron order of static user tasks
@@ -108,17 +113,18 @@ func AppendStaticTasks(
 	name string,
 	tep sch.SchUserTaskInf,
 	dcb func(interface{})sch.SchErrno,
-	dog sch.SchWatchDog) sch.SchErrno {
+	dog sch.SchWatchDog,
+	tab []sch.TaskStaticDescription) sch.SchErrno {
 
-	TaskStaticTab = append(TaskStaticTab, sch.TaskStaticDescription{Name:name, Tep:tep, DieCb:dcb, Wd:dog})
+	tab = append(tab, sch.TaskStaticDescription{Name:name, Tep:tep, DieCb:dcb, Wd:dog})
 	return sch.SchEnoNone
 }
 
 //
 // Init p2p
 //
-func P2pInit() (*sch.Scheduler, sch.SchErrno) {
-	return sch.SchinfSchedulerInit()
+func P2pCreateInstance(cfg *ycfg.Config) (*sch.Scheduler, sch.SchErrno) {
+	return sch.SchinfSchedulerInit(cfg)
 }
 
 //
@@ -130,9 +136,10 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 	// Start all static tasks
 	//
 
+	var taskName2TaskNode *map[string]interface{} = nil
 	var eno sch.SchErrno
 
-	eno, taskName2TasNode = sdl.SchinfSchedulerStart(TaskStaticTab, TaskStaticPoweronOrder)
+	eno, taskName2TaskNode = sdl.SchinfSchedulerStart(P2pCreateStaticTaskTab(), TaskStaticPoweronOrder)
 
 	if eno != sch.SchEnoNone {
 
@@ -140,7 +147,7 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 			"SchinfSchedulerStart failed, eno: %d",
 			eno	)
 
-		return eno, taskName2TasNode
+		return eno, taskName2TaskNode
 	}
 
 	//
@@ -150,7 +157,8 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 
 	var pmEno peer.PeMgrErrno
 
-	pmEno = peer.PeMgrInited()
+	peMgr := sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+	pmEno = peMgr.PeMgrInited()
 
 	if pmEno != peer.PeMgrEnoNone {
 
@@ -158,14 +166,14 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 			"peer manager init failed, eno: %d",
 			pmEno)
 
-		return sch.SchEnoUserTask, taskName2TasNode
+		return sch.SchEnoUserTask, taskName2TaskNode
 	}
 
 	//
 	// Startup peer manager
 	//
 
-	pmEno = peer.PeMgrStart()
+	pmEno = peMgr.PeMgrStart()
 
 	if pmEno != peer.PeMgrEnoNone {
 
@@ -173,10 +181,10 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 			"PeMgrStart failed, eno: %d",
 			pmEno)
 
-		return sch.SchEnoUserTask, taskName2TasNode
+		return sch.SchEnoUserTask, taskName2TaskNode
 	}
 
-	return sch.SchEnoNone, taskName2TasNode
+	return sch.SchEnoNone, taskName2TaskNode
 }
 
 

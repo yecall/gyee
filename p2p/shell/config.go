@@ -22,43 +22,26 @@
 package shell
 
 import (
-	"fmt"
 	ycfg	"github.com/yeeco/gyee/p2p/config"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
-// Get default configuration pointer
+// Get default configuration
 //
 func ShellDefaultConfig() *ycfg.Config {
-
-	cfg := ycfg.P2pDefaultConfig()
-
-	yclog.LogCallerFileLine("ShellDefaultConfig: %s",
-		fmt.Sprintf("%+v", *cfg))
-
-	return cfg
+	return ycfg.P2pDefaultConfig()
 }
 
 //
 // Set configuration
 //
-func ShellSetConfig(cfg *ycfg.Config) ycfg.P2pCfgErrno {
-
-	if cfg == nil {
-		yclog.LogCallerFileLine("ShellSetConfig: invalid parameter")
-		return ycfg.PcfgEnoParameter
-	}
-
-	yclog.LogCallerFileLine("ShellSetConfig: %s",
-		fmt.Sprintf("%+v", *cfg))
-
-	return ycfg.P2pSetConfig(cfg)
+func ShellSetConfig(name string, cfg *ycfg.Config) (string, ycfg.P2pCfgErrno) {
+	return ycfg.P2pSetConfig(name, cfg)
 }
 
 //
-// Set configuration
+// Get configuration
 //
-func ShellGetConfig() *ycfg.Config {
-	return ycfg.P2pGetConfig()
+func ShellGetConfig(name string) *ycfg.Config {
+	return ycfg.P2pGetConfig(name)
 }

@@ -144,7 +144,7 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	// Get configuration
 	//
 
-	lsnMgr.cfg = ycfg.P2pConfig4PeerListener()
+	lsnMgr.cfg = ycfg.P2pConfig4PeerListener(lsnMgr.sdl.SchinfGetP2pCfgName())
 
 	if lsnMgr.cfg == nil {
 		yclog.LogCallerFileLine("lsnMgrPoweron: invalid configuration pointer")
@@ -316,9 +316,9 @@ type acceptTskCtrlBlock struct {
 // message for sch.EvPeLsnConnAcceptedInd
 //
 type msgConnAcceptedInd struct {
-	conn		net.Conn
-	localAddr	*net.TCPAddr
-	remoteAddr	*net.TCPAddr
+	conn		net.Conn		// underlying network connection
+	localAddr	*net.TCPAddr	// local tcp address
+	remoteAddr	*net.TCPAddr	// remote tcp address
 }
 
 //

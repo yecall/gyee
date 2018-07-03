@@ -24,6 +24,7 @@ package scheduler
 import (
 	"sync"
 	"time"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
@@ -153,17 +154,18 @@ type scheduler struct {
 	// practice really, we might take it into account future ...
 	//
 
-	lock             sync.Mutex                        // lock to protect the scheduler
-	tkFree           *schTaskNode                      // free task queue
-	freeSize         int                               // number of nodes in free
-	tkBusy           *schTaskNode                      // busy task queue in scheduling
-	tkMap            map[schTaskName]*schTaskNode      // map task name to pointer of running task node
-	busySize         int                               // number of nodes in busy
-	tmFree           *schTmcbNode                      // free timer node queue
-	tmFreeSize       int                               // free timer node queue size
-	tmMap            map[*schTmcbNode]*schTaskNode     // map busy timer node pointer to its' owner task node pointer
-	schTaskNodePool  [schTaskNodePoolSize]schTaskNode  // task node pool
-	schTimerNodePool [schTimerNodePoolSize]schTmcbNode // timer node pool
+	lock				sync.Mutex							// lock to protect the scheduler
+	p2pCfg				*ycfg.Config						// p2p network configuration
+	tkFree				*schTaskNode						// free task queue
+	freeSize			int									// number of nodes in free
+	tkBusy				*schTaskNode						// busy task queue in scheduling
+	tkMap				map[schTaskName]*schTaskNode		// map task name to pointer of running task node
+	busySize			int									// number of nodes in busy
+	tmFree				*schTmcbNode						// free timer node queue
+	tmFreeSize			int									// free timer node queue size
+	tmMap				map[*schTmcbNode]*schTaskNode		// map busy timer node pointer to its' owner task node pointer
+	schTaskNodePool		[schTaskNodePoolSize]schTaskNode	// task node pool
+	schTimerNodePool	[schTimerNodePoolSize]schTmcbNode	// timer node pool
 }
 
 //

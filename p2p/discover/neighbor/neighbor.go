@@ -759,33 +759,13 @@ func (inst *neighborInst) NgbProtoPingTimeout() NgbProtoErrno {
 func (ni *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
 
 	//
-	// here we are called while task is exiting, we need to free resources had been
-	// allocated to the instance
-	//
-
-	var inst *neighborInst
-
-	//
-	// get user data pointer which points to our instance
-	//
-
-	if inst = inst.sdl.SchinfGetUserDataArea(ptn).(*neighborInst); inst == nil {
-
-		yclog.LogCallerFileLine("NgbProtoDieCb: " +
-			"invalid user data area, name: %s",
-			inst.sdl.SchinfGetTaskName(ptn))
-
-		return sch.SchEnoInternal
-	}
-
-	//
 	// kill any timer if needed, should not care the result returned from
 	// scheduler, for timer might have been killed by scheduler.
 	//
 
 	if ni.tidPP != sch.SchInvalidTid {
 
-		if eno := inst.sdl.SchinfKillTimer(ni.ptn, ni.tidPP); eno != sch.SchEnoNone {
+		if eno := ni.sdl.SchinfKillTimer(ni.ptn, ni.tidPP); eno != sch.SchEnoNone {
 
 			yclog.LogCallerFileLine("NgbProtoDieCb: " +
 				"SchinfKillTimer fialed, eno: %d",
@@ -795,7 +775,7 @@ func (ni *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
 
 	if ni.tidFN != sch.SchInvalidTid {
 
-		if eno := inst.sdl.SchinfKillTimer(ni.ptn, ni.tidFN); eno != sch.SchEnoNone {
+		if eno := ni.sdl.SchinfKillTimer(ni.ptn, ni.tidFN); eno != sch.SchEnoNone {
 
 			yclog.LogCallerFileLine("NgbProtoDieCb: " +
 				"SchinfKillTimer fialed, eno: %d",
@@ -807,10 +787,10 @@ func (ni *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
 	// clean the map
 	//
 
-	inst.ngbMgr.cleanMap(inst.name)
+	ni.ngbMgr.cleanMap(ni.name)
 
 	//
-	// More ... ?
+	// any more ...?
 	//
 
 	return sch.SchEnoNone
@@ -945,16 +925,16 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	var ptnTab interface{}
 
+	ngbMgr.ptnMe = ptn
+	ngbMgr.sdl = sch.SchinfGetScheduler(ptn)
+	eno, ptnTab = ngbMgr.sdl.SchinfGetTaskNodeByName(sch.TabMgrName)
+
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("PoweronHandler: " +
 			"setupConfig failed, eno: %d",
 			eno)
 		return eno
 	}
-
-	ngbMgr.ptnMe = ptn
-	ngbMgr.sdl = sch.SchinfGetScheduler(ptn)
-	eno, ptnTab = ngbMgr.sdl.SchinfGetTaskNodeByName(sch.TabMgrName)
 
 	if 	eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("PoweronHandler: " +
@@ -1288,23 +1268,30 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	var umNodes = make([]*um.Node, 0)
 
 	local := ngbMgr.localNode()
-	tabMgr := ngbMgr.sdl.SchinfGetUserTaskInf(sch.TabMgrName).(*tab.TableManager)
+	tabMgr := ngbMgr.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
 	nodes = append(nodes, tabMgr.TabClosest(tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
+
+	cfgNode := ycfg.Node{
+		IP:		ngbMgr.cfg.IP,
+		UDP:	ngbMgr.cfg.UDP,
+		TCP:	ngbMgr.cfg.TCP,
+		ID:		ngbMgr.cfg.ID,
+	}
 
 	if len(nodes) == 0 {
 
-		nodes = append(nodes, tab.TabBuildNode(&ycfg.PtrConfig.Local))
+		nodes = append(nodes, tab.TabBuildNode(&cfgNode))
 
 	} else if findNode.From.NodeId == findNode.Target {
 
 		num := len(nodes)
 		if num < tab.TabInstQPendingMax {
 
-			nodes = append(nodes, tab.TabBuildNode(&ycfg.PtrConfig.Local))
+			nodes = append(nodes, tab.TabBuildNode(&cfgNode))
 
 		} else {
 
-			nodes[num-1] = tab.TabBuildNode(&ycfg.PtrConfig.Local)
+			nodes[num-1] = tab.TabBuildNode(&cfgNode)
 		}
 	}
 
@@ -1856,11 +1843,11 @@ func expired(ts uint64) bool {
 //
 //Setup configuraion
 //
-func (ngbMgr *NeighborManager) setupConfig() sch.SchErrno {
+func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 
 	var ptCfg *ycfg.Cfg4UdpNgbManager = nil
 
-	if ptCfg = ycfg.P2pConfig4UdpNgbManager(); ptCfg == nil {
+	if ptCfg = ycfg.P2pConfig4UdpNgbManager(ngbMgr.sdl.SchinfGetP2pCfgName()); ptCfg == nil {
 		yclog.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbManager failed")
 		return sch.SchEnoConfig
 	}
@@ -1872,3 +1859,4 @@ func (ngbMgr *NeighborManager) setupConfig() sch.SchErrno {
 
 	return sch.SchEnoNone
 }
+

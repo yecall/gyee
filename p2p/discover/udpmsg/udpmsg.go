@@ -106,11 +106,6 @@ type (
 // protobuf message. for decoding, protobuf message will be extract from
 // the raw one; for encoding, bytes will be wriiten into raw buffer.
 //
-// Notice: since we would only one UDP reader for descovering, we can put
-// an UdpMsg instance here for income messages decoding, but for outcome
-// message decoding, since multiple instances might be activated, each
-// should obtain its' own encoder.
-//
 type UdpMsg struct {
 	Pbuf	*[]byte			// buffer pointer
 	Len		int				// bytes buffered
@@ -119,16 +114,9 @@ type UdpMsg struct {
 	Eno		UdpMsgErrno		// current errno
 }
 
-var udpMsg = UdpMsg {
-	Pbuf:	nil,
-	Len:	0,
-	From:	nil,
-	Msg:	pb.UdpMessage{},
-	Eno:	UdpMsgEnoUnknown,
-}
-
-var PtrUdpMsg = &udpMsg
-
+//
+// errno
+//
 const (
 	UdpMsgEnoNone 		= iota
 	UdpMsgEnoParameter
@@ -139,6 +127,19 @@ const (
 )
 
 type UdpMsgErrno int
+
+//
+// Create UdpMsg object
+//
+func NewUdpMsg() *UdpMsg {
+	return &UdpMsg {
+		Pbuf:	nil,
+		Len:	0,
+		From:	nil,
+		Msg:	pb.UdpMessage{},
+		Eno:	UdpMsgEnoUnknown,
+	}
+}
 
 //
 // Set raw message

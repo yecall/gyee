@@ -40,17 +40,17 @@ const MaxProtocols = ycfg.MaxProtocols
 // Protocol identities
 //
 const (
-	PID_P2P			= pb.ProtocolId_PID_P2P
-	PID_EXT			= pb.ProtocolId_PID_EXT
+	PID_P2P			= pb.ProtocolId_PID_P2P		// p2p internal
+	PID_EXT			= pb.ProtocolId_PID_EXT		// external protocol
 )
 
 //
 // Message identities
 //
 const (
-	MID_HANDSHAKE	= pb.MessageId_MID_HANDSHAKE
-	MID_PING		= pb.MessageId_MID_PING
-	MID_PONG		= pb.MessageId_MID_PONG
+	MID_HANDSHAKE	= pb.MessageId_MID_HANDSHAKE	// handshake
+	MID_PING		= pb.MessageId_MID_PING			// ping
+	MID_PONG		= pb.MessageId_MID_PONG			// pong
 )
 
 //
@@ -94,10 +94,10 @@ type P2pPackage struct {
 // Message for TCP message
 //
 type P2pMessage struct {
-	Mid				uint32
-	Ping			*Pingpong
-	Pong			*Pingpong
-	Handshake		*Handshake
+	Mid				uint32		// message identity
+	Ping			*Pingpong	// ping message
+	Pong			*Pingpong	// pong message
+	Handshake		*Handshake	// handshake message
 }
 
 //

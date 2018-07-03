@@ -38,7 +38,12 @@ import (
 //
 // Configuration pointer
 //
-var p2pCfg *ycfg.Config = nil
+var p2pName2Cfg = make(map[string]*ycfg.Config)
+var p2pInst2Cfg = make(map[*sch.Scheduler]*ycfg.Config)
+
+//
+//
+//
 
 
 //
@@ -52,12 +57,12 @@ var (
 //
 // Done signal for Tx routines
 //
-var doneMap = make(map[peer.PeerId] chan bool)
+var doneMap = make(map[*sch.Scheduler]map[peer.PeerId]chan bool)
 
 //
 // Tx routine
 //
-func txProc(id peer.PeerId) {
+func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 
 	//
 	// This demo simply apply timer with 1s cycle and then sends a string
@@ -65,7 +70,7 @@ func txProc(id peer.PeerId) {
 	// task is done. See bellow pls.
 	//
 
-	if _, dup := doneMap[id]; dup == true {
+	if _, dup := doneMap[p2pInst][id]; dup == true {
 
 		yclog.LogCallerFileLine("txProc: " +
 			"duplicated, id: %s",
@@ -75,7 +80,7 @@ func txProc(id peer.PeerId) {
 	}
 
 	done := make(chan bool, 1)
-	doneMap[id] = done
+	doneMap[p2pInst][id] = done
 	seq := 0
 	pkg := peer.P2pPackage2Peer {
 		IdList: 		make([]peer.PeerId, 0),
@@ -96,14 +101,14 @@ func txProc(id peer.PeerId) {
 
 		pkg.IdList = make([]peer.PeerId, 1)
 
-		for id, _ := range doneMap {
+		for id := range doneMap[p2pInst] {
 
 			txString := fmt.Sprintf("<<<<<<\nseq:%d\n"+
 				"from: %s\n"+
 				"to: %s\n"+
 				">>>>>>",
 				seq,
-				fmt.Sprintf("%X", p2pCfg.Local.ID),
+				fmt.Sprintf("%X", p2pInst2Cfg[p2pInst].Local.ID),
 				fmt.Sprintf("%X", id))
 
 			pkg.IdList[0] = id
@@ -114,7 +119,7 @@ func txProc(id peer.PeerId) {
 				yclog.LogCallerFileLine("txProc: "+
 					"send package failed, eno: %d, id: %s",
 					eno,
-					fmt.Sprintf("%X", p2pCfg.Local.ID))
+					fmt.Sprintf("%X", p2pInst2Cfg[p2pInst].Local.ID))
 			}
 
 			yclog.LogCallerFileLine("txProc: %s", txString)
@@ -148,7 +153,10 @@ txLoop:
 	}
 
 	close(done)
-	delete(doneMap, id)
+	delete(doneMap[p2pInst], id)
+	if len(doneMap[p2pInst]) == 0 {
+		delete(doneMap, p2pInst)
+	}
 
 	yclog.LogCallerFileLine("txProc: " +
 		"exit, id: %s",
@@ -188,7 +196,8 @@ func p2pIndProc(what int, para interface{}) interface{} {
 				eno)
 		}
 
-		go txProc(peer.PeerId(pap.PeerInfo.NodeId))
+		p2pInst := sch.SchinfGetScheduler(pap.Ptn)
+		go txProc(p2pInst, peer.PeerId(pap.PeerInfo.NodeId))
 
 	case shell.P2pIndConnStatus:
 
@@ -203,6 +212,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		//
 
 		psp := para.(*peer.P2pIndConnStatusPara)
+		p2pInst := sch.SchinfGetScheduler(psp.Ptn)
 
 		yclog.LogCallerFileLine("p2pIndProc: " +
 			"P2pIndConnStatus, para: %s",
@@ -221,7 +231,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 					"try to close the instance, peer: %s",
 					fmt.Sprintf("%X", (*peer.PeerId)(&psp.PeerInfo.NodeId)))
 
-				if eno := shell.P2pInfClosePeer((*peer.PeerId)(&psp.PeerInfo.NodeId));
+				if eno := shell.P2pInfClosePeer(p2pInst, (*peer.PeerId)(&psp.PeerInfo.NodeId));
 					eno != shell.P2pInfEnoNone {
 					yclog.LogCallerFileLine("p2pIndProc: "+
 						"P2pInfClosePeer failed, eno: %d, peer: %s",
@@ -239,13 +249,14 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		//
 
 		pcp := para.(*peer.P2pIndPeerClosedPara)
+		p2pInst := sch.SchinfGetScheduler(pcp.Ptn)
 
 		yclog.LogCallerFileLine("p2pIndProc: " +
 			"P2pIndPeerClosed, para: %s",
 			fmt.Sprintf("%+v", *pcp))
 
 
-		if done, ok := doneMap[pcp.PeerId]; ok && done != nil {
+		if done, ok := doneMap[p2pInst][pcp.PeerId]; ok && done != nil {
 			done<-true
 			break
 		}
@@ -298,22 +309,31 @@ func main() {
 
 	//
 	// one can then apply his configurations based on the default by calling
-	// ShellSetConfig with a defferent configuration if he likes to.
+	// ShellSetConfig with a defferent configuration if he likes to. notice
+	// that a configuration name also returned.
 	//
 
 	myCfg := *dftCfg
-	shell.ShellSetConfig(&myCfg)
-	p2pCfg = shell.ShellGetConfig()
+	cfgName := "myCfg"
+	cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
+	p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
 
 	//
-	// init underlying p2p logic and then start
+	// init underlying p2p logic, an instance of p2p returned
 	//
 
-	sdl, eno := shell.P2pInit();
+	p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 	if eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("main: SchinfSchedulerInit failed, eno: %d", eno)
 		return
 	}
+	p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
+
+	//
+	// start p2p instance
+	//
+
+	eno, _ = shell.P2pStart(p2pInst)
 
 	//
 	// register indication handler. notice that please, the indication handler is a
@@ -323,13 +343,11 @@ func main() {
 	// package handler p2pPkgHandler for more please.
 	//
 
-	if eno := shell.P2pInfRegisterCallback(shell.P2pInfIndCb, p2pIndHandler, nil);
+	if eno := shell.P2pInfRegisterCallback(shell.P2pInfIndCb, p2pIndHandler, p2pInst);
 	eno != shell.P2pInfEnoNone {
 		yclog.LogCallerFileLine("main: P2pInfRegisterCallback failed, eno: %d", eno)
 		return
 	}
-
-	eno, _ = shell.P2pStart(sdl)
 
 	yclog.LogCallerFileLine("main: ycp2p started, eno: %d", eno)
 

@@ -136,6 +136,7 @@ type Protocol struct {
 // Node static Configuration parameters
 //
 type Config struct {
+	CfgName			string				// configureation name
 	Version			string				// p2p version
 	PrivateKey		*ecdsa.PrivateKey	// node private key
 	PublicKey		*ecdsa.PublicKey	// node public key
@@ -250,7 +251,7 @@ var dftLocal = Node {
 	ID:		NodeID{0},
 }
 
-var config = Config {
+var defaultConfig = Config {
 	Version:			dftVersion,
 	PrivateKey:			nil,
 	PublicKey:			nil,
@@ -269,19 +270,19 @@ var config = Config {
 	Protocols:			[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
 }
 
-var PtrConfig = &config
+var config = make(map[string] *Config)
 
 //
 // Get default config
 //
 func P2pDefaultConfig() *Config {
-	return &config
+	return &defaultConfig
 }
 
 //
 // P2pSetConfig
 //
-func P2pSetConfig(cfg *Config) P2pCfgErrno {
+func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 
 	//
 	// Update, one SHOULD first call P2pDefaultConfig to get default value, modify
@@ -291,9 +292,8 @@ func P2pSetConfig(cfg *Config) P2pCfgErrno {
 
 	if cfg == nil {
 		yclog.LogCallerFileLine("P2pSetConfig: invalid configuration")
-		return PcfgEnoParameter
+		return name, PcfgEnoParameter
 	}
-	config = *cfg
 
 	//
 	// Check configuration. Notice that we do not need a private key in current
@@ -302,35 +302,35 @@ func P2pSetConfig(cfg *Config) P2pCfgErrno {
 	// nils, key pair will be built, see bellow pls.
 	//
 
-	if config.PrivateKey == nil {
+	if cfg.PrivateKey == nil {
 		yclog.LogCallerFileLine("P2pSetConfig: private key is empty")
 	}
 
-	if config.PublicKey == nil {
+	if cfg.PublicKey == nil {
 		yclog.LogCallerFileLine("P2pSetConfig: public key is empty")
 	}
 
-	if config.MaxPeers == 0 ||
-		config.MaxOutbounds == 0 ||
-		config.MaxInbounds == 0	||
-		config.MaxPeers < config.MaxInbounds + config.MaxOutbounds {
+	if cfg.MaxPeers == 0 ||
+		cfg.MaxOutbounds == 0 ||
+		cfg.MaxInbounds == 0	||
+		cfg.MaxPeers < cfg.MaxInbounds + cfg.MaxOutbounds {
 
 		yclog.LogCallerFileLine("P2pSetConfig: " +
 			"invalid peer number constraint, MaxPeers: %d, MaxOutbounds: %d, MaxInbounds: %d",
-			config.MaxPeers, config.MaxOutbounds, config.MaxInbounds)
+			cfg.MaxPeers, cfg.MaxOutbounds, cfg.MaxInbounds)
 
-		return PcfgEnoParameter
+		return name, PcfgEnoParameter
 	}
 
-	if len(config.Name) == 0 {
+	if len(cfg.Name) == 0 {
 		yclog.LogCallerFileLine("P2pSetConfig: node name is empty")
 	}
 
-	if cap(config.BootstrapNodes) == 0 {
+	if cap(cfg.BootstrapNodes) == 0 {
 		yclog.LogCallerFileLine("P2pSetConfig: BootstrapNodes is empty")
 	}
 
-	if cap(config.StaticNodes) == 0 {
+	if cap(cfg.StaticNodes) == 0 {
 		yclog.LogCallerFileLine("P2pSetConfig: StaticNodes is empty")
 	}
 
@@ -338,38 +338,55 @@ func P2pSetConfig(cfg *Config) P2pCfgErrno {
 	// Seems path.IsAbs does not work under Windows
 	//
 
-	if len(config.NodeDataDir) == 0 /*|| path.IsAbs(config.NodeDataDir) == false*/ {
+	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
 		yclog.LogCallerFileLine("P2pSetConfig: invaid data directory")
-		return PcfgEnoDataDir
+		return name, PcfgEnoDataDir
 	}
 
-	if len(config.NodeDatabase) == 0 {
+	if len(cfg.NodeDatabase) == 0 {
 		yclog.LogCallerFileLine("P2pSetConfig: invalid database name")
-		return PcfgEnoDatabase
+		return name, PcfgEnoDatabase
 	}
 
-	if config.Local.IP == nil {
+	if cfg.Local.IP == nil {
 		yclog.LogCallerFileLine("P2pSetConfig: invalid ip address")
-		return PcfgEnoIpAddr
+		return name, PcfgEnoIpAddr
 	}
+
+	name = strings.Trim(name, " ")
+	if len(name) == 0 {
+		if len(cfg.CfgName) == 0 {
+			yclog.LogCallerFileLine("P2pSetConfig: empty configuration name")
+			return name, PcfgEnoParameter
+		}
+		name = cfg.CfgName
+	}
+	cfg.CfgName = name
+
+	if _, dup := config[name]; dup {
+		yclog.LogCallerFileLine("P2pSetConfig: duplicated configuration name: %s", name)
+		yclog.LogCallerFileLine("P2pSetConfig: old configuration: %+v", *config[name])
+		yclog.LogCallerFileLine("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
+	}
+	config[name] = cfg
 
 	//
 	// setup local node identity from key
 	//
 
-	if p2pSetupLocalNodeId() != PcfgEnoNone {
+	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
 		yclog.LogCallerFileLine("P2pSetConfig: invalid ip address")
-		return PcfgEnoNodeId
+		return name, PcfgEnoNodeId
 	}
 
-	return PcfgEnoNone
+	return name, PcfgEnoNone
 }
 
 //
 // Get global configuration pointer
 //
-func P2pGetConfig() *Config {
-	return &config
+func P2pGetConfig(name string) *Config {
+	return config[name]
 }
 
 //
@@ -473,7 +490,7 @@ func P2pGetUserHomeDir() string {
 	return ""
 }
 
-func p2pBuildPrivateKey() *ecdsa.PrivateKey {
+func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 
 	//
 	// Here we apply the Ethereum crypto package to build node private key:
@@ -485,7 +502,7 @@ func p2pBuildPrivateKey() *ecdsa.PrivateKey {
 	// See bellow please, also see Ethereum function node.NodeKey pls.
 	//
 
-	if config.NodeDataDir == "" {
+	if cfg.NodeDataDir == "" {
 		//key, err := ethereum.GenerateKey()
 		key, err := GenerateKey()
 		if err != nil {
@@ -497,7 +514,7 @@ func p2pBuildPrivateKey() *ecdsa.PrivateKey {
 		return key
 	}
 
-	keyfile := filepath.Join(config.NodeDataDir, config.Name, PcfgEnoIpAddrivateKey)
+	keyfile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
 	//if key, err := ethereum.LoadECDSA(keyfile); err == nil {
 	if key, err := LoadECDSA(keyfile); err == nil {
 		yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
@@ -515,7 +532,7 @@ func p2pBuildPrivateKey() *ecdsa.PrivateKey {
 		return nil
 	}
 
-	instanceDir := filepath.Join(config.NodeDataDir, config.Name)
+	instanceDir := filepath.Join(cfg.NodeDataDir, cfg.Name)
 	if _, err := os.Stat(instanceDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(instanceDir, 0700); err != nil {
 			yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
@@ -561,26 +578,26 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 //
 // Setup local node identity
 //
-func p2pSetupLocalNodeId() P2pCfgErrno {
+func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 
-	if config.PrivateKey != nil {
+	if cfg.PrivateKey != nil {
 
-		config.PublicKey = &config.PrivateKey.PublicKey
+		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 
-	} else if config.PublicKey == nil {
+	} else if cfg.PublicKey == nil {
 
-		config.PrivateKey = p2pBuildPrivateKey()
+		cfg.PrivateKey = p2pBuildPrivateKey(cfg)
 
-		if config.PrivateKey == nil {
+		if cfg.PrivateKey == nil {
 			yclog.LogCallerFileLine("p2pSetupLocalNodeId: " +
 				"p2pBuildPrivateKey failed")
 			return PcfgEnoPrivateKye
 		}
 
-		config.PublicKey = &config.PrivateKey.PublicKey
+		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	}
 
-	pnid := p2pPubkey2NodeId(config.PublicKey)
+	pnid := p2pPubkey2NodeId(cfg.PublicKey)
 
 	if pnid == nil {
 
@@ -588,11 +605,11 @@ func p2pSetupLocalNodeId() P2pCfgErrno {
 			"p2pPubkey2NodeId failed")
 		return PcfgEnoPublicKye
 	}
-	config.Local.ID = *pnid
+	cfg.Local.ID = *pnid
 
 	yclog.LogCallerFileLine("p2pSetupLocalNodeId: " +
 		"local node identity: %s",
-		P2pNodeId2HexString(config.Local.ID))
+		P2pNodeId2HexString(cfg.Local.ID))
 
 	return PcfgEnoNone
 }
@@ -664,78 +681,78 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 //
 // Get configuration of neighbor discovering manager
 //
-func P2pConfig4UdpNgbManager() *Cfg4UdpNgbManager {
+func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 	return &Cfg4UdpNgbManager {
-		IP:		config.Local.IP,
-		UDP:	config.Local.UDP,
-		TCP:	config.Local.TCP,
-		ID:		config.Local.ID,
+		IP:		config[name].Local.IP,
+		UDP:	config[name].Local.UDP,
+		TCP:	config[name].Local.TCP,
+		ID:		config[name].Local.ID,
 	}
 }
 
 //
 // Get configuration of neighbor discovering listener
 //
-func P2pConfig4UdpNgbListener() *Cfg4UdpNgbListener {
+func P2pConfig4UdpNgbListener(name string) *Cfg4UdpNgbListener {
 	return &Cfg4UdpNgbListener {
-		IP:		config.Local.IP,
-		UDP:	config.Local.UDP,
-		TCP:	config.Local.TCP,
-		ID:		config.Local.ID,
+		IP:		config[name].Local.IP,
+		UDP:	config[name].Local.UDP,
+		TCP:	config[name].Local.TCP,
+		ID:		config[name].Local.ID,
 	}
 }
 
 //
 // Get configuration of peer listener
 //
-func P2pConfig4PeerListener() *Cfg4PeerListener {
+func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
 	return &Cfg4PeerListener {
-		IP:			config.Local.IP,
-		Port:		config.Local.TCP,
-		ID:			config.Local.ID,
-		MaxInBounds:config.MaxInbounds,
+		IP:			config[name].Local.IP,
+		Port:		config[name].Local.TCP,
+		ID:			config[name].Local.ID,
+		MaxInBounds:config[name].MaxInbounds,
 	}
 }
 
 //
 // Get configuration of peer manager
 //
-func P2pConfig4PeerManager() *Cfg4PeerManager {
+func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 	return &Cfg4PeerManager {
-		IP:				config.Local.IP,
-		Port:			config.Local.TCP,
-		UDP:			config.Local.UDP,
-		ID:				config.Local.ID,
-		MaxPeers:		config.MaxPeers,
-		MaxOutbounds:	config.MaxOutbounds,
-		MaxInBounds:	config.MaxInbounds,
-		Statics:		config.StaticNodes,
-		NoDial:			config.NoDial,
-		ProtoNum:		config.ProtoNum,
-		Protocols:		config.Protocols,
+		IP:				config[name].Local.IP,
+		Port:			config[name].Local.TCP,
+		UDP:			config[name].Local.UDP,
+		ID:				config[name].Local.ID,
+		MaxPeers:		config[name].MaxPeers,
+		MaxOutbounds:	config[name].MaxOutbounds,
+		MaxInBounds:	config[name].MaxInbounds,
+		Statics:		config[name].StaticNodes,
+		NoDial:			config[name].NoDial,
+		ProtoNum:		config[name].ProtoNum,
+		Protocols:		config[name].Protocols,
 	}
 }
 
 //
 // Get configuration op table manager
 //
-func P2pConfig4TabManager() *Cfg4TabManager {
+func P2pConfig4TabManager(name string) *Cfg4TabManager {
 	return &Cfg4TabManager {
-		Local:			config.Local,
-		BootstrapNodes:	config.BootstrapNodes,
-		DataDir:		config.NodeDataDir,
-		NodeDB:			config.NodeDatabase,
-		BootstrapNode:	config.BootstrapNode,
+		Local:			config[name].Local,
+		BootstrapNodes:	config[name].BootstrapNodes,
+		DataDir:		config[name].NodeDataDir,
+		NodeDB:			config[name].NodeDatabase,
+		BootstrapNode:	config[name].BootstrapNode,
 	}
 }
 
 //
 // Get protocols
 //
-func P2pConfig4Protocols() *Cfg4Protocols {
+func P2pConfig4Protocols(name string) *Cfg4Protocols {
 	return &Cfg4Protocols {
-		ProtoNum: config.ProtoNum,
-		Protocols: config.Protocols,
+		ProtoNum: config[name].ProtoNum,
+		Protocols: config[name].Protocols,
 	}
 }
 

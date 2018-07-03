@@ -24,8 +24,9 @@ package scheduler
 import(
 	"fmt"
 	"time"
-	yclog "github.com/yeeco/gyee/p2p/logger"
 	"sync"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
+	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -192,8 +193,8 @@ type TaskStaticDescription struct {
 //
 // Scheduler initilization
 //
-func SchinfSchedulerInit() (*Scheduler, SchErrno) {
-	return schimplSchedulerInit()
+func SchinfSchedulerInit(cfg *ycfg.Config) (*Scheduler, SchErrno) {
+	return schimplSchedulerInit(cfg)
 }
 
 //
@@ -333,15 +334,15 @@ func SchinfGetScheduler(ptn interface{}) *Scheduler {
 //
 // Get user task interface exported to scheduler
 //
-func (sdl *Scheduler)SchinfGetUserTaskInf(tn string) interface{} {
+func (sdl *Scheduler)SchinfGetUserTaskIF(tn string) interface{} {
 	eno, ptn := sdl.SchinfGetTaskNodeByName(tn)
 	if eno != SchEnoNone {
-		yclog.LogCallerFileLine("SchinfGetUserTaskInf: " +
+		yclog.LogCallerFileLine("SchinfGetUserTaskIF: " +
 			"SchinfGetTaskNodeByName failed, eno: %d, task: %s",
 			eno, tn)
 		return nil
 	}
-	return ptn.(schTaskNode).task.utep
+	return ptn.(*schTaskNode).task.utep
 }
 
 //
@@ -363,4 +364,11 @@ func (sdl *Scheduler)SchinfSetUserDataArea(ptn interface{}, uda interface{}) Sch
 //
 func (sdl *Scheduler)SchinfGetTaskName(ptn interface{}) string {
 	return sdl.schimplGetTaskName(ptn.(*schTaskNode))
+}
+
+//
+// Get p2p network configuration name
+//
+func (sdl *Scheduler)SchinfGetP2pCfgName() string {
+	return sdl.p2pCfg.CfgName
 }

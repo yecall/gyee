@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"github.com/yeeco/gyee/p2p/peer"
 	yclog "github.com/yeeco/gyee/p2p/logger"
-	"github.com/yeeco/gyee/p2p/scheduler"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
 
@@ -86,7 +86,7 @@ const (
 	P2pIndPeerClosed	= peer.P2pIndPeerClosed		// indication for peer connection closed
 )
 
-func P2pInfRegisterCallback(what int, cb interface{}, ptn interface{}) P2pInfErrno {
+func P2pInfRegisterCallback(what int, cb interface{}, target interface{}) P2pInfErrno {
 
 	if what != P2pInfIndCb && what != P2pInfPkgCb {
 		yclog.LogCallerFileLine("P2pInfRegisterCallback: " +
@@ -95,33 +95,43 @@ func P2pInfRegisterCallback(what int, cb interface{}, ptn interface{}) P2pInfErr
 		return P2pInfEnoParameter
 	}
 
+
 	if what == P2pInfIndCb {
-		if peer.P2pIndHandler != nil {
+
+		sdl := target.(*sch.Scheduler)
+		peMgr := sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+
+		if peMgr.P2pIndHandler != nil {
 			yclog.LogCallerFileLine("P2pInfRegisterCallback: old handler will be overlapped")
 		}
+
 		if cb == nil {
 			yclog.LogCallerFileLine("P2pInfRegisterCallback: user registers nil indication handler")
 		}
-		peer.Lock4Cb.Lock()
-		peer.P2pIndHandler = cb.(peer.P2pInfIndCallback)
-		peer.Lock4Cb.Unlock()
+
+		peMgr.Lock4Cb.Lock()
+		peMgr.P2pIndHandler = cb.(peer.P2pInfIndCallback)
+		peMgr.Lock4Cb.Unlock()
+
 		return P2pInfEnoNone
 	}
 
-	if ptn == nil {
+	var peerInst = target
+
+	if peerInst == nil {
 		yclog.LogCallerFileLine("P2pInfRegisterCallback: nil task node pointer")
 		return P2pInfEnoParameter
 	}
 
 	yclog.LogCallerFileLine("P2pInfRegisterCallback: " +
 		"target instance: %s",
-		scheduler.SchinfGetTaskName(ptn))
+		sch.SchinfGetScheduler(peerInst).SchinfGetTaskName(peerInst))
 
 	if cb == nil {
 		yclog.LogCallerFileLine("P2pInfRegisterCallback: user registers nil package handler")
 	}
 
-	if eno := peer.SetP2pkgCallback(cb, ptn); eno != peer.PeMgrEnoNone {
+	if eno := peer.SetP2pkgCallback(cb, peerInst); eno != peer.PeMgrEnoNone {
 		yclog.LogCallerFileLine("P2pInfRegisterCallback: " +
 			"SetP2pkgCallback failed, eno: %d",
 			eno)
@@ -162,21 +172,27 @@ func P2pInfSendPackage(pkg *peer.P2pPackage2Peer) P2pInfErrno {
 //
 // Disconnect peer
 //
-func P2pInfClosePeer(id *peer.PeerId) P2pInfErrno {
-	if eno := peer.ClosePeer(id); eno != peer.PeMgrEnoNone {
+func P2pInfClosePeer(sdl *sch.Scheduler, id *peer.PeerId) P2pInfErrno {
+
+	peMgr := sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+
+	if eno := peMgr.ClosePeer(id); eno != peer.PeMgrEnoNone {
+
 		yclog.LogCallerFileLine("P2pInfSendPackage: " +
 			"ClosePeer failed, eno: %d, peer: %s",
 			eno,
 			fmt.Sprintf("%+v", *id))
+
 		return P2pInfEnoInternal
 	}
+
 	return P2pInfEnoNone
 }
 
 //
-// Free total p2p all
+// Turn off specific p2p instance
 //
-func P2pInfPoweroff() P2pInfErrno {
+func P2pInfPoweroff(p2pInst *sch.Scheduler) P2pInfErrno {
 	yclog.LogCallerFileLine("P2pInfPoweroff: not supported yet")
 	return P2pInfEnoNotImpl
 }

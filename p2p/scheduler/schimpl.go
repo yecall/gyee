@@ -25,6 +25,7 @@ import (
 	"time"
 	"strings"
 	golog	"log"
+	ycfg	"github.com/yeeco/gyee/p2p/config"
 	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -53,9 +54,15 @@ var rawTmTsk = schTaskNode {
 //
 // Scheduler initilization
 //
-func schimplSchedulerInit() (*scheduler, SchErrno) {
+func schimplSchedulerInit(cfg *ycfg.Config) (*scheduler, SchErrno) {
 
 	var sdl = new(scheduler)
+
+	//
+	// backup p2p network configuration
+	//
+
+	sdl.p2pCfg = cfg
 
 	//
 	// make maps

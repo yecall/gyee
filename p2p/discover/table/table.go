@@ -328,6 +328,9 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 
 	var eno TabMgrErrno = TabMgrEnoNone
 
+	tabMgr.ptnMe = ptn
+	tabMgr.sdl = sch.SchinfGetScheduler(ptn)
+
 	//
 	// fetch configurations
 	//
@@ -811,7 +814,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 			TCP: msg.Pong.From.TCP,
 			ID:  msg.Pong.From.NodeId,
 		},
-		sha: *tabNodeId2Hash(NodeID(msg.Pong.From.NodeId)),
+		sha: *TabNodeId2Hash(NodeID(msg.Pong.From.NodeId)),
 	}
 
 	if eno := tabMgr.tabUpdateNodeDb4Bounding(&n, nil, &pot);
@@ -1086,7 +1089,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 	}
 
 	ndbc.sdl = sch.SchinfGetScheduler(ptn)
-	ndbc.tabMgr = ndbc.sdl.SchinfGetUserTaskInf(TabMgrName).(*TableManager)
+	ndbc.tabMgr = ndbc.sdl.SchinfGetUserTaskIF(TabMgrName).(*TableManager)
 
 	var tmd  = sch.TimerDescription {
 		Name:	NdbcName + "_autoclean",
@@ -1180,7 +1183,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 		return TabMgrEnoParameter
 	}
 
-	cfg := ycfg.P2pConfig4TabManager()
+	cfg := ycfg.P2pConfig4TabManager(tabMgr.sdl.SchinfGetP2pCfgName())
 	if cfg == nil {
 		yclog.LogCallerFileLine("tabGetConfig: P2pConfig4TabManager failed")
 		return TabMgrEnoConfig
@@ -1195,7 +1198,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	for idx, n := range cfg.BootstrapNodes {
 		tabCfg.bootstrapNodes[idx] = new(Node)
 		tabCfg.bootstrapNodes[idx].Node = *n
-		tabCfg.bootstrapNodes[idx].sha = *tabNodeId2Hash(NodeID(n.ID))
+		tabCfg.bootstrapNodes[idx].sha = *TabNodeId2Hash(NodeID(n.ID))
 	}
 
 	return TabMgrEnoNone
@@ -1224,7 +1227,7 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 //
 // Node identity to sha
 //
-func tabNodeId2Hash(id NodeID) *Hash {
+func TabNodeId2Hash(id NodeID) *Hash {
 	h := sha256.Sum256(id[:])
 	return (*Hash)(&h)
 }
@@ -1237,7 +1240,7 @@ func (tabMgr *TableManager)tabSetupLocalHashId() TabMgrErrno {
 		yclog.LogCallerFileLine("tabSetupLocalHashId: hash identity should be 32 bytes")
 		return TabMgrEnoParameter
 	}
-	var h = tabNodeId2Hash(NodeID(tabMgr.cfg.local.ID))
+	var h = TabNodeId2Hash(NodeID(tabMgr.cfg.local.ID))
 	tabMgr.shaLocal = *h
 	return TabMgrEnoNone
 }
@@ -1253,7 +1256,6 @@ func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno 
 	}
 
 	var eno = sch.SchEnoNone
-	tabMgr.ptnMe = ptnMe
 
 	if eno, tabMgr.ptnNgbMgr = tabMgr.sdl.SchinfGetTaskNodeByName(sch.NgbMgrName); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("tabRelatedTaskPrepare: " +
@@ -1443,7 +1445,7 @@ func (tabMgr *TableManager)tabClosest(target NodeID, size int) []*Node {
 		return nil
 	}
 
-	ht := tabNodeId2Hash(target)
+	ht := TabNodeId2Hash(target)
 	dt := tabMgr.tabLog2Dist(tabMgr.shaLocal, *ht)
 
 	var addClosest = func (bk *bucket) int {
@@ -1970,7 +1972,7 @@ func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 			TCP: n.TCP,
 			ID:  n.NodeId,
 		},
-		sha: *tabNodeId2Hash(id),
+		sha: *TabNodeId2Hash(id),
 	}
 
 	if err := tabMgr.nodeDb.updateNode(&node); err != nil {
@@ -2051,7 +2053,7 @@ func (tabMgr *TableManager)tabStartTimer(inst *instCtrlBlock, tmt int, dur time.
 //
 func (tabMgr *TableManager)tabBucketFindNode(id NodeID) (int, int, TabMgrErrno) {
 
-	h := tabNodeId2Hash(id)
+	h := TabNodeId2Hash(id)
 	d := tabMgr.tabLog2Dist(tabMgr.shaLocal, *h)
 	b := tabMgr.buckets[d]
 
@@ -2300,7 +2302,7 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastPing *time.Time, las
 	yclog.LogCallerFileLine("tabBucketAddNode: node: %s", fmt.Sprintf("%+v", *n))
 
 	id := NodeID(n.NodeId)
-	h := tabNodeId2Hash(id)
+	h := TabNodeId2Hash(id)
 	d := tabMgr.tabLog2Dist(tabMgr.shaLocal, *h)
 	b := tabMgr.buckets[d]
 
@@ -2335,7 +2337,7 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastPing *time.Time, las
 			ID:		n.NodeId,
 		}
 
-		be.sha = *tabNodeId2Hash(id)
+		be.sha = *TabNodeId2Hash(id)
 		be.addTime = time.Now()
 		be.lastPing = *lastPing
 		be.lastPong = *lastPong
@@ -2395,7 +2397,7 @@ kickSelected:
 		ID:		n.NodeId,
 	}
 
-	beKicked.sha = *tabNodeId2Hash(id)
+	beKicked.sha = *TabNodeId2Hash(id)
 	beKicked.addTime = time.Now()
 	beKicked.lastPing = *lastPing
 	beKicked.lastPong = *lastPong
@@ -2601,7 +2603,7 @@ func (tabMgr *TableManager)tabAddPendingBoundInst(node *um.Node) TabMgrErrno {
 			TCP:	node.TCP,
 			ID:		node.NodeId,
 		},
-		sha: *tabNodeId2Hash(NodeID(node.NodeId)),
+		sha: *TabNodeId2Hash(NodeID(node.NodeId)),
 	}
 
 	tabMgr.boundPending = append(tabMgr.boundPending, &n)
@@ -2921,7 +2923,7 @@ func (tabMgr *TableManager)TabUpdateNode(umn *um.Node) TabMgrErrno {
 			TCP: umn.TCP,
 			ID:  ycfg.NodeID(umn.NodeId),
 		},
-		sha: *tabNodeId2Hash(NodeID(umn.NodeId)),
+		sha: *TabNodeId2Hash(NodeID(umn.NodeId)),
 	}
 
 	if err := tabMgr.nodeDb.updateNode(&n); err != nil {
@@ -2970,6 +2972,6 @@ func TabBuildNode(pn *ycfg.Node) *Node {
 			TCP: pn.TCP,
 			ID:  ycfg.NodeID(pn.ID),
 		},
-		sha: *tabNodeId2Hash(NodeID(pn.ID)),
+		sha: *TabNodeId2Hash(NodeID(pn.ID)),
 	}
 }
