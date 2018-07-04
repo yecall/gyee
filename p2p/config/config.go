@@ -78,10 +78,7 @@ const (
 const P2pMaxBootstrapNodes = 32
 
 var BootstrapNodeUrl = []string {
-	//"2449D3414F03086CE20802BA87182AD84F53999AD4C2FF6E3A757A45C06CD8755ACB9DDD9A2423F41A6051EE03C2525E4ADF411EB7C039E40912D4457F87A969@192.168.2.178:30303:30303",
-	"7552072DFE9BCB9F51FD65459E9AEF77FE02D4210C227668663A6E81792CE3216FB7CDBD8AA589C49D0279824F6011D2719C1540B42B24F94A9C3006C98388DB@192.168.2.129:30303:30303",
-	//"C420E65B2171543A3D3B746327C6F099D5DA21449B1BD17A822FCEF010890059C2EC44FEF8A8B992D4960E69A58C892687FCFF888F39C3D65A5F79A68690F3A3@192.168.2.102:30303:30303",
-	//"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.107:30303:30303",
+	"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.190:30303:30303",
 }
 
 //
@@ -150,6 +147,7 @@ type Config struct {
 	NodeDatabase	string				// node database
 	ListenAddr		string				// address listened
 	NoDial			bool				// outboundless flag
+	NoAccept		bool				// inboundless flag
 	BootstrapNode	bool				// bootstrap node flag
 	Local			Node				// myself
 	ProtoNum		uint32				// local protocol number
@@ -220,8 +218,8 @@ type Cfg4TabManager struct {
 // Configuration about protocols supported
 //
 type Cfg4Protocols struct {
-	ProtoNum  uint32     // local protocol number
-	Protocols []Protocol // local protocol table
+	ProtoNum  uint32     	// local protocol number
+	Protocols []Protocol	// local protocol table
 }
 
 //
@@ -245,7 +243,7 @@ const (
 )
 
 var dftLocal = Node {
-	IP:		net.IPv4(192,168,2,102),
+	IP:		net.IPv4(192,168,2,144),
 	UDP:	dftUdpPort,
 	TCP:	dftTcpPort,
 	ID:		NodeID{0},
@@ -264,6 +262,7 @@ var defaultConfig = Config {
 	NodeDataDir:		P2pDefaultDataDir(true),
 	NodeDatabase:		datadirNodeDatabase,
 	NoDial:				false,
+	NoAccept:			false,
 	BootstrapNode:		false,
 	Local:				dftLocal,
 	ProtoNum:			1,
