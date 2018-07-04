@@ -87,6 +87,7 @@ func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 	doneMap[p2pInst] = idMap
 
 	pkg := peer.P2pPackage2Peer {
+		P2pInst:		p2pInst,
 		IdList: 		make([]peer.PeerId, 0),
 		ProtoId:		int(peer.PID_EXT),
 		PayloadLength:	0,
