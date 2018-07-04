@@ -1388,7 +1388,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 	if peMgr.P2pIndHandler != nil {
 
 		para := P2pIndPeerClosedPara {
-			Ptn:		peMgr,
+			Ptn:		peMgr.ptnMe,
 			PeerId:		PeerId(cfm.peNode.ID),
 		}
 

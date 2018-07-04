@@ -655,10 +655,14 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 	// deal with neighbors reported
 	//
 
+	yclog.LogCallerFileLine("tabMgrFindNodeRsp: number of neighbor: %d", len(msg.Neighbors.Nodes))
+
 	for _, node := range msg.Neighbors.Nodes {
 		if eno := tabMgr.tabAddPendingBoundInst(node); eno != TabMgrEnoNone {
 			yclog.LogCallerFileLine("tabMgrFindNodeRsp: tabAddPendingBoundInst failed, eno: %d", eno)
-			break
+			if eno == TabMgrEnoResource {
+				break
+			}
 		}
 	}
 
@@ -1503,8 +1507,8 @@ func (tabMgr *TableManager)tabClosest(target NodeID, size int) []*Node {
 	// the last bank
 	//
 
-	for dt--; dt >= 0; dt-- {
-		if bk := tabMgr.buckets[dt]; bk != nil {
+	for loop := dt - 1; loop >= 0; loop-- {
+		if bk := tabMgr.buckets[loop]; bk != nil {
 			if addClosest(bk) >= size {
 				return closest
 			}
@@ -2642,7 +2646,7 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 
 		if pn.ID == tabMgr.cfg.local.ID {
 
-			tabMgr.boundPending = tabMgr.boundPending[1:]
+			tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
 			continue
 		}
 

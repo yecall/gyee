@@ -110,7 +110,7 @@ type UdpMsg struct {
 	Pbuf	*[]byte			// buffer pointer
 	Len		int				// bytes buffered
 	From	*net.UDPAddr	// source address from underlying network library
-	Msg		pb.UdpMessage	// protobuf message
+	Msg		*pb.UdpMessage	// protobuf message
 	Eno		UdpMsgErrno		// current errno
 }
 
@@ -136,7 +136,7 @@ func NewUdpMsg() *UdpMsg {
 		Pbuf:	nil,
 		Len:	0,
 		From:	nil,
-		Msg:	pb.UdpMessage{},
+		Msg:	nil,
 		Eno:	UdpMsgEnoUnknown,
 	}
 }
@@ -164,7 +164,9 @@ func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) Udp
 //
 func (pum *UdpMsg) Decode() UdpMsgErrno {
 
-	if err := (&pum.Msg).Unmarshal((*pum.Pbuf)[0:pum.Len]); err != nil {
+	pum.Msg = new(pb.UdpMessage)
+
+	if err := (pum.Msg).Unmarshal((*pum.Pbuf)[0:pum.Len]); err != nil {
 
 		yclog.LogCallerFileLine("Decode: " +
 			"Unmarshal failed, err: %s",
@@ -180,7 +182,7 @@ func (pum *UdpMsg) Decode() UdpMsgErrno {
 // Get decoded message
 //
 func (pum *UdpMsg) GetPbMessage() *pb.UdpMessage {
-	return &pum.Msg
+	return pum.Msg
 }
 
 //
@@ -415,7 +417,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 
 	var err error
 
-	if *pum.Pbuf, err = (&pum.Msg).Marshal(); err != nil {
+	if *pum.Pbuf, err = pum.Msg.Marshal(); err != nil {
 
 		yclog.LogCallerFileLine("Encode: " +
 			"Marshal failed, err: %s",
@@ -437,6 +439,8 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 
 	var eno UdpMsgErrno
+
+	pum.Msg = new(pb.UdpMessage)
 
 	switch t {
 
@@ -470,7 +474,7 @@ func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 //
 func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 
-	var pbm = &pum.Msg
+	var pbm = pum.Msg
 	var pbPing *pb.UdpMessage_Ping
 
 	pbm.MsgType = new(pb.UdpMessage_MessageType)
@@ -528,7 +532,7 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 //
 func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 
-	var pbm = &pum.Msg
+	var pbm = pum.Msg
 	var pbPong *pb.UdpMessage_Pong
 
 	pbm.MsgType = new(pb.UdpMessage_MessageType)
@@ -587,7 +591,7 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 //
 func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 
-	var pbm = &pum.Msg
+	var pbm = pum.Msg
 	var pbFN *pb.UdpMessage_FindNode
 
 	pbm.MsgType = new(pb.UdpMessage_MessageType)
@@ -660,7 +664,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 //
 func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 
-	var pbm = &pum.Msg
+	var pbm = pum.Msg
 	var pbNgb *pb.UdpMessage_Neighbors
 
 	pbm.MsgType = new(pb.UdpMessage_MessageType)

@@ -89,7 +89,8 @@ type P2pIndConnStatusPara struct {
 
 type P2pIndPeerClosedPara struct {
 	Ptn			interface{}			// task node pointer, notice: it points to the peer manager
-									// than peer instance, since the instance had been closed.
+									// task node than peer instance, since the instance had been
+									// closed.
 	PeerId		PeerId				// peer identity
 }
 
