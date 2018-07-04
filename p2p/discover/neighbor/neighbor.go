@@ -1269,13 +1269,20 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 
 	local := ngbMgr.localNode()
 	tabMgr := ngbMgr.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
-	nodes = append(nodes, tabMgr.TabClosest(tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
+	nodes = append(nodes, tabMgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
 
 	cfgNode := ycfg.Node{
 		IP:		ngbMgr.cfg.IP,
 		UDP:	ngbMgr.cfg.UDP,
 		TCP:	ngbMgr.cfg.TCP,
 		ID:		ngbMgr.cfg.ID,
+	}
+
+	for idx, n := range nodes {
+		if n.ID == findNode.From.NodeId {
+			nodes = append(nodes[:idx], nodes[idx:]...)
+			break
+		}
 	}
 
 	if len(nodes) == 0 {

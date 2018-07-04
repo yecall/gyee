@@ -88,6 +88,7 @@ const (
 	autoRefreshCycle	= 1 * time.Hour			// period to auto refresh
 	autoBsnRefreshCycle	= autoRefreshCycle / 60	// one minute
 
+	findNodeMinInterval	= 4 * time.Second		// min interval for two queries to same node
 	findNodeExpiration	= 21 * time.Second		// should be (NgbProtoFindNodeResponseTimeout + delta)
 	pingpongExpiration	= 21 * time.Second		// should be (NgbProtoPingResponseTimeout + delta)
 	seedMaxCount          = 32					// wanted number of seeds
@@ -118,6 +119,7 @@ type bucketEntry struct {
 	ycfg.Node				// node
 	sha			Hash		// hash of id
 	addTime		time.Time	// time when node added
+	lastQuery	time.Time	// time when node latest queryed
 	lastPing	time.Time	// time when node latest pinged
 	lastPong	time.Time	// time when node pong latest received
 	failCount	int			// fail to response find node request counter
@@ -164,6 +166,7 @@ type instCtrlBlock struct {
 	req		interface{}			// request message pointer which inited this instance
 	rsp		interface{}			// pointer to response message received
 	tid		int					// identity of timer for response
+	qrt		time.Time			// findnode sent time
 	pit		time.Time			// ping sent time
 	pot		time.Time			// pong received time
 }
@@ -652,10 +655,15 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 	}
 
 	//
-	// deal with neighbors reported
+	// deal with the peer and those neighbors the peer reported, we add them into the
+	// BOUND pending queue for bounding, see bellow pls.
 	//
 
 	yclog.LogCallerFileLine("tabMgrFindNodeRsp: number of neighbor: %d", len(msg.Neighbors.Nodes))
+
+	if eno := tabMgr.tabAddPendingBoundInst(&msg.Neighbors.From); eno != TabMgrEnoNone {
+		yclog.LogCallerFileLine("tabMgrFindNodeRsp: tabAddPendingBoundInst failed, eno: %d", eno)
+	}
 
 	for _, node := range msg.Neighbors.Nodes {
 		if eno := tabMgr.tabAddPendingBoundInst(node); eno != TabMgrEnoNone {
@@ -1329,7 +1337,7 @@ func (tabMgr *TableManager)tabRefresh(tid *NodeID) TabMgrErrno {
 		target = *tid
 	}
 
-	if nodes = tabMgr.tabClosest(target, TabInstQPendingMax); len(nodes) == 0 {
+	if nodes = tabMgr.tabClosest(Closest4Querying, target, TabInstQPendingMax); len(nodes) == 0 {
 
 		//
 		// Here all our buckets are empty, we then apply our local node as
@@ -1430,7 +1438,7 @@ func (tabMgr *TableManager)tabLog2Dist(h1 Hash, h2 Hash) int {
 //
 // Get nodes closest to target
 //
-func (tabMgr *TableManager)tabClosest(target NodeID, size int) []*Node {
+func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*Node {
 
 	//
 	// Notice: in this function, we got []*Node with a approximate order,
@@ -1459,6 +1467,17 @@ func (tabMgr *TableManager)tabClosest(target NodeID, size int) []*Node {
 		if bk != nil {
 
 			for _, ne := range bk.nodes {
+
+				//
+				// if we are fetching nodes to which we would query, we need to check the time
+				// we had queried them last time eo escape the case to query too frequency.
+				//
+
+				if forWhat == Closest4Querying {
+					if time.Now().Sub(ne.lastQuery) < findNodeMinInterval {
+						continue
+					}
+				}
 
 				closest = append(closest, &Node{
 					Node: ne.Node,
@@ -1626,6 +1645,7 @@ func (tabMgr *TableManager)tabQuery(target *NodeID, nodes []*Node) TabMgrErrno {
 			icb := new(instCtrlBlock)
 
 			icb.state	= TabInstStateQuering
+			icb.qrt		= time.Now()
 			icb.req		= msg
 			icb.rsp		= nil
 			icb.tid		= sch.SchInvalidTid
@@ -1931,12 +1951,12 @@ func (tabMgr *TableManager)tabUpdateBucket(inst *instCtrlBlock, result int) TabM
 
 		node := &inst.req.(*um.Ping).To
 		inst.pot = time.Now()
-		return tabMgr.TabBucketAddNode(node, &inst.pit, &inst.pot)
+		return tabMgr.TabBucketAddNode(node, &inst.qrt, &inst.pit, &inst.pot)
 
 	case (inst.state == TabInstStateBonding || inst.state == TabInstStateBTimeout) && result != TabMgrEnoNone:
 
 		node := &inst.req.(*um.Ping).To
-		return tabMgr.TabBucketAddNode(node, &inst.pit,nil)
+		return tabMgr.TabBucketAddNode(node, &inst.qrt, &inst.pit, nil)
 
 	default:
 
@@ -1951,7 +1971,7 @@ func (tabMgr *TableManager)tabUpdateBucket(inst *instCtrlBlock, result int) TabM
 //
 // Update node database while local node is a bootstrap node for an unexcepeted
 // bounding procedure: this procedure is inited by neighbor manager task when a
-// Ping or Pong message recived without an according neighbor instance can be mapped
+// Ping or Pong message recived without an responding neighbor instance can be mapped
 // it. In this case, the neighbor manager then carry the pingpong procedure (if Ping
 // received, a Pong sent firstly), and when Pong recvied, it is sent to here the
 // table manager task, see Ping, Pong handler in file neighbor.go for details pls.
@@ -1997,7 +2017,7 @@ func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 		NodeId:	node.ID,
 	}
 
-	return tabMgr.TabBucketAddNode(&umn, &now, &now)
+	return tabMgr.TabBucketAddNode(&umn, &time.Time{}, &now, &now)
 }
 
 //
@@ -2282,14 +2302,14 @@ func (b *bucket) eldestPong(src []*bucketEntry) ([]*bucketEntry) {
 //
 // Add node to bucket
 //
-func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
+func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 
 	//
 	// node must be pinged can it be added into a bucket, if pong does not received
 	// while adding, we set a very old one.
 	//
 
-	if n == nil || lastPing == nil {
+	if n == nil || lastQuery == nil || lastPing == nil {
 		yclog.LogCallerFileLine("tabBucketAddNode: invalid parameters")
 		return TabMgrEnoParameter
 	}
@@ -2320,6 +2340,7 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastPing *time.Time, las
 			"node duplicated: %s",
 			fmt.Sprintf("%X", id))
 
+		b.nodes[nidx].lastQuery = *lastQuery
 		b.nodes[nidx].lastPing = *lastPing
 		b.nodes[nidx].lastPong = *lastPong
 
@@ -2343,6 +2364,7 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastPing *time.Time, las
 
 		be.sha = *TabNodeId2Hash(id)
 		be.addTime = time.Now()
+		be.lastPing = *lastQuery
 		be.lastPing = *lastPing
 		be.lastPong = *lastPong
 		be.failCount = 0
@@ -2403,6 +2425,7 @@ kickSelected:
 
 	beKicked.sha = *TabNodeId2Hash(id)
 	beKicked.addTime = time.Now()
+	beKicked.lastPing = *lastQuery
 	beKicked.lastPing = *lastPing
 	beKicked.lastPong = *lastPong
 	beKicked.failCount = 0
@@ -2646,6 +2669,7 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 
 		if pn.ID == tabMgr.cfg.local.ID {
 
+			yclog.LogCallerFileLine("tabActiveBoundInst: duplicated to local node")
 			tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
 			continue
 		}
@@ -2660,6 +2684,7 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 
 			if bi.req.(*um.Ping).To.NodeId == pn.ID {
 
+				yclog.LogCallerFileLine("tabActiveBoundInst: duplicated to active node")
 				tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
 				dup = true
 				break
@@ -2883,7 +2908,7 @@ func (tabMgr *TableManager)tabShouldBoundDbNode(id NodeID) bool {
 // Notice: inside the table manager task, this function MUST NOT be called,
 // since we had obtain the lock at the entry of the task handler.
 //
-func (tabMgr *TableManager)TabBucketAddNode(n *um.Node, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
+func (tabMgr *TableManager)TabBucketAddNode(n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 
 	//
 	// We would be called by other task, we need to lock and
@@ -2893,7 +2918,7 @@ func (tabMgr *TableManager)TabBucketAddNode(n *um.Node, lastPing *time.Time, las
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 
-	return tabMgr.tabBucketAddNode(n, lastPing, lastPong)
+	return tabMgr.tabBucketAddNode(n, lastQuery, lastPing, lastPong)
 }
 
 
@@ -2947,7 +2972,10 @@ func (tabMgr *TableManager)TabUpdateNode(umn *um.Node) TabMgrErrno {
 // Notice: inside the table manager task, this function MUST NOT be called,
 // since we had obtain the lock at the entry of the task handler.
 //
-func (tabMgr *TableManager)TabClosest(target NodeID, size int) []*Node {
+const Closest4Querying	= 1
+const Closest4Queried	= 0
+
+func (tabMgr *TableManager)TabClosest(forWhat int, target NodeID, size int) []*Node {
 
 	//
 	// We would be called by other task, we need to lock and
@@ -2957,7 +2985,7 @@ func (tabMgr *TableManager)TabClosest(target NodeID, size int) []*Node {
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 
-	return tabMgr.tabClosest(target, size)
+	return tabMgr.tabClosest(forWhat, target, size)
 }
 
 //

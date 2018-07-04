@@ -1224,6 +1224,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if inst.dir == PeInstDirInbound {
 
+		lastQuery := time.Time{}
 		lastPing := time.Now()
 		lastPong := time.Now()
 
@@ -1235,7 +1236,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 
 		tabMgr := inst.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
-		tabEno := tabMgr.TabBucketAddNode(&n, &lastPing, &lastPong)
+		tabEno := tabMgr.TabBucketAddNode(&n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
 
 			yclog.LogCallerFileLine("peMgrHandshakeRsp: "+
