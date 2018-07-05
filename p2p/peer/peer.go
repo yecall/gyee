@@ -663,6 +663,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	var eno = sch.SchEnoNone
 	var ptnInst interface{} = nil
+	var ibInd = msg.(*msgConnAcceptedInd)
 
 	//
 	// Check if more inbound allowed
@@ -674,6 +675,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 			"no more resources, ibpNum: %d, max: %d",
 			peMgr.ibpNum, peMgr.cfg.maxInBounds)
 
+		ibInd.conn.Close()
 		return PeMgrEnoResource
 	}
 
@@ -681,7 +683,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	// Init peer instance control block
 	//
 
-	var ibInd = msg.(*msgConnAcceptedInd)
 	var peInst = new(peerInstance)
 
 	*peInst				= peerInstDefault
@@ -736,18 +737,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	}
 
 	peInst.ptnMe = ptnInst
-
-	//
-	// Check the map
-	//
-
-	if _, dup := peMgr.peers[peInst]; dup {
-
-		yclog.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
-			"impossible duplicated peer instance")
-
-		return PeMgrEnoInternal
-	}
 
 	//
 	// Send handshake request to the instance created aboved
@@ -1208,6 +1197,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	// identity of a inbound peer.
 	//
 
+	inst.state = peInstStateActivated
 	peMgr.workers[rsp.peNode.ID] = inst
 	peMgr.wrkNum++
 
@@ -1586,18 +1576,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *ycfg.Node) PeMgrErrno {
 	peInst.ptnMe = ptnInst
 
 	//
-	// Check the map
-	//
-
-	if _, dup := peMgr.peers[peInst]; dup {
-
-		yclog.LogCallerFileLine("peMgrCreateOutboundInst: " +
-			"impossible duplicated peer instance")
-
-		return PeMgrEnoInternal
-	}
-
-	//
 	// Send EvPeConnOutReq request to the instance created aboved
 	//
 
@@ -1723,13 +1701,27 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *ycfg.Node) PeMgrEr
 		fmt.Sprintf("%X", peInst.node.ID	))
 
 	//
-	// Remove maps for the node
+	// Remove maps for the node: we must check the instance state and connection
+	// direction to step.
 	//
 
 	if peInst.state == peInstStateActivated {
 
 		delete(peMgr.workers, peInst.node.ID)
 		peMgr.wrkNum--
+	}
+
+	if peInst.dir == PeInstDirOutbound {
+
+		delete(peMgr.nodes, peInst.node.ID)
+		delete(peMgr.peers, ptn)
+
+	} else if peInst.dir == PeInstDirInbound {
+
+		delete(peMgr.peers, ptn)
+		if peInst.state == peInstStateActivated {
+			delete(peMgr.nodes, peInst.node.ID)
+		}
 	}
 
 	if peInst.dir == PeInstDirOutbound {
@@ -1746,9 +1738,6 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *ycfg.Node) PeMgrEr
 			"invalid peer instance direction: %d",
 			peInst.dir)
 	}
-
-	delete(peMgr.nodes, peInst.node.ID)
-	delete(peMgr.peers, ptn)
 
 	yclog.LogCallerFileLine("peMgrKillInst: " +
 		"map deleted, peer: %s",
@@ -2574,7 +2563,6 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 	//
 
 	inst.conn.SetDeadline(time.Time{})
-	inst.state = peInstStateActivated
 	inst.txEno = PeMgrEnoNone
 	inst.rxEno = PeMgrEnoNone
 	inst.ppEno = PeMgrEnoNone

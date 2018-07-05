@@ -1280,7 +1280,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 
 	for idx, n := range nodes {
 		if n.ID == findNode.From.NodeId {
-			nodes = append(nodes[:idx], nodes[idx:]...)
+			nodes = append(nodes[:idx], nodes[idx+1:]...)
 			break
 		}
 	}
