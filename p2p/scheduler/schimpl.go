@@ -1492,6 +1492,9 @@ func (sdl *scheduler)schimplKillTaskTimers(task *schTask) SchErrno {
 //
 func (sdl *scheduler)schimplGetTaskNodeByName(name string) (SchErrno, *schTaskNode) {
 
+	sdl.lock.Lock()
+	defer sdl.lock.Unlock()
+
 	// if exist
 	if _, err := sdl.tkMap[schTaskName(name)]; !err {
 		return SchEnoNotFound, nil

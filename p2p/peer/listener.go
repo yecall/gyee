@@ -255,6 +255,9 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
+	peMgr := lsnMgr.sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*PeerManager)
+	peMgr.accepter = &accepter
+
 	yclog.LogCallerFileLine("lsnMgrStart: accept task created")
 
 	return sch.SchEnoNone

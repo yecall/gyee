@@ -131,6 +131,8 @@ type PeerManager struct {
 	ptnLsn			interface{}						// pointer to peer listener manager task node
 	ptnAcp			interface{}						// pointer to peer acceptor manager task node
 	ptnDcv			interface{}						// pointer to discover task node
+	tabMgr			*tab.TableManager				// pointer to table manager
+	accepter		*acceptTskCtrlBlock				// pointer to accepter
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
@@ -162,6 +164,10 @@ func NewPeerMgr() *PeerManager {
 		ptnMe:        	nil,
 		ptnTab:       	nil,
 		ptnLsn:       	nil,
+		ptnAcp:			nil,
+		ptnDcv:			nil,
+		tabMgr:			nil,
+		accepter:		nil,
 		peers:        	map[interface{}]*peerInstance{},
 		nodes:        	map[ycfg.NodeID]*peerInstance{},
 		workers:      	map[ycfg.NodeID]*peerInstance{},
@@ -265,6 +271,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	peMgr.ptnMe	= ptn
 	peMgr.sdl = sch.SchinfGetScheduler(ptn)
+	peMgr.tabMgr = peMgr.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
 	eno, peMgr.ptnTab = peMgr.sdl.SchinfGetTaskNodeByName(sch.TabMgrName)
 
 	if eno != sch.SchEnoNone || peMgr.ptnTab == nil {
@@ -480,6 +487,8 @@ func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
 	//
 	// drive ourself to startup outbound
 	//
+
+	time.Sleep(time.Microsecond * 100)
 
 	eno = peMgr.sdl.SchinfMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	if eno != sch.SchEnoNone {
@@ -785,8 +794,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		yclog.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
 			"maxInbounds reached, try to pause accept task ...")
 
-		accetper := peMgr.sdl.SchinfGetUserTaskIF(PeerAccepterName).(*acceptTskCtrlBlock)
-		peMgr.acceptPaused = accetper.PauseAccept()
+		peMgr.acceptPaused = peMgr.accepter.PauseAccept()
 
 		yclog.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
 			"pause result: %d", peMgr.acceptPaused)
@@ -1224,8 +1232,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			NodeId: rsp.peNode.ID,
 		}
 
-		tabMgr := inst.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
-		tabEno := tabMgr.TabBucketAddNode(&n, &lastQuery, &lastPing, &lastPong)
+		tabEno := peMgr.tabMgr.TabBucketAddNode(&n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
 
 			yclog.LogCallerFileLine("peMgrHandshakeRsp: "+
@@ -1239,7 +1246,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		// should not care the result returned from interface of table module.
 		//
 
-		tabEno = tabMgr.TabUpdateNode(&n)
+		tabEno = peMgr.tabMgr.TabUpdateNode(&n)
 		if tabEno != tab.TabMgrEnoNone {
 
 			yclog.LogCallerFileLine("peMgrHandshakeRsp: "+
@@ -1768,8 +1775,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *ycfg.Node) PeMgrEr
 	//
 
 	if peMgr.acceptPaused == true {
-		accepter := peMgr.sdl.SchinfGetUserTaskIF(PeerAccepterName).(*acceptTskCtrlBlock)
-		peMgr.acceptPaused = !accepter.ResumeAccept()
+		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
 	}
 
 	return PeMgrEnoNone

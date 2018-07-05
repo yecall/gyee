@@ -819,6 +819,7 @@ type NeighborManager struct {
 	tep			sch.SchUserTaskEp			// entry
 	ptnMe		interface{}					// pointer to task node of myself
 	ptnTab		interface{}					// pointer to task node of table task
+	tabMgr		*tab.TableManager			// pointer to table manager
 	ptnLsn		interface{}					// pointer to task node of listner
 	ngbMap		map[string]*neighborInst	// map neighbor node id to task node pointer
 	fnInstSeq	int							// findnode instance sequence number
@@ -929,8 +930,10 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 
 	ngbMgr.ptnMe = ptn
 	ngbMgr.sdl = sch.SchinfGetScheduler(ptn)
+	ngbMgr.tabMgr = ngbMgr.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
 	eno, ptnTab = ngbMgr.sdl.SchinfGetTaskNodeByName(sch.TabMgrName)
 	eno, ptnLsn = ngbMgr.sdl.SchinfGetTaskNodeByName(sch.NgbLsnName)
+
 
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("PoweronHandler: " +
@@ -1272,8 +1275,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	var umNodes = make([]*um.Node, 0)
 
 	local := ngbMgr.localNode()
-	tabMgr := ngbMgr.sdl.SchinfGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
-	nodes = append(nodes, tabMgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
+	nodes = append(nodes, ngbMgr.tabMgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
 
 	cfgNode := ycfg.Node{
 		IP:		ngbMgr.cfg.IP,
