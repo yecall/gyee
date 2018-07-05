@@ -3147,6 +3147,7 @@ txBreak:
 
 		if inst.txEno != PeMgrEnoNone {
 			yclog.LogCallerFileLine("piTx: txEno: %d", inst.txEno)
+			time.Sleep(time.Microsecond * 100)
 			continue
 		}
 
@@ -3263,6 +3264,7 @@ rxBreak:
 
 		if inst.rxEno != PeMgrEnoNone {
 			yclog.LogCallerFileLine("piRx: rxEno: %d", inst.rxEno)
+			time.Sleep(time.Microsecond * 100)
 			continue
 		}
 
