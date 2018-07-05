@@ -26,7 +26,6 @@ import (
 	"time"
 	"fmt"
 	"sync"
-	"io"
 	"math/rand"
 	ggio "github.com/gogo/protobuf/io"
 	ycfg	"github.com/yeeco/gyee/p2p/config"
@@ -2587,9 +2586,9 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	//
 	// setup IO writer and reader
 	//
-
-	inst.conn.SetDeadline(time.Time{})
 /*
+	inst.conn.SetDeadline(time.Time{})
+
 	w := inst.conn.(io.Writer)
 	inst.iow = ggio.NewDelimitedWriter(w)
 

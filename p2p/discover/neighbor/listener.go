@@ -764,13 +764,7 @@ func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.Sc
 //
 // Send message with specific scheduler
 //
-func sendUdpMsg(sdl *sch.Scheduler, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
-
-	eno, receiver := sdl.SchinfGetTaskNodeByName(sch.NgbLsnName)
-	if eno != sch.SchEnoNone {
-		yclog.LogCallerFileLine("SendUdpMsg: SchinfMakeMessage failed, eno: %d", eno)
-		return eno
-	}
+func sendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 
 	var schMsg = sch.SchMessage{}
 
@@ -779,17 +773,17 @@ func sendUdpMsg(sdl *sch.Scheduler, sender interface{}, buf []byte, toAddr *net.
 		TgtAddr:	toAddr,
 	}
 
-	if eno = sdl.SchinfMakeMessage(&schMsg, sender, receiver, sch.EvNblDataReq, &req);
+	if eno := sdl.SchinfMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req);
 	eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("SendUdpMsg: SchinfMakeMessage failed, eno: %d", eno)
 		return eno
 	}
 
-	if eno = sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+	if eno := sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("SendUdpMsg: " +
 			"SchinfSendMessage failed, eno: %d, target: %s",
-			eno, sdl.SchinfGetTaskName(receiver))
+			eno, sdl.SchinfGetTaskName(lsn))
 
 		return eno
 	}

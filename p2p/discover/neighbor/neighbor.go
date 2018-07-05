@@ -208,7 +208,7 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 	dst.IP = append(dst.IP, fn.To.IP...)
 	dst.Port = int(fn.To.UDP)
 
-	if eno := sendUdpMsg(inst.sdl, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
+	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
 
 		//
 		// response FindNode  NgbProtoEnoUdp to table task
@@ -357,7 +357,7 @@ func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbPro
 	dst.IP = append(dst.IP, ping.To.IP...)
 	dst.Port = int(ping.To.UDP)
 
-	if eno := sendUdpMsg(inst.sdl, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
+	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("NgbProtoPingReq：" +
 			"sendUdpMsg failed, dst: %s, eno: %d",
@@ -819,6 +819,7 @@ type NeighborManager struct {
 	tep			sch.SchUserTaskEp			// entry
 	ptnMe		interface{}					// pointer to task node of myself
 	ptnTab		interface{}					// pointer to task node of table task
+	ptnLsn		interface{}					// pointer to task node of listner
 	ngbMap		map[string]*neighborInst	// map neighbor node id to task node pointer
 	fnInstSeq	int							// findnode instance sequence number
 	ppInstSeq	int							// pingpong instance sequence number
@@ -924,10 +925,12 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 
 	var eno sch.SchErrno
 	var ptnTab interface{}
+	var ptnLsn interface{}
 
 	ngbMgr.ptnMe = ptn
 	ngbMgr.sdl = sch.SchinfGetScheduler(ptn)
 	eno, ptnTab = ngbMgr.sdl.SchinfGetTaskNodeByName(sch.TabMgrName)
+	eno, ptnLsn = ngbMgr.sdl.SchinfGetTaskNodeByName(sch.NgbLsnName)
 
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("PoweronHandler: " +
@@ -951,6 +954,7 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 
 	ngbMgr.ptnMe = ptn
 	ngbMgr.ptnTab = ptnTab
+	ngbMgr.ptnLsn = ptnLsn
 
 	return sch.SchEnoNone
 }
@@ -1061,7 +1065,7 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 
 	if buf, bytes := pum.GetRawMessage(); buf != nil && bytes > 0 {
 
-		if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
+		if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
 
 			yclog.LogCallerFileLine("PingHandler: " +
 				"sendUdpMsg failed, eno: %d",
@@ -1339,7 +1343,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 
 	if buf, bytes := pum.GetRawMessage(); buf != nil && bytes > 0 {
 
-		if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
+		if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
 
 			yclog.LogCallerFileLine("FindNodeHandler: " +
 				"sendUdpMsg failed, eno: %d", eno)
