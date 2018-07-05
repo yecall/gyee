@@ -1297,10 +1297,32 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 
 	//
 	// This is an event from other module requests to close a peer connection,
-	// the peer to be closed should be included in the message passed in.
+	// or sent by peer manager itself while pingpong failed. All cases the instance
+	// is in WORKING state. The peer to be closed should be included in the message
+	// passed in.
 	//
 
 	var req = msg.(*sch.MsgPeCloseReq)
+
+	inst := peMgr.nodes[req.Node.ID]
+	if inst == nil {
+
+		yclog.LogCallerFileLine("peMgrCloseReq: " +
+			"instance not found, ID: %s, ptn: %p",
+			fmt.Printf("%X", req.Node.ID),
+			req.Ptn)
+
+		return PeMgrEnoNotfound
+	}
+
+	if inst.killing {
+
+		yclog.LogCallerFileLine("peMgrCloseReq: " +
+			"instance already in killing",
+			eno)
+
+		return PeMgrEnoDuplicaated
+	}
 
 	//
 	// Send close-request to instance
@@ -1327,6 +1349,8 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 
 		return PeMgrEnoScheduler
 	}
+
+	inst.killing = true
 
 	yclog.LogCallerFileLine("peMgrCloseReq: " +
 		"SchinfSendMessage EvPeCloseReq ok, target: %s",
@@ -1877,6 +1901,7 @@ const (
 	peInstStateConnected		// outbound connected, need handshake
 	peInstStateHandshook		// handshook
 	peInstStateActivated		// actived in working
+	peInstStateKilledReq		// peer manager is required to kill the instance
 )
 
 type peerInstState int	// instance state type
@@ -1898,6 +1923,7 @@ type peerInstance struct {
 	ptnMe		interface{}					// the instance task node pointer
 	ptnMgr		interface{}					// the peer manager task node pointer
 	state		peerInstState				// state
+	killing		bool						// is instance in killing
 	cto			time.Duration				// connect timeout value
 	hto			time.Duration				// handshake timeout value
 	ato			time.Duration				// active peer connection read/write timeout value

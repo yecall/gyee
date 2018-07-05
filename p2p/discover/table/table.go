@@ -116,13 +116,13 @@ type Node struct {
 }
 
 type bucketEntry struct {
-	ycfg.Node				// node
-	sha			Hash		// hash of id
 	addTime		time.Time	// time when node added
 	lastQuery	time.Time	// time when node latest queryed
 	lastPing	time.Time	// time when node latest pinged
 	lastPong	time.Time	// time when node pong latest received
 	failCount	int			// fail to response find node request counter
+	ycfg.Node				// node
+	sha			Hash		// hash of id
 }
 
 //
@@ -1485,8 +1485,8 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*N
 				})
 
 				yclog.LogCallerFileLine("tabClosest: " +
-					"node appended, dt: %d, node: %s",
-					dt, fmt.Sprintf("%X", ne.ID))
+					"node appended, dt: %d, %+v",
+					dt, ne)
 
 				if count++; count >= size {
 					break
