@@ -116,10 +116,10 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 	}
 
 	r := inst.conn.(io.Reader)
-	gr := ggio.NewDelimitedReader(r, inst.maxPkgSize)
+	inst.ior = ggio.NewDelimitedReader(r, inst.maxPkgSize)
 	pkg := new(pb.P2PPackage)
 
-	if err := gr.ReadMsg(pkg); err != nil {
+	if err := inst.ior.ReadMsg(pkg); err != nil {
 
 		yclog.LogCallerFileLine("getHandshakeInbound: " +
 			"ReadMsg faied, err: %s",
@@ -308,9 +308,9 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 	}
 
 	w := inst.conn.(io.Writer)
-	gw := ggio.NewDelimitedWriter(w)
+	inst.iow = ggio.NewDelimitedWriter(w)
 
-	if err := gw.WriteMsg(pbPkg); err != nil {
+	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
 		yclog.LogCallerFileLine("putHandshakeOutbound:" +
 			"Write failed, err: %s",

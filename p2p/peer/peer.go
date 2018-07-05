@@ -1309,7 +1309,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 
 		yclog.LogCallerFileLine("peMgrCloseReq: " +
 			"instance not found, ID: %s, ptn: %p",
-			fmt.Printf("%X", req.Node.ID),
+			fmt.Sprintf("%X", req.Node.ID),
 			req.Ptn)
 
 		return PeMgrEnoNotfound
@@ -1317,10 +1317,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 
 	if inst.killing {
 
-		yclog.LogCallerFileLine("peMgrCloseReq: " +
-			"instance already in killing",
-			eno)
-
+		yclog.LogCallerFileLine("peMgrCloseReq: instance already in killing")
 		return PeMgrEnoDuplicaated
 	}
 
@@ -2060,30 +2057,28 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 
 	var eno PeMgrErrno
 
-	inst := pi.sdl.SchinfGetUserDataArea(ptn).(*peerInstance)
-
 	switch msg.Id {
 
 	case sch.EvPeConnOutReq:
-		eno = pi.piConnOutReq(inst, msg.Body)
+		eno = pi.piConnOutReq(msg.Body)
 
 	case sch.EvPeHandshakeReq:
-		eno = pi.piHandshakeReq(inst, msg.Body)
+		eno = pi.piHandshakeReq(msg.Body)
 
 	case sch.EvPePingpongReq:
-		eno = pi.piPingpongReq(inst, msg.Body)
+		eno = pi.piPingpongReq(msg.Body)
 
 	case sch.EvPeCloseReq:
-		eno = pi.piCloseReq(inst, msg.Body)
+		eno = pi.piCloseReq(msg.Body)
 
 	case sch.EvPeEstablishedInd:
-		eno = pi.piEstablishedInd(inst, msg.Body)
+		eno = pi.piEstablishedInd(msg.Body)
 
 	case sch.EvPePingpongTimer:
-		eno = pi.piPingpongTimerHandler(inst)
+		eno = pi.piPingpongTimerHandler()
 
 	case sch.EvPeDataReq:
-		eno = pi.piDataReq(inst, msg.Body)
+		eno = pi.piDataReq(msg.Body)
 
 	default:
 		yclog.LogCallerFileLine("PeerInstProc: invalid message: %d", msg.Id)
@@ -2101,18 +2096,13 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 //
 // Outbound connect to peer request handler
 //
-func (pi *peerInstance)piConnOutReq(inst *peerInstance, msg interface{}) PeMgrErrno {
+func (inst *peerInstance)piConnOutReq(msg interface{}) PeMgrErrno {
 
 	_ = msg
 
 	//
 	// Check instance
 	//
-
-	if inst == nil {
-		yclog.LogCallerFileLine("piConnOutReq: invalid instance")
-		return PeMgrEnoParameter
-	}
 
 	if inst.dialer == nil ||
 		inst.dir != PeInstDirOutbound  ||
@@ -2175,7 +2165,7 @@ func (pi *peerInstance)piConnOutReq(inst *peerInstance, msg interface{}) PeMgrEr
 		ptn: inst.ptnMe,
 	}
 
-	schEno = pi.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMgr, sch.EvPeConnOutRsp, &rsp)
+	schEno = inst.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMgr, sch.EvPeConnOutRsp, &rsp)
 	if schEno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("piConnOutReq: " +
@@ -2185,18 +2175,18 @@ func (pi *peerInstance)piConnOutReq(inst *peerInstance, msg interface{}) PeMgrEr
 		return PeMgrEnoScheduler
 	}
 
-	if schEno = pi.sdl.SchinfSendMessage(&schMsg); schEno != sch.SchEnoNone {
+	if schEno = inst.sdl.SchinfSendMessage(&schMsg); schEno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("piConnOutReq: " +
 			"SchinfSendMessage EvPeConnOutRsp failed, eno: %d, target: %s",
-			schEno, pi.sdl.SchinfGetTaskName(inst.ptnMgr))
+			schEno, inst.sdl.SchinfGetTaskName(inst.ptnMgr))
 
 		return PeMgrEnoScheduler
 	}
 
 	yclog.LogCallerFileLine("piConnOutReq: " +
 		"send EvPeConnOutRsp ok, target: %s",
-		pi.sdl.SchinfGetTaskName(inst.ptnMgr))
+		inst.sdl.SchinfGetTaskName(inst.ptnMgr))
 
 	return PeMgrEnoNone
 }
@@ -2204,7 +2194,7 @@ func (pi *peerInstance)piConnOutReq(inst *peerInstance, msg interface{}) PeMgrEr
 //
 // Handshake request handler
 //
-func (pi *peerInstance)piHandshakeReq(inst *peerInstance, msg interface{}) PeMgrErrno {
+func (inst *peerInstance)piHandshakeReq(msg interface{}) PeMgrErrno {
 
 	_ = msg
 
@@ -2242,11 +2232,11 @@ func (pi *peerInstance)piHandshakeReq(inst *peerInstance, msg interface{}) PeMgr
 
 	if inst.dir == PeInstDirInbound {
 
-		eno = pi.piHandshakeInbound(inst)
+		eno = inst.piHandshakeInbound(inst)
 
 	} else if inst.dir == PeInstDirOutbound {
 
-		eno = pi.piHandshakeOutbound(inst)
+		eno = inst.piHandshakeOutbound(inst)
 
 	} else {
 
@@ -2278,7 +2268,7 @@ func (pi *peerInstance)piHandshakeReq(inst *peerInstance, msg interface{}) PeMgr
 		ptn:	inst.ptnMe,
 	}
 
-	schEno = pi.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMgr, sch.EvPeHandshakeRsp, &rsp)
+	schEno = inst.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMgr, sch.EvPeHandshakeRsp, &rsp)
 	if schEno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("piHandshakeReq: " +
@@ -2288,18 +2278,18 @@ func (pi *peerInstance)piHandshakeReq(inst *peerInstance, msg interface{}) PeMgr
 		return PeMgrEnoScheduler
 	}
 
-	if schEno = pi.sdl.SchinfSendMessage(&schMsg); schEno != sch.SchEnoNone {
+	if schEno = inst.sdl.SchinfSendMessage(&schMsg); schEno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("piHandshakeReq: " +
 			"SchinfSendMessage EvPeConnOutRsp failed, eno: %d, target: %s",
-			schEno, pi.sdl.SchinfGetTaskName(inst.ptnMgr))
+			schEno, inst.sdl.SchinfGetTaskName(inst.ptnMgr))
 
 		return PeMgrEnoScheduler
 	}
 
 	yclog.LogCallerFileLine("piHandshakeReq: " +
 		"EvPeHandshakeRsp sent ok, target: %s, msg: %s",
-		pi.sdl.SchinfGetTaskName(inst.ptnMgr),
+		inst.sdl.SchinfGetTaskName(inst.ptnMgr),
 		fmt.Sprintf("%+v", rsp))
 
 	return eno
@@ -2308,7 +2298,7 @@ func (pi *peerInstance)piHandshakeReq(inst *peerInstance, msg interface{}) PeMgr
 //
 // Ping-Request handler
 //
-func (pi *peerInstance)piPingpongReq(inst *peerInstance, msg interface{}) PeMgrErrno {
+func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 
 	//
 	// The ping procedure is fired by a timer internal the peer task
@@ -2371,7 +2361,7 @@ func (pi *peerInstance)piPingpongReq(inst *peerInstance, msg interface{}) PeMgrE
 			eno,
 			fmt.Sprintf("%X", inst.node.ID))
 
-		pi.peMgr.Lock4Cb.Lock()
+		inst.peMgr.Lock4Cb.Lock()
 
 		inst.ppEno = eno
 
@@ -2395,7 +2385,7 @@ func (pi *peerInstance)piPingpongReq(inst *peerInstance, msg interface{}) PeMgrE
 			yclog.LogCallerFileLine("piPingpongReq: indication callback not installed yet")
 		}
 
-		pi.peMgr.Lock4Cb.Unlock()
+		inst.peMgr.Lock4Cb.Unlock()
 
 		return eno
 	}
@@ -2411,7 +2401,7 @@ func (pi *peerInstance)piPingpongReq(inst *peerInstance, msg interface{}) PeMgrE
 //
 // Close-Request handler
 //
-func (pi *peerInstance)piCloseReq(inst *peerInstance, msg interface{}) PeMgrErrno {
+func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 
 	//
 	// Notice: do not kill the instance task here in this function, just the
@@ -2463,11 +2453,11 @@ func (pi *peerInstance)piCloseReq(inst *peerInstance, msg interface{}) PeMgrErrn
 
 	if inst.ppTid != sch.SchInvalidTid {
 
-		if eno = pi.sdl.SchinfKillTimer(inst.ptnMe, inst.ppTid); eno != sch.SchEnoNone {
+		if eno = inst.sdl.SchinfKillTimer(inst.ptnMe, inst.ppTid); eno != sch.SchEnoNone {
 
 			yclog.LogCallerFileLine("piCloseReq: " +
 				"kill timer failed, task: %s, tid: %d, eno: %d",
-				pi.sdl.SchinfGetTaskName(inst.ptnMe), inst.ppTid, eno)
+				inst.sdl.SchinfGetTaskName(inst.ptnMe), inst.ppTid, eno)
 
 			return PeMgrEnoScheduler
 		}
@@ -2505,7 +2495,7 @@ func (pi *peerInstance)piCloseReq(inst *peerInstance, msg interface{}) PeMgrErrn
 
 	var schMsg = sch.SchMessage{}
 
-	eno = pi.sdl.SchinfMakeMessage(&schMsg, pi.peMgr.ptnMe, pi.peMgr.ptnMe, sch.EvPeCloseCfm, &req)
+	eno = inst.sdl.SchinfMakeMessage(&schMsg, inst.peMgr.ptnMe, inst.peMgr.ptnMe, sch.EvPeCloseCfm, &req)
 	if eno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("piCloseReq: " +
@@ -2515,18 +2505,18 @@ func (pi *peerInstance)piCloseReq(inst *peerInstance, msg interface{}) PeMgrErrn
 		return PeMgrEnoScheduler
 	}
 
-	if eno = pi.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+	if eno = inst.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
 
 		yclog.LogCallerFileLine("piCloseReq: " +
 			"SchinfSendMessage EvPeCloseCfm failed, eno: %d, target: %s",
-			eno, pi.sdl.SchinfGetTaskName(pi.peMgr.ptnMe))
+			eno, inst.sdl.SchinfGetTaskName(inst.peMgr.ptnMe))
 
 		return PeMgrEnoScheduler
 	}
 
 	yclog.LogCallerFileLine("piCloseReq: " +
 		"EvPeCloseCfm sent ok, target: %s",
-		pi.sdl.SchinfGetTaskName(pi.peMgr.ptnMe))
+		inst.sdl.SchinfGetTaskName(inst.peMgr.ptnMe))
 
 	return PeMgrEnoNone
 }
@@ -2534,7 +2524,7 @@ func (pi *peerInstance)piCloseReq(inst *peerInstance, msg interface{}) PeMgrErrn
 //
 // Peer-Established indication handler
 //
-func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeMgrErrno {
+func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 
 	//
 	// When sch.EvPeEstablishedInd received, an peer instance should go into serving,
@@ -2566,7 +2556,7 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 		Extra:	nil,
 	}
 
-	if schEno, tid = pi.sdl.SchInfSetTimer(inst.ptnMe, &tmDesc);
+	if schEno, tid = inst.sdl.SchInfSetTimer(inst.ptnMe, &tmDesc);
 	schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 
 		yclog.LogCallerFileLine("piEstablishedInd: " +
@@ -2582,13 +2572,14 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 		"pingpong timer for heartbeat set ok, tid: %d",
 		inst.ppTid)
 
+
+
 	//
 	// modify deadline of peer connection for we had set specific value while
 	// handshake procedure. we set deadline to value 0, so action on connection
 	// would be blocked until it's completed.
 	//
 
-	inst.conn.SetDeadline(time.Time{})
 	inst.txEno = PeMgrEnoNone
 	inst.rxEno = PeMgrEnoNone
 	inst.ppEno = PeMgrEnoNone
@@ -2597,11 +2588,14 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 	// setup IO writer and reader
 	//
 
+	inst.conn.SetDeadline(time.Time{})
+/*
 	w := inst.conn.(io.Writer)
 	inst.iow = ggio.NewDelimitedWriter(w)
 
 	r := inst.conn.(io.Reader)
 	inst.ior = ggio.NewDelimitedReader(r, inst.maxPkgSize)
+*/
 
 	yclog.LogCallerFileLine("piEstablishedInd: " +
 		"instance is in service now, inst: %s",
@@ -2611,7 +2605,7 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 	// callback to the user of p2p
 	//
 
-	pi.peMgr.Lock4Cb.Lock()
+	inst.peMgr.Lock4Cb.Lock()
 
 	if inst.peMgr.P2pIndHandler != nil {
 
@@ -2630,7 +2624,7 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 		yclog.LogCallerFileLine("piEstablishedInd: indication callback not installed yet")
 	}
 
-	pi.peMgr.Lock4Cb.Unlock()
+	inst.peMgr.Lock4Cb.Unlock()
 
 	//
 	// :( here we go routines for tx/rx on the activated peer):
@@ -2649,7 +2643,7 @@ func (pi *peerInstance)piEstablishedInd(inst *peerInstance, msg interface{}) PeM
 //
 // Pingpong timer handler
 //
-func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
+func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 
 	//
 	// This timer is for pingpong after peer is established, as heartbit.
@@ -2693,7 +2687,7 @@ func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
 			"call P2pIndHandler noping threshold reached, ppCnt: %d",
 			inst.ppCnt)
 
-		pi.peMgr.Lock4Cb.Lock()
+		inst.peMgr.Lock4Cb.Lock()
 
 		if inst.peMgr.P2pIndHandler != nil {
 
@@ -2715,13 +2709,13 @@ func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
 			yclog.LogCallerFileLine("piPingpongTimerHandler: indication callback not installed yet")
 		}
 
-		pi.peMgr.Lock4Cb.Unlock()
+		inst.peMgr.Lock4Cb.Unlock()
 
 		//
 		// close the peer instance
 		//
 
-		if eno := pi.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPeCloseReq, nil);
+		if eno := inst.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPeCloseReq, nil);
 		eno != sch.SchEnoNone {
 			yclog.LogCallerFileLine("piPingpongTimerHandler: " +
 				"SchinfMakeMessage failed, eno: %d",
@@ -2729,17 +2723,17 @@ func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
 			return PeMgrEnoScheduler
 		}
 
-		if eno := pi.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+		if eno := inst.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
 			yclog.LogCallerFileLine("piPingpongTimerHandler: " +
 				"SchinfSendMessage failed, eno: %d, target: %s",
 				eno,
-				pi.sdl.SchinfGetTaskName(inst.ptnMe))
+				inst.sdl.SchinfGetTaskName(inst.ptnMe))
 			return PeMgrEnoScheduler
 		}
 
 		yclog.LogCallerFileLine("piPingpongTimerHandler: " +
 			"EvPeCloseReq sent ok, target: %s",
-			pi.sdl.SchinfGetTaskName(inst.ptnMe))
+			inst.sdl.SchinfGetTaskName(inst.ptnMe))
 
 		return PeMgrEnoNone
 	}
@@ -2748,7 +2742,7 @@ func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
 	// Send pingpong request
 	//
 
-	if eno := pi.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPePingpongReq, nil);
+	if eno := inst.sdl.SchinfMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPePingpongReq, nil);
 	eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("piPingpongTimerHandler: " +
 			"SchinfMakeMessage failed, eno: %d",
@@ -2756,17 +2750,17 @@ func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 
-	if eno := pi.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+	if eno := inst.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
 		yclog.LogCallerFileLine("piPingpongTimerHandler: " +
 			"SchinfSendMessage failed, eno: %d, target: %s",
 			eno,
-			pi.sdl.SchinfGetTaskName(inst.ptnMe))
+			inst.sdl.SchinfGetTaskName(inst.ptnMe))
 		return PeMgrEnoScheduler
 	}
 
 	yclog.LogCallerFileLine("piPingpongTimerHandler: " +
 		"EvPePingpongReq sent ok, target: %s",
-		pi.sdl.SchinfGetTaskName(inst.ptnMe))
+		inst.sdl.SchinfGetTaskName(inst.ptnMe))
 
 	return PeMgrEnoNone
 }
@@ -2774,8 +2768,7 @@ func (pi *peerInstance)piPingpongTimerHandler(inst *peerInstance) PeMgrErrno {
 //
 // Data-Request(send data) handler
 //
-func (pi *peerInstance)piDataReq(inst *peerInstance, msg interface{}) PeMgrErrno {
-	_ = inst
+func (inst *peerInstance)piDataReq(msg interface{}) PeMgrErrno {
 	_ = msg
 	return PeMgrEnoNone
 }
