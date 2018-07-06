@@ -472,7 +472,7 @@ func EncodeToBytes(node *Node) ([]byte, error) {
 // Added by yeeco to remove the reference to Ethereum's rlp
 //
 func DecodeBytes(blob []byte, node *Node) error {
-	copy(node.IP, blob[0:16])
+	node.IP = append(node.IP, blob[0:16]...)
 	node.UDP = uint16((blob[16] << 8) + blob[17])
 	node.TCP = uint16((blob[18] << 8) + blob[19])
 	copy(node.ID[0:], blob[20:20+cap(node.ID)])
