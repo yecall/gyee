@@ -108,10 +108,9 @@ func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 
 		for id := range doneMap[p2pInst] {
 
-			txString := fmt.Sprintf("<<<<<<\nseq:%d\n"+
+			txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
 				"from: %s\n"+
-				"to: %s\n"+
-				">>>>>>",
+				"to: %s\n",
 				seq,
 				fmt.Sprintf("%X", p2pInst2Cfg[p2pInst].Local.ID),
 				fmt.Sprintf("%X", id))
