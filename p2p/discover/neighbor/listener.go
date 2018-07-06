@@ -201,25 +201,8 @@ func (lsnMgr *ListenerManager) start() sch.SchErrno {
 	// send ourself a "start" message
 	//
 
-	eno = lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnMe, sch.EvNblStart, nil)
-	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("start: " +
-			"SchMakeMessage failed, sender: %s, recver: %s, eno: %d",
-			sch.SchGetMessageSender(&msg),
-			sch.SchGetMessageRecver(&msg),
-			eno)
-		return eno
-	}
-
-	eno = lsnMgr.sdl.SchSendMessage(&msg)
-	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("start: " +
-			"SchSendMessage failed, sender: %s, recver: %s, eno: %d",
-			sch.SchGetMessageSender(&msg),
-			sch.SchGetMessageRecver(&msg),
-			eno)
-		return eno
-	}
+	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnMe, sch.EvNblStart, nil)
+	lsnMgr.sdl.SchSendMessage(&msg)
 
 	return sch.SchEnoNone
 }
@@ -416,10 +399,7 @@ func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
 	// see scheduler for details pls.
 	//
 
-	if eno = lsnMgr.sdl.SchStopTask(lsnMgr.ptnReader); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("procStop: SchStopTask failed, eno: %d", eno)
-		return eno
-	}
+	lsnMgr.sdl.SchStopTask(lsnMgr.ptnReader)
 
 	//
 	// update manager state
@@ -642,7 +622,6 @@ func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sc
 	// for details please.
 	//
 
-	var schEno sch.SchErrno
 	var msg sch.SchMessage
 	var eno umsg.UdpMsgErrno
 
@@ -671,30 +650,8 @@ func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sc
 		return sch.SchEnoUserTask
 	}
 
-	schEno = rd.sdl.SchMakeMessage(&msg, rd.ptnMe, rd.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
-	if schEno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("msgHandler: " +
-			"SchMakeMessage failed, sender: %s, recver: %s, eno: %d",
-			sch.SchGetMessageSender(&msg),
-			sch.SchGetMessageRecver(&msg),
-			eno)
-
-		return schEno
-	}
-
-	schEno = rd.sdl.SchSendMessage(&msg)
-
-	if schEno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("msgHandler: " +
-			"SchSendMessage failed, sender: %s, recver: %s, eno: %d",
-			sch.SchGetMessageSender(&msg),
-			sch.SchGetMessageRecver(&msg),
-			schEno)
-
-		return schEno
-	}
+	rd.sdl.SchMakeMessage(&msg, rd.ptnMe, rd.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
+	rd.sdl.SchSendMessage(&msg)
 
 	return sch.SchEnoNone
 }
@@ -748,20 +705,8 @@ func sendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []b
 		TgtAddr:	toAddr,
 	}
 
-	if eno := sdl.SchMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req);
-	eno != sch.SchEnoNone {
-		log.LogCallerFileLine("SendUdpMsg: SchMakeMessage failed, eno: %d", eno)
-		return eno
-	}
-
-	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("SendUdpMsg: " +
-			"SchSendMessage failed, eno: %d, target: %s",
-			eno, sdl.SchGetTaskName(lsn))
-
-		return eno
-	}
+	sdl.SchMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req)
+	sdl.SchSendMessage(&schMsg)
 
 	return sch.SchEnoNone
 }

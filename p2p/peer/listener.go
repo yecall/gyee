@@ -466,29 +466,8 @@ acceptLoop:
 			remoteAddr:	conn.RemoteAddr().(*net.TCPAddr),
 		}
 
-		eno := accepter.sdl.SchMakeMessage(&msg, ptn, accepter.ptnPeMgr, sch.EvPeLsnConnAcceptedInd, &msgBody)
-		if eno != sch.SchEnoNone {
-
-			log.LogCallerFileLine("PeerAcceptProc: " +
-				"SchMakeMessage for EvPeLsnConnAcceptedInd failed, eno: %d",
-				eno)
-
-			accepter.lockTcb.Unlock()
-
-			continue
-		}
-
-		eno = accepter.sdl.SchSendMessage(&msg)
-		if eno != sch.SchEnoNone {
-
-			log.LogCallerFileLine("PeerAcceptProc: " +
-				"SchSendMessage for EvPeLsnConnAcceptedInd failed, target: %s",
-				accepter.sdl.SchGetTaskName(accepter.ptnPeMgr))
-
-			accepter.lockTcb.Unlock()
-
-			continue
-		}
+		accepter.sdl.SchMakeMessage(&msg, ptn, accepter.ptnPeMgr, sch.EvPeLsnConnAcceptedInd, &msgBody)
+		accepter.sdl.SchSendMessage(&msg)
 
 		log.LogCallerFileLine("PeerAcceptProc: " +
 			"send EvPeLsnConnAcceptedInd ok, target: %s",

@@ -421,10 +421,7 @@ func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 		tabMgr.nodeDb = nil
 	}
 
-	if tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) == sch.SchEnoNone {
-		log.LogCallerFileLine("tabMgrPoweroff: done task failed")
-		return TabMgrEnoNone
-	}
+	tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 
 	log.LogCallerFileLine("tabMgrPoweroff: task done")
 	return TabMgrEnoScheduler
@@ -1031,8 +1028,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 		tid int
 	)
 
-	if eno, tid = ndbc.sdl.SchInfSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("ndbcPoweron: set timer failed, eno: %d", eno)
+	if eno, tid = ndbc.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
 
@@ -1052,17 +1048,11 @@ func (ndbc *NodeDbCleaner)ndbcPoweroff(ptn interface{}) TabMgrErrno {
 	}
 
 	if ndbc.tid != sch.SchInvalidTid {
-		if eno := ndbc.sdl.SchKillTimer(ptn, ndbc.tid); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("ndbcPoweroff: SchKillTimer failed, eno: %d", eno)
-			return TabMgrEnoScheduler
-		}
+		ndbc.sdl.SchKillTimer(ptn, ndbc.tid)
 		ndbc.tid = sch.SchInvalidTid
 	}
 
-	if eno := ndbc.sdl.SchTaskDone(ptn, sch.SchEnoKilled); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("ndbcPoweroff: SchTaskDone failed, eno: %d", eno)
-		return TabMgrEnoScheduler
-	}
+	ndbc.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 
 	return TabMgrEnoNone
 }
@@ -1567,16 +1557,8 @@ func (tabMgr *TableManager)tabQuery(target *NodeID, nodes []*Node) TabMgrErrno {
 			msg.Expiration	= 0
 			msg.Extra		= nil
 
-			if eno := tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblFindNodeReq, msg);
-				eno != sch.SchEnoNone {
-				log.LogCallerFileLine("tabQuery: SchMakeMessage failed, eno: %d", eno)
-				return TabMgrEnoScheduler
-			}
-
-			if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-				log.LogCallerFileLine("tabQuery: SchSendMessage failed, eno: %d", eno)
-				return TabMgrEnoScheduler
-			}
+			tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblFindNodeReq, msg)
+			tabMgr.sdl.SchSendMessage(&schMsg)
 
 			if eno := tabMgr.tabStartTimer(icb, sch.TabFindNodeTimerId, findNodeExpiration); eno != TabMgrEnoNone {
 				log.LogCallerFileLine("tabQuery: tabStartTimer failed, eno: %d", eno)
@@ -1948,8 +1930,7 @@ func (tabMgr *TableManager)tabStartTimer(inst *instCtrlBlock, tmt int, dur time.
 	var eno sch.SchErrno
 	var tid int
 
-	if eno, tid = tabMgr.sdl.SchInfSetTimer(tabMgr.ptnMe, &td); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("tabStartTimer: SchInfSetTimer failed, eno: %d", eno)
+	if eno, tid = tabMgr.sdl.SchSetTimer(tabMgr.ptnMe, &td); eno != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
 
@@ -2322,18 +2303,7 @@ func (tabMgr *TableManager)tabDeleteActiveQueryInst(inst *instCtrlBlock) TabMgrE
 
 			if inst.tid != sch.SchInvalidTid {
 
-				if eno := tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid); eno != sch.SchEnoNone {
-
-					//
-					// Notice: we should not care the return value of function SchKillTimer, since the timer
-					// might have been removed by scheduler when we try to kill it.
-					//
-
-					log.LogCallerFileLine("tabDeleteActiveQueryInst: " +
-						"kill timer failed, eno: %d",
-						eno	)
-				}
-
+				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
 				inst.tid = sch.SchInvalidTid
 			}
 
@@ -2430,15 +2400,7 @@ func (tabMgr *TableManager)tabDeleteActiveBoundInst(inst *instCtrlBlock) TabMgrE
 
 			if inst.tid != sch.SchInvalidTid {
 
-				if eno := tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid); eno != sch.SchEnoNone {
-
-					log.LogCallerFileLine("tabDeleteActiveBoundInst: " +
-						"kill timer failed, eno: %d",
-						eno)
-
-					return TabMgrEnoScheduler
-				}
-
+				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
 				inst.tid = sch.SchInvalidTid
 			}
 
@@ -2591,15 +2553,7 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 		}
 
 		var schMsg = sch.SchMessage{}
-		eno := tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblPingpongReq, &req)
-		if eno != sch.SchEnoNone {
-
-			log.LogCallerFileLine("tabActiveBoundInst: " +
-				"SchMakeMessage failed, eno: %d",
-				eno)
-
-			return TabMgrEnoScheduler
-		}
+		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblPingpongReq, &req)
 
 		var icb = new(instCtrlBlock)
 
@@ -2649,24 +2603,8 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 		// Send message to instance task to init the pingpong procedure
 		//
 
-		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-
-			log.LogCallerFileLine("tabActiveBoundInst: " +
-				"SchSendMessage failed, eno: %d",
-				eno)
-
-			return TabMgrEnoScheduler
-		}
-
-		if eno := tabMgr.tabStartTimer(icb, sch.TabPingpongTimerId, pingpongExpiration);
-		eno != TabMgrEnoNone {
-
-			log.LogCallerFileLine("tabActiveBoundInst: " +
-				"tabStartTimer failed, eno: %d",
-				eno)
-
-			return eno
-		}
+		tabMgr.sdl.SchSendMessage(&schMsg)
+		tabMgr.tabStartTimer(icb, sch.TabPingpongTimerId, pingpongExpiration)
 
 		tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:] ...)
 		tabMgr.boundIcb = append(tabMgr.boundIcb, icb)
@@ -2697,17 +2635,8 @@ func (tabMgr *TableManager)tabDiscoverResp(node *um.Node) TabMgrErrno {
 	}
 
 	var schMsg = sch.SchMessage{}
-
-	if eno := tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnDcvMgr, sch.EvTabRefreshRsp, &rsp);
-	eno != sch.SchEnoNone {
-		log.LogCallerFileLine("tabDiscoverResp: SchMakeMessage failed, eno: %d", eno)
-		return TabMgrEnoScheduler
-	}
-
-	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("tabDiscoverResp: SchSendMessage failed, eno: %d", eno)
-		return TabMgrEnoScheduler
-	}
+	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnDcvMgr, sch.EvTabRefreshRsp, &rsp)
+	tabMgr.sdl.SchSendMessage(&schMsg)
 
 	return TabMgrEnoNone
 }

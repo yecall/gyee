@@ -99,7 +99,7 @@ type Scheduler = scheduler
 // User task entry point: notice, parameter ptn would be type of pointer to schTaskNode,
 // the user task should never try to access the field directly, instead, interface func
 // provide by scheduler module should by applied. for example, when user task try to set
-// a timer, it should then pass this ptn to function SchInfSetTimer, see it pls. Also,
+// a timer, it should then pass this ptn to function SchSetTimer, see it pls. Also,
 // user task should try to interpret the msg.body by msg.id, which is defined by user
 // task than scheduler itself, of course, timer event is an exception.
 //
@@ -293,7 +293,7 @@ func (sdl *Scheduler)SchMakeMessage(msg *SchMessage, s, r interface{}, id int, b
 //
 // Set a timer
 //
-func (sdl *Scheduler)SchInfSetTimer(ptn interface{}, tdc *TimerDescription) (eno SchErrno, tid int) {
+func (sdl *Scheduler)SchSetTimer(ptn interface{}, tdc *TimerDescription) (eno SchErrno, tid int) {
 	return sdl.schSetTimer(ptn.(*schTaskNode), (*timerDescription)(tdc))
 }
 
