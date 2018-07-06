@@ -22,7 +22,7 @@
 package shell
 
 import (
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
@@ -34,12 +34,11 @@ import (
 	dhtre	"github.com/yeeco/gyee/p2p/dht/retriver"
 	dhtst	"github.com/yeeco/gyee/p2p/dht/storer"
 	dhtsy	"github.com/yeeco/gyee/p2p/dht/syncer"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
-// Static tasks should be listed in following table, which would be passed to scheduler to
-// create and schedule them while p2p starts up.
+// watch dog is not implemented
 //
 var noDog = sch.SchWatchDog {
 	HaveDog:false,
@@ -72,18 +71,6 @@ func P2pCreateStaticTaskTab() []sch.TaskStaticDescription {
 		{	Name:dhtre.DhtreMgrName,	Tep:dhtre.NewDhtreMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
 		{	Name:dhtst.DhtstMgrName,	Tep:dhtst.NewDhtstMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
 		{	Name:dhtsy.DhtsyMgrName,	Tep:dhtsy.NewDhtsyMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-
-		//
-		// More static tasks outside ycp2p can be appended bellow
-		// handly or by calling function AppendStaticTasks. When
-		// function SchinfSchedulerStart called, currently, all
-		// tasks registered here would be created and scheduled
-		// to go in order.
-		//
-		// Since static tasks might depend each other, the order
-		// to be scheduled to go might have to be taken into account
-		// in the future, we leave this possible work later.
-		//
 	}
 }
 
@@ -110,44 +97,50 @@ var TaskStaticPoweronOrder = []string {
 // Append a static user task to table TaskStaticTab
 //
 func AppendStaticTasks(
-	name string,
-	tep sch.SchUserTaskInf,
-	dcb func(interface{})sch.SchErrno,
-	dog sch.SchWatchDog,
-	tab []sch.TaskStaticDescription) sch.SchErrno {
+	tab		[]sch.TaskStaticDescription,
+	name	string,
+	tep		sch.SchUserTaskInf,
+	dcb		func(interface{})sch.SchErrno,
+	dog		sch.SchWatchDog) sch.SchErrno {
+
+	log.LogCallerFileLine("AppendStaticTasks: " +
+		"static task would be appended: \n" +
+		"name: %s\n" +
+		"tep: %p\n" +
+		"dcb: %p\n" +
+		"dog: %+v",
+		name,
+		tep,
+		dcb,
+		dog)
 
 	tab = append(tab, sch.TaskStaticDescription{Name:name, Tep:tep, DieCb:dcb, Wd:dog})
+
 	return sch.SchEnoNone
 }
 
 //
 // Init p2p
 //
-func P2pCreateInstance(cfg *ycfg.Config) (*sch.Scheduler, sch.SchErrno) {
-	return sch.SchinfSchedulerInit(cfg)
+func P2pCreateInstance(cfg *config.Config) (*sch.Scheduler, sch.SchErrno) {
+	return sch.SchSchedulerInit(cfg)
 }
 
 //
 // Start p2p
 //
-func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
+func P2pStart(sdl *sch.Scheduler) (sch.SchErrno) {
 
 	//
 	// Start all static tasks
 	//
 
-	var taskName2TaskNode *map[string]interface{} = nil
 	var eno sch.SchErrno
 
-	eno, taskName2TaskNode = sdl.SchinfSchedulerStart(P2pCreateStaticTaskTab(), TaskStaticPoweronOrder)
+	eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(), TaskStaticPoweronOrder)
 
 	if eno != sch.SchEnoNone {
-
-		yclog.LogCallerFileLine("P2pStart: " +
-			"SchinfSchedulerStart failed, eno: %d",
-			eno	)
-
-		return eno, taskName2TaskNode
+		return eno
 	}
 
 	//
@@ -157,16 +150,11 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 
 	var pmEno peer.PeMgrErrno
 
-	peMgr := sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
 	pmEno = peMgr.PeMgrInited()
 
 	if pmEno != peer.PeMgrEnoNone {
-
-		yclog.LogCallerFileLine("P2pStart: " +
-			"peer manager init failed, eno: %d",
-			pmEno)
-
-		return sch.SchEnoUserTask, taskName2TaskNode
+		return sch.SchEnoUserTask
 	}
 
 	//
@@ -177,14 +165,14 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno, *map[string]interface{}) {
 
 	if pmEno != peer.PeMgrEnoNone {
 
-		yclog.LogCallerFileLine("P2pStart: " +
+		log.LogCallerFileLine("P2pStart: " +
 			"PeMgrStart failed, eno: %d",
 			pmEno)
 
-		return sch.SchEnoUserTask, taskName2TaskNode
+		return sch.SchEnoUserTask
 	}
 
-	return sch.SchEnoNone, taskName2TaskNode
+	return sch.SchEnoNone
 }
 
 

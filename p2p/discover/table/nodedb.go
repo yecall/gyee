@@ -54,7 +54,7 @@ import (
 	//
 
 	//"github.com/ethereum/go-ethereum/log"
-	yclog "github.com/yeeco/gyee/p2p/logger"
+	log "github.com/yeeco/gyee/p2p/logger"
 
 	//
 	// Modified: 20180503, yeeco
@@ -222,7 +222,7 @@ func (db *nodeDB) node(id NodeID) *Node {
 	//
 	if err := DecodeBytes(blob, node); err != nil {
 		//log.Error("Failed to decode node RLP", "err", err)
-		yclog.LogCallerFileLine("node: DecodeBytes failed")
+		log.LogCallerFileLine("node: DecodeBytes failed")
 		return nil
 	}
 
@@ -289,7 +289,7 @@ func (db *nodeDB) expirer() {
 		case <-tick.C:
 			if err := db.expireNodes(); err != nil {
 				//log.Error("Failed to expire nodedb items", "err", err)
-				yclog.LogCallerFileLine("expirer: expireNodes failed, err: %s", err.Error())
+				log.LogCallerFileLine("expirer: expireNodes failed, err: %s", err.Error())
 			}
 		case <-db.quit:
 			return
@@ -424,7 +424,7 @@ func nextNode(it iterator.Iterator) *Node {
 		//
 		if err := DecodeBytes(it.Value(), &n); err != nil {
 			//log.Warn("Failed to decode node RLP", "id", id, "err", err)
-			yclog.LogCallerFileLine("nextNode: DecodeBytes failed")
+			log.LogCallerFileLine("nextNode: DecodeBytes failed")
 			continue
 		}
 		return &n

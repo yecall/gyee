@@ -9,7 +9,6 @@ package provider
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -31,7 +30,6 @@ var dhtpMgr = dhtProviderManager{
 // Table manager entry
 //
 func DhtpMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtpMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

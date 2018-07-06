@@ -23,7 +23,6 @@ package dht
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -60,7 +59,6 @@ func (dhtMgr *DhtManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 // Table manager entry
 //
 func (dhtMgr *DhtManager)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

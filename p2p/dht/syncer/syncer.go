@@ -22,7 +22,6 @@ package syncer
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -58,7 +57,6 @@ func (dhtsyMgr *DhtSyncerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.Sc
 // sync manager entry
 //
 func (dhtsyMgr *DhtSyncerManager)dhtsyMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtsyMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

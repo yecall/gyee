@@ -23,9 +23,9 @@ package discover
 
 import (
 	"fmt"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
+	log	"github.com/yeeco/gyee/p2p/logger"
 )
 
 
@@ -69,7 +69,7 @@ func NewDcvMgr() *DiscoverManager {
 		ptnMe:    nil,
 		ptnTab:   nil,
 		ptnPeMgr: nil,
-		more:     ycfg.MaxOutbounds,
+		more:     config.MaxOutbounds,
 	}
 
 	dcvMgr.tep = dcvMgr.dcvMgrProc
@@ -89,10 +89,6 @@ func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 //
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	yclog.LogCallerFileLine("DcvMgrProc: " +
-		"scheduled, sender: %s, recver: %s, msg: %d",
-		sch.SchinfGetMessageSender(msg), sch.SchinfGetMessageRecver(msg), msg.Id)
-
 	var eno DcvMgrErrno = DcvMgrEnoNone
 
 	switch msg.Id {
@@ -110,12 +106,12 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		eno = dcvMgr.DcvMgrTabRefreshRsp(msg.Body.(*sch.MsgTabRefreshRsp))
 
 	default:
-		yclog.LogCallerFileLine("DcvMgrProc: invalid message: %d", msg.Id)
+		log.LogCallerFileLine("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
 	}
 
 	if eno != DcvMgrEnoNone {
-		yclog.LogCallerFileLine("DcvMgrProc: errors, eno: %d", eno)
+		log.LogCallerFileLine("DcvMgrProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -130,21 +126,21 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	var eno sch.SchErrno
 
 	dcvMgr.ptnMe = ptn
-	dcvMgr.sdl = sch.SchinfGetScheduler(ptn)
+	dcvMgr.sdl = sch.SchGetScheduler(ptn)
 	sdl := dcvMgr.sdl
 
-	if eno, dcvMgr.ptnTab = sdl.SchinfGetTaskNodeByName(sch.TabMgrName); eno != sch.SchEnoNone {
-		yclog.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
+	if eno, dcvMgr.ptnTab = sdl.SchGetTaskNodeByName(sch.TabMgrName); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
 		return DcvMgrEnoScheduler
 	}
 
-	if eno, dcvMgr.ptnPeMgr = dcvMgr.sdl.SchinfGetTaskNodeByName(sch.PeerMgrName); eno != sch.SchEnoNone {
-		yclog.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
+	if eno, dcvMgr.ptnPeMgr = dcvMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
 		return DcvMgrEnoScheduler
 	}
 
 	if dcvMgr.ptnMe == nil || dcvMgr.ptnTab == nil || dcvMgr.ptnPeMgr == nil {
-		yclog.LogCallerFileLine("DcvMgrPoweron: internal errors, invalid task node pointers")
+		log.LogCallerFileLine("DcvMgrPoweron: internal errors, invalid task node pointers")
 		return DcvMgrEnoScheduler
 	}
 
@@ -157,14 +153,14 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 //
 func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 
-	sdl := sch.SchinfGetScheduler(ptn)
-	if eno := sdl.SchinfTaskDone(ptn, sch.SchEnoKilled); eno != sch.SchEnoNone {
+	sdl := sch.SchGetScheduler(ptn)
+	if eno := sdl.SchTaskDone(ptn, sch.SchEnoKilled); eno != sch.SchEnoNone {
 
-		yclog.LogCallerFileLine("DcvMgrPoweroff: done task failed, eno: %d", eno)
+		log.LogCallerFileLine("DcvMgrPoweroff: done task failed, eno: %d", eno)
 		return DcvMgrEnoScheduler
 	}
 
-	yclog.LogCallerFileLine("DcvMgrPoweroff: task done")
+	log.LogCallerFileLine("DcvMgrPoweroff: task done")
 
 	return DcvMgrEnoNone
 }
@@ -195,7 +191,7 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
 
-		yclog.LogCallerFileLine("DcvMgrFindNodeReq: " +
+		log.LogCallerFileLine("DcvMgrFindNodeReq: " +
 			"no more needed, more: %d",
 			dcvMgr.more)
 
@@ -206,18 +202,18 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 	// More needed, ask the table task to refresh
 	//
 
-	if eno := dcvMgr.sdl.SchinfMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnTab, sch.EvTabRefreshReq, &reqRefresh);
+	if eno := dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnTab, sch.EvTabRefreshReq, &reqRefresh);
 		eno != sch.SchEnoNone {
 
-		yclog.LogCallerFileLine("DcvMgrFindNodeReq: SchinfMakeMessage failed, eno: %d", eno)
+		log.LogCallerFileLine("DcvMgrFindNodeReq: SchMakeMessage failed, eno: %d", eno)
 		return DcvMgrEnoScheduler
 	}
 
-	if eno := dcvMgr.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+	if eno := dcvMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 
-		yclog.LogCallerFileLine("DcvMgrFindNodeReq: " +
-			"SchinfSendMessage failed, eno: %d, target: %s",
-			eno, dcvMgr.sdl.SchinfGetTaskName(dcvMgr.ptnTab))
+		log.LogCallerFileLine("DcvMgrFindNodeReq: " +
+			"SchSendMessage failed, eno: %d, target: %s",
+			eno, dcvMgr.sdl.SchGetTaskName(dcvMgr.ptnTab))
 
 		return DcvMgrEnoScheduler
 	}
@@ -237,7 +233,7 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 
 	if dcvMgr.more <= 0 {
 
-		yclog.LogCallerFileLine("DcvMgrTabRefreshRsp: " +
+		log.LogCallerFileLine("DcvMgrTabRefreshRsp: " +
 			"discarded, no more needed, more: %d, rsp: %s",
 			dcvMgr.more,
 			fmt.Sprintf("%+v", rsp))
@@ -253,18 +249,18 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 	var r = sch.MsgDcvFindNodeRsp{}
 	r.Nodes = rsp.Nodes
 
-	if eno := dcvMgr.sdl.SchinfMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r);
+	if eno := dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r);
 	eno != sch.SchEnoNone {
 
-		yclog.LogCallerFileLine("DcvMgrTabRefreshRsp: SchinfMakeMessage failed, eno: %d", eno)
+		log.LogCallerFileLine("DcvMgrTabRefreshRsp: SchMakeMessage failed, eno: %d", eno)
 		return DcvMgrEnoScheduler
 	}
 
-	if eno := dcvMgr.sdl.SchinfSendMessage(&schMsg); eno != sch.SchEnoNone {
+	if eno := dcvMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 
-		yclog.LogCallerFileLine("DcvMgrTabRefreshRsp: " +
-			"SchinfSendMessage failed, eno: %d, target: %s",
-			eno, dcvMgr.sdl.SchinfGetTaskName(dcvMgr.ptnTab))
+		log.LogCallerFileLine("DcvMgrTabRefreshRsp: " +
+			"SchSendMessage failed, eno: %d, target: %s",
+			eno, dcvMgr.sdl.SchGetTaskName(dcvMgr.ptnTab))
 
 		return DcvMgrEnoScheduler
 	}
@@ -274,11 +270,6 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 	//
 
 	dcvMgr.more -= len(r.Nodes)
-
-	yclog.LogCallerFileLine("DcvMgrTabRefreshRsp: " +
-		"send EvDcvFindNodeRsp ok, target: %s, more: %d",
-		dcvMgr.sdl.SchinfGetTaskName(dcvMgr.ptnPeMgr),
-		dcvMgr.more)
 
 	return DcvMgrEnoNone
 }

@@ -24,9 +24,9 @@ package peer
 import (
 	"net"
 	"fmt"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
+	log	"github.com/yeeco/gyee/p2p/logger"
 	"sync"
 )
 
@@ -41,7 +41,7 @@ type ListenerManager struct {
 	tep			sch.SchUserTaskEp		// entry
 	ptn			interface{}				// the listner task node pointer
 	ptnPeerMgr	interface{}				// the peer manager task node pointer
-	cfg			*ycfg.Cfg4PeerListener	// configuration
+	cfg			*config.Cfg4PeerListener	// configuration
 	listener	net.Listener			// listener of net
 	listenAddr	*net.TCPAddr			// listen address
 	accepter	*acceptTskCtrlBlock		// pointer to accepter
@@ -81,10 +81,6 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	// where peer manager is registered.
 	//
 
-	yclog.LogCallerFileLine("LsnMgrProc: " +
-		"scheduled, sender: %s, recver: %s, msg: %d",
-		sch.SchinfGetMessageSender(msg), sch.SchinfGetMessageRecver(msg), msg.Id)
-
 	var eno sch.SchErrno
 
 	switch msg.Id {
@@ -102,12 +98,12 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		eno = lsnMgr.lsnMgrStop()
 
 	default:
-		yclog.LogCallerFileLine("LsnMgrProc: invalid message: %d", msg.Id)
+		log.LogCallerFileLine("LsnMgrProc: invalid message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
 	if eno != sch.SchEnoNone {
-		yclog.LogCallerFileLine("LsnMgrProc: errors, eno: %d", eno)
+		log.LogCallerFileLine("LsnMgrProc: errors, eno: %d", eno)
 	}
 
 	return eno
@@ -118,7 +114,7 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 //
 func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 
-	yclog.LogCallerFileLine("lsnMgrPoweron: poweron, carry out task initilization")
+	log.LogCallerFileLine("lsnMgrPoweron: poweron, carry out task initilization")
 
 	//
 	// Keep ourselves task node pointer;
@@ -128,15 +124,15 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 
 	lsnMgr.ptn = ptn
-	lsnMgr.sdl = sch.SchinfGetScheduler(ptn)
+	lsnMgr.sdl = sch.SchGetScheduler(ptn)
 
-	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchinfGetTaskNodeByName(PeerMgrName); eno != sch.SchEnoNone {
-		yclog.LogCallerFileLine("lsnMgrPoweron: invalid peer manager task node pointer")
+	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetTaskNodeByName(PeerMgrName); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("lsnMgrPoweron: invalid peer manager task node pointer")
 		return eno
 	}
 
 	if lsnMgr.ptnPeerMgr == nil {
-		yclog.LogCallerFileLine("lsnMgrPoweron: invalid peer manager task node pointer")
+		log.LogCallerFileLine("lsnMgrPoweron: invalid peer manager task node pointer")
 		return sch.SchEnoInternal
 	}
 
@@ -144,10 +140,10 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	// Get configuration
 	//
 
-	lsnMgr.cfg = ycfg.P2pConfig4PeerListener(lsnMgr.sdl.SchinfGetP2pCfgName())
+	lsnMgr.cfg = config.P2pConfig4PeerListener(lsnMgr.sdl.SchGetP2pCfgName())
 
 	if lsnMgr.cfg == nil {
-		yclog.LogCallerFileLine("lsnMgrPoweron: invalid configuration pointer")
+		log.LogCallerFileLine("lsnMgrPoweron: invalid configuration pointer")
 		return sch.SchEnoConfig
 	}
 
@@ -165,7 +161,7 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 
 	if lsnMgr.listener, err = net.Listen("tcp", lsnAddr); err != nil {
 
-		yclog.LogCallerFileLine("lsnMgrSetupListener: "+
+		log.LogCallerFileLine("lsnMgrSetupListener: "+
 			"listen failed, addr: %s, err: %s",
 			lsnAddr, err.Error())
 
@@ -174,7 +170,7 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 
 	lsnMgr.listenAddr = lsnMgr.listener.Addr().(*net.TCPAddr)
 
-	yclog.LogCallerFileLine("lsnMgrSetupListener: "+
+	log.LogCallerFileLine("lsnMgrSetupListener: "+
 		"task inited ok, listening address: %s",
 		lsnMgr.listenAddr.String())
 
@@ -186,17 +182,17 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 //
 func (lsnMgr *ListenerManager)lsnMgrPoweroff() sch.SchErrno {
 
-	yclog.LogCallerFileLine("lsnMgrPoweroff: poweroff, done")
+	log.LogCallerFileLine("lsnMgrPoweroff: poweroff, done")
 
 	//
 	// kill accepter task if needed
 	//
 
-	if _, ptn := lsnMgr.sdl.SchinfGetTaskNodeByName(PeerAccepterName); ptn != nil {
+	if _, ptn := lsnMgr.sdl.SchGetTaskNodeByName(PeerAccepterName); ptn != nil {
 		lsnMgr.lsnMgrStop()
 	}
 
-	return lsnMgr.sdl.SchinfTaskDone(lsnMgr.ptn, sch.SchEnoKilled)
+	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptn, sch.SchEnoKilled)
 }
 
 //
@@ -213,11 +209,11 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 	// to close the listener, so the task would get out.
 	//
 
-	yclog.LogCallerFileLine("lsnMgrStart: try to create accept task ...")
+	log.LogCallerFileLine("lsnMgrStart: try to create accept task ...")
 
 	if eno := lsnMgr.lsnMgrSetupListener(); eno != sch.SchEnoNone {
 
-		yclog.LogCallerFileLine("lsnMgrStart: " +
+		log.LogCallerFileLine("lsnMgrStart: " +
 			"setup listener failed, eno: %d",
 			eno)
 
@@ -242,10 +238,10 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 		UserDa:		nil,
 	}
 
-	if eno, ptn := lsnMgr.sdl.SchinfCreateTask(&tskDesc); eno != sch.SchEnoNone || ptn == nil {
+	if eno, ptn := lsnMgr.sdl.SchCreateTask(&tskDesc); eno != sch.SchEnoNone || ptn == nil {
 
-		yclog.LogCallerFileLine("lsnMgrStart: " +
-			"SchinfCreateTask failed, eno: %d, ptn: %X",
+		log.LogCallerFileLine("lsnMgrStart: " +
+			"SchCreateTask failed, eno: %d, ptn: %X",
 			eno, ptn.(*interface{}))
 
 		if ptn == nil {
@@ -255,10 +251,10 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
-	peMgr := lsnMgr.sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*PeerManager)
+	peMgr := lsnMgr.sdl.SchGetUserTaskIF(sch.PeerMgrName).(*PeerManager)
 	peMgr.accepter = &accepter
 
-	yclog.LogCallerFileLine("lsnMgrStart: accept task created")
+	log.LogCallerFileLine("lsnMgrStart: accept task created")
 
 	return sch.SchEnoNone
 }
@@ -268,7 +264,7 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 //
 func (lsnMgr *ListenerManager)lsnMgrStop() sch.SchErrno {
 
-	yclog.LogCallerFileLine("lsnMgrStop: listner will be closed")
+	log.LogCallerFileLine("lsnMgrStop: listner will be closed")
 
 	if lsnMgr.accepter != nil {
 
@@ -286,11 +282,11 @@ func (lsnMgr *ListenerManager)lsnMgrStop() sch.SchErrno {
 
 	if err := lsnMgr.listener.Close(); err != nil {
 
-		yclog.LogCallerFileLine("lsnMgrStop: try to close listner fialed, err: %s", err.Error())
+		log.LogCallerFileLine("lsnMgrStop: try to close listner fialed, err: %s", err.Error())
 		return sch.SchEnoOS
 	}
 
-	yclog.LogCallerFileLine("lsnMgrStop: listner closed ok")
+	log.LogCallerFileLine("lsnMgrStop: listner closed ok")
 
 	lsnMgr.listener = nil
 
@@ -343,34 +339,34 @@ func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, msg *sch.SchM
 	// comments in function lsnMgrStart for more.
 	//
 
-	_, accepter.ptnLsnMgr = accepter.sdl.SchinfGetTaskNodeByName(PeerLsnMgrName)
+	_, accepter.ptnLsnMgr = accepter.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
 
 	if accepter.ptnLsnMgr == nil {
-		yclog.LogCallerFileLine("PeerAcceptProc: invalid listener manager task pointer")
-		accepter.sdl.SchinfTaskDone(ptn, sch.SchEnoInternal)
+		log.LogCallerFileLine("PeerAcceptProc: invalid listener manager task pointer")
+		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
-	_, accepter.ptnPeMgr = accepter.sdl.SchinfGetTaskNodeByName(PeerMgrName)
+	_, accepter.ptnPeMgr = accepter.sdl.SchGetTaskNodeByName(PeerMgrName)
 
 	if accepter.ptnPeMgr == nil {
-		yclog.LogCallerFileLine("PeerAcceptProc: invalid peer manager task pointer")
-		accepter.sdl.SchinfTaskDone(ptn, sch.SchEnoInternal)
+		log.LogCallerFileLine("PeerAcceptProc: invalid peer manager task pointer")
+		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.listener = accepter.lsnMgr.listener
 
 	if accepter.listener == nil {
-		yclog.LogCallerFileLine("PeerAcceptProc: invalid listener, done accepter")
-		accepter.sdl.SchinfTaskDone(ptn, sch.SchEnoInternal)
+		log.LogCallerFileLine("PeerAcceptProc: invalid listener, done accepter")
+		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.event = sch.EvSchNull
 	accepter.curError = nil
 
-	yclog.LogCallerFileLine("PeerAcceptProc: inited ok, tring to accept ...")
+	log.LogCallerFileLine("PeerAcceptProc: inited ok, tring to accept ...")
 
 acceptLoop:
 
@@ -394,7 +390,7 @@ acceptLoop:
 		accepter.lockTcb.Lock()
 
 		if accepter.listener == nil || accepter.event != sch.SchEnoNone {
-			yclog.LogCallerFileLine("PeerAcceptProc: break the loop, for we might have been killed")
+			log.LogCallerFileLine("PeerAcceptProc: break the loop, for we might have been killed")
 			break acceptLoop
 		}
 
@@ -415,11 +411,11 @@ acceptLoop:
 		// listener, accept would get errors from underlying network.
 		//
 
-		yclog.LogCallerFileLine("PeerAcceptProc: try Accept()")
+		log.LogCallerFileLine("PeerAcceptProc: try Accept()")
 
 		conn, err := listener.Accept()
 
-		yclog.LogCallerFileLine("PeerAcceptProc: get out from Accept()")
+		log.LogCallerFileLine("PeerAcceptProc: get out from Accept()")
 
 		//
 		// Lock the control block since following statements need to access it
@@ -433,7 +429,7 @@ acceptLoop:
 
 		if err != nil && !err.(net.Error).Temporary() {
 
-			yclog.LogCallerFileLine("PeerAcceptProc: " +
+			log.LogCallerFileLine("PeerAcceptProc: " +
 				"break loop for non-temporary error while accepting, err: %s", err.Error())
 
 			accepter.curError = err
@@ -446,7 +442,7 @@ acceptLoop:
 
 		if conn == nil {
 
-			yclog.LogCallerFileLine("PeerAcceptProc: " +
+			log.LogCallerFileLine("PeerAcceptProc: " +
 				"break loop for null connection accepted without errors")
 
 			accepter.event = sch.EvSchException
@@ -454,7 +450,7 @@ acceptLoop:
 			break acceptLoop
 		}
 
-		yclog.LogCallerFileLine("PeerAcceptProc: " +
+		log.LogCallerFileLine("PeerAcceptProc: " +
 			"accept one: %s",
 			conn.RemoteAddr().String())
 
@@ -470,11 +466,11 @@ acceptLoop:
 			remoteAddr:	conn.RemoteAddr().(*net.TCPAddr),
 		}
 
-		eno := accepter.sdl.SchinfMakeMessage(&msg, ptn, accepter.ptnPeMgr, sch.EvPeLsnConnAcceptedInd, &msgBody)
+		eno := accepter.sdl.SchMakeMessage(&msg, ptn, accepter.ptnPeMgr, sch.EvPeLsnConnAcceptedInd, &msgBody)
 		if eno != sch.SchEnoNone {
 
-			yclog.LogCallerFileLine("PeerAcceptProc: " +
-				"SchinfMakeMessage for EvPeLsnConnAcceptedInd failed, eno: %d",
+			log.LogCallerFileLine("PeerAcceptProc: " +
+				"SchMakeMessage for EvPeLsnConnAcceptedInd failed, eno: %d",
 				eno)
 
 			accepter.lockTcb.Unlock()
@@ -482,21 +478,21 @@ acceptLoop:
 			continue
 		}
 
-		eno = accepter.sdl.SchinfSendMessage(&msg)
+		eno = accepter.sdl.SchSendMessage(&msg)
 		if eno != sch.SchEnoNone {
 
-			yclog.LogCallerFileLine("PeerAcceptProc: " +
-				"SchinfSendMessage for EvPeLsnConnAcceptedInd failed, target: %s",
-				accepter.sdl.SchinfGetTaskName(accepter.ptnPeMgr))
+			log.LogCallerFileLine("PeerAcceptProc: " +
+				"SchSendMessage for EvPeLsnConnAcceptedInd failed, target: %s",
+				accepter.sdl.SchGetTaskName(accepter.ptnPeMgr))
 
 			accepter.lockTcb.Unlock()
 
 			continue
 		}
 
-		yclog.LogCallerFileLine("PeerAcceptProc: " +
+		log.LogCallerFileLine("PeerAcceptProc: " +
 			"send EvPeLsnConnAcceptedInd ok, target: %s",
-			accepter.sdl.SchinfGetTaskName(accepter.ptnPeMgr))
+			accepter.sdl.SchGetTaskName(accepter.ptnPeMgr))
 
 		accepter.lockTcb.Unlock()
 	}
@@ -516,9 +512,9 @@ acceptLoop:
 		// errors fired from underlying network.
 		//
 
-		yclog.LogCallerFileLine("PeerAcceptProc: broken for event: %d", accepter.event)
+		log.LogCallerFileLine("PeerAcceptProc: broken for event: %d", accepter.event)
 
-		accepter.sdl.SchinfTaskDone(ptn, accepter.event)
+		accepter.sdl.SchTaskDone(ptn, accepter.event)
 		accepter.lockTcb.Unlock()
 
 		return accepter.event
@@ -531,17 +527,17 @@ acceptLoop:
 
 	if accepter.curError != nil {
 
-		yclog.LogCallerFileLine("PeerAcceptProc: abnormal exit, event: %d, err: %s",
+		log.LogCallerFileLine("PeerAcceptProc: abnormal exit, event: %d, err: %s",
 			accepter.event, accepter.curError.Error())
 
 	} else {
 
-		yclog.LogCallerFileLine("PeerAcceptProc: abnormal exit, event: %d, err: nil",
+		log.LogCallerFileLine("PeerAcceptProc: abnormal exit, event: %d, err: nil",
 			accepter.event)
 	}
 
 	accepter.lockTcb.Unlock()
-	accepter.sdl.SchinfTaskDone(ptn, sch.SchEnoUnknown)
+	accepter.sdl.SchTaskDone(ptn, sch.SchEnoUnknown)
 
 	return sch.SchEnoUnknown
 }
@@ -550,7 +546,7 @@ acceptLoop:
 // Pause accept
 //
 func (accepter *acceptTskCtrlBlock)PauseAccept() bool {
-	yclog.LogCallerFileLine("PauseAccept: try to pause accepting inbound")
+	log.LogCallerFileLine("PauseAccept: try to pause accepting inbound")
 	accepter.lockAccept.Lock()
 	return true
 }
@@ -559,7 +555,7 @@ func (accepter *acceptTskCtrlBlock)PauseAccept() bool {
 // Resume accept
 //
 func (accepter *acceptTskCtrlBlock)ResumeAccept() bool {
-	yclog.LogCallerFileLine("PauseAccept: try to resume accepting inbound")
+	log.LogCallerFileLine("PauseAccept: try to resume accepting inbound")
 	accepter.lockAccept.Unlock()
 	return true
 }

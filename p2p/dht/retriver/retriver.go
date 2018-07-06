@@ -23,7 +23,6 @@ package retriver
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -59,7 +58,6 @@ func (dhtreMgr *DhtRetriverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.
 // retrive manager entry
 //
 func (dhtreMgr *DhtRetriverManager)dhtreMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtreMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

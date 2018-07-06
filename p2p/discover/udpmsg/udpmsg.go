@@ -22,8 +22,8 @@ package udpmsg
 
 import (
 	"net"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	log	"github.com/yeeco/gyee/p2p/logger"
+	config	"github.com/yeeco/gyee/p2p/config"
 	pb		"github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
 )
 
@@ -54,7 +54,7 @@ type (
 	Node struct {
 		IP			net.IP		// ip address
 		UDP, TCP	uint16		// udp port number
-		NodeId		ycfg.NodeID	// node identity
+		NodeId		config.NodeID	// node identity
 	}
 
 	//
@@ -84,7 +84,7 @@ type (
 	FindNode struct {
 		From		Node		// source node
 		To			Node		// destination node
-		Target		ycfg.NodeID	// target node identity
+		Target		config.NodeID	// target node identity
 		Id			uint64		// message identity
 		Expiration	uint64		// time to expired of this message
 		Extra		[]byte		// extra info
@@ -147,7 +147,7 @@ func NewUdpMsg() *UdpMsg {
 func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) UdpMsgErrno {
 
 	if pbuf == nil || bytes == 0 || from == nil {
-		yclog.LogCallerFileLine("SetRawMessage: invalid parameter(s)")
+		log.LogCallerFileLine("SetRawMessage: invalid parameter(s)")
 		return UdpMsgEnoParameter
 	}
 
@@ -168,7 +168,7 @@ func (pum *UdpMsg) Decode() UdpMsgErrno {
 
 	if err := (pum.Msg).Unmarshal((*pum.Pbuf)[0:pum.Len]); err != nil {
 
-		yclog.LogCallerFileLine("Decode: " +
+		log.LogCallerFileLine("Decode: " +
 			"Unmarshal failed, err: %s",
 			err.Error())
 
@@ -198,7 +198,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	if mt == UdpMsgTypeUnknown {
 
-		yclog.LogCallerFileLine("GetDecodedMsg: " +
+		log.LogCallerFileLine("GetDecodedMsg: " +
 			"GetDecodedMsgType failed, mt: %d",
 			mt)
 
@@ -222,7 +222,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	if f, ok = funcMap[mt]; !ok {
 
-		yclog.LogCallerFileLine("GetDecodedMsg: " +
+		log.LogCallerFileLine("GetDecodedMsg: " +
 			"invalid message type: %d",
 			mt)
 
@@ -253,7 +253,7 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 
 	if val, ok = pbMap[key]; !ok {
 
-		yclog.LogCallerFileLine("GetDecodedMsgType: invalid message type")
+		log.LogCallerFileLine("GetDecodedMsgType: invalid message type")
 		return UdpMsgTypeUnknown
 	}
 
@@ -419,7 +419,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 
 	if *pum.Pbuf, err = pum.Msg.Marshal(); err != nil {
 
-		yclog.LogCallerFileLine("Encode: " +
+		log.LogCallerFileLine("Encode: " +
 			"Marshal failed, err: %s",
 			err.Error())
 
@@ -461,7 +461,7 @@ func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 	}
 
 	if eno != UdpMsgEnoNone {
-		yclog.LogCallerFileLine("Encode: failed, type: %d", t)
+		log.LogCallerFileLine("Encode: failed, type: %d", t)
 	}
 
 	pum.Eno = eno
@@ -517,7 +517,7 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		yclog.LogCallerFileLine("EncodePing: fialed, err: %s", err.Error())
+		log.LogCallerFileLine("EncodePing: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -576,7 +576,7 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		yclog.LogCallerFileLine("EncodePong: fialed, err: %s", err.Error())
+		log.LogCallerFileLine("EncodePong: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -649,7 +649,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		yclog.LogCallerFileLine("EncodeFindNode: fialed, err: %s", err.Error())
+		log.LogCallerFileLine("EncodeFindNode: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -723,7 +723,7 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		yclog.LogCallerFileLine("EncodeNeighbors: fialed, err: %s", err.Error())
+		log.LogCallerFileLine("EncodeNeighbors: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 

@@ -22,26 +22,26 @@
 package shell
 
 import (
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
 // Get default configuration
 //
-func ShellDefaultConfig() *ycfg.Config {
-	return ycfg.P2pDefaultConfig()
+func ShellDefaultConfig() *config.Config {
+	return config.P2pDefaultConfig()
 }
 
 //
 // Set configuration
 //
-func ShellSetConfig(name string, cfg *ycfg.Config) (string, ycfg.P2pCfgErrno) {
-	return ycfg.P2pSetConfig(name, cfg)
+func ShellSetConfig(name string, cfg *config.Config) (string, config.P2pCfgErrno) {
+	return config.P2pSetConfig(name, cfg)
 }
 
 //
 // Get configuration
 //
-func ShellGetConfig(name string) *ycfg.Config {
-	return ycfg.P2pGetConfig(name)
+func ShellGetConfig(name string) *config.Config {
+	return config.P2pGetConfig(name)
 }

@@ -23,7 +23,6 @@ package dispatcher
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -45,7 +44,6 @@ var dhtdiMgr = dhtDispatcherManager{
 // dispatch manager entry
 //
 func DhtdiMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtdiMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

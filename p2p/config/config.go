@@ -42,7 +42,7 @@ import (
 
 	//ethereum "github.com/ethereum/go-ethereum/crypto"
 
-	yclog "github.com/yeeco/gyee/p2p/logger"
+	log "github.com/yeeco/gyee/p2p/logger"
 )
 
 
@@ -78,7 +78,7 @@ const (
 const P2pMaxBootstrapNodes = 32
 
 var BootstrapNodeUrl = []string {
-	//"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.190:30303:30303",
+	"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.190:30303:30303",
 	//"8FAEAD1F4B57494B6596B4320A9AA5B083486513222B8735E487A59F4C9CC59D2155B3668B1BAA34A7D07FC2F12384CE44EA50746BCA262B66B2F9E89F47D8E6@192.168.2.144:30303:30303",
 }
 
@@ -262,14 +262,17 @@ var defaultConfig = Config {
 	StaticNodes:		nil,
 	NodeDataDir:		P2pDefaultDataDir(true),
 	NodeDatabase:		datadirNodeDatabase,
-	NoDial:				true,
+	NoDial:				false,
 	NoAccept:			false,
-	BootstrapNode:		true,
+	BootstrapNode:		false,
 	Local:				dftLocal,
 	ProtoNum:			1,
 	Protocols:			[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
 }
 
+//
+// Multiple configurations each identified by its' name
+//
 var config = make(map[string] *Config)
 
 //
@@ -291,7 +294,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	//
 
 	if cfg == nil {
-		yclog.LogCallerFileLine("P2pSetConfig: invalid configuration")
+		log.LogCallerFileLine("P2pSetConfig: invalid configuration")
 		return name, PcfgEnoParameter
 	}
 
@@ -303,11 +306,11 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	//
 
 	if cfg.PrivateKey == nil {
-		yclog.LogCallerFileLine("P2pSetConfig: private key is empty")
+		log.LogCallerFileLine("P2pSetConfig: private key is empty")
 	}
 
 	if cfg.PublicKey == nil {
-		yclog.LogCallerFileLine("P2pSetConfig: public key is empty")
+		log.LogCallerFileLine("P2pSetConfig: public key is empty")
 	}
 
 	if cfg.MaxPeers == 0 ||
@@ -315,7 +318,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		cfg.MaxInbounds == 0	||
 		cfg.MaxPeers < cfg.MaxInbounds + cfg.MaxOutbounds {
 
-		yclog.LogCallerFileLine("P2pSetConfig: " +
+		log.LogCallerFileLine("P2pSetConfig: " +
 			"invalid peer number constraint, MaxPeers: %d, MaxOutbounds: %d, MaxInbounds: %d",
 			cfg.MaxPeers, cfg.MaxOutbounds, cfg.MaxInbounds)
 
@@ -323,15 +326,15 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 
 	if len(cfg.Name) == 0 {
-		yclog.LogCallerFileLine("P2pSetConfig: node name is empty")
+		log.LogCallerFileLine("P2pSetConfig: node name is empty")
 	}
 
 	if cap(cfg.BootstrapNodes) == 0 {
-		yclog.LogCallerFileLine("P2pSetConfig: BootstrapNodes is empty")
+		log.LogCallerFileLine("P2pSetConfig: BootstrapNodes is empty")
 	}
 
 	if cap(cfg.StaticNodes) == 0 {
-		yclog.LogCallerFileLine("P2pSetConfig: StaticNodes is empty")
+		log.LogCallerFileLine("P2pSetConfig: StaticNodes is empty")
 	}
 
 	//
@@ -339,24 +342,24 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	//
 
 	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
-		yclog.LogCallerFileLine("P2pSetConfig: invaid data directory")
+		log.LogCallerFileLine("P2pSetConfig: invaid data directory")
 		return name, PcfgEnoDataDir
 	}
 
 	if len(cfg.NodeDatabase) == 0 {
-		yclog.LogCallerFileLine("P2pSetConfig: invalid database name")
+		log.LogCallerFileLine("P2pSetConfig: invalid database name")
 		return name, PcfgEnoDatabase
 	}
 
 	if cfg.Local.IP == nil {
-		yclog.LogCallerFileLine("P2pSetConfig: invalid ip address")
+		log.LogCallerFileLine("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoIpAddr
 	}
 
 	name = strings.Trim(name, " ")
 	if len(name) == 0 {
 		if len(cfg.CfgName) == 0 {
-			yclog.LogCallerFileLine("P2pSetConfig: empty configuration name")
+			log.LogCallerFileLine("P2pSetConfig: empty configuration name")
 			return name, PcfgEnoParameter
 		}
 		name = cfg.CfgName
@@ -364,9 +367,9 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	cfg.CfgName = name
 
 	if _, dup := config[name]; dup {
-		yclog.LogCallerFileLine("P2pSetConfig: duplicated configuration name: %s", name)
-		yclog.LogCallerFileLine("P2pSetConfig: old configuration: %+v", *config[name])
-		yclog.LogCallerFileLine("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
+		log.LogCallerFileLine("P2pSetConfig: duplicated configuration name: %s", name)
+		log.LogCallerFileLine("P2pSetConfig: old configuration: %+v", *config[name])
+		log.LogCallerFileLine("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
 	}
 	config[name] = cfg
 
@@ -375,7 +378,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	//
 
 	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
-		yclog.LogCallerFileLine("P2pSetConfig: invalid ip address")
+		log.LogCallerFileLine("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoNodeId
 	}
 
@@ -404,7 +407,7 @@ func P2pHexString2NodeId(hex string) *NodeID {
 	var nid = NodeID{byte(0)}
 
 	if len(hex) != NodeIDBytes * 2 {
-		yclog.LogCallerFileLine("P2pHexString2NodeId: " +
+		log.LogCallerFileLine("P2pHexString2NodeId: " +
 			"invalid length: %d",
 			len(hex))
 		return nil
@@ -419,7 +422,7 @@ func P2pHexString2NodeId(hex string) *NodeID {
 		} else if c >= 'A' && c <= 'F' {
 			c = c - 'A' + 10
 		} else {
-			yclog.LogCallerFileLine("P2pHexString2NodeId: " +
+			log.LogCallerFileLine("P2pHexString2NodeId: " +
 				"invalid string: %s",
 				hex)
 			return nil
@@ -490,6 +493,9 @@ func P2pGetUserHomeDir() string {
 	return ""
 }
 
+//
+// Build private key
+//
 func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 
 	//
@@ -506,7 +512,7 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 		//key, err := ethereum.GenerateKey()
 		key, err := GenerateKey()
 		if err != nil {
-			yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
+			log.LogCallerFileLine("p2pBuildPrivateKey: " +
 				"GenerateKey failed, err: %s",
 				err.Error())
 			return nil
@@ -517,7 +523,7 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 	keyfile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
 	//if key, err := ethereum.LoadECDSA(keyfile); err == nil {
 	if key, err := LoadECDSA(keyfile); err == nil {
-		yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
+		log.LogCallerFileLine("p2pBuildPrivateKey: " +
 			"private key loaded ok from file: %s",
 			keyfile)
 		return key
@@ -526,7 +532,7 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 	//key, err := ethereum.GenerateKey()
 	key, err := GenerateKey()
 	if err != nil {
-		yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
+		log.LogCallerFileLine("p2pBuildPrivateKey: " +
 			"GenerateKey failed, err: %s",
 			err.Error())
 		return nil
@@ -535,7 +541,7 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 	instanceDir := filepath.Join(cfg.NodeDataDir, cfg.Name)
 	if _, err := os.Stat(instanceDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(instanceDir, 0700); err != nil {
-			yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
+			log.LogCallerFileLine("p2pBuildPrivateKey: " +
 				"MkdirAll failed, err: %s, path: %s",
 				err.Error(), instanceDir)
 			return key
@@ -544,12 +550,12 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 
 	//if err := ethereum.SaveECDSA(keyfile, key); err != nil {
 	if err := SaveECDSA(keyfile, key); err != nil {
-		yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
+		log.LogCallerFileLine("p2pBuildPrivateKey: " +
 			"SaveECDSA failed, err: %s",
 			err.Error())
 	}
 
-	yclog.LogCallerFileLine("p2pBuildPrivateKey: " +
+	log.LogCallerFileLine("p2pBuildPrivateKey: " +
 		"key save ok to file: %s",
 		keyfile)
 
@@ -566,7 +572,7 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 
 	if len(pbytes)-1 != len(id) {
-		yclog.LogCallerFileLine("p2pPubkey2NodeId: " +
+		log.LogCallerFileLine("p2pPubkey2NodeId: " +
 			"invalid public key for node identity")
 		return nil
 	}
@@ -589,7 +595,7 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 		cfg.PrivateKey = p2pBuildPrivateKey(cfg)
 
 		if cfg.PrivateKey == nil {
-			yclog.LogCallerFileLine("p2pSetupLocalNodeId: " +
+			log.LogCallerFileLine("p2pSetupLocalNodeId: " +
 				"p2pBuildPrivateKey failed")
 			return PcfgEnoPrivateKye
 		}
@@ -601,13 +607,13 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 
 	if pnid == nil {
 
-		yclog.LogCallerFileLine("p2pSetupLocalNodeId: " +
+		log.LogCallerFileLine("p2pSetupLocalNodeId: " +
 			"p2pPubkey2NodeId failed")
 		return PcfgEnoPublicKye
 	}
 	cfg.Local.ID = *pnid
 
-	yclog.LogCallerFileLine("p2pSetupLocalNodeId: " +
+	log.LogCallerFileLine("p2pSetupLocalNodeId: " +
 		"local node identity: %s",
 		P2pNodeId2HexString(cfg.Local.ID))
 
@@ -625,7 +631,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 
 		strs := strings.Split(url,"@")
 		if len(strs) != 2 {
-			yclog.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
 				"invalid bootstrap url: %s",
 				url)
 			return nil
@@ -634,7 +640,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 		strNodeId := strs[0]
 		strs = strings.Split(strs[1],":")
 		if len(strs) != 3 {
-			yclog.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
 				"invalid bootstrap url: %s",
 				url)
 			return nil
@@ -646,7 +652,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 
 		pid := P2pHexString2NodeId(strNodeId)
 		if pid == nil {
-			yclog.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
 				"P2pHexString2NodeId failed, strNodeId: %s",
 				strNodeId)
 			return nil
@@ -657,7 +663,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 		bsn[idx].IP = net.ParseIP(strIp)
 
 		if port, err := strconv.Atoi(strUdpPort); err != nil {
-			yclog.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
 				"Atoi for UDP port failed, err: %s",
 				err.Error())
 			return nil
@@ -666,7 +672,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 		}
 
 		if port, err := strconv.Atoi(strTcpPort); err != nil {
-			yclog.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
 				"Atoi for TCP port failed, err: %s",
 				err.Error())
 			return nil
@@ -755,7 +761,6 @@ func P2pConfig4Protocols(name string) *Cfg4Protocols {
 		Protocols: config[name].Protocols,
 	}
 }
-
 
 //
 // by yeeco, alias Ethereum's S256 to elliptic.P256

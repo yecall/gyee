@@ -30,11 +30,9 @@ package scheduler
 
 import (
 	"net"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 )
-
-
 
 //
 // Null event: nothing;
@@ -90,17 +88,16 @@ const (
 // EvTabRefreshReq
 //
 type MsgTabRefreshReq struct {
-	Include	[]*ycfg.NodeID	// wanted, it can be an advice for discover
-	Exclude	[]*ycfg.NodeID	// filter out from response if any
+	Include	[]*config.NodeID	// wanted, it can be an advice for discover
+	Exclude	[]*config.NodeID	// filter out from response if any
 }
 
 //
 // EvTabRefreshRsp
 //
 type MsgTabRefreshRsp struct {
-	Nodes	[]*ycfg.Node	// nodes found
+	Nodes	[]*config.Node		// nodes found
 }
-
 
 //
 // NodeDb cleaner event
@@ -121,14 +118,14 @@ const (
 
 // EvDcvFindNodeReq
 type MsgDcvFindNodeReq struct {
-	More	int				// number of more peers needed
-	Include	[]*ycfg.NodeID	// wanted, it can be an advice for discover
-	Exclude	[]*ycfg.NodeID	// filter out from response if any
+	More	int					// number of more peers needed
+	Include	[]*config.NodeID	// wanted, it can be an advice for discover
+	Exclude	[]*config.NodeID	// filter out from response if any
 }
 
 // EvDcvFindNodeRsp
 type MsgDcvFindNodeRsp struct {
-	Nodes	[]*ycfg.Node	// nodes found
+	Nodes	[]*config.Node		// nodes found
 }
 
 //
@@ -254,7 +251,7 @@ const (
 //
 type MsgPeCloseReq struct {
 	Ptn		interface{}		// pointer to peer task instance node
-	Node	ycfg.Node		// peer node
+	Node	config.Node		// peer node
 }
 
 //

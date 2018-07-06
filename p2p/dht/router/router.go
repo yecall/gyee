@@ -23,7 +23,6 @@ package route
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -60,7 +59,6 @@ func (dhtrMgr *DhtRouteManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchM
 // Table manager entry
 //
 func (dhtrMgr *DhtRouteManager) dhtroMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtroMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

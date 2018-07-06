@@ -52,8 +52,8 @@ type P2pPackage2Peer struct {
 // callback type
 //
 const (
-	P2pInfIndCb	= iota
-	P2pInfPkgCb
+	P2pIndCb	= iota
+	P2pPkgCb
 )
 
 //
@@ -78,7 +78,7 @@ type P2pIndConnStatusPara struct {
 	//
 	// Indicate that if the instance would be closed by underlying of p2p.
 	// If true, user should not try to close the instance; else, user should
-	// determine basing on the status code to call shell.P2pInfClosePeer to
+	// determine basing on the status code to call shell.P2pClosePeer to
 	// close the instance if necessary.
 	//
 
@@ -94,12 +94,12 @@ type P2pIndPeerClosedPara struct {
 	PeerId		PeerId				// peer identity
 }
 
-type P2pInfIndCallback func(what int, para interface{}) interface{}
+type P2pIndCallback func(what int, para interface{}) interface{}
 
 //
 // P2p callback function type for package incoming
 //
-type P2pInfPkgCallback func(msg *P2pPackage4Callback) interface{}
+type P2pPkgCallback func(msg *P2pPackage4Callback) interface{}
 
 
 

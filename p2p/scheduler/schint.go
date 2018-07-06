@@ -24,7 +24,7 @@ package scheduler
 import (
 	"sync"
 	"time"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
@@ -41,17 +41,11 @@ type schUserTaskInf = SchUserTaskInf
 //
 // max mail box size
 //
-const schMaxMbSize	 = SchMaxMbSize
+const schMaxMbSize = SchMaxMbSize
 
 //
-// Watch dog for a user task
+// Watch dog
 //
-const (
-	schDeaultWatchCycle			= SchDeaultWatchCycle
-	schDefaultDogCycle			= SchDefaultDogCycle
-	schDefaultDogDieThresold		= SchDefaultDogDieThresold
-)
-
 type schWatchDog SchWatchDog
 
 //
@@ -67,8 +61,8 @@ type schMailBox struct {
 //
 const (
 	schTmTypeNull		= -1					// null
-	schTmTypePeriod		= SchTmTypePeriod	// cycle timer
-	schTmTypeAbsolute	= SchTmTypeAbsolute	// absolute timer
+	schTmTypePeriod		= SchTmTypePeriod		// cycle timer
+	schTmTypeAbsolute	= SchTmTypeAbsolute		// absolute timer
 )
 
 type schTimerType SchTimerType
@@ -155,7 +149,7 @@ type scheduler struct {
 	//
 
 	lock				sync.Mutex							// lock to protect the scheduler
-	p2pCfg				*ycfg.Config						// p2p network configuration
+	p2pCfg				*config.Config						// p2p network configuration
 	tkFree				*schTaskNode						// free task queue
 	freeSize			int									// number of nodes in free
 	tkBusy				*schTaskNode						// busy task queue in scheduling

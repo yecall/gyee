@@ -22,8 +22,8 @@
 package logger
 
 import (
-	golog "log"
-	"runtime"
+			"runtime"
+	logg	"github.com/yeeco/gyee/utils/logging"
 )
 
 
@@ -43,11 +43,9 @@ func init() {
 // Log the caller's file and line when this function called
 //
 func LogCallerFileLine(format string, args ... interface{}) {
-
 	if !Log_DisableFileLine {
-
 		_, file, line, _ := runtime.Caller(1)
-		golog.Printf("yclog: " + format, args...)
-		golog.Printf("yclog: file: %s, line: %d", file, line)
+		logg.Logger.Errorf(format, args...)
+		logg.Logger.Errorf("file: %s, line: %d", file, line)
 	}
 }

@@ -23,7 +23,6 @@ package chunker
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -59,7 +58,6 @@ func (dhtchMgr *DhtChunkerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.S
 // Table manager entry
 //
 func (dhtchMgr *DhtChunkerManager)dhtchMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtchMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

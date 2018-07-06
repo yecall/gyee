@@ -24,7 +24,7 @@ package shell
 import (
 	"fmt"
 	"github.com/yeeco/gyee/p2p/peer"
-	yclog "github.com/yeeco/gyee/p2p/logger"
+	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -32,43 +32,46 @@ import (
 //
 // errno about this interface
 //
-type P2pInfErrno	int
+type P2pErrno	int
 
 const (
-	P2pInfEnoNone		P2pInfErrno = 0	// none of errors
-	P2pInfEnoParameter	P2pInfErrno = 1	// invalid parameters
-	P2pInfEnoScheduler	P2pInfErrno	= 2	// shceduler
-	P2pInfEnoNotImpl	P2pInfErrno = 3	// not implemented
-	P2pInfEnoInternal	P2pInfErrno	= 4	// internal
-	P2pInfEnoUnknown	P2pInfErrno = 5	// unknown
-	P2pInfEnoMax		P2pInfErrno = 6	// max, for bound checking
+	P2pEnoNone		P2pErrno = 0	// none of errors
+	P2pEnoParameter	P2pErrno = 1	// invalid parameters
+	P2pEnoScheduler	P2pErrno	= 2	// shceduler
+	P2pEnoNotImpl	P2pErrno = 3	// not implemented
+	P2pEnoInternal	P2pErrno	= 4	// internal
+	P2pEnoUnknown	P2pErrno = 5	// unknown
+	P2pEnoMax		P2pErrno = 6	// max, for bound checking
 )
 
 //
 // Description about user interface errno
 //
-var P2pInfErrnoDescription = []string {
+var P2pErrnoDescription = []string {
 	"none of errors",
 	"invalid parameters",
+	"shceduler",
+	"not implemented",
+	"internal",
 	"unknown",
 	"max value can errno be",
 }
 
 //
-// Stringz an errno with itself
+// Errno string
 //
-func (eno P2pInfErrno) P2pInfErrnoString() string {
-	if eno < P2pInfEnoNone || eno >= P2pInfEnoMax {
-		return fmt.Sprintf("Can't be stringzed, invalid eno:%d", eno)
+func (eno P2pErrno) P2pErrnoString() string {
+	if eno < P2pEnoNone || eno >= P2pEnoMax {
+		return ""
 	}
-	return P2pInfErrnoDescription[eno]
+	return P2pErrnoDescription[eno]
 }
 
 //
-// Stringz an errno with an eno parameter
+// Error interface
 //
-func P2pInfErrnoString(eno P2pInfErrno) string {
-	return eno.P2pInfErrnoString()
+func (eno P2pErrno) Error() string {
+	return eno.P2pErrnoString()
 }
 
 //
@@ -76,8 +79,8 @@ func P2pInfErrnoString(eno P2pInfErrno) string {
 //
 
 const (
-	P2pInfIndCb = peer.P2pInfIndCb	// callback type for indication
-	P2pInfPkgCb = peer.P2pInfPkgCb	// callback type for incoming packages
+	P2pIndCb = peer.P2pIndCb	// callback type for indication
+	P2pPkgCb = peer.P2pPkgCb	// callback type for incoming packages
 )
 
 const (
@@ -86,113 +89,97 @@ const (
 	P2pIndPeerClosed	= peer.P2pIndPeerClosed		// indication for peer connection closed
 )
 
-func P2pInfRegisterCallback(what int, cb interface{}, target interface{}) P2pInfErrno {
+func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno {
 
-	if what != P2pInfIndCb && what != P2pInfPkgCb {
-		yclog.LogCallerFileLine("P2pInfRegisterCallback: " +
-			"invalid callback type: %d",
-			what)
-		return P2pInfEnoParameter
+	if what != P2pIndCb && what != P2pPkgCb {
+		return P2pEnoParameter
 	}
 
 
-	if what == P2pInfIndCb {
+	if what == P2pIndCb {
 
 		sdl := target.(*sch.Scheduler)
-		peMgr := sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
 
 		if peMgr.P2pIndHandler != nil {
-			yclog.LogCallerFileLine("P2pInfRegisterCallback: old handler will be overlapped")
+			log.LogCallerFileLine("P2pRegisterCallback: old handler will be overlapped")
 		}
 
 		if cb == nil {
-			yclog.LogCallerFileLine("P2pInfRegisterCallback: user registers nil indication handler")
+			log.LogCallerFileLine("P2pRegisterCallback: user registers nil indication handler")
 		}
 
 		peMgr.Lock4Cb.Lock()
-		peMgr.P2pIndHandler = cb.(peer.P2pInfIndCallback)
+		peMgr.P2pIndHandler = cb.(peer.P2pIndCallback)
 		peMgr.Lock4Cb.Unlock()
 
-		return P2pInfEnoNone
+		return P2pEnoNone
 	}
 
 	var peerInst = target
 
 	if peerInst == nil {
-		yclog.LogCallerFileLine("P2pInfRegisterCallback: nil task node pointer")
-		return P2pInfEnoParameter
+		log.LogCallerFileLine("P2pRegisterCallback: nil task node pointer")
+		return P2pEnoParameter
 	}
 
-	yclog.LogCallerFileLine("P2pInfRegisterCallback: " +
-		"target instance: %s",
-		sch.SchinfGetScheduler(peerInst).SchinfGetTaskName(peerInst))
-
 	if cb == nil {
-		yclog.LogCallerFileLine("P2pInfRegisterCallback: user registers nil package handler")
+		log.LogCallerFileLine("P2pRegisterCallback: user registers nil package handler")
 	}
 
 	if eno := peer.SetP2pkgCallback(cb, peerInst); eno != peer.PeMgrEnoNone {
-		yclog.LogCallerFileLine("P2pInfRegisterCallback: " +
+		log.LogCallerFileLine("P2pRegisterCallback: " +
 			"SetP2pkgCallback failed, eno: %d",
 			eno)
-		return P2pInfEnoInternal
+		return P2pEnoInternal
 	}
 
-	return P2pInfEnoNone
+	return P2pEnoNone
 }
 
 //
 // Send message to peer
 //
-func P2pInfSendPackage(pkg *peer.P2pPackage2Peer) P2pInfErrno {
+func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 
 	if eno, failed := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
 
-		yclog.LogCallerFileLine("P2pInfSendPackage: " +
+		log.LogCallerFileLine("P2pSendPackage: " +
 			"SendPackage failed, eno: %d, pkg: %s",
 			eno,
 			fmt.Sprintf("%+v", *pkg))
 
-		var str = ""
-
-		for _, f := range failed {
-			str = str + fmt.Sprintf("%X", *f)
-		}
-
-		yclog.LogCallerFileLine("P2pInfSendPackage: " +
-			"failed list: %s",
-			str)
-
-		return P2pInfEnoInternal
+		_ = failed
+		return P2pEnoInternal
 	}
 
-	return P2pInfEnoNone
+	return P2pEnoNone
 }
 
 //
 // Disconnect peer
 //
-func P2pInfClosePeer(sdl *sch.Scheduler, id *peer.PeerId) P2pInfErrno {
+func P2pClosePeer(sdl *sch.Scheduler, id *peer.PeerId) P2pErrno {
 
-	peMgr := sdl.SchinfGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
 
 	if eno := peMgr.ClosePeer(id); eno != peer.PeMgrEnoNone {
 
-		yclog.LogCallerFileLine("P2pInfSendPackage: " +
+		log.LogCallerFileLine("P2pSendPackage: " +
 			"ClosePeer failed, eno: %d, peer: %s",
 			eno,
 			fmt.Sprintf("%+v", *id))
 
-		return P2pInfEnoInternal
+		return P2pEnoInternal
 	}
 
-	return P2pInfEnoNone
+	return P2pEnoNone
 }
 
 //
 // Turn off specific p2p instance
 //
-func P2pInfPoweroff(p2pInst *sch.Scheduler) P2pInfErrno {
-	yclog.LogCallerFileLine("P2pInfPoweroff: not supported yet")
-	return P2pInfEnoNotImpl
+func P2pPoweroff(p2pInst *sch.Scheduler) P2pErrno {
+	log.LogCallerFileLine("P2pPoweroff: not supported yet")
+	return P2pEnoNotImpl
 }

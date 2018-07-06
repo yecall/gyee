@@ -25,8 +25,8 @@ import(
 	"fmt"
 	"time"
 	"sync"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
+	config	"github.com/yeeco/gyee/p2p/config"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -56,16 +56,25 @@ const (
 var SchErrnoDescription = []string {
 	"none of errors",
 	"invalid parameters",
-	"no resources",
+	"resources",
 	"watch dog",
 	"not found",
-	"internal errors",
+	"internal",
 	"mismathced",
+	"os",
+	"configuration",
+	"killed",
+	"not implemented",
+	"user task",
+	"duplicated",
+	"suspended",
+	"not supported",
 	"unknowns",
+	"max value errno can be",
 }
 
 //
-// Stringz an errno with itself
+// Errno string
 //
 func (eno SchErrno) SchErrnoString() string {
 	if eno < SchEnoNone || eno >= SchEnoMax {
@@ -75,9 +84,9 @@ func (eno SchErrno) SchErrnoString() string {
 }
 
 //
-// Stringz an errno with an eno parameter
+// error interface
 //
-func SchErrnoString(eno SchErrno) string {
+func (eno SchErrno) Error() string {
 	return eno.SchErrnoString()
 }
 
@@ -110,7 +119,7 @@ type SchMessage struct {
 	sender 	*schTaskNode	// sender task node pointer
 	recver	*schTaskNode	// receiver task node pointer
 	Id		int				// message identity
-	Body	interface{}	// message body
+	Body	interface{}		// message body
 }
 
 //
@@ -151,15 +160,15 @@ type SchTaskDescription struct {
 	Wd		*SchWatchDog				// watchdog
 	Flag	int							// flag: start at once or to be suspended
 	DieCb	func(interface{}) SchErrno	// callbacked when going to die
-	UserDa	interface{}				// user data area pointer
+	UserDa	interface{}					// user data area pointer
 }
 
 //
 // Timer type
 //
 const (
-	SchTmTypePeriod	= 0		// cycle timer
-	SchTmTypeAbsolute	= 1	// absolute timer
+	SchTmTypePeriod		= 0		// cycle timer
+	SchTmTypeAbsolute	= 1		// absolute timer
 )
 
 type SchTimerType int
@@ -171,11 +180,11 @@ const SchMaxTaskTimer 	= 128	// max timers can be held by one user task
 const SchInvalidTid		= -1	// invalid timer identity
 
 type TimerDescription struct {
-	Name	string			// timer name
-	Utid	int				// user timer identity
-	Tmt		SchTimerType	// timer type, see aboved
-	Dur		time.Duration	// duration: a period value or duration from now
-	Extra	interface{}		// extra data return to timer owner when expired
+	Name	string				// timer name
+	Utid	int					// user timer identity
+	Tmt		SchTimerType		// timer type, see aboved
+	Dur		time.Duration		// duration: a period value or duration from now
+	Extra	interface{}			// extra data return to timer owner when expired
 }
 
 //
@@ -191,39 +200,39 @@ type TaskStaticDescription struct {
 }
 
 //
-// Scheduler initilization
+// Scheduler init
 //
-func SchinfSchedulerInit(cfg *ycfg.Config) (*Scheduler, SchErrno) {
-	return schimplSchedulerInit(cfg)
+func SchSchedulerInit(cfg *config.Config) (*Scheduler, SchErrno) {
+	return schSchedulerInit(cfg)
 }
 
 //
 // Start scheduler
 //
-func (sdl *Scheduler)SchinfSchedulerStart(tsd []TaskStaticDescription, tpo []string) (SchErrno, *map[string]interface{}){
-	return sdl.schimplSchedulerStart(tsd, tpo)
+func (sdl *Scheduler)SchSchedulerStart(tsd []TaskStaticDescription, tpo []string) (SchErrno, *map[string]interface{}){
+	return sdl.schSchedulerStart(tsd, tpo)
 }
 
 //
 // Create a single task
 //
-func (sdl *Scheduler)SchinfCreateTask(taskDesc *SchTaskDescription)(SchErrno, interface{}) {
-	return sdl.schimplCreateTask((*schTaskDescription)(taskDesc))
+func (sdl *Scheduler)SchCreateTask(taskDesc *SchTaskDescription)(SchErrno, interface{}) {
+	return sdl.schCreateTask((*schTaskDescription)(taskDesc))
 }
 
 //
 // Start task by task node pointer
 //
-func (sdl *Scheduler)SchinfStartTaskEx(ptn interface{}) SchErrno {
-	return sdl.schimplStartTaskEx(ptn.(*schTaskNode))
+func (sdl *Scheduler)SchStartTaskEx(ptn interface{}) SchErrno {
+	return sdl.schStartTaskEx(ptn.(*schTaskNode))
 }
 
 //
 // Stop a single task by task node pointer
 //
-func (sdl *Scheduler)SchinfStopTask(ptn interface{}) SchErrno {
-	if eno := sdl.SchinfTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
-		yclog.LogCallerFileLine("SchinfStopTask: SchinfTaskDone failed, eno: %d", eno)
+func (sdl *Scheduler)SchStopTask(ptn interface{}) SchErrno {
+	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
+		log.LogCallerFileLine("SchStopTask: SchTaskDone failed, eno: %d", eno)
 		return eno
 	}
 	return SchEnoNone
@@ -235,51 +244,49 @@ func (sdl *Scheduler)SchinfStopTask(ptn interface{}) SchErrno {
 // by that pointer returned. any actions to the task should be carried out by calling funcs
 // exported here in this file, which would call into the core of the scheduler.
 //
-func (sdl *Scheduler)SchinfGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
-	return sdl.schimplGetTaskNodeByName(name)
+func (sdl *Scheduler)SchGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
+	return sdl.schGetTaskNodeByName(name)
 }
 
 //
 // Send message to a specific task
 //
-func (sdl *Scheduler)SchinfSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
+func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
 
-	eno, src := sdl.SchinfGetTaskNodeByName(srcTask)
+	eno, src := sdl.SchGetTaskNodeByName(srcTask)
 	if eno != SchEnoNone || src == nil {
-		yclog.LogCallerFileLine("SchinfSendMessageByName: " +
-			"SchinfGetTaskNodeByName failed, name: %s, eno: %d", srcTask, eno)
 		return eno
 	}
 
-	eno, dst := sdl.SchinfGetTaskNodeByName(dstTask)
+	eno, dst := sdl.SchGetTaskNodeByName(dstTask)
 	if eno != SchEnoNone || dst == nil {
-		yclog.LogCallerFileLine("SchinfSendMessageByName: " +
-			"SchinfGetTaskNodeByName failed, name: %s, eno: %d", dstTask, eno)
 		return eno
 	}
 
 	msg.sender = src.(*schTaskNode)
 	msg.recver = dst.(*schTaskNode)
 
-	return sdl.SchinfSendMessage(msg)
+	return sdl.SchSendMessage(msg)
 }
 
-func (sdl *Scheduler)SchinfSendMessage(msg *SchMessage) SchErrno {
-	return sdl.schimplSendMsg((*schMessage)(msg))
+func (sdl *Scheduler)SchSendMessage(msg *SchMessage) SchErrno {
+	return sdl.schSendMsg((*schMessage)(msg))
 }
 
 //
 // Make scheduling message
 //
-func (sdl *Scheduler)SchinfMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
+func (sdl *Scheduler)SchMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
+
 	if msg == nil || s == nil || r == nil {
-		yclog.LogCallerFileLine("SchinfMakeMessage: invalid parameter(s)")
 		return SchEnoParameter
 	}
+
 	msg.sender = s.(*schTaskNode)
 	msg.recver = r.(*schTaskNode)
 	msg.Id = id
 	msg.Body = body
+
 	return SchEnoNone
 }
 
@@ -287,27 +294,27 @@ func (sdl *Scheduler)SchinfMakeMessage(msg *SchMessage, s, r interface{}, id int
 // Set a timer
 //
 func (sdl *Scheduler)SchInfSetTimer(ptn interface{}, tdc *TimerDescription) (eno SchErrno, tid int) {
-	return sdl.schimplSetTimer(ptn.(*schTaskNode), (*timerDescription)(tdc))
+	return sdl.schSetTimer(ptn.(*schTaskNode), (*timerDescription)(tdc))
 }
 
 //
 // Kill a timer
 //
-func (sdl *Scheduler)SchinfKillTimer(ptn interface{}, tid int) SchErrno {
-	return sdl.schimplKillTimer(ptn.(*schTaskNode), tid)
+func (sdl *Scheduler)SchKillTimer(ptn interface{}, tid int) SchErrno {
+	return sdl.schKillTimer(ptn.(*schTaskNode), tid)
 }
 
 //
 // Done a task
 //
-func (sdl *Scheduler)SchinfTaskDone(ptn interface{}, eno SchErrno) SchErrno {
-	return sdl.schimplTaskDone(ptn.(*schTaskNode), eno)
+func (sdl *Scheduler)SchTaskDone(ptn interface{}, eno SchErrno) SchErrno {
+	return sdl.schTaskDone(ptn.(*schTaskNode), eno)
 }
 
 //
 // Get message sender
 //
-func SchinfGetMessageSender(msg *SchMessage) string {
+func SchGetMessageSender(msg *SchMessage) string {
 	if msg == nil {
 		return ""
 	}
@@ -317,7 +324,7 @@ func SchinfGetMessageSender(msg *SchMessage) string {
 //
 // Get message recevier
 //
-func SchinfGetMessageRecver(msg *SchMessage) string {
+func SchGetMessageRecver(msg *SchMessage) string {
 	if msg == nil {
 		return ""
 	}
@@ -327,19 +334,16 @@ func SchinfGetMessageRecver(msg *SchMessage) string {
 //
 // Get scheduler by task node
 //
-func SchinfGetScheduler(ptn interface{}) *Scheduler {
+func SchGetScheduler(ptn interface{}) *Scheduler {
 	return ptn.(*schTaskNode).task.sdl
 }
 
 //
 // Get user task interface exported to scheduler
 //
-func (sdl *Scheduler)SchinfGetUserTaskIF(tn string) interface{} {
-	eno, ptn := sdl.SchinfGetTaskNodeByName(tn)
+func (sdl *Scheduler)SchGetUserTaskIF(tn string) interface{} {
+	eno, ptn := sdl.SchGetTaskNodeByName(tn)
 	if eno != SchEnoNone {
-		yclog.LogCallerFileLine("SchinfGetUserTaskIF: " +
-			"SchinfGetTaskNodeByName failed, eno: %d, task: %s",
-			eno, tn)
 		return nil
 	}
 	return ptn.(*schTaskNode).task.utep
@@ -348,27 +352,27 @@ func (sdl *Scheduler)SchinfGetUserTaskIF(tn string) interface{} {
 //
 // Get user data area pointer
 //
-func (sdl *Scheduler)SchinfGetUserDataArea(ptn interface{}) interface{} {
-	return sdl.schimplGetUserDataArea(ptn.(*schTaskNode))
+func (sdl *Scheduler)SchGetUserDataArea(ptn interface{}) interface{} {
+	return sdl.schGetUserDataArea(ptn.(*schTaskNode))
 }
 
 //
 // Set user data area pointer
 //
-func (sdl *Scheduler)SchinfSetUserDataArea(ptn interface{}, uda interface{}) SchErrno {
-	return sdl.schimplSetUserDataArea(ptn.(*schTaskNode), uda)
+func (sdl *Scheduler)SchSetUserDataArea(ptn interface{}, uda interface{}) SchErrno {
+	return sdl.schSetUserDataArea(ptn.(*schTaskNode), uda)
 }
 
 //
 // Get task name
 //
-func (sdl *Scheduler)SchinfGetTaskName(ptn interface{}) string {
-	return sdl.schimplGetTaskName(ptn.(*schTaskNode))
+func (sdl *Scheduler)SchGetTaskName(ptn interface{}) string {
+	return sdl.schGetTaskName(ptn.(*schTaskNode))
 }
 
 //
 // Get p2p network configuration name
 //
-func (sdl *Scheduler)SchinfGetP2pCfgName() string {
+func (sdl *Scheduler)SchGetP2pCfgName() string {
 	return sdl.p2pCfg.CfgName
 }

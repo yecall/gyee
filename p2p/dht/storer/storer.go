@@ -23,7 +23,6 @@ package storer
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -59,7 +58,6 @@ func (dhtstMgr *DhtStorerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.Sc
 // store manager entry
 //
 func (dhtstMgr *DhtStorerManager)dhtstMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	yclog.LogCallerFileLine("DhtstMgrProc: scheduled, msg: %d", msg.Id)
 	return sch.SchEnoNone
 }
 

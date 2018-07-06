@@ -25,16 +25,16 @@ import (
 	"time"
 	"net"
 	ggio "github.com/gogo/protobuf/io"
-	ycfg	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	pb		"github.com/yeeco/gyee/p2p/peer/pb"
-	yclog	"github.com/yeeco/gyee/p2p/logger"
+	log	"github.com/yeeco/gyee/p2p/logger"
 )
 
 
 //
 // Max protocols supported
 //
-const MaxProtocols = ycfg.MaxProtocols
+const MaxProtocols = config.MaxProtocols
 
 //
 // Protocol identities
@@ -65,7 +65,7 @@ type Protocol struct {
 // Handshake message
 //
 type Handshake struct {
-	NodeId		ycfg.NodeID	// node identity
+	NodeId		config.NodeID	// node identity
 	IP			net.IP		// ip address
 	UDP			uint32		// udp port number
 	TCP			uint32		// tcp port number
@@ -121,7 +121,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"ReadMsg faied, err: %s",
 			err.Error())
 
@@ -134,7 +134,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if *pkg.Pid != PID_P2P {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"not a p2p package, pid: %d",
 			*pkg.Pid)
 
@@ -143,7 +143,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if *pkg.PayloadLength <= 0 {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"invalid payload length: %d",
 			*pkg.PayloadLength)
 
@@ -152,7 +152,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"payload length mismatched, PlLen: %d, real: %d",
 			*pkg.PayloadLength, len(pkg.Payload))
 
@@ -167,7 +167,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if err := pbMsg.Unmarshal(pkg.Payload); err != nil {
 
-		yclog.LogCallerFileLine("getHandshakeInbound:" +
+		log.LogCallerFileLine("getHandshakeInbound:" +
 			"Unmarshal failed, err: %s",
 			err.Error())
 
@@ -180,7 +180,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 	
 	if *pbMsg.Mid != MID_HANDSHAKE {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"it's not a handshake message, mid: %d",
 			*pbMsg.Mid)
 
@@ -191,16 +191,16 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if pbHS == nil {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"invalid handshake message pointer: %p",
 			pbHS)
 
 		return nil, PeMgrEnoMessage
 	}
 
-	if len(pbHS.NodeId) != ycfg.NodeIDBytes {
+	if len(pbHS.NodeId) != config.NodeIDBytes {
 
-		yclog.LogCallerFileLine("getHandshakeInbound:" +
+		log.LogCallerFileLine("getHandshakeInbound:" +
 			"invalid node identity length: %d",
 				len(pbHS.NodeId))
 
@@ -209,7 +209,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if *pbHS.ProtoNum > MaxProtocols {
 
-		yclog.LogCallerFileLine("getHandshakeInbound:" +
+		log.LogCallerFileLine("getHandshakeInbound:" +
 			"too much protocols: %d",
 			*pbHS.ProtoNum)
 
@@ -218,7 +218,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if int(*pbHS.ProtoNum) != len(pbHS.Protocols) {
 
-		yclog.LogCallerFileLine("getHandshakeInbound: " +
+		log.LogCallerFileLine("getHandshakeInbound: " +
 			"number of protocols mismathced, ProtoNum: %d, real: %d",
 			int(*pbHS.ProtoNum), len(pbHS.Protocols))
 
@@ -278,7 +278,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 	payload, err1 := pbMsg.Marshal()
 	if err1 != nil {
 
-		yclog.LogCallerFileLine("putHandshakeOutbound:" +
+		log.LogCallerFileLine("putHandshakeOutbound:" +
 			"Marshal failed, err: %s",
 			err1.Error())
 
@@ -312,7 +312,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		yclog.LogCallerFileLine("putHandshakeOutbound:" +
+		log.LogCallerFileLine("putHandshakeOutbound:" +
 			"Write failed, err: %s",
 			err.Error())
 
@@ -347,7 +347,7 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 	payload, err := pbPing.Marshal()
 
 	if len(payload) == 0 || err != nil {
-		yclog.LogCallerFileLine("ping: empty payload")
+		log.LogCallerFileLine("ping: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -384,7 +384,7 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		yclog.LogCallerFileLine("ping:" +
+		log.LogCallerFileLine("ping:" +
 			"Write failed, err: %s",
 			err.Error())
 
@@ -423,7 +423,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 	payload, err := pbPong.Marshal()
 
 	if len(payload) == 0 || err != nil {
-		yclog.LogCallerFileLine("pong: empty payload")
+		log.LogCallerFileLine("pong: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -460,7 +460,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		yclog.LogCallerFileLine("pong:" +
+		log.LogCallerFileLine("pong:" +
 			"Write failed, err: %s",
 			err.Error())
 
@@ -481,7 +481,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 
 	if inst == nil {
-		yclog.LogCallerFileLine("SendPackage: invalid parameter")
+		log.LogCallerFileLine("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 
@@ -515,7 +515,7 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		yclog.LogCallerFileLine("SendPackage:" +
+		log.LogCallerFileLine("SendPackage:" +
 			"Write failed, err: %s",
 			err.Error())
 
@@ -531,7 +531,7 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 
 	if inst == nil {
-		yclog.LogCallerFileLine("RecvPackage: invalid parameter")
+		log.LogCallerFileLine("RecvPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 
@@ -553,7 +553,7 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
 
-		yclog.LogCallerFileLine("RecvPackage: " +
+		log.LogCallerFileLine("RecvPackage: " +
 			"ReadMsg faied, err: %s",
 			err.Error())
 
@@ -569,7 +569,7 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 	upkg.PayloadLength	= *pkg.PayloadLength
 	upkg.Payload		= append(upkg.Payload, pkg.Payload ...)
 
-	yclog.LogCallerFileLine("RecvPackage: " +
+	log.LogCallerFileLine("RecvPackage: " +
 		"package got, Pid: %d, PayloadLength: %d",
 		upkg.Pid, upkg.PayloadLength)
 
@@ -587,7 +587,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	//
 
 	if pmsg == nil {
-		yclog.LogCallerFileLine("GetMessage: invalid parameter")
+		log.LogCallerFileLine("GetMessage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 
@@ -595,7 +595,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 
 	if err := pbMsg.Unmarshal(upkg.Payload); err != nil {
 
-		yclog.LogCallerFileLine("GetMessage:" +
+		log.LogCallerFileLine("GetMessage:" +
 			"Unmarshal failed, err: %s",
 			err.Error())
 
@@ -639,7 +639,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 
 	} else {
 
-		yclog.LogCallerFileLine("GetMessage: " +
+		log.LogCallerFileLine("GetMessage: " +
 			"unknown message identity: %d",
 			pmsg.Mid)
 
