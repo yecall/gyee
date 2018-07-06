@@ -45,7 +45,7 @@ func init() {
 func LogCallerFileLine(format string, args ... interface{}) {
 	if !Log_DisableFileLine {
 		_, file, line, _ := runtime.Caller(1)
-		logg.Logger.Errorf(format, args...)
-		logg.Logger.Errorf("file: %s, line: %d", file, line)
+		logg.Logger.Infof(format, args...)
+		logg.Logger.Infof("file: %s, line: %d", file, line)
 	}
 }
