@@ -125,8 +125,6 @@ func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 					eno,
 					fmt.Sprintf("%X", p2pInst2Cfg[p2pInst].Local.ID))
 			}
-
-			log.LogCallerFileLine("txProc: %s", txString)
 		}
 	}
 
@@ -292,8 +290,9 @@ func p2pPkgProc(pkg *peer.P2pPackage4Callback) interface{} {
 	//
 
 	log.LogCallerFileLine("p2pPkgProc: " +
-		"paylod of package: %s",
-		fmt.Sprintf("%s", pkg.Payload))
+		"peer: %s, payload length: %d",
+		fmt.Sprintf("%X", pkg.PeerInfo.NodeId),
+		pkg.PayloadLength)
 
 	return nil
 }

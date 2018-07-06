@@ -27,12 +27,12 @@ import (
 	"fmt"
 	"sync"
 	"math/rand"
-	ggio "github.com/gogo/protobuf/io"
+	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	log	"github.com/yeeco/gyee/p2p/logger"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -408,8 +408,6 @@ func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
 	// threshold, and son on.
 	//
 
-	log.LogCallerFileLine("peMgrStartReq: going to start both inbound and outbound procedures")
-
 	_ = msg
 
 	var schMsg = sch.SchMessage{}
@@ -529,8 +527,6 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	// drive ourself to startup outbound if some nodes appended
 	//
 
-	log.LogCallerFileLine("peMgrDcvFindNodeRsp: appended: %d", appended)
-
 	if appended > 0 {
 
 		var schMsg sch.SchMessage
@@ -553,9 +549,6 @@ func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler() PeMgrErrno {
 	// and when it's expired, we try findnode, and set the timer again. This is done by
 	// calling function peMgrAsk4More, see it for details pls.
 	//
-
-	log.LogCallerFileLine("peMgrDcvFindNodeTimerHandler: " +
-		"find node expired, try it again")
 
 	return peMgr.peMgrAsk4More()
 }
@@ -655,13 +648,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peInst.ptnMe, sch.EvPeHandshakeReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
-
-	log.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
-		"send EvPeHandshakeReq ok, laddr: %s, raddr: %s, peer: %s, target: %s",
-		peInst.laddr.String(),
-		peInst.raddr.String(),
-		fmt.Sprintf("%+v", peInst.node),
-		peMgr.sdl.SchGetTaskName(peInst.ptnMe))
 
 	//
 	// Map the instance, notice that we do not konw the node identity yet since
@@ -1268,10 +1254,6 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	// Do not care the result, kill always
 	//
 
-	log.LogCallerFileLine("peMgrConnCloseInd, " +
-		"cause: %d, node: %s",
-		ind.cause, config.P2pNodeId2HexString(ind.peNode.ID))
-
 	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode); eno != PeMgrEnoNone {
 
 		log.LogCallerFileLine("peMgrConnCloseInd: " +
@@ -1452,19 +1434,13 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	var peInst = peMgr.peers[ptn]
 
 	if peInst.ppTid != sch.SchInvalidTid {
-
 		peMgr.sdl.SchKillTimer(ptn, peInst.ppTid)
 		peInst.ppTid = sch.SchInvalidTid
 	}
 
 	if peInst.conn != nil {
-
 		peInst.conn.Close()
 		peInst.conn = nil
-
-		log.LogCallerFileLine("peMgrKillInst: " +
-			"instance connection is closed and set to nil, peer: %s",
-			fmt.Sprintf("%X", peInst.node.ID	))
 	}
 
 	//
@@ -1512,9 +1488,11 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 			peInst.dir)
 	}
 
-	log.LogCallerFileLine("peMgrKillInst: " +
-		"map deleted, peer: %s",
-		fmt.Sprintf("%X", peInst.node.ID	))
+	//
+	// Try update static ndoe status
+	//
+
+	peMgr.updateStaticStatus(node.ID, peerIdle)
 
 	//
 	// Check if the accepter task paused, resume it if necessary
@@ -1819,12 +1797,6 @@ func (inst *peerInstance)piConnOutReq(msg interface{}) PeMgrErrno {
 		return PeMgrEnoInternal
 	}
 
-	log.LogCallerFileLine("piConnOutReq: " +
-		"try outbound connect to target: %s, dir: %d, state: %d",
-		fmt.Sprintf("%+v", inst.node),
-		inst.dir,
-		inst.state)
-
 	//
 	// Dial to peer node
 	//
@@ -1903,12 +1875,6 @@ func (inst *peerInstance)piHandshakeReq(msg interface{}) PeMgrErrno {
 		log.LogCallerFileLine("piHandshakeReq: invalid instance")
 		return PeMgrEnoInternal
 	}
-
-	log.LogCallerFileLine("piHandshakeReq: " +
-		"handshake request received, dir: %d. laddr: %s, raddr: %s",
-		inst.dir,
-		inst.laddr.String(),
-		inst.raddr.String())
 
 	//
 	// Carry out action according to the direction of current peer instance
@@ -2054,11 +2020,6 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 		return eno
 	}
 
-	log.LogCallerFileLine("piPingpongReq: " +
-		"ping sent ok: %s, peer: %s",
-		fmt.Sprintf("%+v", ping),
-		fmt.Sprintf("%X", inst.node.ID))
-
 	return PeMgrEnoNone
 }
 
@@ -2173,10 +2134,6 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	var schEno sch.SchErrno
 	_ = msg
 
-	log.LogCallerFileLine("piEstablishedInd: " +
-		"instance will be activated, inst: %s",
-		fmt.Sprintf("%+v", *inst))
-
 	//
 	// setup pingpong timer
 	//
@@ -2197,12 +2154,6 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 
 	inst.ppTid = tid
 
-	log.LogCallerFileLine("piEstablishedInd: " +
-		"pingpong timer for heartbeat set ok, tid: %d",
-		inst.ppTid)
-
-
-
 	//
 	// modify deadline of peer connection for we had set specific value while
 	// handshake procedure. we set deadline to value 0, so action on connection
@@ -2212,23 +2163,7 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	inst.txEno = PeMgrEnoNone
 	inst.rxEno = PeMgrEnoNone
 	inst.ppEno = PeMgrEnoNone
-
-	//
-	// setup IO writer and reader
-	//
-/*
 	inst.conn.SetDeadline(time.Time{})
-
-	w := inst.conn.(io.Writer)
-	inst.iow = ggio.NewDelimitedWriter(w)
-
-	r := inst.conn.(io.Reader)
-	inst.ior = ggio.NewDelimitedReader(r, inst.maxPkgSize)
-*/
-
-	log.LogCallerFileLine("piEstablishedInd: " +
-		"instance is in service now, inst: %s",
-		fmt.Sprintf("%+v", *inst)	)
 
 	//
 	// callback to the user of p2p
@@ -2285,10 +2220,6 @@ func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 	//
 
 	schMsg := sch.SchMessage{}
-
-	log.LogCallerFileLine("piPingpongTimerHandler: " +
-		"pingpong timer expired for inst: %s",
-		fmt.Sprintf("%+v", *inst))
 
 	//
 	// Check the pingpong timer: when this expired event comes, the timer
@@ -2394,11 +2325,6 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 		return eno
 	}
 
-	log.LogCallerFileLine("piHandshakeInbound: " +
-		"read handshake: %s, peer: %s",
-		fmt.Sprintf("%+v", hs),
-		inst.raddr.String())
-
 	//
 	// backup info about protocols supported by peer. notice that here we can
 	// check against the ip and tcp port from handshake with that obtained from
@@ -2415,11 +2341,6 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	//
 	// write outbound handshake to remote peer
 	//
-
-	log.LogCallerFileLine("piHandshakeInbound: " +
-		"write Handshake: %s, peer: %s",
-		fmt.Sprintf("%+v", hs),
-		inst.raddr.String())
 
 	hs.NodeId = pi.peMgr.cfg.nodeId
 	hs.IP = append(hs.IP, pi.peMgr.cfg.ip ...)
@@ -2442,12 +2363,6 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	//
 
 	inst.state = peInstStateHandshook
-
-	log.LogCallerFileLine("piHandshakeInbound: " +
-		"Handshake procedure completed, laddr: %s, raddr: %s, peer: %s",
-		inst.laddr.String(),
-		inst.raddr.String(),
-		fmt.Sprintf("%+v", inst.node)	)
 
 	return PeMgrEnoNone
 }
@@ -2472,11 +2387,6 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 	hs.ProtoNum = pi.peMgr.cfg.protoNum
 	hs.Protocols = append(hs.Protocols, pi.peMgr.cfg.protocols ...)
 
-	log.LogCallerFileLine("piHandshakeOutbound: " +
-		"write handshake: %s, peer: %s",
-		fmt.Sprintf("%+v", hs),
-		inst.raddr.String())
-
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
 
 		log.LogCallerFileLine("piHandshakeOutbound: " +
@@ -2485,9 +2395,6 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 
 		return eno
 	}
-
-	log.LogCallerFileLine("piHandshakeOutbound: " +
-		"write outbound Handshake message ok, try to read the incoming Handshake ...")
 
 	//
 	// read inbound handshake from remote peer
@@ -2501,11 +2408,6 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 
 		return eno
 	}
-
-	log.LogCallerFileLine("piHandshakeOutbound: " +
-		"read handshake: %s, peer: %s",
-		fmt.Sprintf("%+v", hs),
-		inst.raddr.String())
 
 	//
 	// since it's an outbound peer, the peer node id is known before this
@@ -2530,12 +2432,6 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 	inst.protoNum = hs.ProtoNum
 	inst.protocols = hs.Protocols
 	inst.state = peInstStateHandshook
-
-	log.LogCallerFileLine("piHandshakeOutbound: " +
-		"the total Handshake procedure completed ok, laddr: %s, raddr: %s: peer: %s",
-		inst.laddr.String(),
-		inst.raddr.String(),
-		fmt.Sprintf("%+v", inst.node)	)
 
 	return PeMgrEnoNone
 }
@@ -2633,8 +2529,6 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 	if len(failed) == 0 {
 		return PeMgrEnoNone, nil
 	}
-
-	log.LogCallerFileLine("SendPackage: seems failed to send packages to nodes, check it pls")
 
 	return PeMgrEnoUnknown, failed
 }
@@ -2840,8 +2734,6 @@ rxBreak:
 			time.Sleep(time.Microsecond * 100)
 			continue
 		}
-
-		log.LogCallerFileLine("piRx: try RecvPackage ...")
 
 		upkg := new(P2pPackage)
 
@@ -3072,12 +2964,6 @@ func (pi *peerInstance)piP2pPingProc(ping *Pingpong) PeMgrErrno {
 		return eno
 	}
 
-	log.LogCallerFileLine("piP2pPingProc: " +
-		"pong ok, ping: %s, pong: %s, inst: %s",
-		fmt.Sprintf("%+v", *ping),
-		fmt.Sprintf("%+v", pong),
-		fmt.Sprintf("%+v", *pi))
-
 	return PeMgrEnoNone
 }
 
@@ -3096,11 +2982,6 @@ func (pi *peerInstance)piP2pPongProc(pong *Pingpong) PeMgrErrno {
 	// EvPePingpongRsp to peer manager. The event EvPePingpongRsp is not
 	// applied currently. We leave this work later.
 	//
-
-	log.LogCallerFileLine("piP2pPongProc: " +
-		"pong received: %s, pi: %s",
-		fmt.Sprintf("%+v", pong),
-		fmt.Sprintf("%+v", *pi))
 
 	return PeMgrEnoNone
 }

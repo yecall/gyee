@@ -569,10 +569,6 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 	upkg.PayloadLength	= *pkg.PayloadLength
 	upkg.Payload		= append(upkg.Payload, pkg.Payload ...)
 
-	log.LogCallerFileLine("RecvPackage: <<<<<< " +
-		"package got, Pid: %d, PayloadLength: %d",
-		upkg.Pid, upkg.PayloadLength)
-
 	return PeMgrEnoNone
 }
 
