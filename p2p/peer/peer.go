@@ -1306,6 +1306,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 
 	var eno = sch.SchEnoNone
 	var ptnInst interface{} = nil
+	var ptnMe interface{} = nil
 
 	//
 	// Init peer instance control block
@@ -1355,7 +1356,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 	}
 	peInst.name = peInst.name + tskDesc.Name
 
-	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
+	if eno, ptnMe = peMgr.sdl.SchCreateTask(&tskDesc);
 	eno != sch.SchEnoNone || ptnInst == nil {
 
 		log.LogCallerFileLine("peMgrCreateOutboundInst: " +
@@ -1365,7 +1366,14 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 
-	peInst.ptnMe = ptnInst
+	//
+	// Map the instance
+	//
+
+	peInst.ptnMe = ptnMe
+	peMgr.peers[peInst.ptnMe] = peInst
+	peMgr.nodes[peInst.node.ID] = peInst
+	peMgr.obpNum++
 
 	//
 	// Send EvPeConnOutReq request to the instance created aboved
@@ -1374,14 +1382,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peInst.ptnMe, sch.EvPeConnOutReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
-
-	//
-	// Map the instance
-	//
-
-	peMgr.peers[peInst.ptnMe] = peInst
-	peMgr.nodes[peInst.node.ID] = peInst
-	peMgr.obpNum++
 
 	return PeMgrEnoNone
 }
