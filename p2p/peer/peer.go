@@ -1357,7 +1357,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 	peInst.name = peInst.name + tskDesc.Name
 
 	if eno, ptnMe = peMgr.sdl.SchCreateTask(&tskDesc);
-	eno != sch.SchEnoNone || ptnInst == nil {
+	eno != sch.SchEnoNone || ptnMe == nil {
 
 		log.LogCallerFileLine("peMgrCreateOutboundInst: " +
 			"SchCreateTask failed, eno: %d",
