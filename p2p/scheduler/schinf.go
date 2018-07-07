@@ -312,26 +312,6 @@ func (sdl *Scheduler)SchTaskDone(ptn interface{}, eno SchErrno) SchErrno {
 }
 
 //
-// Get message sender
-//
-func SchGetMessageSender(msg *SchMessage) string {
-	if msg == nil {
-		return ""
-	}
-	return msg.sender.task.name
-}
-
-//
-// Get message recevier
-//
-func SchGetMessageRecver(msg *SchMessage) string {
-	if msg == nil {
-		return ""
-	}
-	return msg.recver.task.name
-}
-
-//
 // Get scheduler by task node
 //
 func SchGetScheduler(ptn interface{}) *Scheduler {

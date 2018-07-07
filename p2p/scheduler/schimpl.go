@@ -24,13 +24,12 @@ package scheduler
 import (
 			"time"
 			"strings"
-	golog	"log"
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
-// Default task node for shceduler to send event
+// Default task node for scheduler to send event
 //
 const rawSchTaskName = "schTsk"
 
@@ -41,7 +40,7 @@ var rawSchTsk = schTaskNode {
 }
 
 //
-// Default task node for shceduler to send event
+// Default task node for scheduler to send timer event
 //
 const rawTmTaskName = "tmTsk"
 
@@ -106,8 +105,6 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 //
 func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 
-	var queMsg	*chan schMessage
-	var done 	*chan SchErrno
 	var eno		SchErrno
 
 	//
@@ -132,12 +129,9 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 		return SchEnoParameter
 	}
 
-	//
-	// get chans
-	//
-
-	queMsg = ptn.task.mailbox.que
-	done = &ptn.task.done
+	queMsg := ptn.task.mailbox.que
+	done := &ptn.task.done
+	proc := ptn.task.utep.TaskProc4Scheduler
 
 	//
 	// loop to schedule, until done(or something else happened).
@@ -145,18 +139,18 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 	// Notice: if the message queue size of one user task is zero, then this means
 	// the user task would be a longlong loop, which need not to be shceduled by
 	// messages. In this case, we go a routine for the loop first, then we check
-	// the task until it done.
+	// the task until it done. mailbox.que would not be nil, see function schCreateTask
+	// for more pls.
 	//
 
 	if ptn.task.mailbox.size == 0 ||
-		ptn.task.mailbox.que == nil ||
 		cap(*ptn.task.mailbox.que) == 0 {
 
 		log.LogCallerFileLine("schCommonTask: " +
 			"dead loop user task: %s",
 			ptn.task.name)
 
-		go ptn.task.utep.TaskProc4Scheduler(ptn, nil)
+		go proc(ptn, nil)
 	}
 
 taskLoop:
@@ -167,31 +161,18 @@ taskLoop:
 		case msg := <-*queMsg:
 
 			//
-			// dog wakes up
-			//
-
-			ptn.task.dog.lock.Lock()
-			ptn.task.dog.Inited = ptn.task.dog.HaveDog
-			ptn.task.dog.lock.Unlock()
-
-			//
 			// call handler
 			//
 
-			ptn.task.utep.TaskProc4Scheduler(ptn, (*SchMessage)(&msg))
-
-			//
-			// dog sleeps
-			//
-
-			ptn.task.dog.lock.Lock()
-			ptn.task.dog.Inited = false
-			ptn.task.dog.lock.Unlock()
+			proc(ptn, (*SchMessage)(&msg))
 
 		case eno = <-*done:
 
-			if eno != SchEnoNone {
+			//
+			// done
+			//
 
+			if eno != SchEnoNone {
 				log.LogCallerFileLine("schCommonTask: done with eno: %d", eno)
 			}
 
@@ -222,21 +203,23 @@ taskLoop:
 //
 func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
-	//
-	// backup for debug output
-	//
-
-	ptm.tmcb.taskNode.task.lock.Lock()
-	var tid = ptm.tmcb.taskNode.task.tmIdxTab[ptm]
-	ptm.tmcb.taskNode.task.lock.Unlock()
-
+	var tm *time.Ticker
 	var killed = false
+	var task = &ptm.tmcb.taskNode.task
+
+	//
+	// get timer identity
+	//
+
+	task.lock.Lock()
+	var tid = task.tmIdxTab[ptm]
+	task.lock.Unlock()
 
 	//
 	// cleaner for absolute timer when it expired
 	//
 
-	var funcAbsTimerClean = func (tn *schTmcbNode) {
+	var absTimerClean = func (tn *schTmcbNode) {
 
 		//
 		// clear timer control block and remove it from maps, notice that the task
@@ -244,9 +227,9 @@ func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 		// called; and do not ret the timer control block node here.
 		//
 
-		delete(tn.tmcb.taskNode.task.tmIdxTab, tn)
+		delete(task.tmIdxTab, tn)
 		delete(sdl.tmMap, tn)
-		tn.tmcb.taskNode.task.tmTab[tid] = nil
+		task.tmTab[tid] = nil
 
 		tn.tmcb.name	= ""
 		tn.tmcb.tmt		= schTmTypeNull
@@ -255,21 +238,10 @@ func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 	}
 
 	//
-	// cleaning job for cyclic timers are same as those absolute ones
+	// cleaning job for cyclic timers are the same as those absolute ones
 	//
 
-	var funcCycTimerClean = funcAbsTimerClean
-
-	var tm *time.Ticker
-
-	//
-	// check pointer to timer node
-	//
-
-	if ptm == nil {
-		log.LogCallerFileLine("schTimerCommonTask: invalid timer pointer")
-		return SchEnoParameter
-	}
+	var cycTimerClean = absTimerClean
 
 	//
 	// check timer type to deal with it
@@ -291,7 +263,7 @@ timerLoop:
 
 			case <-tm.C:
 
-				ptm.tmcb.taskNode.task.lock.Lock()
+				task.lock.Lock()
 
 				if eno := schSendTimerEvent(ptm); eno != SchEnoNone {
 
@@ -303,19 +275,22 @@ timerLoop:
 
 			case stop := <-ptm.tmcb.stop:
 
-				ptm.tmcb.taskNode.task.lock.Lock()
+				task.lock.Lock()
 
 				if stop == true {
 
 					tm.Stop()
 					killed = true
-					funcCycTimerClean(ptm)
+
+					sdl.lock.Lock()
+					cycTimerClean(ptm)
+					sdl.lock.Unlock()
 
 					break timerLoop
 				}
 			}
 
-			ptm.tmcb.taskNode.task.lock.Unlock()
+			task.lock.Unlock()
 		}
 	} else if ptm.tmcb.tmt == schTmTypeAbsolute {
 
@@ -323,22 +298,15 @@ timerLoop:
 		// absolute, check duration
 		//
 
-		ptm.tmcb.taskNode.task.lock.Lock()
-
 		dur := ptm.tmcb.dur
-
 		if dur <= 0 {
 
 			log.LogCallerFileLine("schTimerCommonTask: " +
 				"invalid absolute timer duration:%d",
 				ptm.tmcb.dur)
 
-			ptm.tmcb.taskNode.task.lock.Unlock()
-
 			return SchEnoParameter
 		}
-
-		ptm.tmcb.taskNode.task.lock.Unlock()
 
 		//
 		// send timer event after duration specified. we could not call time.After
@@ -365,7 +333,7 @@ absTimerLoop:
 				// see function schKillTimer for details please.
 				//
 
-				ptm.tmcb.taskNode.task.lock.Lock()
+				task.lock.Lock()
 				sdl.lock.Lock()
 
 				if eno := schSendTimerEvent(ptm); eno != SchEnoNone {
@@ -376,19 +344,19 @@ absTimerLoop:
 						ptm.tmcb.taskNode.task.name)
 				}
 
-				funcAbsTimerClean(ptm)
+				absTimerClean(ptm)
 				sdl.lock.Unlock()
 
 				break absTimerLoop
 
 			case stop := <-ptm.tmcb.stop:
 
-				ptm.tmcb.taskNode.task.lock.Lock()
+				task.lock.Lock()
 				sdl.lock.Lock()
 
 				if stop == true {
 
-					funcAbsTimerClean(ptm)
+					absTimerClean(ptm)
 					killed = true
 				}
 
@@ -426,8 +394,8 @@ absTimerLoop:
 		ptm.tmcb.stopped = nil
 	}
 
-	ptm.tmcb.taskNode.task.lock.Unlock()
 	ptm.tmcb.taskNode = nil
+	task.lock.Unlock()
 
 	if eno := sdl.schRetTimerNode(ptm); eno != SchEnoNone {
 
@@ -451,18 +419,10 @@ func (sdl *scheduler)schGetTimerNode() (SchErrno, *schTmcbNode) {
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 
-	//
-	// if empty
-	//
-
 	if sdl.tmFree == nil {
 		log.LogCallerFileLine("schGetTimerNode: free queue is empty")
 		return SchEnoResource, nil
 	}
-
-	//
-	// dequeue one node
-	//
 
 	tmn = sdl.tmFree
 
@@ -511,17 +471,8 @@ func (sdl *scheduler)schGetTimerNode() (SchErrno, *schTmcbNode) {
 //
 func (sdl *scheduler)schRetTimerNode(ptm *schTmcbNode) SchErrno {
 
-	if ptm == nil {
-		log.LogCallerFileLine("schRetTimerNode: invalid timer node pointer")
-		return SchEnoParameter
-	}
-
 	sdl.lock.Lock()
 	defer  sdl.lock.Unlock()
-
-	//
-	// enqueue a node
-	//
 
 	if sdl.tmFree == nil {
 
@@ -554,18 +505,10 @@ func (sdl *scheduler)schGetTaskNode() (SchErrno, *schTaskNode) {
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 
-	//
-	// if free node queue empty
-	//
-
 	if sdl.tkFree== nil {
 		log.LogCallerFileLine("schGetTaskNode: free queue is empty")
 		return SchEnoResource, nil
 	}
-
-	//
-	// dequeue one node
-	//
 
 	tkn = sdl.tkFree
 
@@ -606,17 +549,8 @@ func (sdl *scheduler)schGetTaskNode() (SchErrno, *schTaskNode) {
 //
 func (sdl *scheduler)schRetTaskNode(ptn *schTaskNode) SchErrno {
 
-	if ptn == nil {
-		log.LogCallerFileLine("schRetTaskNode: invalid task node pointer")
-		return SchEnoParameter
-	}
-
 	sdl.lock.Lock()
 	defer  sdl.lock.Unlock()
-
-	//
-	// enqueue a node
-	//
 
 	if sdl.tkFree == nil {
 
@@ -644,21 +578,8 @@ func (sdl *scheduler)schRetTaskNode(ptn *schTaskNode) SchErrno {
 //
 func (sdl *scheduler)schTaskBusyEnque(ptn *schTaskNode) SchErrno {
 	
-	if ptn == nil {
-		log.LogCallerFileLine("schTaskBusyEnque: invalid task node pointer")
-		return SchEnoParameter
-	}
-
-	//
-	// lock/unlock scheduler control block
-	//
-
 	sdl.lock.Lock()
 	defer  sdl.lock.Unlock()
-
-	//
-	// enqueue a node
-	//
 
 	if sdl.tkBusy == nil {
 
@@ -686,21 +607,8 @@ func (sdl *scheduler)schTaskBusyEnque(ptn *schTaskNode) SchErrno {
 //
 func (sdl *scheduler)schTaskBusyDeque(ptn *schTaskNode) SchErrno {
 
-	if ptn == nil {
-		log.LogCallerFileLine("schTaskBusyDeque: invalid parameter")
-		return SchEnoParameter
-	}
-
-	//
-	// lock/unlock schduler control block
-	//
-
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
-
-	//
-	// remove the busy node
-	//
 
 	if sdl.busySize <= 0 {
 
@@ -768,31 +676,14 @@ func (sdl *scheduler)schTaskBusyDeque(ptn *schTaskNode) SchErrno {
 //
 func schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 
-	//
-	// get owner task
-	//
-
 	var task = &ptm.tmcb.taskNode.task
-
-	//
-	// setup timer event message. notice that the sender is the scheduler indeed,
-	// we set sender pointer to raw timer task in this case; and the extra set when
-	// timer crated is also return to timer owner.
-	//
-
 	var msg = schMessage{
 		sender:	&rawTmTsk,
 		recver:	ptm.tmcb.taskNode,
 		Id:		EvSchNull,
 		Body:	ptm.tmcb.extra,
 	}
-
 	msg.Id = EvTimerBase + ptm.tmcb.utid
-
-	//
-	// put message to task mailbox
-	//
-
 	*task.mailbox.que<-msg
 
 	return SchEnoNone
@@ -814,7 +705,7 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 	}
 
 	//
-	// get task node
+	// get node and check it
 	//
 
 	if eno, ptn = sdl.schGetTaskNode(); eno != SchEnoNone || ptn == nil {
@@ -826,29 +717,18 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 		return eno, nil
 	}
 
-	//
-	// check if a nil mailbox
-	//
-
 	if ptn.task.mailbox.que != nil {
-
 		close(*ptn.task.mailbox.que)
 		ptn.task.mailbox.que = nil
 		ptn.task.mailbox.size = 0
 	}
 
-	//
-	// check if a nil done channel
-	//
-
 	if ptn.task.done != nil {
-
 		close(ptn.task.done)
 		ptn.task.done = nil
 	}
 
 	if ptn.task.stopped != nil {
-
 		close(ptn.task.stopped)
 		ptn.task.stopped = nil
 	}
@@ -870,23 +750,16 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 	ptn.task.userData		= taskDesc.UserDa
 
 	//
-	// make timer table
+	// task timer table
 	//
 
 	for idx, ptm := range ptn.task.tmTab {
-
 		if ptm != nil {
-
 			ptn.task.tmTab[idx] = nil
 		}
 	}
 
-	//
-	// make timer map clean
-	//
-
 	for k := range ptn.task.tmIdxTab {
-
 		delete(ptn.task.tmIdxTab, k)
 	}
 
@@ -970,10 +843,6 @@ func (sdl *scheduler)schStartTask(name string) SchErrno {
 	// Notice: only those suspended user task can be started, so this function does
 	// not create new user task, instead, it try to find the suspended task and then
 	// start it.
-	//
-
-	//
-	// get task node pointer by name
 	//
 
 	eno, ptn := sdl.schGetTaskNodeByName(name)
@@ -1097,19 +966,6 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	}
 
 	//
-	// dequeue form busy queue
-	//
-
-	if eno := sdl.schTaskBusyDeque(ptn); eno != SchEnoNone {
-
-		log.LogCallerFileLine("schStopTaskEx: " +
-			"schTaskBusyDeque failed, eno: %d",
-			eno)
-
-		return eno
-	}
-
-	//
 	// callback user task to die.
 	//
 
@@ -1139,6 +995,19 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 
 		log.LogCallerFileLine("schStopTaskEx: " +
 			"schKillTaskTimers faild, eno: %d",
+			eno)
+
+		return eno
+	}
+
+	//
+	// dequeue form busy queue
+	//
+
+	if eno := sdl.schTaskBusyDeque(ptn); eno != SchEnoNone {
+
+		log.LogCallerFileLine("schStopTaskEx: " +
+			"schTaskBusyDeque failed, eno: %d",
 			eno)
 
 		return eno
@@ -1426,19 +1295,10 @@ func (sdl *scheduler)schKillTimer(ptn *schTaskNode, tid int) SchErrno {
 //
 func (sdl *scheduler)schKillTaskTimers(task *schTask) SchErrno {
 
-	if task == nil {
-		log.LogCallerFileLine("schKillTaskTimers: nil task pointer")
-		return SchEnoParameter
-	}
-
 	task.lock.Lock()
 	defer task.lock.Unlock()
 
 	for tm, idx := range task.tmIdxTab {
-
-		//
-		// check
-		//
 
 		if tm != task.tmTab[idx] {
 
@@ -1451,15 +1311,7 @@ func (sdl *scheduler)schKillTaskTimers(task *schTask) SchErrno {
 			return SchEnoInternal
 		}
 
-		//
-		// done the timer task
-		//
-
 		tm.tmcb.stop<-true
-
-		//
-		// wait until done
-		//
 
 		if stopped := <-tm.tmcb.stopped; stopped != true {
 
@@ -1481,12 +1333,10 @@ func (sdl *scheduler)schGetTaskNodeByName(name string) (SchErrno, *schTaskNode) 
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 
-	// if exist
 	if _, err := sdl.tkMap[schTaskName(name)]; !err {
 		return SchEnoNotFound, nil
 	}
 
-	// yes
 	return SchEnoNone, sdl.tkMap[schTaskName(name)]
 }
 
@@ -1572,11 +1422,11 @@ func (sdl *scheduler)schGetTaskName(ptn *schTaskNode) string {
 //
 func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string) (eno SchErrno, name2Ptn *map[string]interface{}){
 
-	golog.Printf("schSchedulerStart:")
-	golog.Printf("schSchedulerStart:")
-	golog.Printf("schSchedulerStart: going to start ycp2p scheduler ...")
-	golog.Printf("schSchedulerStart:")
-	golog.Printf("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart: going to start ycp2p scheduler ...")
+	log.LogCallerFileLine("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart:")
 
 	var po = schMessage {
 		sender:	&rawSchTsk,
@@ -1713,11 +1563,11 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 		}
 	}
 
-	golog.Printf("schSchedulerStart:")
-	golog.Printf("schSchedulerStart:")
-	golog.Printf("schSchedulerStart: it's ok, ycp2p in running")
-	golog.Printf("schSchedulerStart:")
-	golog.Printf("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart: it's ok, ycp2p in running")
+	log.LogCallerFileLine("schSchedulerStart:")
+	log.LogCallerFileLine("schSchedulerStart:")
 
 	return SchEnoNone, &name2PtnMap
 }
