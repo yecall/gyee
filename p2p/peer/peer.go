@@ -869,13 +869,22 @@ func (peMgr *PeerManager)peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 			"outbound failed, result: %d, node: %s",
 			rsp.result, fmt.Sprintf("%+v", rsp.peNode.ID))
 
-		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+		//
+		// Notice: here the outgoing instance might have been killed in function
+		// peMgrHandshakeRsp due to the duplication nodes, so we should check this
+		// to kill it.
+		//
 
-			log.LogCallerFileLine("peMgrConnOutRsp: " +
-				"peMgrKillInst failed, eno: %d",
-				eno)
+		if _, lived := peMgr.peers[rsp.ptn]; lived {
 
-			return eno
+			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+
+				log.LogCallerFileLine("peMgrConnOutRsp: "+
+					"peMgrKillInst failed, eno: %d",
+					eno)
+
+				return eno
+			}
 		}
 
 		return PeMgrEnoNone
@@ -1306,7 +1315,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 
 	var eno = sch.SchEnoNone
 	var ptnInst interface{} = nil
-	var ptnMe interface{} = nil
 
 	//
 	// Init peer instance control block
@@ -1356,8 +1364,8 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 	}
 	peInst.name = peInst.name + tskDesc.Name
 
-	if eno, ptnMe = peMgr.sdl.SchCreateTask(&tskDesc);
-	eno != sch.SchEnoNone || ptnMe == nil {
+	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
+	eno != sch.SchEnoNone || ptnInst == nil {
 
 		log.LogCallerFileLine("peMgrCreateOutboundInst: " +
 			"SchCreateTask failed, eno: %d",
@@ -1370,7 +1378,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 	// Map the instance
 	//
 
-	peInst.ptnMe = ptnMe
+	peInst.ptnMe = ptnInst
 	peMgr.peers[peInst.ptnMe] = peInst
 	peMgr.nodes[peInst.node.ID] = peInst
 	peMgr.obpNum++
