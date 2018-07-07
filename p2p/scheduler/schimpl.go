@@ -1175,6 +1175,9 @@ func (sdl *scheduler)schSetTimer(ptn *schTaskNode, tdc *timerDescription) (SchEr
 		return SchEnoParameter, schInvalidTid
 	}
 
+	ptn.task.lock.Lock()
+	defer ptn.task.lock.Unlock()
+
 	//
 	// check if some user task timers are free
 	//

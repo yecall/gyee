@@ -40,8 +40,6 @@ import (
 	"math/big"
 	"errors"
 
-	//ethereum "github.com/ethereum/go-ethereum/crypto"
-
 	log "github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -66,8 +64,8 @@ const (
 // Some paths
 //
 const (
-	PcfgEnoIpAddrivateKey	= "nodekey"	// Path within the datadir to the node's private key
-	datadirNodeDatabase		= "nodes"	// Path within the datadir to store the node infos
+	PcfgEnoIpAddrivateKey	= "nodekey"		// Path within the datadir to the node's private key
+	datadirNodeDatabase		= "nodes"		// Path within the datadir to store the node infos
 )
 
 //
