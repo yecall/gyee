@@ -88,7 +88,6 @@ const durDcvFindNodeTimer = time.Second * 22		// duration to wait for find node 
 const (
 	peerIdle			= iota			// idle
 	peerConnectOutInited				// connecting out inited
-	peerConnectingout					// connecting out
 	peerActivated						// had been activated
 	peerKilling							// in killing
 )

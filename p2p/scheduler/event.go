@@ -88,6 +88,7 @@ const (
 // EvTabRefreshReq
 //
 type MsgTabRefreshReq struct {
+	Snid	config.SubNetworkID	// sub network identity
 	Include	[]*config.NodeID	// wanted, it can be an advice for discover
 	Exclude	[]*config.NodeID	// filter out from response if any
 }
@@ -118,6 +119,7 @@ const (
 
 // EvDcvFindNodeReq
 type MsgDcvFindNodeReq struct {
+	Snid	config.SubNetworkID	// sub network identity
 	More	int					// number of more peers needed
 	Include	[]*config.NodeID	// wanted, it can be an advice for discover
 	Exclude	[]*config.NodeID	// filter out from response if any
@@ -150,18 +152,19 @@ const (
 // EvNblFindNodeRsp message
 //
 type NblFindNodeRsp struct {
-	Result		int				// result, 0: ok, others: errno
-	FindNode	*um.FindNode	// FindNode message from table task
-	Neighbors	*um.Neighbors	// Neighbors message from peer node
+	Result		int					// result, 0: ok, others: errno
+	FindNode	*um.FindNode		// FindNode message from table task
+	Neighbors	*um.Neighbors		// Neighbors message from peer node
 }
 
 //
 // EvNblPingpongrRsp message
 //
 type NblPingRsp struct {
-	Result		int			// result, 0: ok, others: errno
-	Ping		*um.Ping	// Ping message from table task
-	Pong		*um.Pong	// Pong message from peer
+	Snid		config.SubNetworkID	// sub network identity
+	Result		int					// result, 0: ok, others: errno
+	Ping		*um.Ping			// Ping message from table task
+	Pong		*um.Pong			// Pong message from peer
 }
 
 //

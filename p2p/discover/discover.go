@@ -178,7 +178,7 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 	//
 
 	var schMsg = sch.SchMessage{}
-	var reqRefresh = sch.MsgTabRefreshReq{nil,nil}
+	var reqRefresh = sch.MsgTabRefreshReq{req.Snid,nil,nil}
 
 	//
 	// Update "more" counter
@@ -187,8 +187,8 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
 
 		log.LogCallerFileLine("DcvMgrFindNodeReq: " +
-			"no more needed, more: %d",
-			dcvMgr.more)
+			"no more needed, subnet: %x, more: %d",
+			reqRefresh.Snid, dcvMgr.more)
 
 		return DcvMgrEnoNone
 	}

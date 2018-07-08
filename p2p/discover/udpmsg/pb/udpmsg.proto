@@ -35,11 +35,16 @@ message UdpMessage {
         NEIGHBORS   = 3;
     }
 
+    message SubNetworkID {
+        required bytes Id = 1,
+    }
+
     message Node {
         required bytes IP  = 1;
         required uint32 UDP = 2;
         required uint32 TCP = 3;
         required bytes NodeId = 4;
+        repeated SubNetworkID SubNetIdList = 5;
     }
 
     message Ping {

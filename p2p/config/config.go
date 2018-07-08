@@ -76,7 +76,7 @@ const (
 const P2pMaxBootstrapNodes = 32
 
 var BootstrapNodeUrl = []string {
-	//"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.190:30303:30303",
+	"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.190:30303:30303",
 	//"8FAEAD1F4B57494B6596B4320A9AA5B083486513222B8735E487A59F4C9CC59D2155B3668B1BAA34A7D07FC2F12384CE44EA50746BCA262B66B2F9E89F47D8E6@192.168.2.144:30303:30303",
 }
 
@@ -117,15 +117,20 @@ const MaxOutbounds	= MaxPeers / 2
 //
 // Node
 //
+
+const MaxSubNetworks = 32			// max sub networks can a node attached to
+type SubNetworkID [2]byte			// sbu network identity
+
 type Node struct {
-	IP			net.IP		// ip address
-	UDP, TCP	uint16		// port numbers
-	ID			NodeID		// the node's public key
+	IP				net.IP			// ip address
+	UDP, TCP		uint16			// port numbers
+	ID				NodeID			// the node's public key
+	SubNetIdList	[]SubNetworkID	// sub network identity list
 }
 
 type Protocol struct {
-	Pid		uint32		// protocol identity
-	Ver		[4]byte		// protocol version: M.m0.m1.m2
+	Pid		uint32					// protocol identity
+	Ver		[4]byte					// protocol version: M.m0.m1.m2
 }
 
 //
@@ -242,7 +247,7 @@ const (
 )
 
 var dftLocal = Node {
-	IP:		net.IPv4(192,168,2,144),
+	IP:		net.IPv4(192,168,0, 20),
 	UDP:	dftUdpPort,
 	TCP:	dftTcpPort,
 	ID:		NodeID{0},
@@ -260,9 +265,9 @@ var defaultConfig = Config {
 	StaticNodes:		nil,
 	NodeDataDir:		P2pDefaultDataDir(true),
 	NodeDatabase:		datadirNodeDatabase,
-	NoDial:				true,
+	NoDial:				false,
 	NoAccept:			false,
-	BootstrapNode:		true,
+	BootstrapNode:		false,
 	Local:				dftLocal,
 	ProtoNum:			1,
 	Protocols:			[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},

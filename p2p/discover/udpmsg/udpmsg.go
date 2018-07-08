@@ -40,6 +40,7 @@ const (
 )
 
 type UdpMsgType int
+type SubNetworkID = config.SubNetworkID
 
 type (
 
@@ -52,9 +53,10 @@ type (
 
 	// Node: endpoint with node identity
 	Node struct {
-		IP			net.IP		// ip address
-		UDP, TCP	uint16		// udp port number
+		IP			net.IP			// ip address
+		UDP, TCP	uint16			// udp port number
 		NodeId		config.NodeID	// node identity
+		SubNetId	SubNetworkID	// sub network identity
 	}
 
 	//
@@ -82,12 +84,12 @@ type (
 
 	// FindNode: request the endpoint of the target
 	FindNode struct {
-		From		Node		// source node
-		To			Node		// destination node
+		From		Node			// source node
+		To			Node			// destination node
 		Target		config.NodeID	// target node identity
-		Id			uint64		// message identity
-		Expiration	uint64		// time to expired of this message
-		Extra		[]byte		// extra info
+		Id			uint64			// message identity
+		Expiration	uint64			// time to expired of this message
+		Extra		[]byte			// extra info
 	}
 
 	// Neighbors: response to FindNode

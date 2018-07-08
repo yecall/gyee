@@ -680,10 +680,10 @@ func schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 	var msg = schMessage{
 		sender:	&rawTmTsk,
 		recver:	ptm.tmcb.taskNode,
-		Id:		EvSchNull,
+		Id:		EvTimerBase + ptm.tmcb.utid,
 		Body:	ptm.tmcb.extra,
 	}
-	msg.Id = EvTimerBase + ptm.tmcb.utid
+
 	*task.mailbox.que<-msg
 
 	return SchEnoNone
