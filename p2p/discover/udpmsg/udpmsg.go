@@ -86,6 +86,7 @@ type (
 	FindNode struct {
 		From		Node			// source node
 		To			Node			// destination node
+		SubNetId	SubNetworkID	// sub network identity
 		Target		config.NodeID	// target node identity
 		Id			uint64			// message identity
 		Expiration	uint64			// time to expired of this message

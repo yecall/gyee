@@ -65,12 +65,13 @@ type Protocol struct {
 // Handshake message
 //
 type Handshake struct {
+	Snid		SubNetworkID	// sub network identity
 	NodeId		config.NodeID	// node identity
-	IP			net.IP		// ip address
-	UDP			uint32		// udp port number
-	TCP			uint32		// tcp port number
-	ProtoNum	uint32		// number of protocols supported
-	Protocols	[]Protocol	// version of protocol
+	IP			net.IP			// ip address
+	UDP			uint32			// udp port number
+	TCP			uint32			// tcp port number
+	ProtoNum	uint32			// number of protocols supported
+	Protocols	[]Protocol		// version of protocol
 }
 
 //

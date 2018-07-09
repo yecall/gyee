@@ -37,9 +37,9 @@ type P2pErrno	int
 const (
 	P2pEnoNone		P2pErrno = 0	// none of errors
 	P2pEnoParameter	P2pErrno = 1	// invalid parameters
-	P2pEnoScheduler	P2pErrno	= 2	// shceduler
+	P2pEnoScheduler	P2pErrno = 2	// shceduler
 	P2pEnoNotImpl	P2pErrno = 3	// not implemented
-	P2pEnoInternal	P2pErrno	= 4	// internal
+	P2pEnoInternal	P2pErrno = 4	// internal
 	P2pEnoUnknown	P2pErrno = 5	// unknown
 	P2pEnoMax		P2pErrno = 6	// max, for bound checking
 )
@@ -159,11 +159,11 @@ func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 //
 // Disconnect peer
 //
-func P2pClosePeer(sdl *sch.Scheduler, id *peer.PeerId) P2pErrno {
+func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) P2pErrno {
 
 	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
 
-	if eno := peMgr.ClosePeer(id); eno != peer.PeMgrEnoNone {
+	if eno := peMgr.ClosePeer(snid, id); eno != peer.PeMgrEnoNone {
 
 		log.LogCallerFileLine("P2pSendPackage: " +
 			"ClosePeer failed, eno: %d, peer: %s",

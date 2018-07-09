@@ -38,7 +38,8 @@ type P2pPackage4Callback struct {
 // Message from user
 //
 type P2pPackage2Peer struct {
-	P2pInst			*sch.Scheduler	// p2p network instance
+	P2pInst			*sch.Scheduler			// p2p network instance
+	SubNetId		SubNetworkID			// sub network identity
 	IdList			[]PeerId				// peer identity list
 	ProtoId			int						// protocol identity
 	PayloadLength	int						// payload length
@@ -91,6 +92,7 @@ type P2pIndPeerClosedPara struct {
 	Ptn			interface{}			// task node pointer, notice: it points to the peer manager
 									// task node than peer instance, since the instance had been
 									// closed.
+	Snid		SubNetworkID		// sub network identity
 	PeerId		PeerId				// peer identity
 }
 

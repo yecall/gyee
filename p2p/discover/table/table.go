@@ -135,12 +135,20 @@ type bucket struct {
 //
 // Table task configuration
 //
+const (
+	p2pTypeDynamic	= 0		// neighbor discovering needed
+	p2pTypeStatic	= 1		// no discovering
+)
+
 type tabConfig struct {
-	local			config.Node	// local node identity
-	bootstrapNodes	[]*Node		// bootstrap nodes
-	dataDir			string		// data directory
-	nodeDb			string		// node database
-	bootstrapNode	bool		// bootstrap flag of local node
+	local			config.Node		// local node identity
+	networkType		int				// p2p network type
+	bootstrapNodes	[]*Node			// bootstrap nodes
+	dataDir			string			// data directory
+	nodeDb			string			// node database
+	bootstrapNode	bool			// bootstrap flag of local node
+	subNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
+									// of the local node in this list.
 }
 
 //
@@ -185,7 +193,8 @@ type queryPendingEntry struct {
 //
 const TabMgrName = sch.TabMgrName
 type SubNetworkID = config.SubNetworkID
-var ZeroSubNet  = SubNetworkID{0,0}
+var ZeroSubNet = config.ZeroSubNet
+var AnySubNet = config.AnySubNet
 
 type TableManager struct {
 	lock			sync.Mutex			// lock for sync
@@ -220,6 +229,8 @@ type TableManager struct {
 	// a table manager for each sub network. A table manager is allocated to
 	// handle the case which no sub networks are needed.
 	//
+
+	networkType		int								// network type
 	snid			SubNetworkID					// sub network identity
 	subNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
 }
@@ -246,8 +257,12 @@ func NewTabMgr() *TableManager {
 		dlkTab:			make([]int, 256),
 		refreshing:		false,
 		dataDir:		"",
-		nodeDb:			nil,
 		arfTid:			sch.SchInvalidTid,
+		nodeDb:			nil,
+
+		networkType:	p2pTypeDynamic,
+		snid:			ZeroSubNet,
+		subNetMgrList:	map[SubNetworkID]*TableManager{},
 	}
 
 	tabMgr.tep = tabMgr.tabMgrProc
@@ -256,10 +271,6 @@ func NewTabMgr() *TableManager {
 		tabMgr.buckets[loop] = b
 		b.nodes = make([]*bucketEntry, 0, bucketSize)
 	}
-
-	tabMgr.snid = ZeroSubNet
-	tabMgr.subNetMgrList = map[SubNetworkID]*TableManager{}
-	tabMgr.subNetMgrList[ZeroSubNet] = &tabMgr
 
 	return &tabMgr
 }
@@ -336,15 +347,12 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 //
 func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 
+	var eno TabMgrErrno = TabMgrEnoNone
+
 	if ptn == nil {
 		log.LogCallerFileLine("tabMgrPoweron: invalid parameters")
 		return TabMgrEnoParameter
 	}
-
-	var eno TabMgrErrno = TabMgrEnoNone
-
-	tabMgr.ptnMe = ptn
-	tabMgr.sdl = sch.SchGetScheduler(ptn)
 
 	//
 	// fetch configurations
@@ -354,6 +362,29 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 		log.LogCallerFileLine("tabMgrPoweron: tabGetConfig failed, eno: %d", eno)
 		return eno
 	}
+
+	//
+	// if it's a static type, no table manager needed, just done the table
+	// manager task and then return. so, in this case, any other must not
+	// try to interact with table manager for it is not exist.
+	//
+
+	if tabMgr.networkType == p2pTypeStatic {
+
+		log.LogCallerFileLine("tabMgrPoweron: static type, tabMgr is not needed")
+
+		sdl := sch.SchGetScheduler(ptn)
+		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+
+		return TabMgrEnoNone
+	}
+
+	//
+	// save task node pointer, fetch scheduler pointer
+	//
+
+	tabMgr.ptnMe = ptn
+	tabMgr.sdl = sch.SchGetScheduler(ptn)
 
 	//
 	// prepare node database
@@ -392,20 +423,6 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	}
 
 	//
-	// setup auto-refresh timer
-	//
-
-	var cycle = autoRefreshCycle
-	if tabMgr.cfg.bootstrapNode {
-		cycle = autoBsnRefreshCycle
-	}
-
-	if eno = tabMgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
-		log.LogCallerFileLine("tabMgrPoweron: tabStartTimer failed, eno: %d", eno)
-		return eno
-	}
-
-	//
 	// Since the system is just powered on at this moment, we start table
 	// refreshing at once. Before doing this, we update the random seed for
 	// the underlying.
@@ -414,16 +431,13 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	rand.Seed(time.Now().UnixNano())
 	tabMgr.refreshing = false
 
-	if eno = tabMgr.tabRefresh(nil, &tabMgr.cfg.local.ID); eno != TabMgrEnoNone {
-		log.LogCallerFileLine("tabMgrPoweron: tabRefresh failed, eno: %d", eno)
-		return eno
-	}
-
 	//
 	// setup table manager for sub networks
 	//
 
-	if len(tabMgr.cfg.local.SubNetIdList) > 0 {
+	tabMgr.subNetMgrList[tabMgr.snid] = tabMgr
+
+	if len(tabMgr.cfg.subNetIdList) > 0 {
 		if eno = tabMgr.setupSubNetTabMgr(); eno != TabMgrEnoNone {
 			log.LogCallerFileLine("tabMgrPoweron: SetSubNetTabMgr failed, eno: %d", eno)
 			return eno
@@ -434,7 +448,18 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// refresh all possible sub networks
 	//
 
+	var cycle = autoRefreshCycle
+	if tabMgr.cfg.bootstrapNode {
+		cycle = autoBsnRefreshCycle
+	}
+
 	for _, mgr := range tabMgr.subNetMgrList {
+
+		if eno = mgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
+			log.LogCallerFileLine("tabMgrPoweron: tabStartTimer failed, eno: %d", eno)
+			return eno
+		}
+
 		if eno = mgr.tabRefresh(&mgr.snid, &mgr.cfg.local.ID); eno != TabMgrEnoNone {
 			log.LogCallerFileLine("tabMgrPoweron: " +
 				"tabRefresh sub network failed, eno: %d, subnet: %x",
@@ -451,7 +476,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 //
 func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 
-	snl := tabMgr.cfg.local.SubNetIdList
+	snl := tabMgr.cfg.subNetIdList
 
 	for _, snid := range snl {
 		mgr := NewTabMgr()
@@ -775,7 +800,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 		return TabMgrEnoParameter
 	}
 
-	snid := msg.Ping.From.SubNetId
+	snid := msg.Pong.From.SubNetId
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
 		return TabMgrEnoNotFound
@@ -1255,6 +1280,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	tabCfg.dataDir			= cfg.DataDir
 	tabCfg.nodeDb			= cfg.NodeDB
 	tabCfg.bootstrapNode	= cfg.BootstrapNode
+	tabCfg.subNetIdList		= cfg.SubNetIdList
 
 	tabCfg.bootstrapNodes = make([]*Node, len(cfg.BootstrapNodes))
 	for idx, n := range cfg.BootstrapNodes {
@@ -1262,6 +1288,9 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 		tabCfg.bootstrapNodes[idx].Node = *n
 		tabCfg.bootstrapNodes[idx].sha = *TabNodeId2Hash(NodeID(n.ID))
 	}
+
+	tabMgr.networkType = cfg.NetworkType
+	tabMgr.snid = tabCfg.local.Snid
 
 	return TabMgrEnoNone
 }
@@ -1677,6 +1706,7 @@ func (tabMgr *TableManager)tabQuery(target *NodeID, nodes []*Node) TabMgrErrno {
 			msg := new(um.FindNode)
 			icb := new(instCtrlBlock)
 
+			icb.snid	= tabMgr.snid
 			icb.state	= TabInstStateQuering
 			icb.qrt		= time.Now()
 			icb.req		= msg
@@ -2051,21 +2081,24 @@ func (tabMgr *TableManager)tabStartTimer(inst *instCtrlBlock, tmt int, dur time.
 		Name:	TabMgrName,
 		Utid:	tmt,
 		Dur:	dur,
-		Extra:	inst,
+		Extra:	nil,
 	}
 
 	switch tmt {
 	case sch.TabRefreshTimerId:
 		td.Tmt = sch.SchTmTypePeriod
 		td.Name = td.Name + "_AutoRefresh"
+		td.Extra = &tabMgr.snid
 
 	case sch.TabFindNodeTimerId:
 		td.Tmt = sch.SchTmTypeAbsolute
 		td.Name = td.Name + "_FindNode"
+		td.Extra = inst
 
 	case sch.TabPingpongTimerId:
 		td.Tmt = sch.SchTmTypeAbsolute
 		td.Name = td.Name + "_Pingpong"
+		td.Extra = inst
 
 	default:
 		log.LogCallerFileLine("tabStartTimer: invalid time type, type: %d", tmt)

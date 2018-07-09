@@ -233,7 +233,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 					"try to close the instance, peer: %s",
 					fmt.Sprintf("%X", (*peer.PeerId)(&psp.PeerInfo.NodeId)))
 
-				if eno := shell.P2pClosePeer(p2pInst, (*peer.PeerId)(&psp.PeerInfo.NodeId));
+				if eno := shell.P2pClosePeer(p2pInst, &psp.PeerInfo.Snid, &psp.PeerInfo.NodeId);
 					eno != shell.P2pEnoNone {
 
 					log.LogCallerFileLine("p2pIndProc: "+

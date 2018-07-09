@@ -161,7 +161,6 @@ type NblFindNodeRsp struct {
 // EvNblPingpongrRsp message
 //
 type NblPingRsp struct {
-	Snid		config.SubNetworkID	// sub network identity
 	Result		int					// result, 0: ok, others: errno
 	Ping		*um.Ping			// Ping message from table task
 	Pong		*um.Pong			// Pong message from peer

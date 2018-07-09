@@ -58,7 +58,7 @@ type PeMgrErrno int
 //
 // Peer identity as string
 //
-type PeerId config.NodeID
+type PeerId = config.NodeID
 
 //
 // Peer information
@@ -86,38 +86,38 @@ const maxTcpmsgSize = 1024*1024*4					// max size of a tcpmsg package could be, 
 const durDcvFindNodeTimer = time.Second * 22		// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 const (
-	peerIdle			= iota			// idle
-	peerConnectOutInited				// connecting out inited
-	peerActivated						// had been activated
-	peerKilling							// in killing
+	peerIdle			= iota						// idle
+	peerConnectOutInited							// connecting out inited
+	peerActivated									// had been activated
+	peerKilling										// in killing
 )
 
-type peMgrConfig struct {
-	maxPeers		int					// max peers would be
-	maxOutbounds	int					// max concurrency outbounds
-	maxInBounds		int					// max concurrency inbounds
-	ip				net.IP				// ip address
-	port			uint16				// tcp port number
-	udp				uint16				// udp port number, used with handshake procedure
-	nodeId			config.NodeID		// the node's public key
-	statics			[]*config.Node		// static nodes
-	noDial			bool				// do not dial outbound
-	bootstrapNode	bool				// local is a bootstrap node
-	defaultCto		time.Duration		// default connect outbound timeout
-	defaultHto		time.Duration		// default handshake timeout
-	defaultAto		time.Duration		// default active read/write timeout
-	maxMsgSize		int					// max tcpmsg package size
-	protoNum		uint32				// local protocol number
-	protocols		[]Protocol			// local protocol table
-}
+type SubNetworkID = config.SubNetworkID
 
-//
-// Statistics history
-//
-type peHistory struct {
-	tmBegin		time.Time	// time begin to count
-	cntOk		int			// counter for succeed to establish
-	cntFailed	int			// counter for failed to establish
+type peMgrConfig struct {
+	ip					net.IP						// ip address
+	port				uint16						// tcp port number
+	udp					uint16						// udp port number, used with handshake procedure
+	nodeId				config.NodeID				// the node's public key
+	noDial				bool						// do not dial outbound
+	bootstrapNode		bool						// local is a bootstrap node
+	defaultCto			time.Duration				// default connect outbound timeout
+	defaultHto			time.Duration				// default handshake timeout
+	defaultAto			time.Duration				// default active read/write timeout
+	maxMsgSize			int							// max tcpmsg package size
+	protoNum			uint32						// local protocol number
+	protocols			[]Protocol					// local protocol table
+
+	networkType			int							// p2p network type
+	staticMaxPeers		int							// max peers would be
+	staticMaxOutbounds	int							// max concurrency outbounds
+	staticMaxInBounds	int							// max concurrency inbounds
+	staticNodes			[]*config.Node				// static nodes
+	staticSubNetId		SubNetworkID				// static network identity
+	subNetMaxPeers		map[SubNetworkID]int		// max peers would be
+	subNetMaxOutbounds	map[SubNetworkID]int		// max concurrency outbounds
+	subNetMaxInBounds	map[SubNetworkID]int		// max concurrency inbounds
+	subNetIdList		[]SubNetworkID				// sub network identity list. do not put the identity
 }
 
 //
@@ -131,7 +131,7 @@ type PeerManager struct {
 	inited			chan PeMgrErrno					// result of initialization
 	tep				sch.SchUserTaskEp				// entry
 	cfg				peMgrConfig						// configuration
-	tidFindNode		int								// find node timer identity
+	tidFindNode		map[SubNetworkID]int			// find node timer identity
 	ptnMe			interface{}						// pointer to myself(peer manager task node)
 	ptnTab			interface{}						// pointer to table task node
 	ptnLsn			interface{}						// pointer to peer listener manager task node
@@ -142,14 +142,13 @@ type PeerManager struct {
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
-	nodes			map[config.NodeID]*peerInstance	// map peer node identity to instance pointer
-	workers			map[config.NodeID]*peerInstance	// map peer node identity to pointer of instance in work
-	wrkNum			int								// worker peer number
-	ibpNum			int								// active inbound peer number
-	obpNum			int								// active outbound peer number
+	nodes			map[SubNetworkID]map[config.NodeID]*peerInstance	// map peer node identity to instance pointer
+	workers			map[SubNetworkID]map[config.NodeID]*peerInstance	// map peer node identity to pointer of instance in work
+	wrkNum			map[SubNetworkID]int			// worker peer number
+	ibpNum			map[SubNetworkID]int			// active inbound peer number
+	obpNum			map[SubNetworkID]int			// active outbound peer number
 	acceptPaused	bool							// if accept task paused
-	randoms			[]*config.Node					// random nodes found by discover
-	stats			map[config.NodeID]peHistory		// history for successful and failed
+	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
 
 	txLock			sync.Mutex						// lock for data sending action from shell
 	Lock4Cb			sync.Mutex						// lock for indication callback
@@ -168,7 +167,7 @@ func NewPeerMgr() *PeerManager {
 		inited:       	make(chan PeMgrErrno),
 		tep:          	nil,
 		cfg:          	peMgrConfig{},
-		tidFindNode:  	sch.SchInvalidTid,
+		tidFindNode:  	map[SubNetworkID]int{},
 		ptnMe:        	nil,
 		ptnTab:       	nil,
 		ptnLsn:       	nil,
@@ -177,14 +176,13 @@ func NewPeerMgr() *PeerManager {
 		tabMgr:			nil,
 		accepter:		nil,
 		peers:        	map[interface{}]*peerInstance{},
-		nodes:        	map[config.NodeID]*peerInstance{},
-		workers:      	map[config.NodeID]*peerInstance{},
-		wrkNum:       	0,
-		ibpNum:       	0,
-		obpNum:       	0,
+		nodes:        	map[SubNetworkID]map[config.NodeID]*peerInstance{},
+		workers:      	map[SubNetworkID]map[config.NodeID]*peerInstance{},
+		wrkNum:       	map[SubNetworkID]int{},
+		ibpNum:       	map[SubNetworkID]int{},
+		obpNum:       	map[SubNetworkID]int{},
 		acceptPaused: 	false,
-		randoms:      	[]*config.Node{},
-		stats:        	map[config.NodeID]peHistory{},
+		randoms:      	map[SubNetworkID][]*config.Node{},
 		P2pIndHandler:	nil,
 		staticsStatus:	map[config.NodeID]int{},
 	}
@@ -224,7 +222,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = peMgr.peMgrDcvFindNodeRsp(msg.Body)
 
 	case sch.EvPeDcvFindNodeTimer:
-		eno = peMgr.peMgrDcvFindNodeTimerHandler()
+		eno = peMgr.peMgrDcvFindNodeTimerHandler(msg.Body)
 
 	case sch.EvPeLsnConnAcceptedInd:
 		eno = peMgr.peMgrLsnConnAcceptedInd(msg.Body)
@@ -295,22 +293,29 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	}
 
 	peMgr.cfg = peMgrConfig {
-		maxPeers:		cfg.MaxPeers,
-		maxOutbounds:	cfg.MaxOutbounds,
-		maxInBounds:	cfg.MaxInBounds,
-		ip:				cfg.IP,
-		port:			cfg.Port,
-		udp:			cfg.UDP,
-		nodeId:			cfg.ID,
-		statics:		cfg.Statics,
-		noDial:			cfg.NoDial,
-		bootstrapNode:	cfg.BootstrapNode,
-		defaultCto:		defaultConnectTimeout,
-		defaultHto:		defaultHandshakeTimeout,
-		defaultAto:		defaultActivePeerTimeout,
-		maxMsgSize:		maxTcpmsgSize,
-		protoNum:		cfg.ProtoNum,
-		protocols:		make([]Protocol, 0),
+		ip:					cfg.IP,
+		port:				cfg.Port,
+		udp:				cfg.UDP,
+		nodeId:				cfg.ID,
+		noDial:				cfg.NoDial,
+		bootstrapNode:		cfg.BootstrapNode,
+		defaultCto:			defaultConnectTimeout,
+		defaultHto:			defaultHandshakeTimeout,
+		defaultAto:			defaultActivePeerTimeout,
+		maxMsgSize:			maxTcpmsgSize,
+		protoNum:			cfg.ProtoNum,
+		protocols:			make([]Protocol, 0),
+
+		networkType:		cfg.NetworkType,
+		staticMaxPeers:		cfg.StaticMaxPeers,
+		staticMaxOutbounds:	cfg.StaticMaxOutbounds,
+		staticMaxInBounds:	cfg.StaticMaxInBounds,
+		staticNodes:		cfg.StaticNodes,
+		staticSubNetId:		cfg.StaticNetId,
+		subNetMaxPeers:		cfg.SubNetMaxPeers,
+		subNetMaxOutbounds:	cfg.SubNetMaxOutbounds,
+		subNetMaxInBounds:	cfg.SubNetMaxInBounds,
+		subNetIdList:		cfg.SubNetIdList,
 	}
 
 	for _, p := range cfg.Protocols {
@@ -319,7 +324,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		)
 	}
 
-	for _, sn := range peMgr.cfg.statics {
+	for _, sn := range peMgr.cfg.staticNodes {
 		peMgr.staticsStatus[sn.ID] = peerIdle
 	}
 
@@ -378,10 +383,11 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 
 	log.LogCallerFileLine("peMgrPoweroff: pwoeroff received, done the task")
 
-	if peMgr.tidFindNode != sch.SchInvalidTid {
-
-		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.tidFindNode);
-		peMgr.tidFindNode = sch.SchInvalidTid
+	for snid, tid := range peMgr.tidFindNode {
+		if tid != sch.SchInvalidTid {
+			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid);
+			peMgr.tidFindNode[snid] = sch.SchInvalidTid
+		}
 	}
 
 	peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
@@ -419,7 +425,8 @@ func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
 	peMgr.sdl.SchSendMessage(&schMsg)
 
 	//
-	// drive ourself to startup outbound
+	// drive ourself to startup outbound. set following message body to be nil
+	// so all sub networks would try to connect outound.
 	//
 
 	time.Sleep(time.Microsecond * 100)
@@ -436,23 +443,17 @@ func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
 func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 
 	//
-	// Here we got response about FindNode from discover task, which should contain
-	// nodes could be try to connect to. We should check the number of the active
-	// active outbound peer number currently to carry out action accordingly.
+	// notice: currntly the sub network identity for neighbor nodes should be
+	// the same one which is specified in FindNode messages.
 	//
 
 	var rsp = msg.(*sch.MsgDcvFindNodeRsp)
-
 	if rsp == nil {
 		log.LogCallerFileLine("peMgrDcvFindNodeRsp: invalid FindNode response")
 		return PeMgrEnoParameter
 	}
 
-	//
-	// Deal with each node responsed
-	//
-
-	var appended = 0
+	var appended = make(map[SubNetworkID]int, 0)
 	var dup bool
 
 	for _, n := range rsp.Nodes {
@@ -461,7 +462,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		// Check if duplicated instances
 		//
 
-		if _, ok := peMgr.nodes[n.ID]; ok {
+		if _, ok := peMgr.nodes[n.Snid][n.ID]; ok {
 
 			log.LogCallerFileLine("peMgrDcvFindNodeRsp: " +
 				"duplicated(nodes): %s", fmt.Sprintf("%X", n.ID))
@@ -475,7 +476,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 
 		dup = false
 
-		for _, rn := range peMgr.randoms {
+		for _, rn := range peMgr.randoms[n.Snid] {
 
 			if rn.ID == n.ID {
 
@@ -495,9 +496,9 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 
 		dup = false
 
-		for _, s := range peMgr.cfg.statics {
+		for _, s := range peMgr.cfg.staticNodes {
 
-			if s.ID == n.ID {
+			if s.ID == n.ID && n.Snid == peMgr.cfg.staticSubNetId {
 
 				log.LogCallerFileLine("peMgrDcvFindNodeRsp: " +
 					"duplicated(statics): %s", fmt.Sprintf("%X", n.ID))
@@ -513,23 +514,23 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		// backup node, max to the number of most peers can be
 		//
 
-		peMgr.randoms = append(peMgr.randoms, n)
-
-		if appended++; len(peMgr.randoms) >= peMgr.cfg.maxPeers {
-
+		if len(peMgr.randoms[n.Snid]) >= peMgr.cfg.subNetMaxPeers[n.Snid] {
 			log.LogCallerFileLine("peMgrDcvFindNodeRsp: too much, some are truncated")
-			break
+			continue
 		}
+
+		peMgr.randoms[n.Snid] = append(peMgr.randoms[n.Snid], n)
+		appended[n.Snid]++
 	}
 
 	//
-	// drive ourself to startup outbound if some nodes appended
+	// drive ourself to startup outbound if some nodes appended, we set following message
+	// body to be nil so all sub networks would be request to try to connect outbound.
 	//
 
-	if appended > 0 {
-
+	for snid, _ := range appended {
 		var schMsg sch.SchMessage
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	}
 
@@ -539,7 +540,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 //
 // handler of timer for find node response expired
 //
-func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler() PeMgrErrno {
+func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErrno {
 
 	//
 	// This timer is set after a find node request is sent peer manager to discover task.
@@ -549,7 +550,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler() PeMgrErrno {
 	// calling function peMgrAsk4More, see it for details pls.
 	//
 
-	return peMgr.peMgrAsk4More()
+	return peMgr.peMgrAsk4More(msg.(*SubNetworkID))
 }
 
 //
@@ -566,20 +567,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	var eno = sch.SchEnoNone
 	var ptnInst interface{} = nil
 	var ibInd = msg.(*msgConnAcceptedInd)
-
-	//
-	// Check if more inbound allowed
-	//
-
-	if peMgr.ibpNum >= peMgr.cfg.maxInBounds {
-
-		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
-			"no more resources, ibpNum: %d, max: %d",
-			peMgr.ibpNum, peMgr.cfg.maxInBounds)
-
-		ibInd.conn.Close()
-		return PeMgrEnoResource
-	}
 
 	//
 	// Init peer instance control block
@@ -655,21 +642,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	peMgr.peers[peInst.ptnMe] = peInst
 
-	//
-	// Check if the accept task needs to be paused
-	//
-
-	if peMgr.ibpNum += 1;  peMgr.ibpNum >= peMgr.cfg.maxInBounds {
-
-		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
-			"maxInbounds reached, try to pause accept task ...")
-
-		peMgr.acceptPaused = peMgr.accepter.PauseAccept()
-
-		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
-			"pause result: %d", peMgr.acceptPaused)
-	}
-
 	return PeMgrEnoNone
 }
 
@@ -678,26 +650,14 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 //
 func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 
-	//
-	// Notice: the event sch.EvPeOutboundReq, which is designed to drive the manager
-	// to carry out the outbound action, when received, the manager should do its best
-	// to start as many as possible outbound tasks, if the possible nodes are not
-	// enougth, it then ask the discover task to find more.
-	//
-	// When event sch.EvPeMgrStartReq received, the manager should send itself a message
-	// with event sch.EvPeOutboundReq, and while some other events recevied, the manager
-	// should also send itself event sch.EvPeOutboundReq too.
-	//
-	// When the local node is configurated as "NoDial" or "bootstrap", outbound would
-	// not be inited.
-	//
-
-	_ = msg
-
+	var snid *SubNetworkID = nil
+	if msg != nil {
+		snid = msg.(*SubNetworkID)
+	}
 
 	if peMgr.cfg.noDial {
 
-		log.LogCallerFileLine("peMgrOutboundReq: " +
+		log.LogCallerFileLine("peMgrOutboundReq: "+
 			"abandon for noDial flag set: %t",
 			peMgr.cfg.noDial)
 
@@ -706,65 +666,70 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 
 	if peMgr.cfg.bootstrapNode {
 
-		log.LogCallerFileLine("peMgrOutboundReq: " +
+		log.LogCallerFileLine("peMgrOutboundReq: "+
 			"abandon for bootstrapNode flag set: %t",
 			peMgr.cfg.bootstrapNode)
 
 		return PeMgrEnoNone
 	}
 
-	//
-	// Check workers number
-	//
+	if snid == nil {
 
-	if peMgr.wrkNum >= peMgr.cfg.maxPeers {
-		log.LogCallerFileLine("peMgrOutboundReq: it's good, peers full")
+		if eno := peMgr.peMgrStaticSubNetOutbound(); eno != PeMgrEnoNone {
+			return eno
+		}
+
+		for _, snid := range peMgr.cfg.subNetIdList {
+			if eno := peMgr.peMgrDynamicSubNetOutbound(&snid); eno != PeMgrEnoNone {
+				return eno
+			}
+		}
+
+	} else if *snid == peMgr.cfg.staticSubNetId {
+
+		return peMgr.peMgrStaticSubNetOutbound()
+
+	} else {
+
+		for _, snid := range peMgr.cfg.subNetIdList {
+			if eno := peMgr.peMgrDynamicSubNetOutbound(&snid); eno != PeMgrEnoNone {
+				return eno
+			}
+		}
+	}
+
+	return PeMgrEnoUnknown
+}
+
+//
+// static outbound
+//
+func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
+
+	snid := peMgr.cfg.staticSubNetId
+	if peMgr.wrkNum[snid] >= peMgr.cfg.staticMaxPeers {
+		log.LogCallerFileLine("peMgrStaticSubNetOutbound: peers full")
 		return PeMgrEnoNone
 	}
 
-	//
-	// Check outbounds number
-	//
-
-	if peMgr.obpNum >= peMgr.cfg.maxOutbounds {
-		log.LogCallerFileLine("peMgrOutboundReq: it's good, outbounds full")
+	if peMgr.obpNum[snid] >= peMgr.cfg.staticMaxOutbounds {
+		log.LogCallerFileLine("peMgrStaticSubNetOutbound: outbounds full")
 		return PeMgrEnoNone
 	}
-
-	//
-	// Collect all possible candidates, duplicated nodes should be filtered out
-	//
 
 	var candidates = make([]*config.Node, 0)
 	var count = 0
 
-	for _, n := range peMgr.cfg.statics {
+	for _, n := range peMgr.cfg.staticNodes {
 
-		 _, dup := peMgr.nodes[n.ID];
+		_, dup := peMgr.nodes[snid][n.ID];
 
-		 if !dup && peMgr.staticsStatus[n.ID] == peerIdle {
+		if !dup && peMgr.staticsStatus[n.ID] == peerIdle {
 
 			candidates = append(candidates, n)
 			count++
 		}
 	}
-
-	var rdCnt = 0
-
-	for _, n := range peMgr.randoms {
-		if _, ok := peMgr.nodes[n.ID]; !ok {
-			candidates = append(candidates, n)
-			count++
-		}
-		rdCnt++
-	}
-
-	if rdCnt > 0 {
-		peMgr.randoms = append(peMgr.randoms[:0], peMgr.randoms[rdCnt:]...)
-	}
-
-	log.LogCallerFileLine("peMgrOutboundReq: " +
-		"total number of candidates: %d", len(candidates))
 
 	//
 	// Create outbound instances for candidates if any
@@ -776,13 +741,9 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 
 	for _, n := range candidates {
 
-		//
-		// Check duplicated: it's needed here, since candidate nodes might be duplicated
-		//
+		if _, dup := peMgr.nodes[snid][n.ID]; dup {
 
-		if _, dup := peMgr.nodes[n.ID]; dup {
-
-			log.LogCallerFileLine("peMgrOutboundReq: " +
+			log.LogCallerFileLine("peMgrStaticSubNetOutbound: " +
 				"duplicated node: %s",
 				fmt.Sprintf("%X", n.ID))
 
@@ -790,13 +751,9 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 			continue
 		}
 
-		//
-		// Create instance
-		//
-
 		if eno := peMgr.peMgrCreateOutboundInst(n); eno != PeMgrEnoNone {
 
-			log.LogCallerFileLine("peMgrOutboundReq: " +
+			log.LogCallerFileLine("peMgrStaticSubNetOutbound: " +
 				"create outbound instance failed, eno: %d", eno)
 
 			if _, static := peMgr.staticsStatus[n.ID]; static {
@@ -807,18 +764,11 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 			continue
 		}
 
-		if _, static := peMgr.staticsStatus[n.ID]; static {
-			peMgr.staticsStatus[n.ID] = peerConnectOutInited
-		}
-
+		peMgr.staticsStatus[n.ID] = peerConnectOutInited
 		ok++
 
-		//
-		// Break if full
-		//
-
-		if peMgr.obpNum >= peMgr.cfg.maxOutbounds {
-			log.LogCallerFileLine("peMgrOutboundReq: " +
+		if peMgr.obpNum[snid] >= peMgr.cfg.staticMaxOutbounds {
+			log.LogCallerFileLine("peMgrStaticSubNetOutbound: " +
 				"too much candidates, the remains are discarded")
 			break
 		}
@@ -828,11 +778,101 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 	// If outbounds are not enougth, ask discover to find more
 	//
 
-	if peMgr.obpNum < peMgr.cfg.maxOutbounds {
+	if peMgr.obpNum[snid] < peMgr.cfg.staticMaxOutbounds {
 
-		if eno := peMgr.peMgrAsk4More(); eno != PeMgrEnoNone {
+		if eno := peMgr.peMgrAsk4More(&snid); eno != PeMgrEnoNone {
 
 			log.LogCallerFileLine("peMgrOutboundReq: " +
+				"peMgrAsk4More failed, eno: %d", eno)
+
+			return eno
+		}
+	}
+
+	return PeMgrEnoNone
+}
+
+//
+// dynamic outbound
+//
+func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErrno {
+
+	if peMgr.wrkNum[*snid] >= peMgr.cfg.subNetMaxPeers[*snid] {
+		log.LogCallerFileLine("peMgrDynamicSubNetOutbound: peers full")
+		return PeMgrEnoNone
+	}
+
+	if peMgr.obpNum[*snid] >= peMgr.cfg.subNetMaxOutbounds[*snid] {
+		log.LogCallerFileLine("peMgrDynamicSubNetOutbound: outbounds full")
+		return PeMgrEnoNone
+	}
+
+	var candidates = make([]*config.Node, 0)
+	var rdCnt = 0
+
+	for _, n := range peMgr.randoms[*snid] {
+		if _, ok := peMgr.nodes[*snid][n.ID]; !ok {
+			candidates = append(candidates, n)
+		}
+		rdCnt++
+	}
+
+	if rdCnt > 0 {
+		peMgr.randoms[*snid] = append(peMgr.randoms[*snid][:0], peMgr.randoms[*snid][rdCnt:]...)
+	}
+
+	//
+	// Create outbound instances for candidates if any
+	//
+
+	var failed = 0
+	var ok = 0
+	var duped = 0
+
+	for _, n := range candidates {
+
+		if _, dup := peMgr.nodes[*snid][n.ID]; dup {
+
+			log.LogCallerFileLine("peMgrDynamicSubNetOutbound: " +
+				"duplicated node: %s",
+				fmt.Sprintf("%X", n.ID))
+
+			duped++
+			continue
+		}
+
+		if eno := peMgr.peMgrCreateOutboundInst(n); eno != PeMgrEnoNone {
+
+			log.LogCallerFileLine("peMgrDynamicSubNetOutbound: " +
+				"create outbound instance failed, eno: %d", eno)
+
+			if _, static := peMgr.staticsStatus[n.ID]; static {
+				peMgr.staticsStatus[n.ID] = peerIdle
+			}
+
+			failed++
+			continue
+		}
+
+		peMgr.staticsStatus[n.ID] = peerConnectOutInited
+		ok++
+
+		if peMgr.obpNum[*snid] >= peMgr.cfg.staticMaxOutbounds {
+			log.LogCallerFileLine("peMgrDynamicSubNetOutbound: " +
+				"too much candidates, the remains are discarded")
+			break
+		}
+	}
+
+	//
+	// If outbounds are not enougth, ask discover to find more
+	//
+
+	if peMgr.obpNum[*snid] < peMgr.cfg.staticMaxOutbounds {
+
+		if eno := peMgr.peMgrAsk4More(snid); eno != PeMgrEnoNone {
+
+			log.LogCallerFileLine("peMgrDynamicSubNetOutbound: " +
 				"peMgrAsk4More failed, eno: %d", eno)
 
 			return eno
@@ -958,9 +998,12 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	// instance connect from local to the same peer.
 	//
 
+	snid := rsp.peNode.Snid
+	id := rsp.peNode.ID
+
 	if inst.dir == PeInstDirInbound {
 
-		if _, dup := peMgr.nodes[rsp.peNode.ID]; dup {
+		if _, dup := peMgr.nodes[snid][id]; dup {
 
 			log.LogCallerFileLine("peMgrHandshakeRsp: "+
 				"duplicated, node: %s",
@@ -976,7 +1019,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			var ptn2Kill interface{} = nil
 			var node2Kill *config.Node = nil
 
-			dupInst := peMgr.nodes[rsp.peNode.ID]
+			dupInst := peMgr.nodes[snid][id]
 			cmp := inst.state.compare(dupInst.state)
 
 			if cmp < 0 {
@@ -1045,11 +1088,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.updateStaticStatus(rsp.peNode.ID, peerActivated)
 
 	inst.state = peInstStateActivated
-	peMgr.workers[rsp.peNode.ID] = inst
-	peMgr.wrkNum++
+	peMgr.workers[snid][id] = inst
+	peMgr.wrkNum[snid]++
 
 	if inst.dir == PeInstDirInbound {
-		peMgr.nodes[inst.node.ID] = inst
+		peMgr.nodes[snid][id] = inst
 	}
 
 	//
@@ -1150,7 +1193,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 
 	var req = msg.(*sch.MsgPeCloseReq)
 
-	inst := peMgr.nodes[req.Node.ID]
+	inst := peMgr.nodes[req.Node.Snid][req.Node.ID]
 
 	if inst == nil {
 		return PeMgrEnoNotfound
@@ -1239,7 +1282,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 	//
 
 	var schMsg = sch.SchMessage{}
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.peNode.Snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
 
 	return PeMgrEnoNone
@@ -1297,7 +1340,7 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	//
 
 	var schMsg = sch.SchMessage{}
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &ind.peNode.Snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
 
 	return PeMgrEnoNone
@@ -1379,8 +1422,8 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 
 	peInst.ptnMe = ptnInst
 	peMgr.peers[peInst.ptnMe] = peInst
-	peMgr.nodes[peInst.node.ID] = peInst
-	peMgr.obpNum++
+	peMgr.nodes[peInst.node.Snid][peInst.node.ID] = peInst
+	peMgr.obpNum[peInst.node.Snid]++
 
 	//
 	// Send EvPeConnOutReq request to the instance created aboved
@@ -1398,17 +1441,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(node *config.Node) PeMgrErrno {
 //
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgrErrno {
 
-	//
-	// Notice: when an instance is activated into state peInstStateActivated,
-	// it then must not be killed by calling this function directly, instead,
-	// peer.ClosePeer should be called, and this function would be invoked
-	// later when evnet EvPeCloseCfm received.
-	//
-
-	//
-	// Get task node pointer, if "ptn" is nil, we try to get it by "node"
-	//
-
 	if ptn == nil && node == nil {
 		log.LogCallerFileLine("peMgrKillInst: invalid parameters")
 		return PeMgrEnoParameter
@@ -1416,7 +1448,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 
 	if ptn == nil {
 
-		if ptn = peMgr.nodes[node.ID].ptnMe; ptn == nil {
+		if ptn = peMgr.nodes[node.Snid][node.ID].ptnMe; ptn == nil {
 
 			log.LogCallerFileLine("peMgrKillInst: " +
 				"instance not found, node: %s",
@@ -1425,18 +1457,6 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 			return PeMgrEnoScheduler
 		}
 	}
-
-	//
-	// Get instance data area pointer, and if the connection is not nil
-	// we close it so the instance would get out event it's blocked in
-	// actions on its' connection.
-	//
-	// Notice: the possible pingpong timer should be closed before the
-	// connection closing, since the timer handler would try to send ping
-	// message on the connection. But since this function should be called
-	// before peer activated, this seems not necessary, for pingpong timer
-	// is still not be created for peer instance before its' activation.
-	//
 
 	var peInst = peMgr.peers[ptn]
 
@@ -1461,32 +1481,35 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	// direction to step.
 	//
 
+	snid := peInst.node.Snid
+	id := peInst.node.ID
+
 	if peInst.state == peInstStateActivated {
 
-		delete(peMgr.workers, peInst.node.ID)
-		peMgr.wrkNum--
+		delete(peMgr.workers[snid], id)
+		peMgr.wrkNum[snid]--
 	}
 
 	if peInst.dir == PeInstDirOutbound {
 
-		delete(peMgr.nodes, peInst.node.ID)
+		delete(peMgr.nodes[snid], id)
 		delete(peMgr.peers, ptn)
 
 	} else if peInst.dir == PeInstDirInbound {
 
 		delete(peMgr.peers, ptn)
 		if peInst.state == peInstStateActivated {
-			delete(peMgr.nodes, peInst.node.ID)
+			delete(peMgr.nodes[snid], id)
 		}
 	}
 
 	if peInst.dir == PeInstDirOutbound {
 
-		peMgr.obpNum--
+		peMgr.obpNum[snid]--
 
 	} else if peInst.dir == PeInstDirInbound {
 
-		peMgr.ibpNum--
+		peMgr.ibpNum[snid]--
 
 	} else {
 
@@ -1515,70 +1538,71 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 //
 // Request the discover task to findout more node for outbound
 //
-func (peMgr *PeerManager)peMgrAsk4More() PeMgrErrno {
+func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 
-	//
-	// Send EvDcvFindNodeReq to discover task. The filters “include" and
-	// "exclude" are not applied currently.
-	//
-
-	more := peMgr.cfg.maxOutbounds - peMgr.obpNum
-
-	if more <= 0 {
-
-		log.LogCallerFileLine("peMgrAsk4More: " +
-			"no more needed, obpNum: %d, max: %d",
-			peMgr.obpNum,
-			peMgr.cfg.maxOutbounds)
-
-		return PeMgrEnoNone
-	}
-
+	var timerName = ""
 	var eno sch.SchErrno
-	var schMsg = sch.SchMessage{}
+	var tid int
 
-	var req = sch.MsgDcvFindNodeReq {
-		More:		more,
-		Include:	nil,
-		Exclude:	nil,
+	//
+	// no discovering needed for static nodes
+	//
+
+	if *snid != peMgr.cfg.staticSubNetId {
+
+		more := peMgr.cfg.subNetMaxOutbounds[*snid] - peMgr.obpNum[*snid]
+
+		if more <= 0 {
+
+			log.LogCallerFileLine("peMgrAsk4More: "+
+				"no more needed, obpNum: %d, max: %d",
+				peMgr.obpNum[*snid],
+				peMgr.cfg.subNetMaxOutbounds[*snid])
+
+			return PeMgrEnoNone
+		}
+
+		var schMsg= sch.SchMessage{}
+		var req = sch.MsgDcvFindNodeReq{
+			Snid:	*snid,
+			More:    more,
+			Include: nil,
+			Exclude: nil,
+		}
+
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvFindNodeReq, &req)
+		peMgr.sdl.SchSendMessage(&schMsg)
+
+		timerName = PeerMgrName + "_DcvFindNode"
+
+	} else {
+
+		timerName = PeerMgrName + "_static"
 	}
 
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvFindNodeReq, &req)
-	peMgr.sdl.SchSendMessage(&schMsg)
+	//
+	// set a ABS timer
+	//
 
 	var td = sch.TimerDescription {
-		Name:	PeerMgrName + "_DcvFindNode",
+		Name:	timerName,
 		Utid:	sch.PeDcvFindNodeTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	durDcvFindNodeTimer,
-		Extra:	nil,
+		Extra:	snid,
 	}
 
-	peMgr.tidFindNode = sch.SchInvalidTid
-
-	//
-	// if the findnode timer not still not expired, we kill it and set a new one,
-	// but attention: if SchEnoNotFound returned while killing timer, we still go
-	// ahead, see function sch.SchKillTimer for more please.
-	//
-
-	tid := peMgr.tidFindNode
-
-	if tid != sch.SchInvalidTid {
+	if tid, ok := peMgr.tidFindNode[*snid]; ok && tid != sch.SchInvalidTid {
 		peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
-		peMgr.tidFindNode = sch.SchInvalidTid
+		peMgr.tidFindNode[*snid] = sch.SchInvalidTid
 	}
 
-	if eno, tid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td);
-	eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
+	if eno, tid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
+		log.LogCallerFileLine("peMgrAsk4More: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
 
-	log.LogCallerFileLine("peMgrAsk4More: " +
-		"set timer sch.PeDcvFindNodeTimerId ok, tid: %d",
-		tid)
-
-	peMgr.tidFindNode = tid
+	peMgr.tidFindNode[*snid] = tid
 
 	return PeMgrEnoNone
 }
@@ -2505,7 +2529,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 
 	for _, pid := range pkg.IdList {
 
-		if inst = peMgr.workers[config.NodeID(pid)]; inst == nil {
+		if inst = peMgr.workers[pkg.SubNetId][config.NodeID(pid)]; inst == nil {
 
 			log.LogCallerFileLine("SendPackage: " +
 				"instance not exist, id: %s",
@@ -2543,7 +2567,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 //
 // Close connection to a peer
 //
-func (peMgr *PeerManager)ClosePeer(id *PeerId) PeMgrErrno {
+func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 
 	//
 	// Notice: this function should only be called to kill instance when it
@@ -2557,7 +2581,7 @@ func (peMgr *PeerManager)ClosePeer(id *PeerId) PeMgrErrno {
 
 	var inst *peerInstance = nil
 
-	if inst = peMgr.workers[config.NodeID(*id)]; inst == nil {
+	if inst = peMgr.workers[*snid][config.NodeID(*id)]; inst == nil {
 
 		log.LogCallerFileLine("ClosePeer: " +
 			"instance not exist, id: %s",
