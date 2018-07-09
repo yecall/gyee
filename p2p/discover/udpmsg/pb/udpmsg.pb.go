@@ -120,18 +120,36 @@ func (m *UdpMessage) GetNeighbors() *UdpMessage_Neighbors {
 	return nil
 }
 
+type UdpMessage_SubNetworkID struct {
+	Id               []byte `protobuf:"bytes,1,req,name=Id" json:"Id,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
+}
+
+func (m *UdpMessage_SubNetworkID) Reset()                    { *m = UdpMessage_SubNetworkID{} }
+func (m *UdpMessage_SubNetworkID) String() string            { return proto.CompactTextString(m) }
+func (*UdpMessage_SubNetworkID) ProtoMessage()               {}
+func (*UdpMessage_SubNetworkID) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 0} }
+
+func (m *UdpMessage_SubNetworkID) GetId() []byte {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
 type UdpMessage_Node struct {
-	IP               []byte  `protobuf:"bytes,1,req,name=IP" json:"IP,omitempty"`
-	UDP              *uint32 `protobuf:"varint,2,req,name=UDP" json:"UDP,omitempty"`
-	TCP              *uint32 `protobuf:"varint,3,req,name=TCP" json:"TCP,omitempty"`
-	NodeId           []byte  `protobuf:"bytes,4,req,name=NodeId" json:"NodeId,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	IP               []byte                   `protobuf:"bytes,1,req,name=IP" json:"IP,omitempty"`
+	UDP              *uint32                  `protobuf:"varint,2,req,name=UDP" json:"UDP,omitempty"`
+	TCP              *uint32                  `protobuf:"varint,3,req,name=TCP" json:"TCP,omitempty"`
+	NodeId           []byte                   `protobuf:"bytes,4,req,name=NodeId" json:"NodeId,omitempty"`
+	SubNetId         *UdpMessage_SubNetworkID `protobuf:"bytes,5,req,name=SubNetId" json:"SubNetId,omitempty"`
+	XXX_unrecognized []byte                   `json:"-"`
 }
 
 func (m *UdpMessage_Node) Reset()                    { *m = UdpMessage_Node{} }
 func (m *UdpMessage_Node) String() string            { return proto.CompactTextString(m) }
 func (*UdpMessage_Node) ProtoMessage()               {}
-func (*UdpMessage_Node) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 0} }
+func (*UdpMessage_Node) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 1} }
 
 func (m *UdpMessage_Node) GetIP() []byte {
 	if m != nil {
@@ -161,6 +179,13 @@ func (m *UdpMessage_Node) GetNodeId() []byte {
 	return nil
 }
 
+func (m *UdpMessage_Node) GetSubNetId() *UdpMessage_SubNetworkID {
+	if m != nil {
+		return m.SubNetId
+	}
+	return nil
+}
+
 type UdpMessage_Ping struct {
 	From             *UdpMessage_Node `protobuf:"bytes,1,req,name=From" json:"From,omitempty"`
 	To               *UdpMessage_Node `protobuf:"bytes,2,req,name=To" json:"To,omitempty"`
@@ -173,7 +198,7 @@ type UdpMessage_Ping struct {
 func (m *UdpMessage_Ping) Reset()                    { *m = UdpMessage_Ping{} }
 func (m *UdpMessage_Ping) String() string            { return proto.CompactTextString(m) }
 func (*UdpMessage_Ping) ProtoMessage()               {}
-func (*UdpMessage_Ping) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 1} }
+func (*UdpMessage_Ping) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 2} }
 
 func (m *UdpMessage_Ping) GetFrom() *UdpMessage_Node {
 	if m != nil {
@@ -222,7 +247,7 @@ type UdpMessage_Pong struct {
 func (m *UdpMessage_Pong) Reset()                    { *m = UdpMessage_Pong{} }
 func (m *UdpMessage_Pong) String() string            { return proto.CompactTextString(m) }
 func (*UdpMessage_Pong) ProtoMessage()               {}
-func (*UdpMessage_Pong) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 2} }
+func (*UdpMessage_Pong) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 3} }
 
 func (m *UdpMessage_Pong) GetFrom() *UdpMessage_Node {
 	if m != nil {
@@ -260,19 +285,20 @@ func (m *UdpMessage_Pong) GetExtra() []byte {
 }
 
 type UdpMessage_FindNode struct {
-	From             *UdpMessage_Node `protobuf:"bytes,1,req,name=From" json:"From,omitempty"`
-	To               *UdpMessage_Node `protobuf:"bytes,2,req,name=To" json:"To,omitempty"`
-	Id               *uint64          `protobuf:"varint,3,req,name=Id" json:"Id,omitempty"`
-	Target           []byte           `protobuf:"bytes,4,req,name=Target" json:"Target,omitempty"`
-	Expiration       *uint64          `protobuf:"varint,5,opt,name=Expiration" json:"Expiration,omitempty"`
-	Extra            []byte           `protobuf:"bytes,6,opt,name=Extra" json:"Extra,omitempty"`
-	XXX_unrecognized []byte           `json:"-"`
+	From             *UdpMessage_Node         `protobuf:"bytes,1,req,name=From" json:"From,omitempty"`
+	To               *UdpMessage_Node         `protobuf:"bytes,2,req,name=To" json:"To,omitempty"`
+	Id               *uint64                  `protobuf:"varint,3,req,name=Id" json:"Id,omitempty"`
+	SubNetId         *UdpMessage_SubNetworkID `protobuf:"bytes,4,req,name=SubNetId" json:"SubNetId,omitempty"`
+	Target           []byte                   `protobuf:"bytes,5,req,name=Target" json:"Target,omitempty"`
+	Expiration       *uint64                  `protobuf:"varint,6,opt,name=Expiration" json:"Expiration,omitempty"`
+	Extra            []byte                   `protobuf:"bytes,7,opt,name=Extra" json:"Extra,omitempty"`
+	XXX_unrecognized []byte                   `json:"-"`
 }
 
 func (m *UdpMessage_FindNode) Reset()                    { *m = UdpMessage_FindNode{} }
 func (m *UdpMessage_FindNode) String() string            { return proto.CompactTextString(m) }
 func (*UdpMessage_FindNode) ProtoMessage()               {}
-func (*UdpMessage_FindNode) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 3} }
+func (*UdpMessage_FindNode) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 4} }
 
 func (m *UdpMessage_FindNode) GetFrom() *UdpMessage_Node {
 	if m != nil {
@@ -293,6 +319,13 @@ func (m *UdpMessage_FindNode) GetId() uint64 {
 		return *m.Id
 	}
 	return 0
+}
+
+func (m *UdpMessage_FindNode) GetSubNetId() *UdpMessage_SubNetworkID {
+	if m != nil {
+		return m.SubNetId
+	}
+	return nil
 }
 
 func (m *UdpMessage_FindNode) GetTarget() []byte {
@@ -329,7 +362,7 @@ type UdpMessage_Neighbors struct {
 func (m *UdpMessage_Neighbors) Reset()                    { *m = UdpMessage_Neighbors{} }
 func (m *UdpMessage_Neighbors) String() string            { return proto.CompactTextString(m) }
 func (*UdpMessage_Neighbors) ProtoMessage()               {}
-func (*UdpMessage_Neighbors) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 4} }
+func (*UdpMessage_Neighbors) Descriptor() ([]byte, []int) { return fileDescriptorUdpmsg, []int{0, 5} }
 
 func (m *UdpMessage_Neighbors) GetFrom() *UdpMessage_Node {
 	if m != nil {
@@ -375,6 +408,7 @@ func (m *UdpMessage_Neighbors) GetExtra() []byte {
 
 func init() {
 	proto.RegisterType((*UdpMessage)(nil), "udpmsg.pb.UdpMessage")
+	proto.RegisterType((*UdpMessage_SubNetworkID)(nil), "udpmsg.pb.UdpMessage.SubNetworkID")
 	proto.RegisterType((*UdpMessage_Node)(nil), "udpmsg.pb.UdpMessage.Node")
 	proto.RegisterType((*UdpMessage_Ping)(nil), "udpmsg.pb.UdpMessage.Ping")
 	proto.RegisterType((*UdpMessage_Pong)(nil), "udpmsg.pb.UdpMessage.Pong")
@@ -450,6 +484,35 @@ func (m *UdpMessage) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *UdpMessage_SubNetworkID) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *UdpMessage_SubNetworkID) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Id == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintUdpmsg(dAtA, i, uint64(len(m.Id)))
+		i += copy(dAtA[i:], m.Id)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
 func (m *UdpMessage_Node) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -495,6 +558,18 @@ func (m *UdpMessage_Node) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintUdpmsg(dAtA, i, uint64(len(m.NodeId)))
 		i += copy(dAtA[i:], m.NodeId)
 	}
+	if m.SubNetId == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x2a
+		i++
+		i = encodeVarintUdpmsg(dAtA, i, uint64(m.SubNetId.Size()))
+		n5, err := m.SubNetId.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n5
+	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
 	}
@@ -522,11 +597,11 @@ func (m *UdpMessage_Ping) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.From.Size()))
-		n5, err := m.From.MarshalTo(dAtA[i:])
+		n6, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n5
+		i += n6
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -534,11 +609,11 @@ func (m *UdpMessage_Ping) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.To.Size()))
-		n6, err := m.To.MarshalTo(dAtA[i:])
+		n7, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n6
+		i += n7
 	}
 	if m.Id == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -585,11 +660,11 @@ func (m *UdpMessage_Pong) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.From.Size()))
-		n7, err := m.From.MarshalTo(dAtA[i:])
+		n8, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n7
+		i += n8
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -597,11 +672,11 @@ func (m *UdpMessage_Pong) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.To.Size()))
-		n8, err := m.To.MarshalTo(dAtA[i:])
+		n9, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n8
+		i += n9
 	}
 	if m.Id == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -648,11 +723,11 @@ func (m *UdpMessage_FindNode) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.From.Size()))
-		n9, err := m.From.MarshalTo(dAtA[i:])
+		n10, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n9
+		i += n10
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -660,11 +735,11 @@ func (m *UdpMessage_FindNode) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.To.Size()))
-		n10, err := m.To.MarshalTo(dAtA[i:])
+		n11, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n10
+		i += n11
 	}
 	if m.Id == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -673,21 +748,33 @@ func (m *UdpMessage_FindNode) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(*m.Id))
 	}
-	if m.Target == nil {
+	if m.SubNetId == nil {
 		return 0, new(proto.RequiredNotSetError)
 	} else {
 		dAtA[i] = 0x22
+		i++
+		i = encodeVarintUdpmsg(dAtA, i, uint64(m.SubNetId.Size()))
+		n12, err := m.SubNetId.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n12
+	}
+	if m.Target == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x2a
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(len(m.Target)))
 		i += copy(dAtA[i:], m.Target)
 	}
 	if m.Expiration != nil {
-		dAtA[i] = 0x28
+		dAtA[i] = 0x30
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(*m.Expiration))
 	}
 	if m.Extra != nil {
-		dAtA[i] = 0x32
+		dAtA[i] = 0x3a
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(len(m.Extra)))
 		i += copy(dAtA[i:], m.Extra)
@@ -719,11 +806,11 @@ func (m *UdpMessage_Neighbors) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.From.Size()))
-		n11, err := m.From.MarshalTo(dAtA[i:])
+		n13, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n11
+		i += n13
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -731,11 +818,11 @@ func (m *UdpMessage_Neighbors) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintUdpmsg(dAtA, i, uint64(m.To.Size()))
-		n12, err := m.To.MarshalTo(dAtA[i:])
+		n14, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n12
+		i += n14
 	}
 	if m.Id == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -810,6 +897,19 @@ func (m *UdpMessage) Size() (n int) {
 	return n
 }
 
+func (m *UdpMessage_SubNetworkID) Size() (n int) {
+	var l int
+	_ = l
+	if m.Id != nil {
+		l = len(m.Id)
+		n += 1 + l + sovUdpmsg(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *UdpMessage_Node) Size() (n int) {
 	var l int
 	_ = l
@@ -825,6 +925,10 @@ func (m *UdpMessage_Node) Size() (n int) {
 	}
 	if m.NodeId != nil {
 		l = len(m.NodeId)
+		n += 1 + l + sovUdpmsg(uint64(l))
+	}
+	if m.SubNetId != nil {
+		l = m.SubNetId.Size()
 		n += 1 + l + sovUdpmsg(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -900,6 +1004,10 @@ func (m *UdpMessage_FindNode) Size() (n int) {
 	}
 	if m.Id != nil {
 		n += 1 + sovUdpmsg(uint64(*m.Id))
+	}
+	if m.SubNetId != nil {
+		l = m.SubNetId.Size()
+		n += 1 + l + sovUdpmsg(uint64(l))
 	}
 	if m.Target != nil {
 		l = len(m.Target)
@@ -1172,6 +1280,93 @@ func (m *UdpMessage) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *UdpMessage_SubNetworkID) Unmarshal(dAtA []byte) error {
+	var hasFields [1]uint64
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowUdpmsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SubNetworkID: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SubNetworkID: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowUdpmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthUdpmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Id = append(m.Id[:0], dAtA[iNdEx:postIndex]...)
+			if m.Id == nil {
+				m.Id = []byte{}
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipUdpmsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthUdpmsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *UdpMessage_Node) Unmarshal(dAtA []byte) error {
 	var hasFields [1]uint64
 	l := len(dAtA)
@@ -1308,6 +1503,40 @@ func (m *UdpMessage_Node) Unmarshal(dAtA []byte) error {
 			}
 			iNdEx = postIndex
 			hasFields[0] |= uint64(0x00000008)
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubNetId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowUdpmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthUdpmsg
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SubNetId == nil {
+				m.SubNetId = &UdpMessage_SubNetworkID{}
+			}
+			if err := m.SubNetId.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000010)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipUdpmsg(dAtA[iNdEx:])
@@ -1334,6 +1563,9 @@ func (m *UdpMessage_Node) Unmarshal(dAtA []byte) error {
 		return new(proto.RequiredNotSetError)
 	}
 	if hasFields[0]&uint64(0x00000008) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000010) == 0 {
 		return new(proto.RequiredNotSetError)
 	}
 
@@ -1865,6 +2097,40 @@ func (m *UdpMessage_FindNode) Unmarshal(dAtA []byte) error {
 			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubNetId", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowUdpmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthUdpmsg
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SubNetId == nil {
+				m.SubNetId = &UdpMessage_SubNetworkID{}
+			}
+			if err := m.SubNetId.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000008)
+		case 5:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Target", wireType)
 			}
 			var byteLen int
@@ -1894,8 +2160,8 @@ func (m *UdpMessage_FindNode) Unmarshal(dAtA []byte) error {
 				m.Target = []byte{}
 			}
 			iNdEx = postIndex
-			hasFields[0] |= uint64(0x00000008)
-		case 5:
+			hasFields[0] |= uint64(0x00000010)
+		case 6:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Expiration", wireType)
 			}
@@ -1915,7 +2181,7 @@ func (m *UdpMessage_FindNode) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Expiration = &v
-		case 6:
+		case 7:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Extra", wireType)
 			}
@@ -1972,6 +2238,9 @@ func (m *UdpMessage_FindNode) Unmarshal(dAtA []byte) error {
 		return new(proto.RequiredNotSetError)
 	}
 	if hasFields[0]&uint64(0x00000008) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000010) == 0 {
 		return new(proto.RequiredNotSetError)
 	}
 
@@ -2320,33 +2589,37 @@ var (
 func init() { proto.RegisterFile("udpmsg.proto", fileDescriptorUdpmsg) }
 
 var fileDescriptorUdpmsg = []byte{
-	// 444 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x94, 0x41, 0x6e, 0xd3, 0x40,
-	0x14, 0x86, 0x3b, 0xe3, 0x49, 0x88, 0x5f, 0xd3, 0xca, 0x1a, 0xa1, 0x6a, 0x94, 0x85, 0x09, 0x5d,
-	0x45, 0x2c, 0x2c, 0xd4, 0x25, 0x08, 0x16, 0x6d, 0x9c, 0xe0, 0x05, 0xce, 0x68, 0x70, 0x0f, 0xe0,
-	0xca, 0x66, 0xf0, 0x22, 0x1e, 0xcb, 0x36, 0x52, 0xb9, 0x09, 0x47, 0xe0, 0x06, 0x5c, 0x80, 0x05,
-	0x4b, 0x6e, 0x00, 0x0a, 0x17, 0x41, 0x7e, 0xb6, 0xd3, 0x08, 0xa5, 0x45, 0x62, 0x51, 0xa9, 0x2b,
-	0xcf, 0x7b, 0xfe, 0xfe, 0xf1, 0xfb, 0xff, 0xb1, 0x06, 0xc6, 0x1f, 0x93, 0x62, 0x5d, 0x69, 0xaf,
-	0x28, 0x4d, 0x6d, 0xb8, 0xdd, 0x57, 0x57, 0xa7, 0x5f, 0x6d, 0x80, 0xcb, 0xa4, 0x78, 0x9b, 0x56,
-	0x55, 0xac, 0x53, 0xfe, 0x12, 0x1e, 0xad, 0x2b, 0x1d, 0x7d, 0x2a, 0x52, 0x41, 0xa6, 0x74, 0x76,
-	0x7c, 0xf6, 0xd4, 0xdb, 0xb2, 0xde, 0x0d, 0xe7, 0x75, 0xcf, 0x06, 0x54, 0xbd, 0x82, 0x7b, 0xc0,
-	0x8a, 0x2c, 0xd7, 0x82, 0x4e, 0xc9, 0xec, 0xf0, 0x6c, 0xb2, 0x5f, 0x29, 0xb3, 0x5c, 0x2b, 0xe4,
-	0x90, 0x37, 0xb9, 0x16, 0xd6, 0x9d, 0xbc, 0x41, 0xde, 0xe4, 0x9a, 0xbf, 0x80, 0xd1, 0xfb, 0x2c,
-	0x4f, 0x42, 0x93, 0xa4, 0x82, 0xa1, 0xc6, 0xdd, 0xaf, 0x59, 0x74, 0x94, 0xda, 0xf2, 0xfc, 0x15,
-	0xd8, 0x79, 0x9a, 0xe9, 0x0f, 0x57, 0xa6, 0xac, 0xc4, 0x00, 0xc5, 0x4f, 0xf6, 0x8b, 0xc3, 0x1e,
-	0x53, 0x37, 0x8a, 0x89, 0x02, 0x86, 0xdb, 0x1c, 0x03, 0x0d, 0x24, 0x46, 0x33, 0x56, 0x34, 0x90,
-	0xdc, 0x01, 0xeb, 0x72, 0x2e, 0x05, 0x9d, 0xd2, 0xd9, 0x91, 0x6a, 0x96, 0x4d, 0x27, 0xba, 0x90,
-	0xc2, 0x6a, 0x3b, 0xd1, 0x85, 0xe4, 0x27, 0x30, 0x6c, 0xb4, 0x41, 0x22, 0x18, 0xea, 0xba, 0x6a,
-	0xf2, 0x85, 0x00, 0x93, 0x5d, 0x0e, 0x8b, 0xd2, 0xac, 0x71, 0xdb, 0x5b, 0x73, 0x40, 0x3f, 0xc8,
-	0xf1, 0x67, 0x40, 0x23, 0x83, 0xdf, 0xbc, 0x9b, 0xa6, 0x91, 0xc1, 0x81, 0x13, 0x9c, 0x86, 0x29,
-	0x1a, 0x24, 0xdc, 0x05, 0xf0, 0xaf, 0x8b, 0xac, 0x8c, 0xeb, 0xcc, 0xe4, 0x98, 0x22, 0x53, 0x3b,
-	0x1d, 0xfe, 0x18, 0x06, 0xfe, 0x75, 0x5d, 0xc6, 0x98, 0xd1, 0x58, 0xb5, 0x45, 0x3b, 0xaa, 0x79,
-	0x10, 0xa3, 0x7e, 0x23, 0x30, 0xea, 0xcf, 0xff, 0x5e, 0xc7, 0x3d, 0x81, 0x61, 0x14, 0x97, 0x3a,
-	0xad, 0xfb, 0x63, 0x6e, 0xab, 0xbf, 0x6c, 0x0c, 0x6e, 0xb7, 0x31, 0xdc, 0xb5, 0xf1, 0x93, 0x80,
-	0xbd, 0xfd, 0x13, 0xef, 0xd5, 0xc7, 0x73, 0x18, 0x34, 0xef, 0x2a, 0xc1, 0xa6, 0xd6, 0x3f, 0xe4,
-	0x2d, 0xf8, 0x7f, 0x0e, 0x4f, 0x5f, 0xc3, 0xe1, 0xce, 0x2d, 0xc2, 0x47, 0xc0, 0x64, 0x10, 0x2e,
-	0x9d, 0x03, 0x5c, 0xad, 0xc2, 0xa5, 0x43, 0xf8, 0x18, 0x46, 0x8b, 0x20, 0x9c, 0x87, 0xab, 0xb9,
-	0xef, 0x50, 0x7e, 0x04, 0x76, 0xe8, 0x07, 0xcb, 0x37, 0xe7, 0x2b, 0xf5, 0xce, 0xb1, 0xce, 0x9d,
-	0xef, 0x1b, 0x97, 0xfc, 0xd8, 0xb8, 0xe4, 0xd7, 0xc6, 0x25, 0x9f, 0x7f, 0xbb, 0x07, 0x7f, 0x02,
-	0x00, 0x00, 0xff, 0xff, 0x3a, 0xc0, 0x35, 0xfa, 0xe5, 0x04, 0x00, 0x00,
+	// 497 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x94, 0x4f, 0x6f, 0xd3, 0x30,
+	0x18, 0xc6, 0x17, 0xc7, 0xe9, 0xd2, 0xb7, 0xd9, 0x14, 0x59, 0x08, 0x59, 0x3d, 0x84, 0xd0, 0x53,
+	0xc5, 0x21, 0x42, 0x3d, 0x82, 0xd8, 0x61, 0xeb, 0x1f, 0x72, 0x20, 0x8d, 0xbc, 0xec, 0x03, 0xb4,
+	0x4a, 0x30, 0x11, 0x6a, 0x1c, 0x25, 0x99, 0x18, 0x77, 0x3e, 0x01, 0x27, 0x3e, 0x02, 0x1f, 0x85,
+	0x23, 0x47, 0x6e, 0xa0, 0xf2, 0x45, 0x90, 0x9d, 0x34, 0x8b, 0xa6, 0x76, 0x88, 0xcb, 0x24, 0x4e,
+	0xf5, 0x6b, 0xff, 0x1e, 0xf9, 0x79, 0x1f, 0xbf, 0x0d, 0x58, 0xd7, 0x71, 0xbe, 0x29, 0xb9, 0x97,
+	0x17, 0xa2, 0x12, 0xa4, 0xbf, 0xab, 0xd6, 0xa3, 0x1f, 0x00, 0x70, 0x15, 0xe7, 0x6f, 0x92, 0xb2,
+	0x5c, 0xf1, 0x84, 0xbc, 0x84, 0xe3, 0x4d, 0xc9, 0xa3, 0x8f, 0x79, 0x42, 0x35, 0x17, 0x8d, 0x4f,
+	0x27, 0x4f, 0xbd, 0x96, 0xf5, 0x6e, 0x39, 0xaf, 0xf9, 0x95, 0x20, 0xdb, 0x29, 0x88, 0x07, 0x38,
+	0x4f, 0x33, 0x4e, 0x91, 0xab, 0x8d, 0x07, 0x93, 0xe1, 0x7e, 0x65, 0x98, 0x66, 0x9c, 0x29, 0x4e,
+	0xf1, 0x22, 0xe3, 0x54, 0xbf, 0x97, 0x17, 0x8a, 0x17, 0x19, 0x27, 0x2f, 0xc0, 0x7c, 0x9b, 0x66,
+	0x71, 0x20, 0xe2, 0x84, 0x62, 0xa5, 0x71, 0xf6, 0x6b, 0xe6, 0x0d, 0xc5, 0x5a, 0x9e, 0xbc, 0x82,
+	0x7e, 0x96, 0xa4, 0xfc, 0xdd, 0x5a, 0x14, 0x25, 0x35, 0x94, 0xf8, 0xc9, 0x7e, 0x71, 0xb0, 0xc3,
+	0xd8, 0xad, 0x62, 0xe8, 0x80, 0x75, 0x79, 0xbd, 0x0e, 0x92, 0xea, 0x83, 0x28, 0xde, 0xfb, 0x53,
+	0x72, 0x0a, 0xc8, 0x8f, 0x55, 0x44, 0x16, 0x43, 0x7e, 0x3c, 0xfc, 0xac, 0x01, 0x56, 0xf7, 0xc8,
+	0x83, 0xb0, 0x3d, 0x08, 0x89, 0x0d, 0xfa, 0xd5, 0x34, 0xa4, 0xc8, 0x45, 0xe3, 0x13, 0x26, 0x97,
+	0x72, 0x27, 0xba, 0x08, 0xa9, 0x5e, 0xef, 0x44, 0x17, 0x21, 0x79, 0x0c, 0x3d, 0xa9, 0xf5, 0x63,
+	0x8a, 0x95, 0xae, 0xa9, 0xc8, 0x19, 0x98, 0xf5, 0xa5, 0x7e, 0x4c, 0x0d, 0x17, 0x8d, 0x07, 0x93,
+	0xd1, 0x7e, 0xcb, 0x5d, 0x6b, 0xac, 0xd5, 0x0c, 0xbf, 0x6a, 0x80, 0xc3, 0x26, 0xe8, 0x79, 0x21,
+	0x36, 0xca, 0xd6, 0xc1, 0xa0, 0x55, 0x60, 0x8a, 0x23, 0xcf, 0x00, 0x45, 0x42, 0x79, 0xbe, 0x9f,
+	0x46, 0x91, 0x68, 0x92, 0x90, 0xdd, 0x60, 0x99, 0x04, 0x71, 0x00, 0x66, 0x37, 0x79, 0x5a, 0xac,
+	0xaa, 0x54, 0x64, 0xea, 0x99, 0x30, 0xeb, 0xec, 0x90, 0x47, 0x60, 0xcc, 0x6e, 0xaa, 0x62, 0xa5,
+	0x1e, 0xc1, 0x62, 0x75, 0x51, 0x5b, 0x15, 0xff, 0x85, 0xd5, 0x4f, 0x08, 0xcc, 0xdd, 0x80, 0x3d,
+	0xa8, 0xdd, 0xee, 0x38, 0xe0, 0x7f, 0x1f, 0x07, 0x39, 0x66, 0xd1, 0xaa, 0xe0, 0x49, 0xa5, 0x86,
+	0xc9, 0x62, 0x4d, 0x75, 0x27, 0x86, 0xde, 0xe1, 0x18, 0x8e, 0xbb, 0x31, 0xfc, 0xd4, 0xa0, 0xdf,
+	0xfe, 0x55, 0x1e, 0x34, 0x87, 0xe7, 0x60, 0xc8, 0xb3, 0x92, 0x62, 0x57, 0xff, 0x8b, 0xbc, 0x06,
+	0xef, 0x74, 0x68, 0x1c, 0xee, 0xb0, 0xd7, 0xe9, 0x70, 0x74, 0x06, 0x83, 0xce, 0x67, 0x8e, 0x98,
+	0x80, 0x43, 0x3f, 0x58, 0xd8, 0x47, 0x6a, 0xb5, 0x0c, 0x16, 0xb6, 0x46, 0x2c, 0x30, 0xe7, 0x7e,
+	0x30, 0x0d, 0x96, 0xd3, 0x99, 0x8d, 0xc8, 0x09, 0xf4, 0x83, 0x99, 0xbf, 0x78, 0x7d, 0xbe, 0x64,
+	0x97, 0xb6, 0x7e, 0x6e, 0x7f, 0xdb, 0x3a, 0xda, 0xf7, 0xad, 0xa3, 0xfd, 0xda, 0x3a, 0xda, 0x97,
+	0xdf, 0xce, 0xd1, 0x9f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x9e, 0x8a, 0x00, 0x28, 0x86, 0x05, 0x00,
+	0x00,
 }

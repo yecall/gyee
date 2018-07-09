@@ -36,7 +36,7 @@ message UdpMessage {
     }
 
     message SubNetworkID {
-        required bytes Id = 1,
+        required bytes Id = 1;
     }
 
     message Node {
@@ -44,7 +44,7 @@ message UdpMessage {
         required uint32 UDP = 2;
         required uint32 TCP = 3;
         required bytes NodeId = 4;
-        repeated SubNetworkID SubNetIdList = 5;
+        required SubNetworkID SubNetId = 5;
     }
 
     message Ping {
@@ -67,9 +67,10 @@ message UdpMessage {
         required Node From = 1;
         required Node To = 2;
         required uint64 Id = 3;
-        required bytes Target = 4;
-        optional uint64 Expiration = 5;
-        optional bytes Extra = 6;
+        required SubNetworkID SubNetId = 4;
+        required bytes Target = 5;
+        optional uint64 Expiration = 6;
+        optional bytes Extra = 7;
     }
 
     message Neighbors {

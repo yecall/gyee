@@ -76,7 +76,7 @@ const (
 //
 const (
 	bucketSize			= 32					// max nodes can be held for one bucket
-	nBuckets			= HashBits				// total number of buckets
+	nBuckets			= HashBits + 1			// total number of buckets
 	maxBonding			= 16					// max concurrency bondings
 	maxFindnodeFailures	= 5						// max FindNode failures to remove a node
 
@@ -266,11 +266,6 @@ func NewTabMgr() *TableManager {
 	}
 
 	tabMgr.tep = tabMgr.tabMgrProc
-	for loop := 0; loop < cap(tabMgr.buckets); loop++ {
-		b := new(bucket)
-		tabMgr.buckets[loop] = b
-		b.nodes = make([]*bucketEntry, 0, bucketSize)
-	}
 
 	return &tabMgr
 }
@@ -355,6 +350,13 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	}
 
 	//
+	// save task node pointer, fetch scheduler pointer
+	//
+
+	tabMgr.ptnMe = ptn
+	tabMgr.sdl = sch.SchGetScheduler(ptn)
+
+	//
 	// fetch configurations
 	//
 
@@ -373,18 +375,9 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 
 		log.LogCallerFileLine("tabMgrPoweron: static type, tabMgr is not needed")
 
-		sdl := sch.SchGetScheduler(ptn)
-		sdl.SchTaskDone(ptn, sch.SchEnoNone)
-
+		tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return TabMgrEnoNone
 	}
-
-	//
-	// save task node pointer, fetch scheduler pointer
-	//
-
-	tabMgr.ptnMe = ptn
-	tabMgr.sdl = sch.SchGetScheduler(ptn)
 
 	//
 	// prepare node database
@@ -435,6 +428,11 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// setup table manager for sub networks
 	//
 
+	for loop := 0; loop < cap(tabMgr.buckets); loop++ {
+		b := new(bucket)
+		tabMgr.buckets[loop] = b
+		b.nodes = make([]*bucketEntry, 0, bucketSize)
+	}
 	tabMgr.subNetMgrList[tabMgr.snid] = tabMgr
 
 	if len(tabMgr.cfg.subNetIdList) > 0 {
@@ -460,7 +458,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 			return eno
 		}
 
-		if eno = mgr.tabRefresh(&mgr.snid, &mgr.cfg.local.ID); eno != TabMgrEnoNone {
+		if eno = mgr.tabRefresh(&mgr.snid, nil); eno != TabMgrEnoNone {
 			log.LogCallerFileLine("tabMgrPoweron: " +
 				"tabRefresh sub network failed, eno: %d, subnet: %x",
 				eno, mgr.snid)
@@ -479,10 +477,17 @@ func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 	snl := tabMgr.cfg.subNetIdList
 
 	for _, snid := range snl {
+
 		mgr := NewTabMgr()
 		*mgr = *tabMgr
 		mgr.snid = snid
 		tabMgr.subNetMgrList[snid] = mgr
+
+		for loop := 0; loop < cap(mgr.buckets); loop++ {
+			b := new(bucket)
+			mgr.buckets[loop] = b
+			b.nodes = make([]*bucketEntry, 0, bucketSize)
+		}
 	}
 
 	return TabMgrEnoNone

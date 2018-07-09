@@ -328,6 +328,14 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.staticsStatus[sn.ID] = peerIdle
 	}
 
+	for _, snid := range peMgr.cfg.subNetIdList {
+		peMgr.nodes[snid] = make(map[config.NodeID]*peerInstance)
+		peMgr.workers[snid] = make(map[config.NodeID]*peerInstance)
+		peMgr.wrkNum[snid] = 0
+		peMgr.ibpNum[snid] = 0
+		peMgr.obpNum[snid] = 0
+	}
+
 	//
 	// tell initialization result
 	//
