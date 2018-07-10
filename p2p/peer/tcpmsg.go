@@ -231,6 +231,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 	//
 
 	var ptrMsg = new(Handshake)
+	copy(ptrMsg.Snid[:], pbHS.SubNetId)
 	copy(ptrMsg.NodeId[:], pbHS.NodeId)
 	ptrMsg.IP = append(ptrMsg.IP, pbHS.IP...)
 	ptrMsg.UDP = *pbHS.UDP
@@ -256,7 +257,8 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 	//
 
 	pbHandshakeMsg := new(pb.P2PMessage_Handshake)
-	pbHandshakeMsg.NodeId = append(pbHandshakeMsg.NodeId, hs.NodeId[:] ...)
+	pbHandshakeMsg.SubNetId = append(pbHandshakeMsg.SubNetId, hs.Snid[:]...)
+	pbHandshakeMsg.NodeId = append(pbHandshakeMsg.NodeId, hs.NodeId[:]...)
 	pbHandshakeMsg.IP = append(pbHandshakeMsg.IP, hs.IP...)
 	pbHandshakeMsg.TCP = &hs.TCP
 	pbHandshakeMsg.UDP = &hs.UDP

@@ -127,6 +127,7 @@ type MsgDcvFindNodeReq struct {
 
 // EvDcvFindNodeRsp
 type MsgDcvFindNodeRsp struct {
+	Snid	config.SubNetworkID	// sub network identity
 	Nodes	[]*config.Node		// nodes found
 }
 
@@ -252,8 +253,9 @@ const (
 // EvPeCloseReq
 //
 type MsgPeCloseReq struct {
-	Ptn		interface{}		// pointer to peer task instance node
-	Node	config.Node		// peer node
+	Ptn		interface{}			// pointer to peer task instance node
+	Snid	config.SubNetworkID	// sub network identity
+	Node	config.Node			// peer node
 }
 
 //

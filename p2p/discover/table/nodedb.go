@@ -1,6 +1,5 @@
 
 package table
-import 	"crypto/sha256"
 
 
 //
@@ -46,6 +45,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"crypto/sha256"
 
 	//
 	// Modified: 20180503, yeeco
@@ -55,6 +55,7 @@ import (
 
 	//"github.com/ethereum/go-ethereum/log"
 	log "github.com/yeeco/gyee/p2p/logger"
+	config "github.com/yeeco/gyee/p2p/config"
 
 	//
 	// Modified: 20180503, yeeco
@@ -163,7 +164,7 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 
 // makeKey generates the leveldb key-blob from a node id and its particular
 // field of interest.
-func makeKey(id NodeID, field string) []byte {
+func makeKey(id []byte, field string) []byte {
 	if bytes.Equal(id[:], nodeDBNilNodeID[:]) {
 		return []byte(field)
 	}
@@ -171,10 +172,10 @@ func makeKey(id NodeID, field string) []byte {
 }
 
 // splitKey tries to split a database key into a node id and a field part.
-func splitKey(key []byte) (id NodeID, field string) {
+func splitKey(key []byte) (id NodeIdEx, field string) {
 	// If the key is not of a node, return it plainly
 	if !bytes.HasPrefix(key, nodeDBItemPrefix) {
-		return NodeID{}, string(key)
+		return NodeIdEx{}, string(key)
 	}
 	// Otherwise split the id and field
 	item := key[len(nodeDBItemPrefix):]
@@ -208,8 +209,13 @@ func (db *nodeDB) storeInt64(key []byte, n int64) error {
 }
 
 // node retrieves a node with a given id from the database.
-func (db *nodeDB) node(id NodeID) *Node {
-	blob, err := db.lvl.Get(makeKey(id, nodeDBDiscoverRoot), nil)
+func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
+
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+
+	blob, err := db.lvl.Get(makeKey(idEx, nodeDBDiscoverRoot), nil)
 	if err != nil {
 		return nil
 	}
@@ -220,7 +226,7 @@ func (db *nodeDB) node(id NodeID) *Node {
 	//
 	//if err := rlp.DecodeBytes(blob, node); err != nil {
 	//
-	if err := DecodeBytes(blob, node); err != nil {
+	if err := DecodeBytes(blob, node, nil); err != nil {
 		//log.Error("Failed to decode node RLP", "err", err)
 		log.LogCallerFileLine("node: DecodeBytes failed")
 		return nil
@@ -237,13 +243,13 @@ func (db *nodeDB) node(id NodeID) *Node {
 }
 
 // updateNode inserts - potentially overwriting - a node into the peer database.
-func (db *nodeDB) updateNode(node *Node) error {
+func (db *nodeDB) updateNode(snid SubNetworkID, node *Node) error {
 	//
 	// Modified: 20180612, yeeco
 	//
 	//blob, err := rlp.EncodeToBytes(node)
 	//
-	blob, err := EncodeToBytes(node)
+	blob, err := EncodeToBytes(snid, node)
 	if err != nil {
 		return err
 	}
@@ -252,12 +258,21 @@ func (db *nodeDB) updateNode(node *Node) error {
 	//
 	// return db.lvl.Put(makeKey(node.ID, nodeDBDiscoverRoot), blob, nil)
 	//
-	return db.lvl.Put(makeKey(NodeID(node.ID), nodeDBDiscoverRoot), blob, nil)
+	var idEx = []byte{}
+	idEx = append(idEx, node.ID[:]...)
+	idEx = append(idEx, snid[:]...)
+
+	return db.lvl.Put(makeKey(idEx, nodeDBDiscoverRoot), blob, nil)
 }
 
 // deleteNode deletes all information/keys associated with a node.
-func (db *nodeDB) deleteNode(id NodeID) error {
-	deleter := db.lvl.NewIterator(util.BytesPrefix(makeKey(id, "")), nil)
+func (db *nodeDB) deleteNode(snid SubNetworkID, id NodeID) error {
+
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+
+	deleter := db.lvl.NewIterator(util.BytesPrefix(makeKey(idEx, "")), nil)
 	for deleter.Next() {
 		if err := db.lvl.Delete(deleter.Key(), nil); err != nil {
 			return err
@@ -312,52 +327,78 @@ func (db *nodeDB) expireNodes() error {
 		if field != nodeDBDiscoverRoot {
 			continue
 		}
+
+		var nodeId NodeID
+		var snid SubNetworkID
+
+		snid = SubNetworkID{id[config.NodeIDBytes], id[config.NodeIDBytes+1]}
+		copy(nodeId[0:], id[:config.NodeIDBytes])
+
 		// Skip the node if not expired yet (and not self)
-		if !bytes.Equal(id[:], db.self[:]) {
-			if seen := db.lastPong(id); seen.After(threshold) {
+		if !bytes.Equal(id[2:], db.self[:]) {
+
+			if seen := db.lastPong(snid, nodeId); seen.After(threshold) {
 				continue
 			}
 		}
 		// Otherwise delete all associated information
-		db.deleteNode(id)
+		db.deleteNode(snid, nodeId)
 	}
 	return nil
 }
 
 // lastPing retrieves the time of the last ping packet send to a remote node,
 // requesting binding.
-func (db *nodeDB) lastPing(id NodeID) time.Time {
-	return time.Unix(db.fetchInt64(makeKey(id, nodeDBDiscoverPing)), 0)
+func (db *nodeDB) lastPing(snid SubNetworkID, id NodeID) time.Time {
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+	return time.Unix(db.fetchInt64(makeKey(idEx, nodeDBDiscoverPing)), 0)
 }
 
 // updateLastPing updates the last time we tried contacting a remote node.
-func (db *nodeDB) updateLastPing(id NodeID, instance time.Time) error {
-	return db.storeInt64(makeKey(id, nodeDBDiscoverPing), instance.Unix())
+func (db *nodeDB) updateLastPing(snid SubNetworkID, id NodeID, instance time.Time) error {
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+	return db.storeInt64(makeKey(idEx, nodeDBDiscoverPing), instance.Unix())
 }
 
 // lastPong retrieves the time of the last successful contact from remote node.
-func (db *nodeDB) lastPong(id NodeID) time.Time {
-	return time.Unix(db.fetchInt64(makeKey(id, nodeDBDiscoverPong)), 0)
+func (db *nodeDB) lastPong(snid SubNetworkID, id NodeID) time.Time {
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+	return time.Unix(db.fetchInt64(makeKey(idEx, nodeDBDiscoverPong)), 0)
 }
 
 // updateLastPong updates the last time a remote node successfully contacted.
-func (db *nodeDB) updateLastPong(id NodeID, instance time.Time) error {
-	return db.storeInt64(makeKey(id, nodeDBDiscoverPong), instance.Unix())
+func (db *nodeDB) updateLastPong(snid SubNetworkID, id NodeID, instance time.Time) error {
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+	return db.storeInt64(makeKey(idEx, nodeDBDiscoverPong), instance.Unix())
 }
 
 // findFails retrieves the number of findnode failures since bonding.
-func (db *nodeDB) findFails(id NodeID) int {
-	return int(db.fetchInt64(makeKey(id, nodeDBDiscoverFindFails)))
+func (db *nodeDB) findFails(snid SubNetworkID, id NodeID) int {
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+	return int(db.fetchInt64(makeKey(idEx, nodeDBDiscoverFindFails)))
 }
 
 // updateFindFails updates the number of findnode failures since bonding.
-func (db *nodeDB) updateFindFails(id NodeID, fails int) error {
-	return db.storeInt64(makeKey(id, nodeDBDiscoverFindFails), int64(fails))
+func (db *nodeDB) updateFindFails(snid SubNetworkID, id NodeID, fails int) error {
+	var idEx = []byte{}
+	idEx = append(idEx, id[:]...)
+	idEx = append(idEx, snid[:]...)
+	return db.storeInt64(makeKey(idEx, nodeDBDiscoverFindFails), int64(fails))
 }
 
 // querySeeds retrieves random nodes to be used as potential seed nodes
 // for bootstrapping.
-func (db *nodeDB) querySeeds(n int, maxAge time.Duration) []*Node {
+func (db *nodeDB) querySeeds(snid SubNetworkID, n int, maxAge time.Duration) []*Node {
 	var (
 		now   = time.Now()
 		nodes = make([]*Node, 0, n)
@@ -374,9 +415,14 @@ seek:
 		ctr := id[0]
 		rand.Read(id[:])
 		id[0] = ctr + id[0]%16
-		it.Seek(makeKey(id, nodeDBDiscoverRoot))
 
-		n := nextNode(it)
+		var idEx = []byte{}
+		idEx = append(idEx, id[:]...)
+		idEx = append(idEx, snid[:]...)
+
+		it.Seek(makeKey(idEx, nodeDBDiscoverRoot))
+
+		n, nSnid := nextNode(it)
 		if n == nil {
 			id[0] = 0
 			continue seek // iterator exhausted
@@ -386,15 +432,24 @@ seek:
 		//
 		// if n.ID == db.self {
 		//
-		 if NodeID(n.ID) == db.self {
+
+		if snid != AnySubNet {
+			if *nSnid != snid {
+				continue seek
+			}
+		}
+
+		if n.ID == db.self {
 			continue seek
 		}
+
 		//
 		// Modified: 20180503, yeeco
 		//
 		// if now.Sub(db.lastPong(n.ID)) > maxAge {
 		//
-		if now.Sub(db.lastPong(NodeID(n.ID))) > maxAge {
+
+		if now.Sub(db.lastPong(snid, n.ID)) > maxAge {
 			continue seek
 		}
 		for i := range nodes {
@@ -409,7 +464,7 @@ seek:
 
 // reads the next node record from the iterator, skipping over other
 // database entries.
-func nextNode(it iterator.Iterator) *Node {
+func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 	for end := false; !end; end = !it.Next() {
 		//id, field := splitKey(it.Key())
 		_, field := splitKey(it.Key())
@@ -422,14 +477,15 @@ func nextNode(it iterator.Iterator) *Node {
 		//
 		//if err := rlp.DecodeBytes(it.Value(), &n); err != nil {
 		//
-		if err := DecodeBytes(it.Value(), &n); err != nil {
+		var snid SubNetworkID = AnySubNet
+		if err := DecodeBytes(it.Value(), &n, &snid); err != nil {
 			//log.Warn("Failed to decode node RLP", "id", id, "err", err)
 			log.LogCallerFileLine("nextNode: DecodeBytes failed")
 			continue
 		}
-		return &n
+		return &n, &snid
 	}
-	return nil
+	return nil, nil
 }
 
 // close flushes and closes the database files.
@@ -443,7 +499,7 @@ func (db *nodeDB) close() {
 //
 // Added by yeeco to remove the reference to Ethereum's rlp
 //
-func EncodeToBytes(node *Node) ([]byte, error) {
+func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
 	if node == nil {
 		return nil, nil
 	}
@@ -463,6 +519,7 @@ func EncodeToBytes(node *Node) ([]byte, error) {
 	blob = append(blob, []byte{hb,lb}...)
 
 	blob = append(blob, node.ID[:]...)
+	blob = append(blob, snid[:]...)
 	blob = append(blob, node.sha[:]...)
 
 	return blob, nil
@@ -471,11 +528,16 @@ func EncodeToBytes(node *Node) ([]byte, error) {
 //
 // Added by yeeco to remove the reference to Ethereum's rlp
 //
-func DecodeBytes(blob []byte, node *Node) error {
+func DecodeBytes(blob []byte, node *Node, snid *SubNetworkID) error {
 	node.IP = append(node.IP, blob[0:16]...)
 	node.UDP = uint16((blob[16] << 8) + blob[17])
 	node.TCP = uint16((blob[18] << 8) + blob[19])
 	copy(node.ID[0:], blob[20:20+cap(node.ID)])
-	copy(node.sha[0:], blob[20+cap(node.ID):])
+	if snid != nil {
+		(*snid)[0] = blob[20+cap(node.ID)]
+		(*snid)[1] = blob[20+cap(node.ID)+1]
+	}
+	copy(node.sha[0:], blob[20+cap(node.ID)+2:])
 	return nil
 }
+

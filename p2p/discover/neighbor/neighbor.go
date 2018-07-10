@@ -833,14 +833,31 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	}
 
 	//
-	// send Pong always
+	// send Pong if the sub network identity spcefied is matched
 	//
 
+	matched := false
+
+	for _, snid := range ngbMgr.cfg.SubNetIdList {
+		if snid == ping.SubNetId {
+			matched = true
+			break
+		}
+	}
+
+	if !matched {
+		log.LogCallerFileLine("PingHandler: subnet mismatched")
+		return NgbMgrEnoMismatched
+	}
+
 	pong := um.Pong{
-		From:		ping.To,
-		To:			ping.From,
-		Expiration:	0,
-		Extra:		nil,
+		From:			ping.To,
+		To:				ping.From,
+		FromSubNetId:	ngbMgr.cfg.SubNetIdList,
+		SubNetId:		ping.SubNetId,
+		Id:				uint64(time.Now().UnixNano()),
+		Expiration:		0,
+		Extra:			nil,
 	}
 
 	toAddr := net.UDPAddr {
@@ -883,6 +900,9 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	//
 
 	strPeerNodeId := config.P2pNodeId2HexString(ping.From.NodeId)
+	strSubNetId := config.P2pSubNetId2HexString(ping.SubNetId)
+	strPeerNodeId = strSubNetId + strPeerNodeId
+
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == true {
 
 		log.LogCallerFileLine("PingHandler: " +
@@ -933,6 +953,8 @@ func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
 	//
 
 	strPeerNodeId := config.P2pNodeId2HexString(pong.From.NodeId)
+	strSubNetId := config.P2pSubNetId2HexString(pong.SubNetId)
+	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
 
@@ -1004,7 +1026,14 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	var umNodes = make([]*um.Node, 0)
 
 	local := ngbMgr.localNode()
-	nodes = append(nodes, ngbMgr.tabMgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
+	mgr := ngbMgr.tabMgr.TabGetInstBySubNetId(&findNode.SubNetId)
+
+	if mgr == nil {
+		log.LogCallerFileLine("FindNodeHandler: table manager mismatched")
+		return NgbMgrEnoMismatched
+	}
+
+	nodes = append(nodes, mgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
 
 	cfgNode := config.Node{
 		IP:		ngbMgr.cfg.IP,
@@ -1048,12 +1077,14 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	}
 
 	neighbors := um.Neighbors{
-		From: 		*local,
-		To:			findNode.From,
-		Id:			uint64(time.Now().UnixNano()),
-		Nodes:		umNodes,
-		Expiration:	0,
-		Extra:		nil,
+		From: 			*local,
+		To:				findNode.From,
+		FromSubNetId:	ngbMgr.cfg.SubNetIdList,
+		SubNetId:		findNode.SubNetId,
+		Id:				uint64(time.Now().UnixNano()),
+		Nodes:			umNodes,
+		Expiration:		0,
+		Extra:			nil,
 
 	}
 
@@ -1097,6 +1128,9 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	//
 
 	strPeerNodeId := config.P2pNodeId2HexString(findNode.From.NodeId)
+	strSubNetId := config.P2pSubNetId2HexString(findNode.SubNetId)
+	strPeerNodeId = strSubNetId + strPeerNodeId
+
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
 
 		var schMsg= sch.SchMessage{}
@@ -1138,6 +1172,9 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	}
 
 	strPeerNodeId := config.P2pNodeId2HexString(nbs.From.NodeId)
+	strSubNetId := config.P2pSubNetId2HexString(nbs.SubNetId)
+	strPeerNodeId = strSubNetId + strPeerNodeId
+
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeFindNode) == false {
 
 		log.LogCallerFileLine("NeighborsHandler: " +
@@ -1183,6 +1220,8 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	//
 
 	strPeerNodeId := config.P2pNodeId2HexString(findNode.To.NodeId)
+	strSubNetId := config.P2pSubNetId2HexString(findNode.SubNetId)
+	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) {
 
@@ -1299,6 +1338,8 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	//
 
 	strPeerNodeId := config.P2pNodeId2HexString(ping.To.NodeId)
+	strSubNetId := config.P2pSubNetId2HexString(ping.SubNetId)
+	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) {
 
@@ -1482,10 +1523,11 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 		return sch.SchEnoConfig
 	}
 
-	ngbMgr.cfg.IP	= ptCfg.IP
-	ngbMgr.cfg.UDP	= ptCfg.UDP
-	ngbMgr.cfg.TCP	= ptCfg.TCP
-	ngbMgr.cfg.ID	= ptCfg.ID
+	ngbMgr.cfg.IP			= ptCfg.IP
+	ngbMgr.cfg.UDP			= ptCfg.UDP
+	ngbMgr.cfg.TCP			= ptCfg.TCP
+	ngbMgr.cfg.ID			= ptCfg.ID
+	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
 
 	return sch.SchEnoNone
 }

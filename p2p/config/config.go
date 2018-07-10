@@ -120,6 +120,7 @@ const MaxOutbounds	= MaxPeers / 2
 
 type SubNetworkID [2]byte					// sbu network identity
 const MaxSubNetworks = 32					// max sub networks can a node attached to
+const SubNetIdBytes = 2						// 2 bytes for sub network identity
 var ZeroSubNet = SubNetworkID{0,0}			// zero sub network
 var AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
 
@@ -127,7 +128,6 @@ type Node struct {
 	IP				net.IP			// ip address
 	UDP, TCP		uint16			// port numbers
 	ID				NodeID			// the node's public key
-	Snid			SubNetworkID	// local sub network identity
 }
 
 type Protocol struct {
@@ -177,10 +177,11 @@ type Config struct {
 // Configuration about neighbor manager on UDP
 //
 type Cfg4UdpNgbManager struct {
-	IP		net.IP		// ip address
-	UDP		uint16		// udp port numbers
-	TCP		uint16		// tcp port numbers
-	ID		NodeID		// the node's public key
+	IP				net.IP			// ip address
+	UDP				uint16			// udp port numbers
+	TCP				uint16			// tcp port numbers
+	ID				NodeID			// the node's public key
+	SubNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
 }
 
 //
@@ -272,7 +273,7 @@ const (
 )
 
 var dftLocal = Node {
-	IP:		net.IPv4(192,168,0, 20),
+	IP:		net.IPv4(192,168,2, 123),
 	UDP:	dftUdpPort,
 	TCP:	dftTcpPort,
 	ID:		NodeID{0},
@@ -430,6 +431,13 @@ func P2pGetConfig(name string) *Config {
 // Node identity to hex string
 //
 func P2pNodeId2HexString(id NodeID) string {
+	return fmt.Sprintf("%X", id[:])
+}
+
+//
+// Sub network identity to hex string
+//
+func P2pSubNetId2HexString(id SubNetworkID) string {
 	return fmt.Sprintf("%X", id[:])
 }
 
@@ -723,10 +731,11 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 //
 func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 	return &Cfg4UdpNgbManager {
-		IP:		config[name].Local.IP,
-		UDP:	config[name].Local.UDP,
-		TCP:	config[name].Local.TCP,
-		ID:		config[name].Local.ID,
+		IP:				config[name].Local.IP,
+		UDP:			config[name].Local.UDP,
+		TCP:			config[name].Local.TCP,
+		ID:				config[name].Local.ID,
+		SubNetIdList:	config[name].SubNetIdList,
 	}
 }
 

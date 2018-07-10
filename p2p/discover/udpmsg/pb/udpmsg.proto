@@ -28,6 +28,7 @@ syntax = "proto2";
 package udpmsg.pb;
 
 message UdpMessage {
+
     enum MessageType {
         PING        = 0;
         PONG        = 1;
@@ -40,51 +41,57 @@ message UdpMessage {
     }
 
     message Node {
-        required bytes IP  = 1;
-        required uint32 UDP = 2;
-        required uint32 TCP = 3;
-        required bytes NodeId = 4;
-        required SubNetworkID SubNetId = 5;
+        required bytes  IP      = 1;
+        required uint32 UDP     = 2;
+        required uint32 TCP     = 3;
+        required bytes  NodeId  = 4;
     }
 
     message Ping {
-        required Node From = 1;
-        required Node To = 2;
-        required uint64 Id = 3;
-        optional uint64 Expiration = 4;
-        optional bytes Extra = 5;
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated SubNetworkID   FromSubNetId    = 3;
+        required SubNetworkID   SubNetId        = 4;
+        required uint64         Id              = 5;
+        optional uint64         Expiration      = 6;
+        optional bytes          Extra           = 7;
     }
 
     message Pong {
-        required Node From = 1;
-        required Node To = 2;
-        required uint64 Id = 3;
-        optional uint64 Expiration = 4;
-        optional bytes Extra = 5;
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated SubNetworkID   FromSubNetId    = 3;
+        required SubNetworkID   SubNetId        = 4;
+        required uint64         Id              = 5;
+        optional uint64         Expiration      = 6;
+        optional bytes          Extra           = 7;
     }
 
     message FindNode {
-        required Node From = 1;
-        required Node To = 2;
-        required uint64 Id = 3;
-        required SubNetworkID SubNetId = 4;
-        required bytes Target = 5;
-        optional uint64 Expiration = 6;
-        optional bytes Extra = 7;
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated SubNetworkID   FromSubNetId    = 3;
+        required SubNetworkID   SubNetId        = 5;
+        required bytes          Target          = 6;
+        required uint64         Id              = 4;
+        optional uint64         Expiration      = 7;
+        optional bytes          Extra           = 8;
     }
 
     message Neighbors {
-        required Node From = 1;
-        required Node To = 2;
-        required uint64 Id = 3;
-        repeated Node Nodes = 4;
-        optional uint64 Expiration = 5;
-        optional bytes Extra = 6;
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated SubNetworkID   FromSubNetId    = 3;
+        required SubNetworkID   SubNetId        = 5;
+        repeated Node           Nodes           = 6;
+        required uint64         Id              = 4;
+        optional uint64         Expiration      = 7;
+        optional bytes          Extra           = 8;
     }
 
-    required MessageType msgType = 1;
-    optional Ping ping = 2;
-    optional Pong pong = 3;
-    optional FindNode findNode = 4;
-    optional Neighbors neighbors = 5;
+    required MessageType    msgType     = 1;
+    optional Ping           ping        = 2;
+    optional Pong           pong        = 3;
+    optional FindNode       findNode    = 4;
+    optional Neighbors      neighbors   = 5;
 }

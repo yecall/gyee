@@ -78,13 +78,14 @@ message P2PMessage {
     }
 
     message Handshake {
-        required bytes      NodeId      = 1;    // node identity
-        required bytes      IP          = 2;    // ip address
-        required uint32     UDP         = 3;    // udp port number
-        required uint32     TCP         = 4;    // tcp port number
-        required uint32     ProtoNum    = 5;    // number of protocols
-        repeated Protocol   Protocols   = 6;    // protocol table
-        optional bytes      Extra       = 7;    // extra info, reserved
+        required bytes      SubNetId    = 1;    // sub network identity
+        required bytes      NodeId      = 2;    // node identity
+        required bytes      IP          = 3;    // ip address
+        required uint32     UDP         = 4;    // udp port number
+        required uint32     TCP         = 5;    // tcp port number
+        required uint32     ProtoNum    = 6;    // number of protocols
+        repeated Protocol   Protocols   = 7;    // protocol table
+        optional bytes      Extra       = 8;    // extra info, reserved
     }
 
     message Ping {

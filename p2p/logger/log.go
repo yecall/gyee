@@ -36,7 +36,7 @@ var (
 )
 
 func init() {
-	Log_DisableFileLine = true
+	Log_DisableFileLine = false
 }
 
 //

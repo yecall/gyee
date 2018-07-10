@@ -56,7 +56,6 @@ type (
 		IP			net.IP			// ip address
 		UDP, TCP	uint16			// udp port number
 		NodeId		config.NodeID	// node identity
-		SubNetId	SubNetworkID	// sub network identity
 	}
 
 	//
@@ -66,41 +65,48 @@ type (
 
 	// Ping
 	Ping struct {
-		From		Node		// source node
-		To			Node		// destination node
-		Id			uint64		// message identity
-		Expiration	uint64		// time to expired of this message
-		Extra		[]byte		// extra info
+		From			Node			// source node
+		To				Node			// destination node
+		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
+		SubNetId		SubNetworkID	// sub network identity
+		Id				uint64			// message identity
+		Expiration		uint64			// time to expired of this message
+		Extra			[]byte			// extra info
 	}
 
 	// Pong: response to Ping
 	Pong struct {
-		From		Node		// source node
-		To			Node		// destination node
-		Id			uint64		// message identity
-		Expiration	uint64		// time to expired of this message
-		Extra		[]byte		// extra info
+		From			Node			// source node
+		To				Node			// destination node
+		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
+		SubNetId		SubNetworkID	// sub network identity
+		Id				uint64			// message identity
+		Expiration		uint64			// time to expired of this message
+		Extra			[]byte			// extra info
 	}
 
 	// FindNode: request the endpoint of the target
 	FindNode struct {
-		From		Node			// source node
-		To			Node			// destination node
-		SubNetId	SubNetworkID	// sub network identity
-		Target		config.NodeID	// target node identity
-		Id			uint64			// message identity
-		Expiration	uint64			// time to expired of this message
-		Extra		[]byte			// extra info
+		From			Node			// source node
+		To				Node			// destination node
+		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
+		SubNetId		SubNetworkID	// sub network identity
+		Target			config.NodeID	// target node identity
+		Id				uint64			// message identity
+		Expiration		uint64			// time to expired of this message
+		Extra			[]byte			// extra info
 	}
 
 	// Neighbors: response to FindNode
 	Neighbors struct {
-		From		Node		// source node
-		To			Node		// destination node
-		Id			uint64		// message identity
-		Nodes		[]*Node		// neighbor nodes
-		Expiration	uint64		// time to expired of this message
-		Extra		[]byte		// extra info
+		From			Node			// source node
+		To				Node			// destination node
+		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
+		SubNetId		SubNetworkID	// sub network identity
+		Nodes			[]*Node			// neighbor nodes
+		Id				uint64			// message identity
+		Expiration		uint64			// time to expired of this message
+		Extra			[]byte			// extra info
 	}
 )
 
@@ -281,6 +287,14 @@ func (pum *UdpMsg) GetPing() interface{} {
 	ping.To.UDP = uint16(*pbPing.To.UDP)
 	copy(ping.To.NodeId[:], pbPing.To.NodeId)
 
+	for _, snid := range pbPing.FromSubNetId {
+		var id SubNetworkID
+		copy(id[0:], snid.Id[:])
+		ping.FromSubNetId = append(ping.FromSubNetId, id)
+	}
+
+	copy(ping.SubNetId[0:], pbPing.SubNetId.Id[:])
+
 	ping.Id = *pbPing.Id
 	ping.Expiration = *pbPing.Expiration
 	ping.Extra = append(ping.Extra, pbPing.Extra...)
@@ -306,6 +320,14 @@ func (pum *UdpMsg) GetPong() interface{} {
 	pong.To.UDP = uint16(*pbPong.To.UDP)
 	copy(pong.To.NodeId[:], pbPong.To.NodeId)
 
+	for _, snid := range pbPong.FromSubNetId {
+		var id SubNetworkID
+		copy(id[0:], snid.Id[:])
+		pong.FromSubNetId = append(pong.FromSubNetId, id)
+	}
+
+	copy(pong.SubNetId[0:], pbPong.SubNetId.Id[:])
+
 	pong.Id = *pbPong.Id
 	pong.Expiration = *pbPong.Expiration
 	pong.Extra = append(pong.Extra, pbPong.Extra...)
@@ -330,6 +352,14 @@ func (pum *UdpMsg) GetFindNode() interface{} {
 	fn.To.TCP = uint16(*pbFN.To.TCP)
 	fn.To.UDP = uint16(*pbFN.To.UDP)
 	copy(fn.To.NodeId[:], pbFN.To.NodeId)
+
+	for _, snid := range pbFN.FromSubNetId {
+		var id SubNetworkID
+		copy(id[0:], snid.Id[:])
+		fn.FromSubNetId = append(fn.FromSubNetId, id)
+	}
+
+	copy(fn.SubNetId[0:], pbFN.SubNetId.Id[:])
 
 	copy(fn.Target[:], pbFN.Target)
 
@@ -507,6 +537,16 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 	*pbPing.To.UDP = uint32(ping.To.UDP)
 	pbPing.To.NodeId = append(pbPing.To.NodeId, ping.To.NodeId[:]...)
 
+	for _, snid := range ping.FromSubNetId {
+		pbSnid := new(pb.UdpMessage_SubNetworkID)
+		pbSnid.Id = append(pbSnid.Id, snid[:]...)
+		pbPing.FromSubNetId = append(pbPing.FromSubNetId, pbSnid)
+	}
+
+	subNetId := new(pb.UdpMessage_SubNetworkID)
+	subNetId.Id = append(subNetId.Id, ping.SubNetId[:]...)
+	pbPing.SubNetId = subNetId
+
 	pbPing.Id = new(uint64)
 	*pbPing.Id = ping.Id
 
@@ -566,6 +606,16 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 	*pbPong.To.UDP = uint32(pong.To.UDP)
 	pbPong.To.NodeId = append(pbPong.To.NodeId, pong.To.NodeId[:]...)
 
+	for _, snid := range pong.FromSubNetId {
+		pbSnid := new(pb.UdpMessage_SubNetworkID)
+		pbSnid.Id = append(pbSnid.Id, snid[:]...)
+		pbPong.FromSubNetId = append(pbPong.FromSubNetId, pbSnid)
+	}
+
+	subNetId := new(pb.UdpMessage_SubNetworkID)
+	subNetId.Id = append(subNetId.Id, pong.SubNetId[:]...)
+	pbPong.SubNetId = subNetId
+
 	pbPong.Id = new(uint64)
 	*pbPong.Id = pong.Id
 
@@ -617,8 +667,13 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 			XXX_unrecognized:	make([]byte,0),
 		},
 
-		Id:					new(uint64),
+		FromSubNetId: make([]*pb.UdpMessage_SubNetworkID, 0),
+		SubNetId: &pb.UdpMessage_SubNetworkID {
+			Id: make([]byte, 0),
+		},
+
 		Target:				make([]byte, 0),
+		Id:					new(uint64),
 		Expiration:			new(uint64),
 		Extra:				make([]byte, 0),
 		XXX_unrecognized:	make([]byte, 0),
@@ -640,11 +695,21 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 	*pbFN.To.TCP = uint32(fn.To.TCP)
 	*pbFN.To.UDP = uint32(fn.To.UDP)
 	pbFN.To.NodeId = append(pbFN.To.NodeId, fn.To.NodeId[:]...)
+
+	for _, snid := range fn.FromSubNetId {
+		pbSnid := new(pb.UdpMessage_SubNetworkID)
+		pbSnid.Id = append(pbSnid.Id, snid[:]...)
+		pbFN.FromSubNetId = append(pbFN.FromSubNetId, pbSnid)
+	}
+
+	subNetId := new(pb.UdpMessage_SubNetworkID)
+	subNetId.Id = append(subNetId.Id, fn.SubNetId[:]...)
+	pbFN.SubNetId = subNetId
+
 	pbFN.Target = append(pbFN.Target, fn.Target[:]...)
 
 	*pbFN.Id = fn.Id
 	*pbFN.Expiration = fn.Expiration
-
 	pbFN.Extra = append(pbFN.Extra, fn.Extra...)
 
 	var err error
@@ -696,6 +761,16 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	*pbNgb.To.TCP = uint32(ngb.To.TCP)
 	*pbNgb.To.UDP = uint32(ngb.To.UDP)
 	pbNgb.To.NodeId = append(pbNgb.To.NodeId, ngb.To.NodeId[:]...)
+
+	for _, snid := range ngb.FromSubNetId {
+		pbSnid := new(pb.UdpMessage_SubNetworkID)
+		pbSnid.Id = append(pbSnid.Id, snid[:]...)
+		pbNgb.FromSubNetId = append(pbNgb.FromSubNetId, pbSnid)
+	}
+
+	subNetId := new(pb.UdpMessage_SubNetworkID)
+	subNetId.Id = append(subNetId.Id, ngb.SubNetId[:]...)
+	pbNgb.SubNetId = subNetId
 
 	pbNgb.Id = new(uint64)
 	*pbNgb.Id = ngb.Id
