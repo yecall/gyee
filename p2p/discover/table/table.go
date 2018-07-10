@@ -233,7 +233,7 @@ type TableManager struct {
 
 	networkType		int								// network type
 	snid			SubNetworkID					// sub network identity
-	subNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
+	SubNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
 }
 
 //
@@ -263,7 +263,7 @@ func NewTabMgr() *TableManager {
 
 		networkType:	p2pTypeDynamic,
 		snid:			AnySubNet,
-		subNetMgrList:	map[SubNetworkID]*TableManager{},
+		SubNetMgrList:	map[SubNetworkID]*TableManager{},
 	}
 
 	tabMgr.tep = tabMgr.tabMgrProc
@@ -434,7 +434,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 		tabMgr.buckets[loop] = b
 		b.nodes = make([]*bucketEntry, 0, bucketSize)
 	}
-	tabMgr.subNetMgrList[tabMgr.snid] = tabMgr
+	tabMgr.SubNetMgrList[tabMgr.snid] = tabMgr
 
 	if len(tabMgr.cfg.subNetIdList) > 0 {
 		if eno = tabMgr.setupSubNetTabMgr(); eno != TabMgrEnoNone {
@@ -452,7 +452,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 		cycle = autoBsnRefreshCycle
 	}
 
-	for _, mgr := range tabMgr.subNetMgrList {
+	for _, mgr := range tabMgr.SubNetMgrList {
 
 		if eno = mgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
 			log.LogCallerFileLine("tabMgrPoweron: tabStartTimer failed, eno: %d", eno)
@@ -489,7 +489,7 @@ func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 		mgr.dlkTab			= make([]int, 256)
 
 		mgr.snid = snid
-		tabMgr.subNetMgrList[snid] = mgr
+		tabMgr.SubNetMgrList[snid] = mgr
 
 		for loop := 0; loop < cap(mgr.buckets); loop++ {
 			b := new(bucket)
@@ -532,7 +532,7 @@ func (tabMgr *TableManager)tabMgrRefreshTimerHandler(snid *SubNetworkID)TabMgrEr
 		return TabMgrEnoParameter
 	}
 
-	if mgr, ok := tabMgr.subNetMgrList[*snid]; ok {
+	if mgr, ok := tabMgr.SubNetMgrList[*snid]; ok {
 		return mgr.tabRefresh(snid, nil)
 	}
 
@@ -550,7 +550,7 @@ func (tabMgr *TableManager)tabMgrPingpongTimerHandler(inst *instCtrlBlock) TabMg
 		return TabMgrEnoParameter
 	}
 
-	mgr, ok := tabMgr.subNetMgrList[inst.snid]
+	mgr, ok := tabMgr.SubNetMgrList[inst.snid]
 
 	if !ok {
 		log.LogCallerFileLine("tabMgrPingpongTimerHandler: invalid subnet: %x", inst.snid)
@@ -597,7 +597,7 @@ func (tabMgr *TableManager)tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabMg
 		return TabMgrEnoParameter
 	}
 
-	mgr, ok := tabMgr.subNetMgrList[inst.snid]
+	mgr, ok := tabMgr.SubNetMgrList[inst.snid]
 
 	if !ok {
 		log.LogCallerFileLine("tabMgrFindNodeTimerHandler: invalid subnet: %x", inst.snid)
@@ -665,7 +665,7 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 	}
 
 	snid := msg.FindNode.SubNetId
-	mgr, ok := tabMgr.subNetMgrList[snid]
+	mgr, ok := tabMgr.SubNetMgrList[snid]
 
 	if !ok {
 		return TabMgrEnoNotFound
@@ -811,7 +811,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	}
 
 	snid := msg.Ping.SubNetId
-	mgr, ok := tabMgr.subNetMgrList[snid]
+	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
 		return TabMgrEnoNotFound
 	}
@@ -961,7 +961,7 @@ func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 	}
 
 	snid := ping.SubNetId
-	mgr, ok := tabMgr.subNetMgrList[snid]
+	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
 		return TabMgrEnoNotFound
 	}
@@ -1014,7 +1014,7 @@ func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 	}
 
 	snid := pong.SubNetId
-	mgr, ok := tabMgr.subNetMgrList[snid]
+	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
 		return TabMgrEnoNotFound
 	}
@@ -1067,7 +1067,7 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 	}
 
 	snid := findNode.SubNetId
-	mgr, ok := tabMgr.subNetMgrList[snid]
+	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
 		return TabMgrEnoNotFound
 	}
@@ -2991,5 +2991,5 @@ func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
 // Get manager instance by sub network identity
 //
 func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManager {
-	return tabMgr.subNetMgrList[*snid]
+	return tabMgr.SubNetMgrList[*snid]
 }

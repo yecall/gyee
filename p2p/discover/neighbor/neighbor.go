@@ -1026,14 +1026,41 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	var umNodes = make([]*um.Node, 0)
 
 	local := ngbMgr.localNode()
-	mgr := ngbMgr.tabMgr.TabGetInstBySubNetId(&findNode.SubNetId)
 
-	if mgr == nil {
-		log.LogCallerFileLine("FindNodeHandler: table manager mismatched")
-		return NgbMgrEnoMismatched
+	if findNode.SubNetId != config.AnySubNet {
+
+		mgr := ngbMgr.tabMgr.TabGetInstBySubNetId(&findNode.SubNetId)
+
+		if mgr == nil {
+
+			log.LogCallerFileLine("FindNodeHandler: table manager mismatched")
+			return NgbMgrEnoMismatched
+		}
+
+		nodes = append(nodes, mgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
+
+	} else {
+
+		var nodeMap = make(map[tab.NodeID]*tab.Node, 0)
+		var mgr *tab.TableManager
+
+		for _, mgr = range ngbMgr.tabMgr.SubNetMgrList {
+
+			if mgr == nil {
+				continue
+			}
+
+			ns := mgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)
+
+			for _, n := range ns {
+				nodeMap[n.ID] = n
+			}
+		}
+
+		for _, n := range nodeMap {
+			nodes = append(nodes, n)
+		}
 	}
-
-	nodes = append(nodes, mgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
 
 	cfgNode := config.Node{
 		IP:		ngbMgr.cfg.IP,
