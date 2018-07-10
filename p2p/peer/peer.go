@@ -328,6 +328,13 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.staticsStatus[sn.ID] = peerIdle
 	}
 
+	if len(peMgr.cfg.subNetIdList) == 0 && peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+		peMgr.cfg.subNetIdList = append(peMgr.cfg.subNetIdList, config.AnySubNet)
+		peMgr.cfg.subNetMaxPeers[config.AnySubNet] = config.MaxPeers
+		peMgr.cfg.subNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
+		peMgr.cfg.subNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
+	}
+
 	for _, snid := range peMgr.cfg.subNetIdList {
 		peMgr.nodes[snid] = make(map[config.NodeID]*peerInstance)
 		peMgr.workers[snid] = make(map[config.NodeID]*peerInstance)
@@ -674,15 +681,21 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 		return PeMgrEnoNone
 	}
 
+	//
+	// if sub network identity is not specified, try start all
+	//
+
 	if snid == nil {
 
 		if eno := peMgr.peMgrStaticSubNetOutbound(); eno != PeMgrEnoNone {
 			return eno
 		}
 
-		for _, snid := range peMgr.cfg.subNetIdList {
-			if eno := peMgr.peMgrDynamicSubNetOutbound(&snid); eno != PeMgrEnoNone {
-				return eno
+		if peMgr.cfg.networkType != config.P2pNewworkTypeStatic {
+			for _, snid := range peMgr.cfg.subNetIdList {
+				if eno := peMgr.peMgrDynamicSubNetOutbound(&snid); eno != PeMgrEnoNone {
+					return eno
+				}
 			}
 		}
 
@@ -692,20 +705,25 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 
 	} else {
 
-		for _, snid := range peMgr.cfg.subNetIdList {
-			if eno := peMgr.peMgrDynamicSubNetOutbound(&snid); eno != PeMgrEnoNone {
-				return eno
-			}
+		if peMgr.subNetIdExist(snid) == true {
+			return peMgr.peMgrDynamicSubNetOutbound(snid)
 		}
+
+		return PeMgrEnoNotfound
 	}
 
-	return PeMgrEnoUnknown
+	return PeMgrEnoConfig
 }
 
 //
 // static outbound
 //
 func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
+
+	if len(peMgr.cfg.staticNodes) == 0 {
+		log.LogCallerFileLine("peMgrStaticSubNetOutbound: none of static nodes exist")
+		return PeMgrEnoNone
+	}
 
 	snid := peMgr.cfg.staticSubNetId
 	if peMgr.wrkNum[snid] >= peMgr.cfg.staticMaxPeers {
@@ -3064,3 +3082,13 @@ func (peMgr *PeerManager)updateStaticStatus(snid SubNetworkID, id config.NodeID,
 	}
 }
 
+//
+// Check if we have sub network identity as "snid"
+//
+func (peMgr *PeerManager)subNetIdExist(snid *SubNetworkID) bool {
+	for _, id := range peMgr.cfg.subNetIdList {
+		if id == *snid {}
+		return true
+	}
+	return false
+}

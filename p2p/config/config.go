@@ -279,27 +279,6 @@ var dftLocal = Node {
 	ID:		NodeID{0},
 }
 
-var defaultConfig = Config {
-	NetworkType:			P2pNewworkTypeDynamic,
-	Name:					dftName,
-	Version:				dftVersion,
-	PrivateKey:				nil,
-	PublicKey:				nil,
-	StaticMaxPeers:			MaxPeers,
-	StaticMaxInbounds:		MaxInbounds,
-	StaticMaxOutbounds:		MaxOutbounds,
-	BootstrapNodes:			BootstrapNodes,
-	StaticNodes:			nil,
-	StaticNetId:			ZeroSubNet,
-	NodeDataDir:			P2pDefaultDataDir(true),
-	NodeDatabase:			datadirNodeDatabase,
-	NoDial:					false,
-	NoAccept:				false,
-	BootstrapNode:			false,
-	Local:					dftLocal,
-	ProtoNum:				1,
-	Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
-}
 
 //
 // Multiple configurations each identified by its' name
@@ -310,6 +289,33 @@ var config = make(map[string] *Config)
 // Get default config
 //
 func P2pDefaultConfig() *Config {
+
+	var defaultConfig = Config {
+		NetworkType:			P2pNewworkTypeDynamic,
+		Name:					dftName,
+		Version:				dftVersion,
+		PrivateKey:				nil,
+		PublicKey:				nil,
+		StaticMaxPeers:			MaxPeers,
+		StaticMaxInbounds:		MaxInbounds,
+		StaticMaxOutbounds:		MaxOutbounds,
+		BootstrapNodes:			BootstrapNodes,
+		StaticNodes:			nil,
+		StaticNetId:			ZeroSubNet,
+		NodeDataDir:			P2pDefaultDataDir(true),
+		NodeDatabase:			datadirNodeDatabase,
+		NoDial:					false,
+		NoAccept:				false,
+		BootstrapNode:			false,
+		Local:					dftLocal,
+		ProtoNum:				1,
+		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
+		SubNetMaxPeers:			map[SubNetworkID]int{},
+		SubNetMaxOutbounds:		map[SubNetworkID]int{},
+		SubNetMaxInBounds:		map[SubNetworkID]int{},
+		SubNetIdList:			[]SubNetworkID{},
+	}
+
 	return &defaultConfig
 }
 
