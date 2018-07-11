@@ -692,8 +692,8 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 		}
 
 		if peMgr.cfg.networkType != config.P2pNewworkTypeStatic {
-			for _, snid := range peMgr.cfg.subNetIdList {
-				if eno := peMgr.peMgrDynamicSubNetOutbound(&snid); eno != PeMgrEnoNone {
+			for _, id := range peMgr.cfg.subNetIdList {
+				if eno := peMgr.peMgrDynamicSubNetOutbound(&id); eno != PeMgrEnoNone {
 					return eno
 				}
 			}
@@ -887,7 +887,7 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	// If outbounds are not enougth, ask discover to find more
 	//
 
-	if peMgr.obpNum[*snid] < peMgr.cfg.staticMaxOutbounds {
+	if peMgr.obpNum[*snid] < peMgr.cfg.subNetMaxOutbounds[*snid] {
 
 		if eno := peMgr.peMgrAsk4More(snid); eno != PeMgrEnoNone {
 

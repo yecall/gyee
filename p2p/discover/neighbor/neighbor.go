@@ -1076,7 +1076,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		}
 	}
 
-	if len(nodes) == 0 {
+	if len(nodes) == 0 && findNode.SubNetId == config.AnySubNet {
 
 		nodes = append(nodes, tab.TabBuildNode(&cfgNode))
 

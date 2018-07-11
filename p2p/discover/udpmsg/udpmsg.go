@@ -388,6 +388,14 @@ func (pum *UdpMsg) GetNeighbors() interface{} {
 	ngb.To.UDP = uint16(*pbNgb.To.UDP)
 	copy(ngb.To.NodeId[:], pbNgb.To.NodeId)
 
+	for _, snid := range pbNgb.FromSubNetId {
+		var id SubNetworkID
+		copy(id[0:], snid.Id[:])
+		ngb.FromSubNetId = append(ngb.FromSubNetId, id)
+	}
+
+	copy(ngb.SubNetId[0:], pbNgb.SubNetId.Id[:])
+
 	ngb.Id = *pbNgb.Id
 	ngb.Expiration = *pbNgb.Expiration
 	ngb.Extra = append(ngb.Extra, pbNgb.Extra...)
