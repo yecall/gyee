@@ -1694,7 +1694,6 @@ type peerInstance struct {
 	rxEno		PeMgrErrno					// rx errno
 	txEno		PeMgrErrno					// tx errno
 	ppEno		PeMgrErrno					// pingpong errno
-	tcpmsgLock	sync.Mutex					// lock for write to peer connection
 }
 
 //
