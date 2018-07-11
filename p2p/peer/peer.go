@@ -2580,7 +2580,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 
 	for _, pid := range pkg.IdList {
 
-		if inst = peMgr.workers[pkg.SubNetId][config.NodeID(pid)]; inst == nil {
+		if inst = peMgr.workers[pkg.SubNetId][pid]; inst == nil {
 
 			log.LogCallerFileLine("SendPackage: " +
 				"instance not exist, id: %s",

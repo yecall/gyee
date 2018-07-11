@@ -30,7 +30,7 @@ import (
 	"github.com/yeeco/gyee/p2p/shell"
 	"github.com/yeeco/gyee/p2p/peer"
 	config	"github.com/yeeco/gyee/p2p/config"
-	log	"github.com/yeeco/gyee/p2p/logger"
+	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -57,12 +57,17 @@ var (
 //
 // Done signal for Tx routines
 //
-var doneMap = make(map[*sch.Scheduler]map[peer.PeerId]chan bool)
+type peerIdEx struct {
+	subNetId	peer.SubNetworkID
+	nodeId		peer.PeerId
+}
+
+var doneMap = make(map[*sch.Scheduler]map[peerIdEx]chan bool)
 
 //
 // Tx routine
 //
-func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
+func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 
 	//
 	// This demo simply apply timer with 1s cycle and then sends a string
@@ -70,10 +75,16 @@ func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 	// task is done. See bellow pls.
 	//
 
-	if _, dup := doneMap[p2pInst][id]; dup == true {
+	idEx := peerIdEx {
+		subNetId:	snid,
+		nodeId:		id,
+	}
+
+	if _, dup := doneMap[p2pInst][idEx]; dup == true {
 
 		log.LogCallerFileLine("txProc: " +
-			"duplicated, id: %s",
+			"duplicated, subnet: %s, id: %s",
+			fmt.Sprintf("%x", snid),
 			fmt.Sprintf("%X", id))
 
 		return
@@ -82,8 +93,8 @@ func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 	seq := 0
 
 	done := make(chan bool, 1)
-	idMap := make(map[peer.PeerId]chan bool)
-	idMap[id] = done
+	idMap := make(map[peerIdEx]chan bool)
+	idMap[idEx] = done
 	doneMap[p2pInst] = idMap
 
 	pkg := peer.P2pPackage2Peer {
@@ -109,21 +120,23 @@ func txProc(p2pInst *sch.Scheduler, id peer.PeerId) {
 		for id := range doneMap[p2pInst] {
 
 			txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
-				"from: %s\n"+
-				"to: %s\n",
+				"to: subnet: %s\n, id: %s\n",
 				seq,
-				fmt.Sprintf("%X", p2pInst2Cfg[p2pInst].Local.ID),
+				fmt.Sprintf("%x", snid),
 				fmt.Sprintf("%X", id))
 
-			pkg.IdList[0] = id
+			pkg.SubNetId = id.subNetId
+			pkg.IdList[0] = id.nodeId
 			pkg.Payload = []byte(txString)
 			pkg.PayloadLength = len(pkg.Payload)
 
 			if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
+
 				log.LogCallerFileLine("txProc: "+
-					"send package failed, eno: %d, id: %s",
+					"send package failed, eno: %d, subnet: %s, id: %s",
 					eno,
-					fmt.Sprintf("%X", p2pInst2Cfg[p2pInst].Local.ID))
+					fmt.Sprintf("%x", snid),
+					fmt.Sprintf("%X", id))
 			}
 		}
 	}
@@ -141,8 +154,10 @@ txLoop:
 
 			if isDone {
 				log.LogCallerFileLine("txProc: "+
-					"it's done, isDone: %s",
-					fmt.Sprintf("%t", isDone))
+					"it's done, isDone: %s, subnet: %s, id: %s",
+					fmt.Sprintf("%t", isDone),
+					fmt.Sprintf("%x", snid),
+					fmt.Sprintf("%X", id))
 				break txLoop
 			}
 
@@ -155,13 +170,14 @@ txLoop:
 	}
 
 	close(done)
-	delete(doneMap[p2pInst], id)
+	delete(doneMap[p2pInst], idEx)
 	if len(doneMap[p2pInst]) == 0 {
 		delete(doneMap, p2pInst)
 	}
 
 	log.LogCallerFileLine("txProc: " +
-		"exit, id: %s",
+		"exit, subnet: %s, id: %s",
+		fmt.Sprintf("%x", snid),
 		fmt.Sprintf("%X", id))
 }
 
@@ -199,7 +215,10 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		}
 
 		p2pInst := sch.SchGetScheduler(pap.Ptn)
-		go txProc(p2pInst, peer.PeerId(pap.PeerInfo.NodeId))
+		snid := pap.PeerInfo.Snid
+		peerId := pap.PeerInfo.NodeId
+
+		go txProc(p2pInst, snid, peerId)
 
 	case shell.P2pIndConnStatus:
 
@@ -225,13 +244,13 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			log.LogCallerFileLine("p2pIndProc: " +
 				"status: %d, close peer: %s",
 				psp.Status,
-				fmt.Sprintf("%X", psp.PeerInfo.NodeId	))
+				fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
 
 			if psp.Flag == false {
 
 				log.LogCallerFileLine("p2pIndProc: " +
 					"try to close the instance, peer: %s",
-					fmt.Sprintf("%X", (*peer.PeerId)(&psp.PeerInfo.NodeId)))
+					fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
 
 				if eno := shell.P2pClosePeer(p2pInst, &psp.PeerInfo.Snid, &psp.PeerInfo.NodeId);
 					eno != shell.P2pEnoNone {
@@ -239,7 +258,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 					log.LogCallerFileLine("p2pIndProc: "+
 						"P2pClosePeer failed, eno: %d, peer: %s",
 						eno,
-						fmt.Sprintf("%X", psp.PeerInfo.NodeId))
+						fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
 				}
 			}
 		}
@@ -258,14 +277,15 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			"P2pIndPeerClosed, para: %s",
 			fmt.Sprintf("%+v", *pcp))
 
-
-		if done, ok := doneMap[p2pInst][pcp.PeerId]; ok && done != nil {
+		idEx := peerIdEx{subNetId:pcp.Snid, nodeId:pcp.PeerId}
+		if done, ok := doneMap[p2pInst][idEx]; ok && done != nil {
 			done<-true
 			break
 		}
 
 		log.LogCallerFileLine("p2pIndProc: " +
-			"done failed, id: %s",
+			"done failed, subnet: %s, id: %s",
+			fmt.Sprintf("%x", pcp.Snid),
 			fmt.Sprintf("%X", pcp.PeerId))
 
 
@@ -290,7 +310,8 @@ func p2pPkgProc(pkg *peer.P2pPackage4Callback) interface{} {
 	//
 
 	log.LogCallerFileLine("p2pPkgProc: " +
-		"peer: %s, payload length: %d",
+		"subnet: %s, peer: %s, payload length: %d",
+		fmt.Sprintf("%x", pkg.PeerInfo.Snid),
 		fmt.Sprintf("%X", pkg.PeerInfo.NodeId),
 		pkg.PayloadLength)
 
