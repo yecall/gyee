@@ -1289,7 +1289,8 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 		para := P2pIndPeerClosedPara {
 			Ptn:		peMgr.ptnMe,
-			PeerId:		PeerId(cfm.peNode.ID),
+			Snid:		cfm.snid,
+			PeerId:		cfm.peNode.ID,
 		}
 
 		peMgr.P2pIndHandler(P2pIndPeerClosed, &para)
@@ -1348,7 +1349,9 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	if peMgr.P2pIndHandler != nil {
 
 		para := P2pIndPeerClosedPara {
-			PeerId:		PeerId(ind.peNode.ID),
+			Ptn:		peMgr.ptnMe,
+			Snid:		ind.snid,
+			PeerId:		ind.peNode.ID,
 		}
 
 		peMgr.P2pIndHandler(P2pIndPeerClosed, &para)
@@ -2057,6 +2060,7 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 			para := P2pIndConnStatusPara {
 				Ptn:		inst.ptnMe,
 				PeerInfo:	&Handshake {
+					Snid:		inst.snid,
 					NodeId:		inst.node.ID,
 					ProtoNum:	inst.protoNum,
 					Protocols:	inst.protocols,
@@ -2161,6 +2165,7 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 
 	var req = MsgCloseCfm {
 		result: PeMgrEnoNone,
+		snid:	inst.snid,
 		peNode:	&node,
 		ptn:	inst.ptnMe,
 	}
@@ -2233,6 +2238,7 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 		para := P2pIndPeerActivatedPara {
 			Ptn: inst.ptnMe,
 			PeerInfo: & Handshake {
+				Snid:		inst.snid,
 				NodeId:		inst.node.ID,
 				ProtoNum:	inst.protoNum,
 				Protocols:	inst.protocols,
@@ -2311,6 +2317,7 @@ func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 			para := P2pIndConnStatusPara {
 				Ptn:		inst.ptnMe,
 				PeerInfo:	&Handshake {
+					Snid:		inst.snid,
 					NodeId:		inst.node.ID,
 					ProtoNum:	inst.protoNum,
 					Protocols:	inst.protocols,
@@ -2743,6 +2750,7 @@ txBreak:
 				if inst.peMgr.P2pIndHandler != nil {
 
 					hs := Handshake {
+						Snid:		inst.snid,
 						NodeId:		inst.node.ID,
 						ProtoNum:	inst.protoNum,
 						Protocols:	inst.protocols,
@@ -2842,6 +2850,7 @@ rxBreak:
 			if inst.peMgr.P2pIndHandler != nil {
 
 				hs := Handshake {
+					Snid:		inst.snid,
 					NodeId:		inst.node.ID,
 					ProtoNum:	inst.protoNum,
 					Protocols:	inst.protocols,
