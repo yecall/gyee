@@ -97,6 +97,7 @@ type MsgTabRefreshReq struct {
 // EvTabRefreshRsp
 //
 type MsgTabRefreshRsp struct {
+	Snid	config.SubNetworkID	// sub network identity
 	Nodes	[]*config.Node		// nodes found
 }
 

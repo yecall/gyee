@@ -222,8 +222,10 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 	//
 
 	var schMsg = sch.SchMessage{}
-	var r = sch.MsgDcvFindNodeRsp{}
-	r.Nodes = rsp.Nodes
+	var r = sch.MsgDcvFindNodeRsp{
+		Snid:	rsp.Snid,
+		Nodes:	rsp.Nodes,
+	}
 
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r)
 	dcvMgr.sdl.SchSendMessage(&schMsg)

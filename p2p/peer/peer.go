@@ -468,10 +468,14 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	var rsp = msg.(*sch.MsgDcvFindNodeRsp)
+	if peMgr.subNetIdExist(&rsp.Snid) != true {
+		log.LogCallerFileLine("peMgrDcvFindNodeRsp: subnet not exist")
+		return PeMgrEnoNotfound
+	}
+
+	var snid = rsp.Snid
 	var appended = make(map[SubNetworkID]int, 0)
 	var dup bool
-
-	snid := rsp.Snid
 
 	for _, n := range rsp.Nodes {
 

@@ -2822,6 +2822,7 @@ func (tabMgr *TableManager)tabDiscoverResp(node *um.Node) TabMgrErrno {
 	}
 
 	var rsp = sch.MsgTabRefreshRsp {
+		Snid:	tabMgr.snid,
 		Nodes: []*config.Node {
 			&config.Node {
 				IP:		node.IP,
