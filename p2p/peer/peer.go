@@ -1683,7 +1683,7 @@ type peerInstance struct {
 	maxPkgSize	int							// max size of tcpmsg package
 	ppTid		int							// pingpong timer identity
 	p2pkgLock	sync.Mutex					// lock for p2p package tx-sync
-	p2pkgRx		P2pPkgCallback			// incoming p2p package callback
+	p2pkgRx		P2pPkgCallback				// incoming p2p package callback
 	p2pkgTx		[]*P2pPackage				// outcoming p2p packages
 	txDone		chan PeMgrErrno				// TX chan
 	txExit		chan PeMgrErrno				// TX had been done
@@ -2702,7 +2702,6 @@ txBreak:
 		//
 
 		if inst.txEno != PeMgrEnoNone {
-			log.LogCallerFileLine("piTx: txEno: %d", inst.txEno)
 			time.Sleep(time.Microsecond * 100)
 			continue
 		}
@@ -2723,9 +2722,11 @@ txBreak:
 			//
 
 			log.LogCallerFileLine("piTx: " +
-				"send package, Pid: %d, PayloadLength: %d",
+				"send package, Pid: %d, PayloadLength: %d, subnet: %s, peer: %s",
 				upkg.Pid,
-				upkg.PayloadLength)
+				upkg.PayloadLength,
+				fmt.Sprintf("%x", inst.snid),
+				fmt.Sprintf("%X", inst.node.ID))
 
 			if eno := upkg.SendPackage(inst); eno != PeMgrEnoNone {
 
@@ -2875,10 +2876,6 @@ rxBreak:
 			continue
 		}
 
-		log.LogCallerFileLine("piRx: " +
-			"package got, Pid: %d, PayloadLength: %d",
-			upkg.Pid, upkg.PayloadLength)
-
 		//
 		// check the package received to filter out those not for p2p internal only
 		//
@@ -2904,6 +2901,7 @@ rxBreak:
 			if inst.p2pkgRx != nil {
 
 				peerInfo.Protocols	= nil
+				peerInfo.Snid		= inst.snid
 				peerInfo.NodeId		= inst.node.ID
 				peerInfo.ProtoNum	= inst.protoNum
 				peerInfo.Protocols	= append(peerInfo.Protocols, inst.protocols...)

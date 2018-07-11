@@ -310,10 +310,10 @@ func p2pPkgProc(pkg *peer.P2pPackage4Callback) interface{} {
 	//
 
 	log.LogCallerFileLine("p2pPkgProc: " +
-		"subnet: %s, peer: %s, payload length: %d",
+		"payload length: %d, subnet: %s, peer: %s",
+		pkg.PayloadLength,
 		fmt.Sprintf("%x", pkg.PeerInfo.Snid),
-		fmt.Sprintf("%X", pkg.PeerInfo.NodeId),
-		pkg.PayloadLength)
+		fmt.Sprintf("%X", pkg.PeerInfo.NodeId))
 
 	return nil
 }
