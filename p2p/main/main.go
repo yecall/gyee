@@ -80,6 +80,10 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 		nodeId:		id,
 	}
 
+	if _, exist := doneMap[p2pInst]; exist == false {
+		doneMap[p2pInst] = make(map[peerIdEx]chan bool, 0)
+	}
+
 	if _, dup := doneMap[p2pInst][idEx]; dup == true {
 
 		log.LogCallerFileLine("txProc: " +
@@ -90,12 +94,9 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 		return
 	}
 
-	seq := 0
-
 	done := make(chan bool, 1)
-	idMap := make(map[peerIdEx]chan bool)
-	idMap[idEx] = done
-	doneMap[p2pInst] = idMap
+	doneMap[p2pInst][idEx] = done
+	seq := 0
 
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,

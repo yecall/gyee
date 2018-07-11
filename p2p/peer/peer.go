@@ -2821,7 +2821,6 @@ rxBreak:
 		//
 
 		if inst.rxEno != PeMgrEnoNone {
-			log.LogCallerFileLine("piRx: rxEno: %d", inst.rxEno)
 			time.Sleep(time.Microsecond * 100)
 			continue
 		}
