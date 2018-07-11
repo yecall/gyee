@@ -181,6 +181,7 @@ type Cfg4UdpNgbManager struct {
 	UDP				uint16			// udp port numbers
 	TCP				uint16			// tcp port numbers
 	ID				NodeID			// the node's public key
+	NetworkType		int				// network type
 	SubNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
 }
 
@@ -741,6 +742,7 @@ func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 		UDP:			config[name].Local.UDP,
 		TCP:			config[name].Local.TCP,
 		ID:				config[name].Local.ID,
+		NetworkType:	config[name].NetworkType,
 		SubNetIdList:	config[name].SubNetIdList,
 	}
 }

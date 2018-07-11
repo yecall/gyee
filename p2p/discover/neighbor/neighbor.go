@@ -1556,6 +1556,10 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 	ngbMgr.cfg.ID			= ptCfg.ID
 	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
 
+	if len(ngbMgr.cfg.SubNetIdList) == 0 && ngbMgr.cfg.NetworkType == config.P2pNewworkTypeDynamic {
+		ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList, config.AnySubNet)
+	}
+
 	return sch.SchEnoNone
 }
 
