@@ -383,7 +383,7 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 	// share a conection to write without sync.
 	//
 
-	inst.p2pkgLock.Lock()
+	inst.tcpmsgLock.Lock()
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
@@ -391,12 +391,12 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 			"Write failed, err: %s",
 			err.Error())
 
-		inst.p2pkgLock.Unlock()
+		inst.tcpmsgLock.Unlock()
 
 		return PeMgrEnoOs
 	}
 
-	inst.p2pkgLock.Unlock()
+	inst.tcpmsgLock.Unlock()
 
 	return PeMgrEnoNone
 }
@@ -459,7 +459,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 	// share a conection to write without sync.
 	//
 
-	inst.p2pkgLock.Lock()
+	inst.tcpmsgLock.Lock()
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
@@ -467,12 +467,12 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 			"Write failed, err: %s",
 			err.Error())
 
-		inst.p2pkgLock.Unlock()
+		inst.tcpmsgLock.Unlock()
 
 		return PeMgrEnoOs
 	}
 
-	inst.p2pkgLock.Unlock()
+	inst.tcpmsgLock.Unlock()
 
 	return PeMgrEnoNone
 }

@@ -1653,7 +1653,7 @@ const PeInstDirOutbound		= +1	// outbound connection
 const PeInstDirInbound		= -1	// inbound connection
 
 const PeInstMailboxSize 	= 32				// mailbox size
-const PeInstMaxP2packages	= 32				// max p2p packages pending to be sent
+const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
 const PeInstMaxPingpongCnt	= 4					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second *2	// pingpong period
 
@@ -1694,6 +1694,7 @@ type peerInstance struct {
 	rxEno		PeMgrErrno					// rx errno
 	txEno		PeMgrErrno					// tx errno
 	ppEno		PeMgrErrno					// pingpong errno
+	tcpmsgLock	sync.Mutex					// lock for write to peer connection
 }
 
 //
@@ -2602,6 +2603,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 		if len(inst.p2pkgTx) >= PeInstMaxP2packages {
 			log.LogCallerFileLine("SendPackage: tx buffer full")
 			failed = append(failed, &pid)
+			inst.p2pkgLock.Unlock()
 			continue
 		}
 
