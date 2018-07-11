@@ -146,6 +146,7 @@ type tabConfig struct {
 	networkType		int				// p2p network type
 	bootstrapNodes	[]*Node			// bootstrap nodes
 	dataDir			string			// data directory
+	name			string			// node name
 	nodeDb			string			// node database
 	bootstrapNode	bool			// bootstrap flag of local node
 	subNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
@@ -1288,6 +1289,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 
 	tabCfg.local			= cfg.Local
 	tabCfg.dataDir			= cfg.DataDir
+	tabCfg.name				= cfg.Name
 	tabCfg.nodeDb			= cfg.NodeDB
 	tabCfg.bootstrapNode	= cfg.BootstrapNode
 	tabCfg.subNetIdList		= cfg.SubNetIdList
@@ -1314,7 +1316,7 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 		return TabMgrEnoDatabase
 	}
 
-	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.nodeDb)
+	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.name, tabMgr.cfg.nodeDb)
 	db, err := newNodeDB(dbPath, ndbVersion, NodeID(tabMgr.cfg.local.ID))
 	if err != nil {
 		log.LogCallerFileLine("tabNodeDbPrepare: newNodeDB failed, err: %s", err.Error())
@@ -2161,7 +2163,6 @@ func (tabMgr *TableManager)tabBucketFindNode(id NodeID) (int, int, TabMgrErrno) 
 func (tabMgr *TableManager)tabBucketRemoveNode(id NodeID) TabMgrErrno {
 
 	bidx, nidx, eno := tabMgr.tabBucketFindNode(id)
-
 	if eno != TabMgrEnoNone {
 
 		log.LogCallerFileLine("tabBucketRemoveNode: " +
@@ -2184,7 +2185,6 @@ func (tabMgr *TableManager)tabBucketRemoveNode(id NodeID) TabMgrErrno {
 func (tabMgr *TableManager)tabBucketUpdateFailCounter(id NodeID, delta int) TabMgrErrno {
 
 	bidx, nidx, eno := tabMgr.tabBucketFindNode(id)
-
 	if eno != TabMgrEnoNone {
 		return eno
 	}
@@ -2204,19 +2204,9 @@ func (tabMgr *TableManager)tabBucketUpdateFailCounter(id NodeID, delta int) TabM
 func (tabMgr *TableManager)tabBucketUpdateBoundTime(id NodeID, pit *time.Time, pot *time.Time) TabMgrErrno {
 
 	bidx, nidx, eno := tabMgr.tabBucketFindNode(id)
-
 	if eno != TabMgrEnoNone {
-
-		log.LogCallerFileLine("tabBucketUpdateBoundTime: " +
-			"not found, node: %s",
-			config.P2pNodeId2HexString(config.NodeID(id)))
-
 		return eno
 	}
-
-	//
-	// if nil, do nothing then
-	//
 
 	if pit != nil {
 		tabMgr.buckets[bidx].nodes[nidx].lastPing = *pit
@@ -2392,10 +2382,6 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, la
 
 	if nidx, eno := b.findNode(id); eno == TabMgrEnoNone {
 
-		log.LogCallerFileLine("tabBucketAddNode: " +
-			"node duplicated: %s",
-			fmt.Sprintf("%X", id))
-
 		b.nodes[nidx].lastQuery = *lastQuery
 		b.nodes[nidx].lastPing = *lastPing
 		b.nodes[nidx].lastPong = *lastPong
@@ -2426,10 +2412,6 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, la
 		be.failCount = 0
 
 		b.nodes = append(b.nodes, be)
-
-		log.LogCallerFileLine("tabBucketAddNode: " +
-			"appended, d: %d, node: %s",
-			d, fmt.Sprintf("%X", n.NodeId))
 
 		return TabMgrEnoNone
 	}
@@ -2653,12 +2635,10 @@ func (tabMgr *TableManager)tabAddPendingBoundInst(node *um.Node) TabMgrErrno {
 func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 
 	if len(tabMgr.boundIcb) == TabInstBondingMax {
-		log.LogCallerFileLine("tabActiveBoundInst: active bounding table is full")
 		return TabMgrEnoNone
 	}
 
 	if len(tabMgr.boundPending) == 0 {
-		log.LogCallerFileLine("tabActiveBoundInst: pending table is empty")
 		return TabMgrEnoNone
 	}
 

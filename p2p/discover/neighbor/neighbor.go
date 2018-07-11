@@ -904,11 +904,6 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == true {
-
-		log.LogCallerFileLine("PingHandler: " +
-			"neighbor instance exist: %s",
-			strPeerNodeId)
-
 		return NgbMgrEnoNone
 	}
 
@@ -957,10 +952,6 @@ func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
 	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
-
-		log.LogCallerFileLine("PongHandler: " +
-			"indicate that we are ponged by node: %s",
-			fmt.Sprintf("%+v", pong.From))
 
 		var schMsg = sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblPongedInd, pong)
@@ -1252,9 +1243,6 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) {
 
-		log.LogCallerFileLine("FindNodeReq: " +
-			"duplicated neighbor instance: %s", strPeerNodeId)
-
 		rsp.Result = (NgbMgrEnoDuplicated << 16) + tab.TabMgrEnoDuplicated
 		rsp.FindNode = findNode
 
@@ -1370,10 +1358,6 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) {
 
-		log.LogCallerFileLine("PingpongReq: " +
-			"duplicated neighbor instance: %s",
-			strPeerNodeId)
-
 		rsp.Result = NgbMgrEnoDuplicated
 		rsp.Ping = ping
 
@@ -1416,12 +1400,9 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 
 	if eno != sch.SchEnoNone {
 
-		log.LogCallerFileLine("PingpongReq: " +
-			"SchCreateTask failed, eno: %d",
-			eno)
-
 		rsp.Result = NgbMgrEnoScheduler
 		rsp.Ping = ping
+
 		return funcRsp2Tab()
 	}
 
@@ -1445,11 +1426,6 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
 
 	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("PingpongReq: " +
-			"start instance failed, eno: %d",
-			eno)
-
 		return NgbMgrEnoScheduler
 	}
 

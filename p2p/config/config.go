@@ -159,7 +159,6 @@ type Config struct {
 	StaticNodes			[]*Node					// static nodes
 	NodeDataDir			string					// node data directory
 	NodeDatabase		string					// node database
-	ListenAddr			string					// address listened
 	NoDial				bool					// outboundless flag
 	NoAccept			bool					// inboundless flag
 	BootstrapNode		bool					// bootstrap node flag
@@ -239,6 +238,7 @@ type Cfg4TabManager struct {
 	Local			Node			// local node
 	BootstrapNodes	[]*Node			// bootstrap nodes
 	DataDir			string			// data directory
+	Name			string			// node name
 	NodeDB			string			// node database
 	BootstrapNode	bool			// bootstrap node flag
 	SubNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
@@ -673,14 +673,21 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 // Setup default bootstrap nodes
 //
 func P2pSetupDefaultBootstrapNodes() []*Node {
+	return P2pSetupBootstrapNodes(BootstrapNodeUrl)
+}
+
+//
+// Setup bootstrap nodes
+//
+func P2pSetupBootstrapNodes(urls []string) []*Node {
 
 	var bsn = make([]*Node, 0, P2pMaxBootstrapNodes)
 
-	for idx, url := range BootstrapNodeUrl {
+	for idx, url := range urls {
 
 		strs := strings.Split(url,"@")
 		if len(strs) != 2 {
-			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
 				"invalid bootstrap url: %s",
 				url)
 			return nil
@@ -689,7 +696,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 		strNodeId := strs[0]
 		strs = strings.Split(strs[1],":")
 		if len(strs) != 3 {
-			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
 				"invalid bootstrap url: %s",
 				url)
 			return nil
@@ -701,7 +708,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 
 		pid := P2pHexString2NodeId(strNodeId)
 		if pid == nil {
-			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
 				"P2pHexString2NodeId failed, strNodeId: %s",
 				strNodeId)
 			return nil
@@ -712,7 +719,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 		bsn[idx].IP = net.ParseIP(strIp)
 
 		if port, err := strconv.Atoi(strUdpPort); err != nil {
-			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
 				"Atoi for UDP port failed, err: %s",
 				err.Error())
 			return nil
@@ -721,7 +728,7 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 		}
 
 		if port, err := strconv.Atoi(strTcpPort); err != nil {
-			log.LogCallerFileLine("P2pSetupDefaultBootstrapNodes: " +
+			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
 				"Atoi for TCP port failed, err: %s",
 				err.Error())
 			return nil
@@ -803,6 +810,7 @@ func P2pConfig4TabManager(name string) *Cfg4TabManager {
 		Local:			config[name].Local,
 		BootstrapNodes:	config[name].BootstrapNodes,
 		DataDir:		config[name].NodeDataDir,
+		Name:			config[name].Name,
 		NodeDB:			config[name].NodeDatabase,
 		BootstrapNode:	config[name].BootstrapNode,
 		NetworkType:	config[name].NetworkType,

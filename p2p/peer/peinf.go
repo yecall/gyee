@@ -28,7 +28,8 @@ import (
 // Package passed into user's callback
 //
 type P2pPackage4Callback struct {
-	PeerInfo		*PeerInfo	// peer information
+	Ptn				interface{}		// instance task node pointer
+	PeerInfo		*PeerInfo		// peer information
 	ProtoId			int				// protocol identity
 	PayloadLength	int				// bytes in payload buffer
 	Payload			[]byte			// payload buffer

@@ -484,10 +484,6 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		//
 
 		if _, ok := peMgr.nodes[snid][n.ID]; ok {
-
-			log.LogCallerFileLine("peMgrDcvFindNodeRsp: " +
-				"duplicated(nodes): %s", fmt.Sprintf("%X", n.ID))
-
 			continue
 		}
 
@@ -498,12 +494,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		dup = false
 
 		for _, rn := range peMgr.randoms[snid] {
-
 			if rn.ID == n.ID {
-
-				log.LogCallerFileLine("peMgrDcvFindNodeRsp: " +
-					"duplicated(randoms): %s", fmt.Sprintf("%X", n.ID))
-
 				dup = true
 				break
 			}
@@ -518,12 +509,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		dup = false
 
 		for _, s := range peMgr.cfg.staticNodes {
-
 			if s.ID == n.ID && snid == peMgr.cfg.staticSubNetId {
-
-				log.LogCallerFileLine("peMgrDcvFindNodeRsp: " +
-					"duplicated(statics): %s", fmt.Sprintf("%X", n.ID))
-
 				dup = true
 				break
 			}
@@ -2722,13 +2708,6 @@ txBreak:
 			// encode and send it
 			//
 
-			log.LogCallerFileLine("piTx: " +
-				"send package, Pid: %d, PayloadLength: %d, subnet: %s, peer: %s",
-				upkg.Pid,
-				upkg.PayloadLength,
-				fmt.Sprintf("%x", inst.snid),
-				fmt.Sprintf("%X", inst.node.ID))
-
 			if eno := upkg.SendPackage(inst); eno != PeMgrEnoNone {
 
 				//
@@ -2906,6 +2885,7 @@ rxBreak:
 				peerInfo.ProtoNum	= inst.protoNum
 				peerInfo.Protocols	= append(peerInfo.Protocols, inst.protocols...)
 
+				pkgCb.Ptn			= inst.ptnMe
 				pkgCb.Payload		= nil
 				pkgCb.PeerInfo		= &peerInfo
 				pkgCb.ProtoId		= int(upkg.Pid)

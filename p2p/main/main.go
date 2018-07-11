@@ -26,9 +26,10 @@ import (
 	"os"
 	"time"
 	"fmt"
+	"net"
 	"os/signal"
-	"github.com/yeeco/gyee/p2p/shell"
-	"github.com/yeeco/gyee/p2p/peer"
+	shell	"github.com/yeeco/gyee/p2p/shell"
+	peer	"github.com/yeeco/gyee/p2p/peer"
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
@@ -55,14 +56,78 @@ var (
 )
 
 //
-// Done signal for Tx routines
+// extend peer identity
 //
 type peerIdEx struct {
 	subNetId	peer.SubNetworkID
 	nodeId		peer.PeerId
 }
 
-var doneMap = make(map[*sch.Scheduler]map[peerIdEx]chan bool)
+//
+// test statistics
+//
+type testCaseCtrlBlock struct {
+	done 	chan bool
+	txSeq	int64
+	rxSeq	int64
+}
+
+//
+// Done signal for Tx routines
+//
+var doneMap = make(map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock)
+
+//
+// test case
+//
+type testCase struct {
+	name		string
+	description	string
+	entry		func(tc *testCase)
+}
+
+//
+// test case table
+//
+var testCaseTable = []testCase{
+	{
+		name:			"testCase0",
+		description:	"common test case for AnySubNet",
+		entry:			testCase0,
+	},
+	{
+		name:			"testCase1",
+		description:	"case of static sub network",
+		entry:			testCase1,
+	},
+}
+
+//
+// target case
+//
+var tgtCase string = "testCase1"
+
+//
+// create test case control block by name
+//
+func newTcb(name string) *testCaseCtrlBlock {
+
+	tcb := testCaseCtrlBlock {
+		done:	make(chan bool, 1),
+		txSeq:	0,
+		rxSeq:	0,
+	}
+
+	switch name {
+	case "testCase0":
+	case "testCase1":
+	default:
+		log.LogCallerFileLine("newTcb: undefined test: %s", name)
+		return nil
+	}
+
+	return &tcb
+}
 
 //
 // Tx routine
@@ -81,7 +146,7 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 	}
 
 	if _, exist := doneMap[p2pInst]; exist == false {
-		doneMap[p2pInst] = make(map[peerIdEx]chan bool, 0)
+		doneMap[p2pInst] = make(map[peerIdEx] *testCaseCtrlBlock, 0)
 	}
 
 	if _, dup := doneMap[p2pInst][idEx]; dup == true {
@@ -94,9 +159,8 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 		return
 	}
 
-	done := make(chan bool, 1)
-	doneMap[p2pInst][idEx] = done
-	seq := 0
+	tcb := newTcb(tgtCase)
+	doneMap[p2pInst][idEx] = tcb
 
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,
@@ -114,7 +178,7 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 
 	var tmHandler = func() {
 
-		seq++
+		tcb.txSeq++
 
 		pkg.IdList = make([]peer.PeerId, 1)
 
@@ -122,7 +186,7 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 
 			txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
 				"to: subnet: %s\n, id: %s\n",
-				seq,
+				tcb.txSeq,
 				fmt.Sprintf("%x", snid),
 				fmt.Sprintf("%X", id))
 
@@ -151,7 +215,7 @@ txLoop:
 
 		select {
 
-		case isDone := <-done:
+		case isDone := <-tcb.done:
 
 			if isDone {
 				log.LogCallerFileLine("txProc: "+
@@ -170,7 +234,7 @@ txLoop:
 		}
 	}
 
-	close(done)
+	close(tcb.done)
 	delete(doneMap[p2pInst], idEx)
 	if len(doneMap[p2pInst]) == 0 {
 		delete(doneMap, p2pInst)
@@ -205,7 +269,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 
 		log.LogCallerFileLine("p2pIndProc: " +
 			"P2pIndPeerActivated, para: %s",
-			fmt.Sprintf("%+v", *pap))
+			fmt.Sprintf("%+v", *pap.PeerInfo))
 
 		if eno := shell.P2pRegisterCallback(shell.P2pPkgCb, p2pPkgHandler, pap.Ptn);
 		eno != shell.P2pEnoNone {
@@ -279,8 +343,8 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			fmt.Sprintf("%+v", *pcp))
 
 		idEx := peerIdEx{subNetId:pcp.Snid, nodeId:pcp.PeerId}
-		if done, ok := doneMap[p2pInst][idEx]; ok && done != nil {
-			done<-true
+		if tcb, ok := doneMap[p2pInst][idEx]; ok && tcb != nil {
+			tcb.done<-true
 			break
 		}
 
@@ -305,23 +369,62 @@ func p2pIndProc(what int, para interface{}) interface{} {
 //
 func p2pPkgProc(pkg *peer.P2pPackage4Callback) interface{} {
 
-	//
-	// the demo just print the payload, provided that it's a string,
-	// see function txProc(in this file) to know what's sent pls.
-	//
+	p2pInst := sch.SchGetScheduler(pkg.Ptn)
+	snid := pkg.PeerInfo.Snid
+	peerId := pkg.PeerInfo.NodeId
 
-	log.LogCallerFileLine("p2pPkgProc: " +
-		"payload length: %d, subnet: %s, peer: %s",
-		pkg.PayloadLength,
-		fmt.Sprintf("%x", pkg.PeerInfo.Snid),
-		fmt.Sprintf("%X", pkg.PeerInfo.NodeId))
+	if _, exist := doneMap[p2pInst]; !exist {
+		log.LogCallerFileLine("p2pPkgProc: " +
+			"not activated, subnet: %s, id: %s",
+			fmt.Sprintf("%x", snid),
+			fmt.Sprintf("%X", peerId))
+		return nil
+	}
+
+	idEx := peerIdEx{subNetId:snid, nodeId:peerId}
+	tcb, exist := doneMap[p2pInst][idEx]
+	if !exist {
+		log.LogCallerFileLine("p2pPkgProc: " +
+			"not activated, subnet: %s, id: %s",
+			fmt.Sprintf("%x", snid),
+			fmt.Sprintf("%X", peerId))
+		return nil
+	}
+
+	tcb.rxSeq++
 
 	return nil
 }
 
-func main() {
+//
+// hook a system interrupt signal and wait on it
+//
+func waitInterrupt() {
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt)
+	defer signal.Stop(sigc)
+	<-sigc
+}
 
-	log.LogCallerFileLine("main: going to start ycp2p ...")
+//
+// run target case
+//
+func main() {
+	for _, tc := range testCaseTable {
+		if tc.name == tgtCase {
+			tc.entry(&tc)
+			return
+		}
+	}
+	log.LogCallerFileLine("main: target case not found: %s", tgtCase)
+}
+
+//
+// testCase0
+//
+func testCase0(tc *testCase) {
+
+	log.LogCallerFileLine("testCase0: going to start ycp2p ...")
 
 	//
 	// fetch default from underlying
@@ -329,7 +432,7 @@ func main() {
 
 	dftCfg := shell.ShellDefaultConfig()
 	if dftCfg == nil {
-		log.LogCallerFileLine("main: ShellDefaultConfig failed")
+		log.LogCallerFileLine("testCase0: ShellDefaultConfig failed")
 		return
 	}
 
@@ -350,7 +453,7 @@ func main() {
 
 	p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("main: SchSchedulerInit failed, eno: %d", eno)
+		log.LogCallerFileLine("testCase0: SchSchedulerInit failed, eno: %d", eno)
 		return
 	}
 	p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
@@ -359,7 +462,10 @@ func main() {
 	// start p2p instance
 	//
 
-	eno = shell.P2pStart(p2pInst)
+	if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+		return
+	}
 
 	//
 	// register indication handler. notice that please, the indication handler is a
@@ -371,19 +477,102 @@ func main() {
 
 	if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
 	eno != shell.P2pEnoNone {
-		log.LogCallerFileLine("main: P2pRegisterCallback failed, eno: %d", eno)
+		log.LogCallerFileLine("testCase0: P2pRegisterCallback failed, eno: %d", eno)
 		return
 	}
 
-	log.LogCallerFileLine("main: ycp2p started, eno: %d", eno)
+	log.LogCallerFileLine("testCase0: ycp2p started, eno: %d", eno)
 
 	//
-	// hook a system interrupt signal and wait on it
+	// wait os interrupt signal
 	//
 
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt)
-	defer signal.Stop(sigc)
-	<-sigc
+	waitInterrupt()
 }
+
+//
+// testCase1
+//
+func testCase1(tc *testCase) {
+
+	log.LogCallerFileLine("testCase1: going to start ycp2p ...")
+
+	var bootstrapIp net.IP
+	var bootstrapId string = ""
+	var bootstrapUdp uint16 = 0
+	var bootstrapTcp uint16 = 0
+	var bootstrapNodes = []*config.Node{}
+
+	for loop := 0; loop < 5; loop++ {
+
+		cfgName := fmt.Sprintf("p2pInst%d", loop)
+		log.LogCallerFileLine("testCase1: handling configuration:%s ...", cfgName)
+
+		dftCfg := shell.ShellDefaultConfig()
+		if dftCfg == nil {
+			log.LogCallerFileLine("testCase1: ShellDefaultConfig failed")
+			return
+		}
+
+		myCfg := *dftCfg
+		myCfg.Name = cfgName
+		myCfg.Local.IP = net.IP{127, 0, 0, 1}
+		myCfg.Local.UDP = uint16(30303 + loop)
+		myCfg.Local.TCP = uint16(30303 + loop)
+
+		if loop == 0 {
+			myCfg.NoDial = true
+			myCfg.BootstrapNode = true
+		}
+
+		myCfg.BootstrapNodes = nil
+		if loop != 0 {
+			myCfg.BootstrapNodes = append(myCfg.BootstrapNodes, bootstrapNodes...)
+		}
+
+		cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
+		p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
+
+		if loop == 0 {
+			bootstrapIp = p2pName2Cfg[cfgName].Local.IP
+			bootstrapId = fmt.Sprintf("%X", p2pName2Cfg[cfgName].Local.ID)
+			bootstrapUdp = p2pName2Cfg[cfgName].Local.UDP
+			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
+
+			ipv4 := bootstrapIp.To4()
+			url := []string {
+				fmt.Sprintf("%s@%d.%d.%d.%d:%d:%d",
+					bootstrapId,
+					ipv4[0],ipv4[1],ipv4[2],ipv4[3],
+					bootstrapUdp,
+					bootstrapTcp),
+			}
+			bootstrapNodes = append(bootstrapNodes,config.P2pSetupBootstrapNodes(url)...)
+		}
+
+		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
+		if eno != sch.SchEnoNone {
+			log.LogCallerFileLine("testCase1: SchSchedulerInit failed, eno: %d", eno)
+			return
+		}
+		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
+
+		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
+			log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+			return
+		}
+
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+			eno != shell.P2pEnoNone {
+			log.LogCallerFileLine("testCase1: P2pRegisterCallback failed, eno: %d", eno)
+			return
+		}
+
+		log.LogCallerFileLine("testCase1: ycp2p started, cofig: %s, eno: %d", cfgName, eno)
+	}
+
+	waitInterrupt()
+}
+
+
 
