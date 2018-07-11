@@ -2383,12 +2383,16 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	}
 
 	//
-	// check sub network identity
+	// check subnet identity
 	//
 
-	if hs.Snid != inst.snid {
-		log.LogCallerFileLine("piHandshakeInbound: subnet identity mismathced")
-		return PeMgrEnoMessage
+	if inst.peMgr.subNetIdExist(&hs.Snid) != true {
+
+		log.LogCallerFileLine("piHandshakeInbound: " +
+			"eno: %d, local node does not attach to subnet: %x",
+			eno, hs.Snid)
+
+		return PeMgrEnoNotfound
 	}
 
 	//
@@ -2399,6 +2403,7 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 
 	inst.protoNum = hs.ProtoNum
 	inst.protocols = hs.Protocols
+	inst.snid = hs.Snid
 	inst.node.ID = hs.NodeId
 	inst.node.IP = append(inst.node.IP, hs.IP...)
 	inst.node.TCP = uint16(hs.TCP)
@@ -2408,6 +2413,7 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	// write outbound handshake to remote peer
 	//
 
+	hs.Snid = inst.snid
 	hs.NodeId = pi.peMgr.cfg.nodeId
 	hs.IP = append(hs.IP, pi.peMgr.cfg.ip ...)
 	hs.UDP = uint32(pi.peMgr.cfg.udp)
