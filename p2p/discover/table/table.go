@@ -430,12 +430,14 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// setup table manager for sub networks
 	//
 
-	for loop := 0; loop < cap(tabMgr.buckets); loop++ {
-		b := new(bucket)
-		tabMgr.buckets[loop] = b
-		b.nodes = make([]*bucketEntry, 0, bucketSize)
+	if tabMgr.snid != config.ZeroSubNet {
+		for loop := 0; loop < cap(tabMgr.buckets); loop++ {
+			b := new(bucket)
+			tabMgr.buckets[loop] = b
+			b.nodes = make([]*bucketEntry, 0, bucketSize)
+		}
+		tabMgr.SubNetMgrList[tabMgr.snid] = tabMgr
 	}
-	tabMgr.SubNetMgrList[tabMgr.snid] = tabMgr
 
 	if len(tabMgr.cfg.subNetIdList) > 0 {
 		if eno = tabMgr.setupSubNetTabMgr(); eno != TabMgrEnoNone {
@@ -1301,8 +1303,20 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 		tabCfg.bootstrapNodes[idx].sha = *TabNodeId2Hash(NodeID(n.ID))
 	}
 
+	//
+	// for static network type, table manager is not applied; a table manager with sub
+	// network identity as config.ZeroSubNet means that this manager is not applied to
+	// any real service activities.
+	//
+
 	tabMgr.networkType = cfg.NetworkType
-	tabMgr.snid = AnySubNet
+	if tabMgr.networkType == config.P2pNewworkTypeStatic {
+		tabMgr.snid = config.ZeroSubNet
+	} else if tabMgr.networkType == config.P2pNewworkTypeDynamic && len(tabCfg.subNetIdList) == 0 {
+		tabMgr.snid = AnySubNet
+	} else {
+		tabMgr.snid = config.ZeroSubNet
+	}
 
 	return TabMgrEnoNone
 }
@@ -2546,6 +2560,10 @@ func (tabMgr *TableManager)tabActiveQueryInst() TabMgrErrno {
 			}
 		}
 
+		if len(tabMgr.queryPending) <= 0 {
+			break;
+		}
+
 		//
 		// Do query
 		//
@@ -2735,6 +2753,7 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 
 		var icb = new(instCtrlBlock)
 
+		icb.snid = tabMgr.snid
 		icb.state = TabInstStateBonding
 		icb.req = &req
 		icb.rsp = nil

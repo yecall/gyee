@@ -1004,7 +1004,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	//
 	// Check duplicated for inbound instance. Notice: only here the peer manager can known the
 	// identity of peer to determine if it's duplicated to a outbound instance, which is an
-	// instance connect from local to the same peer.
+	// instance connect from local to outside.
 	//
 
 	snid := rsp.snid
@@ -1021,7 +1021,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			//
 			// Here we could not kill instance rudely, the instance state should be
 			// compared with each other to determine whom would be killed. Since here
-			// handshake response received, the duplicated inbound instance must be
+			// handshake response received, this duplicated inbound instance must be
 			// in "handshook" state.
 			//
 

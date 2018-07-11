@@ -498,7 +498,7 @@ func testCase1(tc *testCase) {
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
 
-	for loop := 0; loop < 5; loop++ {
+	for loop := 0; loop < 17; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase1: handling configuration:%s ...", cfgName)
