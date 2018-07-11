@@ -35,17 +35,11 @@ import (
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 )
 
-
 //
 // Configuration pointer
 //
 var p2pName2Cfg = make(map[string]*config.Config)
 var p2pInst2Cfg = make(map[*sch.Scheduler]*config.Config)
-
-//
-//
-//
-
 
 //
 // Indication/Package handlers
@@ -172,7 +166,8 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 	}
 
 	log.LogCallerFileLine("txProc: " +
-		"entered, id: %s",
+		"entered, subnet: %s, id: %s",
+		fmt.Sprintf("%x", snid),
 		fmt.Sprintf("%X", id))
 
 
