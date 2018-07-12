@@ -100,24 +100,24 @@ var testCaseTable = []testCase{
 	{
 		name:			"testCase2",
 		description:	"static network without any dynamic sub networks",
-		entry:			testCase1,
+		entry:			testCase2,
 	},
 	{
 		name:			"testCase3",
 		description:	"multiple sub networks without a static network",
-		entry:			testCase1,
+		entry:			testCase3,
 	},
 	{
 		name:			"testCase4",
 		description:	"multiple sub networks with a static network",
-		entry:			testCase1,
+		entry:			testCase4,
 	},
 }
 
 //
 // target case
 //
-var tgtCase string = "testCase4"
+var tgtCase string = "testCase2"
 
 //
 // create test case control block by name
@@ -640,6 +640,9 @@ func testCase2(tc *testCase) {
 			log.LogCallerFileLine("testCase2: P2pSetupLocalNodeId failed")
 			return
 		}
+
+		log.LogCallerFileLine("testCase2: cfgName: %s, id: %X",
+			cfgName, myCfg.Local.ID)
 
 		n := config.Node{
 			IP:	net.IP{127, 0, 0, 1},

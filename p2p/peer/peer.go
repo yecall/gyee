@@ -275,11 +275,8 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	peMgr.ptnMe	= ptn
 	peMgr.sdl = sch.SchGetScheduler(ptn)
-	peMgr.tabMgr = peMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
 
-	_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 	_, peMgr.ptnLsn = peMgr.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
-	_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
 
 	//
 	// fetch configration
@@ -293,6 +290,16 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 		peMgr.inited<-PeMgrEnoConfig
 		return PeMgrEnoConfig
+	}
+
+	//
+	// with static network type that tabMgr and dcvMgr would be done while power on
+	//
+
+	if cfg.NetworkType == config.P2pNewworkTypeDynamic {
+		peMgr.tabMgr = peMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
+		_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
+		_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
 	}
 
 	peMgr.cfg = peMgrConfig {
@@ -345,12 +352,21 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.cfg.subNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
 	}
 
-	for _, snid := range peMgr.cfg.subNetIdList {
-		peMgr.nodes[snid] = make(map[config.NodeID]*peerInstance)
-		peMgr.workers[snid] = make(map[config.NodeID]*peerInstance)
-		peMgr.wrkNum[snid] = 0
-		peMgr.ibpNum[snid] = 0
-		peMgr.obpNum[snid] = 0
+	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+		for _, snid := range peMgr.cfg.subNetIdList {
+			peMgr.nodes[snid] = make(map[config.NodeID]*peerInstance)
+			peMgr.workers[snid] = make(map[config.NodeID]*peerInstance)
+			peMgr.wrkNum[snid] = 0
+			peMgr.ibpNum[snid] = 0
+			peMgr.obpNum[snid] = 0
+		}
+	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
+		staticSnid := peMgr.cfg.staticSubNetId
+		peMgr.nodes[staticSnid] = make(map[config.NodeID]*peerInstance)
+		peMgr.workers[staticSnid] = make(map[config.NodeID]*peerInstance)
+		peMgr.wrkNum[staticSnid] = 0
+		peMgr.ibpNum[staticSnid] = 0
+		peMgr.obpNum[staticSnid] = 0
 	}
 
 	//

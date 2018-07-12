@@ -128,6 +128,18 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	dcvMgr.sdl = sch.SchGetScheduler(ptn)
 	sdl := dcvMgr.sdl
 
+	//
+	// if it's a static type, no table manager needed
+	//
+
+	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {
+
+		log.LogCallerFileLine("DcvMgrPoweron: static type, dcvMgr is not needed")
+
+		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return DcvMgrEnoNone
+	}
+
 	if eno, dcvMgr.ptnTab = sdl.SchGetTaskNodeByName(sch.TabMgrName); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
 		return DcvMgrEnoScheduler

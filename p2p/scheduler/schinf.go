@@ -356,3 +356,10 @@ func (sdl *Scheduler)SchGetTaskName(ptn interface{}) string {
 func (sdl *Scheduler)SchGetP2pCfgName() string {
 	return sdl.p2pCfg.CfgName
 }
+
+//
+// Get p2p configuration
+//
+func (sdl *Scheduler)SchGetP2pConfig() *config.Config {
+	return sdl.p2pCfg
+}

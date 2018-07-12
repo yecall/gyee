@@ -1336,7 +1336,7 @@ func (sdl *scheduler)schGetTaskNodeByName(name string) (SchErrno, *schTaskNode) 
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 
-	if _, err := sdl.tkMap[schTaskName(name)]; !err {
+	if ptn, err := sdl.tkMap[schTaskName(name)]; ptn == nil || !err {
 		return SchEnoNotFound, nil
 	}
 

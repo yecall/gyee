@@ -1195,7 +1195,21 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 		return TabMgrEnoParameter
 	}
 
-	ndbc.sdl = sch.SchGetScheduler(ptn)
+	//
+	// if it's a static type, no database cleaner needed
+	//
+
+	sdl := sch.SchGetScheduler(ptn)
+
+	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {
+
+		log.LogCallerFileLine("ndbcPoweron: static type, nodeDbCleaner is not needed")
+
+		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return TabMgrEnoNone
+	}
+
+	ndbc.sdl = sdl
 	ndbc.tabMgr = ndbc.sdl.SchGetUserTaskIF(TabMgrName).(*TableManager)
 
 	var tmd  = sch.TimerDescription {
@@ -1379,15 +1393,18 @@ func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno 
 			"get task node failed, name: %s", sch.NgbMgrName)
 		return TabMgrEnoScheduler
 	}
+
 	if eno, tabMgr.ptnDcvMgr = tabMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("tabRelatedTaskPrepare: " +
 			"get task node failed, name: %s", sch.DcvMgrName)
 		return TabMgrEnoScheduler
 	}
+
 	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil {
 		log.LogCallerFileLine("tabRelatedTaskPrepare: invaid task node pointer")
 		return TabMgrEnoInternal
 	}
+
 	return TabMgrEnoNone
 }
 

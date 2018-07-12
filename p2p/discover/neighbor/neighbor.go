@@ -730,10 +730,6 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 
 	ngbMgr.ptnMe = ptn
 	ngbMgr.sdl = sch.SchGetScheduler(ptn)
-	ngbMgr.tabMgr = ngbMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
-	eno, ptnTab = ngbMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
-	eno, ptnLsn = ngbMgr.sdl.SchGetTaskNodeByName(sch.NgbLsnName)
-
 
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("PoweronHandler: " +
@@ -741,6 +737,22 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 			eno)
 		return eno
 	}
+
+	//
+	// if static network, no neighbor manager needed
+	//
+
+	if ngbMgr.cfg.NetworkType == config.P2pNewworkTypeStatic {
+
+		log.LogCallerFileLine("tabMgrPoweron: static type, tabMgr is not needed")
+
+		ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return sch.SchEnoNone
+	}
+
+	ngbMgr.tabMgr = ngbMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
+	eno, ptnTab = ngbMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
+	eno, ptnLsn = ngbMgr.sdl.SchGetTaskNodeByName(sch.NgbLsnName)
 
 	if ptnTab == nil {
 		log.LogCallerFileLine("PoweronHandler: " +
@@ -1517,6 +1529,7 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 	ngbMgr.cfg.UDP			= ptCfg.UDP
 	ngbMgr.cfg.TCP			= ptCfg.TCP
 	ngbMgr.cfg.ID			= ptCfg.ID
+	ngbMgr.cfg.NetworkType	= ptCfg.NetworkType
 	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
 
 	if len(ngbMgr.cfg.SubNetIdList) == 0 && ngbMgr.cfg.NetworkType == config.P2pNewworkTypeDynamic {
