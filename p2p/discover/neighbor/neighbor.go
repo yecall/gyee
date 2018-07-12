@@ -255,6 +255,7 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 	 )
 
 	 if eno, tid = inst.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
+		 log.LogCallerFileLine("NgbProtoFindNodeReq: SchSetTimer failed, eno: %d", eno)
 	 	return NgbProtoEnoScheduler
 	 }
 
@@ -338,6 +339,7 @@ func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbPro
 	)
 
 	if eno, tid = inst.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("NgbProtoPingReq: SchSetTimer failed, eno: %d", eno)
 		return NgbProtoEnoScheduler
 	}
 

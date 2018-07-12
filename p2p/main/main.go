@@ -117,7 +117,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase string = "testCase2"
+var tgtCase string = "testCase1"
 
 //
 // create test case control block by name
@@ -540,7 +540,7 @@ func testCase1(tc *testCase) {
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
 
-	for loop := 0; loop < 64; loop++ {
+	for loop := 0; loop < 16; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase1: handling configuration:%s ...", cfgName)
@@ -595,7 +595,7 @@ func testCase1(tc *testCase) {
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+			log.LogCallerFileLine("testCase1: P2pStart failed, eno: %d", eno)
 			return
 		}
 
@@ -620,7 +620,7 @@ func testCase2(tc *testCase) {
 
 	var staticNodeIdList = []*config.Node{}
 
-	for loop := 0; loop < 16; loop++ {
+	for loop := 0; loop < 64; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase2: prepare node identity: %s ...", cfgName)
@@ -645,7 +645,7 @@ func testCase2(tc *testCase) {
 			cfgName, myCfg.Local.ID)
 
 		n := config.Node{
-			IP:	net.IP{127, 0, 0, 1},
+			IP:		net.IP{127, 0, 0, 1},
 			UDP:	uint16(30303 + loop),
 			TCP:	uint16(30303 + loop),
 			ID:		myCfg.Local.ID,
@@ -654,7 +654,7 @@ func testCase2(tc *testCase) {
 		staticNodeIdList = append(staticNodeIdList, &n)
 	}
 
-	for loop := 0; loop < 16; loop++ {
+	for loop := 0; loop < 64; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase2: handling configuration:%s ...", cfgName)
@@ -674,10 +674,7 @@ func testCase2(tc *testCase) {
 		myCfg.StaticMaxPeers = config.MaxPeers
 		myCfg.StaticMaxOutbounds = config.MaxOutbounds
 		myCfg.StaticMaxInbounds = config.MaxInbounds
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
-		myCfg.Local.UDP = uint16(30303 + loop)
-		myCfg.Local.TCP = uint16(30303 + loop)
-		myCfg.Local.ID = (*staticNodeIdList[loop]).ID
+		myCfg.Local = *staticNodeIdList[loop]
 
 		for idx, n := range staticNodeIdList {
 			if idx != loop {
@@ -696,7 +693,7 @@ func testCase2(tc *testCase) {
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+			log.LogCallerFileLine("testCase2: P2pStart failed, eno: %d", eno)
 			return
 		}
 
@@ -796,7 +793,7 @@ func testCase3(tc *testCase) {
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+			log.LogCallerFileLine("testCase3: P2pStart failed, eno: %d", eno)
 			return
 		}
 
@@ -940,7 +937,7 @@ func testCase4(tc *testCase) {
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+			log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 			return
 		}
 

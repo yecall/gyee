@@ -129,7 +129,7 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	sdl := dcvMgr.sdl
 
 	//
-	// if it's a static type, no table manager needed
+	// if it's a static type, no discover manager needed
 	//
 
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {

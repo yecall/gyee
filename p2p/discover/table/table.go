@@ -1226,6 +1226,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 	)
 
 	if eno, tid = ndbc.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("ndbcPoweron: SchSetTimer failed, eno: %d", eno)
 		return TabMgrEnoScheduler
 	}
 
@@ -2160,6 +2161,7 @@ func (tabMgr *TableManager)tabStartTimer(inst *instCtrlBlock, tmt int, dur time.
 	var tid int
 
 	if eno, tid = tabMgr.sdl.SchSetTimer(tabMgr.ptnMe, &td); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("tabStartTimer: SchSetTimer failed, eno: %d", eno)
 		return TabMgrEnoScheduler
 	}
 

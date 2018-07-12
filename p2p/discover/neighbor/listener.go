@@ -27,7 +27,7 @@ import (
 	"fmt"
 	"time"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	cfg		"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	umsg	"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log	"github.com/yeeco/gyee/p2p/logger"
 )
@@ -38,10 +38,10 @@ import (
 const LsnMgrName = sch.NgbLsnName
 
 type listenerConfig struct {
-	IP	net.IP		// IP
-	UDP	uint16		// UDP port number
-	TCP	uint16		// TCP port number
-	ID	cfg.NodeID	// node identity: the public key
+	IP	net.IP			// IP
+	UDP	uint16			// UDP port number
+	TCP	uint16			// TCP port number
+	ID	config.NodeID	// node identity: the public key
 }
 
 type ListenerManager struct {
@@ -127,9 +127,9 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 //
 func (lsnMgr *ListenerManager) setupConfig() sch.SchErrno {
 
-	var ptCfg *cfg.Cfg4UdpNgbListener = nil
+	var ptCfg *config.Cfg4UdpNgbListener = nil
 
-	if ptCfg = cfg.P2pConfig4UdpNgbListener(lsnMgr.sdl.SchGetP2pCfgName()); ptCfg == nil {
+	if ptCfg = config.P2pConfig4UdpNgbListener(lsnMgr.sdl.SchGetP2pCfgName()); ptCfg == nil {
 		log.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbListener failed")
 		return sch.SchEnoConfig
 	}
@@ -252,6 +252,17 @@ func (lsnMgr *ListenerManager) procPoweron(ptn interface{}) sch.SchErrno {
 
 	lsnMgr.ptnMe = ptn
 	lsnMgr.sdl = sch.SchGetScheduler(ptn)
+	sdl := lsnMgr.sdl
+
+	//
+	// if it's a static type, no listener manager needed
+	//
+
+	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {
+		log.LogCallerFileLine("procPoweron: static type, lsnMgr is not needed")
+		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return sch.SchEnoNone
+	}
 
 	//
 	// update state
