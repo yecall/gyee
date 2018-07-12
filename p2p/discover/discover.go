@@ -214,7 +214,14 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 	//
 
 	if dcvMgr.more <= 0 {
-		return DcvMgrEnoNone
+
+		//
+		// since nodes reported to peer manager might be useless for these nods might
+		// be duplicated nodes, we can not return, nodes still need to be reported in
+		// this case.
+		//
+
+		// return DcvMgrEnoNone
 	}
 
 	//

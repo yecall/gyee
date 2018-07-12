@@ -332,7 +332,6 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 	}
 
 	if eno != TabMgrEnoNone {
-		log.LogCallerFileLine("TabMgrProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -682,7 +681,8 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 
 	inst = mgr.tabFindInst(&msg.FindNode.To, TabInstStateQuering)
 	if inst == nil {
-		log.LogCallerFileLine("tabMgrFindNodeRsp: instance not found, subnet: %x", snid)
+		log.LogCallerFileLine("tabMgrFindNodeRsp: instance not found, subnet: %x, id: %X",
+			snid, msg.FindNode.To.NodeId)
 		return TabMgrEnoNotFound
 	}
 

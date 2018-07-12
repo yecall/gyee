@@ -109,8 +109,8 @@ const MaxPeers = 32
 //
 // Max concurrecny inboudn and outbound
 //
-const MaxInbounds	= MaxPeers / 2
-const MaxOutbounds	= MaxPeers / 2
+const MaxInbounds	= MaxPeers / 2 // +2
+const MaxOutbounds	= MaxPeers / 2 // +2
 
 
 
@@ -209,6 +209,7 @@ type Cfg4PeerListener struct {
 //
 
 type Cfg4PeerManager struct {
+	CfgName				string					// p2p configuration name
 	NetworkType			int						// p2p network type
 	IP					net.IP					// ip address
 	Port				uint16					// tcp port number
@@ -633,6 +634,10 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 //
 // Setup local node identity
 //
+func P2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
+	return p2pSetupLocalNodeId(cfg)
+}
+
 func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 
 	if cfg.PrivateKey != nil {
@@ -782,6 +787,7 @@ func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
 //
 func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 	return &Cfg4PeerManager {
+		CfgName:			name, // config[name].CfgName
 		NetworkType:		config[name].NetworkType,
 		IP:					config[name].Local.IP,
 		Port:				config[name].Local.TCP,

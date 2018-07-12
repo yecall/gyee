@@ -83,7 +83,7 @@ const maxTcpmsgSize = 1024*1024*4					// max size of a tcpmsg package could be, 
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-const durDcvFindNodeTimer = time.Second * 22		// duration to wait for find node response from discover task,
+const durDcvFindNodeTimer = time.Second * 20		// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 const (
 	peerIdle			= iota						// idle
@@ -95,6 +95,7 @@ const (
 type SubNetworkID = config.SubNetworkID
 
 type peMgrConfig struct {
+	cfgName				string						// p2p configuration name
 	ip					net.IP						// ip address
 	port				uint16						// tcp port number
 	udp					uint16						// udp port number, used with handshake procedure
@@ -118,6 +119,7 @@ type peMgrConfig struct {
 	subNetMaxOutbounds	map[SubNetworkID]int		// max concurrency outbounds
 	subNetMaxInBounds	map[SubNetworkID]int		// max concurrency inbounds
 	subNetIdList		[]SubNetworkID				// sub network identity list. do not put the identity
+	ibpNumTotal			int							// total number of concurrency inbound peers
 }
 
 //
@@ -147,6 +149,7 @@ type PeerManager struct {
 	wrkNum			map[SubNetworkID]int			// worker peer number
 	ibpNum			map[SubNetworkID]int			// active inbound peer number
 	obpNum			map[SubNetworkID]int			// active outbound peer number
+	ibpToalNum		int								// total active inbound peer number
 	acceptPaused	bool							// if accept task paused
 	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
 
@@ -181,6 +184,7 @@ func NewPeerMgr() *PeerManager {
 		wrkNum:       	map[SubNetworkID]int{},
 		ibpNum:       	map[SubNetworkID]int{},
 		obpNum:       	map[SubNetworkID]int{},
+		ibpToalNum:		0,
 		acceptPaused: 	false,
 		randoms:      	map[SubNetworkID][]*config.Node{},
 		P2pIndHandler:	nil,
@@ -254,7 +258,6 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 	}
 
 	if eno != PeMgrEnoNone {
-		log.LogCallerFileLine("PeerMgrProc: errors, eno: %d", eno)
 		schEno = sch.SchEnoUserTask
 	}
 
@@ -293,6 +296,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	}
 
 	peMgr.cfg = peMgrConfig {
+		cfgName:			cfg.CfgName,
 		ip:					cfg.IP,
 		port:				cfg.Port,
 		udp:				cfg.UDP,
@@ -316,6 +320,12 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		subNetMaxOutbounds:	cfg.SubNetMaxOutbounds,
 		subNetMaxInBounds:	cfg.SubNetMaxInBounds,
 		subNetIdList:		cfg.SubNetIdList,
+		ibpNumTotal:		0,
+	}
+
+	peMgr.cfg.ibpNumTotal = peMgr.cfg.staticMaxInBounds
+	for _, ibpNum := range peMgr.cfg.subNetMaxInBounds {
+		peMgr.cfg.ibpNumTotal += ibpNum
 	}
 
 	for _, p := range cfg.Protocols {
@@ -640,6 +650,14 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	peMgr.peers[peInst.ptnMe] = peInst
 
+	//
+	// Pause inbound peer accepter if necessary
+	//
+
+	if peMgr.ibpToalNum++; peMgr.ibpToalNum >= peMgr.cfg.ibpNumTotal {
+		peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+	}
+
 	return PeMgrEnoNone
 }
 
@@ -807,12 +825,10 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErrno {
 
 	if peMgr.wrkNum[*snid] >= peMgr.cfg.subNetMaxPeers[*snid] {
-		log.LogCallerFileLine("peMgrDynamicSubNetOutbound: peers full")
 		return PeMgrEnoNone
 	}
 
 	if peMgr.obpNum[*snid] >= peMgr.cfg.subNetMaxOutbounds[*snid] {
-		log.LogCallerFileLine("peMgrDynamicSubNetOutbound: outbounds full")
 		return PeMgrEnoNone
 	}
 
@@ -1011,6 +1027,30 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	id := rsp.peNode.ID
 
 	if inst.dir == PeInstDirInbound {
+
+		if peMgr.ibpNum[snid] >= peMgr.cfg.subNetMaxInBounds[snid] {
+
+			log.LogCallerFileLine("peMgrHandshakeRsp: " +
+				"too much inbound, subnet: %x, ibpNum: %d, max: %d",
+				snid,
+				peMgr.ibpNum[snid],
+				peMgr.cfg.subNetMaxInBounds[snid])
+
+			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+
+				log.LogCallerFileLine("peMgrHandshakeRsp: "+
+					"peMgrKillInst failed, subnet: %x, node: %X",
+					snid, rsp.peNode.ID)
+
+				return eno
+			}
+
+			peMgr.updateStaticStatus(snid, rsp.peNode.ID, peerKilling)
+
+			return PeMgrEnoResource
+		}
+
+		peMgr.ibpNum[snid]++
 
 		if _, dup := peMgr.nodes[snid][id]; dup {
 
@@ -1520,6 +1560,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	} else if peInst.dir == PeInstDirInbound {
 
 		peMgr.ibpNum[snid]--
+		peMgr.ibpToalNum--
 
 	} else {
 
@@ -1554,8 +1595,17 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	var eno sch.SchErrno
 	var tid int
 
+	log.LogCallerFileLine("peMgrAsk4More: " +
+		"configuration name: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpToalNum: %d, wrkNum: %d",
+		peMgr.cfg.cfgName,
+		*snid,
+		peMgr.obpNum[*snid],
+		peMgr.ibpNum[*snid],
+		peMgr.ibpToalNum,
+		peMgr.wrkNum[*snid])
+
 	//
-	// no discovering needed for static nodes
+	// no discovering needed for static nodes, only dynamics need it
 	//
 
 	if *snid != peMgr.cfg.staticSubNetId {
@@ -2361,10 +2411,6 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	//
 	// read inbound handshake from remote peer
 	//
-
-	log.LogCallerFileLine("piHandshakeInbound: " +
-		"try to read the incoming Handshake from raddr: %s",
-		inst.raddr.String())
 
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
 

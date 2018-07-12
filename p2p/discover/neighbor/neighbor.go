@@ -40,13 +40,12 @@ const (
 	NgbMgrEnoNone	= iota
 	NgbMgrEnoParameter
 	NgbMgrEnoTimeout
-	NgbMgrEnoNotImpl
+	NgbMgrEnoNotFound
 	NgbMgrEnoEncode
 	NgbMgrEnoUdp
 	NgbMgrEnoDuplicated
 	NgbMgrEnoMismatched
 	NgbMgrEnoScheduler
-	NgbMgrEnoTable
 )
 
 type NgbMgrErrno int
@@ -714,11 +713,6 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	}
 
 	if eno != NgbMgrEnoNone {
-
-		log.LogCallerFileLine("NgbMgrProc: " +
-			"errors, eno: %d",
-			eno)
-
 		return sch.SchEnoUserTask
 	}
 
@@ -797,10 +791,6 @@ func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 			msg.msgType)
 
 		eno = NgbMgrEnoParameter
-	}
-
-	if eno != NgbMgrEnoNone {
-		log.LogCallerFileLine("NgbMgrProc: errors, eno: %d", eno)
 	}
 
 	return eno
@@ -961,14 +951,17 @@ func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
 	}
 
 	//
-	// neighbor task instance exist, we just dispatch this Pong to it
+	// ping task instance exist, we just dispatch this Pong to it
 	//
 
-	ptnNgb := ngbMgr.getMap(strPeerNodeId).ptn
+	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypePing) {
 
-	var schMsg = sch.SchMessage{}
-	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptnNgb, sch.EvNblPingpongRsp, pong)
-	ngbMgr.sdl.SchSendMessage(&schMsg)
+		ptnNgb := ngbMgr.getMap(strPeerNodeId).ptn
+
+		var schMsg= sch.SchMessage{}
+		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptnNgb, sch.EvNblPingpongRsp, pong)
+		ngbMgr.sdl.SchSendMessage(&schMsg)
+	}
 
 	return NgbMgrEnoNone
 }
@@ -1150,7 +1143,6 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
-
 		var schMsg= sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblQueriedInd, findNode)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
@@ -1185,7 +1177,6 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	}
 
 	if expired(nbs.Expiration) {
-		log.LogCallerFileLine("NeighborsHandler: request timeout")
 		return NgbMgrEnoTimeout
 	}
 
@@ -1194,12 +1185,8 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeFindNode) == false {
-
-		log.LogCallerFileLine("NeighborsHandler: " +
-			"discarded for neighbor instance not exist: %s",
-			strPeerNodeId)
-
-		return NgbMgrEnoMismatched
+		log.LogCallerFileLine("NeighborsHandler: not found, id: %s", strPeerNodeId)
+		return NgbMgrEnoNotFound
 	}
 
 	ptnNgb := ngbMgr.getMap(strPeerNodeId).ptn
@@ -1310,7 +1297,7 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	//
 
 	ngbInst.ptn = ptn
-	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
+	ngbMgr.setupMap(ngbInst.name, &ngbInst)
 
 	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
 
