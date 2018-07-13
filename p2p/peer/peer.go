@@ -1074,7 +1074,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 			maxInbound = peMgr.cfg.staticMaxOutbounds
 
-		} else if peMgr.cfg.networkType != config.P2pNewworkTypeDynamic {
+		} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
 
 			if peMgr.dynamicSubNetIdExist(&snid) == true {
 
