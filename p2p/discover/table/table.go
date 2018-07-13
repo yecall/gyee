@@ -553,7 +553,6 @@ func (tabMgr *TableManager)tabMgrPingpongTimerHandler(inst *instCtrlBlock) TabMg
 	}
 
 	mgr, ok := tabMgr.SubNetMgrList[inst.snid]
-
 	if !ok {
 		log.LogCallerFileLine("tabMgrPingpongTimerHandler: invalid subnet: %x", inst.snid)
 		return TabMgrEnoParameter
@@ -600,10 +599,9 @@ func (tabMgr *TableManager)tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabMg
 	}
 
 	mgr, ok := tabMgr.SubNetMgrList[inst.snid]
-
 	if !ok {
 		log.LogCallerFileLine("tabMgrFindNodeTimerHandler: invalid subnet: %x", inst.snid)
-		return TabMgrEnoParameter
+		return TabMgrEnoNotFound
 	}
 
 	//
@@ -652,7 +650,6 @@ func (tabMgr *TableManager)tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabMg
 // Refresh request handler
 //
 func (tabMgr *TableManager)tabMgrRefreshReq(msg *sch.MsgTabRefreshReq)TabMgrErrno {
-	log.LogCallerFileLine("tabMgrRefreshReq: requst to refresh table ...")
 	return tabMgr.tabRefresh(&msg.Snid, nil)
 }
 
@@ -668,8 +665,8 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 
 	snid := msg.FindNode.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
-
 	if !ok {
+		log.LogCallerFileLine("tabMgrFindNodeRsp: invalid subnet: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
@@ -816,6 +813,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	snid := msg.Ping.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
+		log.LogCallerFileLine("tabMgrFindNodeRsp: invalid subnet: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
@@ -861,7 +859,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	// failed, for some nodes might not be added into any buckets.
 	//
 
-	_ = mgr.tabUpdateBucket(inst, result)
+	mgr.tabUpdateBucket(inst, result)
 
 	//
 	// delete the active instance
@@ -1436,13 +1434,20 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	// If the "tid"(target identity) passed in is nil, we get a random one;
 	//
 
+
+	if _, ok := tabMgr.SubNetMgrList[*snid]; !ok {
+		log.LogCallerFileLine("tabRefresh: none of manager for subnet: %x", *snid)
+		return TabMgrEnoNotFound
+	}
+	mgr := tabMgr.SubNetMgrList[*snid]
+
 	//
 	// Check if the active query instances table full. notice that if it's false,
 	// then the pending table must be empty in current implement.
 	//
 
-	tabMgr.refreshing = len(tabMgr.queryIcb) >= TabInstQueringMax
-	if tabMgr.refreshing == true {
+	mgr.refreshing = len(mgr.queryIcb) >= TabInstQueringMax
+	if mgr.refreshing == true {
 		log.LogCallerFileLine("tabRefresh: already in refreshing")
 		return TabMgrEnoNone
 	}
@@ -1460,7 +1465,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 		target = *tid
 	}
 
-	if nodes = tabMgr.tabClosest(Closest4Querying, target, TabInstQPendingMax); len(nodes) == 0 {
+	if nodes = mgr.tabClosest(Closest4Querying, target, TabInstQPendingMax); len(nodes) == 0 {
 
 		//
 		// Here all our buckets are empty, we then apply our local node as
@@ -1470,9 +1475,9 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 		log.LogCallerFileLine("tabRefresh: seems all buckets are empty, " +
 			"set local as target and try seeds from database and bootstrap nodes ...")
 
-		target = NodeID(tabMgr.cfg.local.ID)
+		target = NodeID(mgr.cfg.local.ID)
 
-		seeds := tabMgr.tabSeedsFromDb(TabInstQPendingMax, seedMaxAge)
+		seeds := mgr.tabSeedsFromDb(TabInstQPendingMax, seedMaxAge)
 		var seedsBackup = make([]*Node, 0)
 
 		if len(seeds) == 0 {
@@ -1489,7 +1494,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 
 			for _, dbn := range seeds {
 
-				if tabMgr.tabShouldBoundDbNode(NodeID(dbn.ID)) == false {
+				if mgr.tabShouldBoundDbNode(NodeID(dbn.ID)) == false {
 
 					var umNode = um.Node {
 						IP:		dbn.IP,
@@ -1498,7 +1503,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 						NodeId:	dbn.ID,
 					}
 
-					if eno := tabMgr.tabDiscoverResp(&umNode); eno != TabMgrEnoNone {
+					if eno := mgr.tabDiscoverResp(&umNode); eno != TabMgrEnoNone {
 						log.LogCallerFileLine("tabRefresh: " +
 							"tabDiscoverResp failed, eno: %d",
 							eno)
@@ -1511,7 +1516,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 			}
 		}
 
-		nodes = append(nodes, tabMgr.cfg.bootstrapNodes...)
+		nodes = append(nodes, mgr.cfg.bootstrapNodes...)
 		nodes = append(nodes, seedsBackup...)
 
 		if len(nodes) == 0 {
@@ -1531,10 +1536,10 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 
 	var eno TabMgrErrno
 
-	if eno := tabMgr.tabQuery(&target, nodes); eno != TabMgrEnoNone {
+	if eno := mgr.tabQuery(&target, nodes); eno != TabMgrEnoNone {
 		log.LogCallerFileLine("tabRefresh: tabQuery failed, eno: %d", eno)
 	} else {
-		tabMgr.refreshing = true
+		mgr.refreshing = true
 	}
 
 	return eno
@@ -2049,12 +2054,12 @@ func (tabMgr *TableManager)tabUpdateBucket(inst *instCtrlBlock, result int) TabM
 
 		node := &inst.req.(*um.Ping).To
 		inst.pot = time.Now()
-		return tabMgr.TabBucketAddNode(node, &inst.qrt, &inst.pit, &inst.pot)
+		return tabMgr.TabBucketAddNode(tabMgr.snid, node, &inst.qrt, &inst.pit, &inst.pot)
 
 	case (inst.state == TabInstStateBonding || inst.state == TabInstStateBTimeout) && result != TabMgrEnoNone:
 
 		node := &inst.req.(*um.Ping).To
-		return tabMgr.TabBucketAddNode(node, &inst.qrt, &inst.pit, nil)
+		return tabMgr.TabBucketAddNode(tabMgr.snid, node, &inst.qrt, &inst.pit, nil)
 
 	default:
 
@@ -2116,7 +2121,7 @@ func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 		NodeId:	node.ID,
 	}
 
-	return tabMgr.TabBucketAddNode(&umn, &time.Time{}, &now, &now)
+	return tabMgr.TabBucketAddNode(snid, &umn, &time.Time{}, &now, &now)
 }
 
 //
@@ -2899,17 +2904,23 @@ func (tabMgr *TableManager)tabShouldBoundDbNode(id NodeID) bool {
 // Notice: inside the table manager task, this function MUST NOT be called,
 // since we had obtain the lock at the entry of the task handler.
 //
-func (tabMgr *TableManager)TabBucketAddNode(n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
+func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 
 	//
 	// We would be called by other task, we need to lock and
 	// defer unlock.
 	//
 
-	tabMgr.lock.Lock()
-	defer tabMgr.lock.Unlock()
+	mgr, ok := tabMgr.SubNetMgrList[snid]
+	if !ok {
+		log.LogCallerFileLine("TabBucketAddNode: none of manager instance for subnet: %x", snid)
+		return TabMgrEnoNotFound
+	}
 
-	return tabMgr.tabBucketAddNode(n, lastQuery, lastPing, lastPong)
+	mgr.lock.Lock()
+	defer mgr.lock.Unlock()
+
+	return mgr.tabBucketAddNode(n, lastQuery, lastPing, lastPong)
 }
 
 
@@ -2918,7 +2929,7 @@ func (tabMgr *TableManager)TabBucketAddNode(n *um.Node, lastQuery *time.Time, la
 // Notice: inside the table manager task, this function MUST NOT be called,
 // since we had obtain the lock at the entry of the task handler.
 //
-func (tabMgr *TableManager)TabUpdateNode(umn *um.Node) TabMgrErrno {
+func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgrErrno {
 
 	//
 	// We would be called by other task, we need to lock and
@@ -2933,8 +2944,14 @@ func (tabMgr *TableManager)TabUpdateNode(umn *um.Node) TabMgrErrno {
 		return TabMgrEnoParameter
 	}
 
-	tabMgr.lock.Lock()
-	defer tabMgr.lock.Unlock()
+	mgr, ok := tabMgr.SubNetMgrList[snid]
+	if !ok {
+		log.LogCallerFileLine("TabUpdateNode: none of manager instance for subnet: %x", snid)
+		return TabMgrEnoNotFound
+	}
+
+	mgr.lock.Lock()
+	defer mgr.lock.Unlock()
 
 	n := Node {
 		Node: config.Node{
@@ -2946,7 +2963,7 @@ func (tabMgr *TableManager)TabUpdateNode(umn *um.Node) TabMgrErrno {
 		sha: *TabNodeId2Hash(NodeID(umn.NodeId)),
 	}
 
-	if err := tabMgr.nodeDb.updateNode(tabMgr.snid, &n); err != nil {
+	if err := mgr.nodeDb.updateNode(snid, &n); err != nil {
 
 		log.LogCallerFileLine("TabUpdateNode: " +
 			"update: updateNode failed, err: %s",
@@ -3003,6 +3020,11 @@ func TabBuildNode(pn *config.Node) *Node {
 // Get sub network identity of manager instance
 //
 func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
+
+	//
+	// notice: "tabMgr" must be the target sub network manager instance
+	//
+
 	return &tabMgr.snid
 }
 
@@ -3010,5 +3032,18 @@ func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
 // Get manager instance by sub network identity
 //
 func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManager {
-	return tabMgr.SubNetMgrList[*snid]
+
+	//
+	// notice: "tabMgr" must one of the managers since "SubNetMgrList"
+	// is referenced by all of them.
+	//
+	// notice: if we are an AnySubNet, return the AnySubNet manager then,
+	// in this case, it should be only one instance in the list.
+	//
+
+	if tabMgr.snid != AnySubNet {
+		return tabMgr.SubNetMgrList[*snid]
+	}
+
+	return tabMgr.SubNetMgrList[AnySubNet]
 }

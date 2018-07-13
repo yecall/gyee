@@ -117,7 +117,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase string = "testCase1"
+var tgtCase string = "testCase3"
 
 //
 // create test case control block by name
@@ -534,13 +534,15 @@ func testCase1(tc *testCase) {
 
 	log.LogCallerFileLine("testCase1: going to start ycp2p ...")
 
+	var p2pInstNum = 32
+
 	var bootstrapIp net.IP
 	var bootstrapId string = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
 
-	for loop := 0; loop < 16; loop++ {
+	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase1: handling configuration:%s ...", cfgName)
@@ -618,9 +620,11 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
+	var p2pInstNum = 32
+
 	var staticNodeIdList = []*config.Node{}
 
-	for loop := 0; loop < 64; loop++ {
+	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase2: prepare node identity: %s ...", cfgName)
@@ -654,7 +658,7 @@ func testCase2(tc *testCase) {
 		staticNodeIdList = append(staticNodeIdList, &n)
 	}
 
-	for loop := 0; loop < 64; loop++ {
+	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase2: handling configuration:%s ...", cfgName)
@@ -716,21 +720,31 @@ func testCase3(tc *testCase) {
 
 	log.LogCallerFileLine("testCase3: going to start ycp2p ...")
 
+	var p2pInstNum = 16
+
 	var bootstrapIp net.IP
 	var bootstrapId string = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
 
-	for loop := 0; loop < 16; loop++ {
+	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase3: handling configuration:%s ...", cfgName)
 
-		dftCfg := shell.ShellDefaultConfig()
-		if dftCfg == nil {
-			log.LogCallerFileLine("testCase3: ShellDefaultConfig failed")
-			return
+		var dftCfg *config.Config = nil
+
+		if loop == 0 {
+			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
+				log.LogCallerFileLine("testCase3: ShellDefaultBootstrapConfig failed")
+				return
+			}
+		} else {
+			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+				log.LogCallerFileLine("testCase3: ShellDefaultConfig failed")
+				return
+			}
 		}
 
 		myCfg := *dftCfg
@@ -742,21 +756,35 @@ func testCase3(tc *testCase) {
 		myCfg.Local.UDP = uint16(30303 + loop)
 		myCfg.Local.TCP = uint16(30303 + loop)
 
-		snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
-		snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
-
-		myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
-		myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
-		myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
-		myCfg.SubNetMaxInBounds[snid0] = config.MaxInbounds
-		myCfg.SubNetMaxOutbounds[snid0] = config.MaxOutbounds
-		myCfg.SubNetMaxPeers[snid1] = config.MaxPeers
-		myCfg.SubNetMaxInBounds[snid1] = config.MaxInbounds
-		myCfg.SubNetMaxOutbounds[snid1] = config.MaxOutbounds
+		if loop == 0 {
+			for idx := 0; idx < p2pInstNum; idx++ {
+				snid0 := config.SubNetworkID{0xff, byte(idx & 0x0f)}
+				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
+				myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
+				myCfg.SubNetMaxInBounds[snid0] = config.MaxPeers
+				myCfg.SubNetMaxOutbounds[snid0] = 0
+			}
+		} else {
+			snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
+			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
+			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
+			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
+			myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
+			myCfg.SubNetMaxInBounds[snid0] = config.MaxInbounds
+			myCfg.SubNetMaxOutbounds[snid0] = config.MaxOutbounds
+			myCfg.SubNetMaxPeers[snid1] = config.MaxPeers
+			myCfg.SubNetMaxInBounds[snid1] = config.MaxInbounds
+			myCfg.SubNetMaxOutbounds[snid1] = config.MaxOutbounds
+		}
 
 		if loop == 0 {
 			myCfg.NoDial = true
+			myCfg.NoAccept = true
 			myCfg.BootstrapNode = true
+		} else {
+			myCfg.NoDial = false
+			myCfg.NoAccept = false
+			myCfg.BootstrapNode = false
 		}
 
 		myCfg.BootstrapNodes = nil
@@ -816,6 +844,8 @@ func testCase4(tc *testCase) {
 
 	log.LogCallerFileLine("testCase4: going to start ycp2p ...")
 
+	var p2pInstNum = 16
+
 	var bootstrapIp net.IP
 	var bootstrapId string = ""
 	var bootstrapUdp uint16 = 0
@@ -824,7 +854,7 @@ func testCase4(tc *testCase) {
 
 	var staticNodeIdList = []*config.Node{}
 
-	for loop := 0; loop < 16; loop++ {
+	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase4: prepare node identity: %s ...", cfgName)
@@ -845,8 +875,11 @@ func testCase4(tc *testCase) {
 			return
 		}
 
+		log.LogCallerFileLine("testCase4: cfgName: %s, id: %X",
+			cfgName, myCfg.Local.ID)
+
 		n := config.Node{
-			IP:	net.IP{127, 0, 0, 1},
+			IP:		net.IP{127, 0, 0, 1},
 			UDP:	uint16(30303 + loop),
 			TCP:	uint16(30303 + loop),
 			ID:		myCfg.Local.ID,
@@ -855,15 +888,23 @@ func testCase4(tc *testCase) {
 		staticNodeIdList = append(staticNodeIdList, &n)
 	}
 
-	for loop := 0; loop < 16; loop++ {
+	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase4: handling configuration:%s ...", cfgName)
 
-		dftCfg := shell.ShellDefaultConfig()
-		if dftCfg == nil {
-			log.LogCallerFileLine("testCase4: ShellDefaultConfig failed")
-			return
+		var dftCfg *config.Config = nil
+
+		if loop == 0 {
+			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
+				log.LogCallerFileLine("testCase4: ShellDefaultBootstrapConfig failed")
+				return
+			}
+		} else {
+			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+				log.LogCallerFileLine("testCase4: ShellDefaultConfig failed")
+				return
+			}
 		}
 
 		myCfg := *dftCfg
@@ -886,21 +927,40 @@ func testCase4(tc *testCase) {
 			}
 		}
 
-		snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
-		snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
-
-		myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
-		myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
-		myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
-		myCfg.SubNetMaxInBounds[snid0] = config.MaxInbounds
-		myCfg.SubNetMaxOutbounds[snid0] = config.MaxOutbounds
-		myCfg.SubNetMaxPeers[snid1] = config.MaxPeers
-		myCfg.SubNetMaxInBounds[snid1] = config.MaxInbounds
-		myCfg.SubNetMaxOutbounds[snid1] = config.MaxOutbounds
+		if loop == 0 {
+			for idx := 0; idx < p2pInstNum; idx++ {
+				snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
+				snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
+				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
+				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
+				myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
+				myCfg.SubNetMaxInBounds[snid0] = config.MaxInbounds
+				myCfg.SubNetMaxOutbounds[snid0] = config.MaxOutbounds
+				myCfg.SubNetMaxPeers[snid1] = config.MaxPeers
+				myCfg.SubNetMaxInBounds[snid1] = config.MaxInbounds
+				myCfg.SubNetMaxOutbounds[snid1] = config.MaxOutbounds
+			}
+		} else {
+			snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
+			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
+			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
+			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
+			myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
+			myCfg.SubNetMaxInBounds[snid0] = config.MaxInbounds
+			myCfg.SubNetMaxOutbounds[snid0] = config.MaxOutbounds
+			myCfg.SubNetMaxPeers[snid1] = config.MaxPeers
+			myCfg.SubNetMaxInBounds[snid1] = config.MaxInbounds
+			myCfg.SubNetMaxOutbounds[snid1] = config.MaxOutbounds
+		}
 
 		if loop == 0 {
 			myCfg.NoDial = true
+			myCfg.NoAccept = true
 			myCfg.BootstrapNode = true
+		} else {
+			myCfg.NoDial = false
+			myCfg.NoAccept = false
+			myCfg.BootstrapNode = false
 		}
 
 		myCfg.BootstrapNodes = nil

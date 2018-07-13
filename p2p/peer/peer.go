@@ -104,6 +104,7 @@ type peMgrConfig struct {
 	udp					uint16						// udp port number, used with handshake procedure
 	nodeId				config.NodeID				// the node's public key
 	noDial				bool						// do not dial outbound
+	noAccept			bool						// do not accept inbound
 	bootstrapNode		bool						// local is a bootstrap node
 	defaultCto			time.Duration				// default connect outbound timeout
 	defaultHto			time.Duration				// default handshake timeout
@@ -312,6 +313,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		udp:				cfg.UDP,
 		nodeId:				cfg.ID,
 		noDial:				cfg.NoDial,
+		noAccept:			cfg.NoAccept,
 		bootstrapNode:		cfg.BootstrapNode,
 		defaultCto:			defaultConnectTimeout,
 		defaultHto:			defaultHandshakeTimeout,
@@ -373,14 +375,11 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	}
 
 	//
-	// tell initialization result
+	// tell initialization result, and EvPeMgrStartReq would be sent to us
+	// at some moment.
 	//
 
 	peMgr.inited<-PeMgrEnoNone
-
-	log.LogCallerFileLine("peMgrPoweron: " +
-		"EvPeMgrStartReq send ok, target: %s",
-		peMgr.sdl.SchGetTaskName(peMgr.ptnMe))
 
 	return PeMgrEnoNone
 }
@@ -462,11 +461,15 @@ func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
 
 	//
-	// start peer listener
+	// start peer listener if necessary
 	//
 
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
-	peMgr.sdl.SchSendMessage(&schMsg)
+	if peMgr.cfg.noAccept == true {
+		peMgr.accepter = nil
+	} else {
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
+		peMgr.sdl.SchSendMessage(&schMsg)
+	}
 
 	//
 	// drive ourself to startup outbound. set following message body to be nil
@@ -692,7 +695,9 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	//
 
 	if peMgr.ibpTotalNum++; peMgr.ibpTotalNum >= peMgr.cfg.ibpNumTotal {
-		peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+		if !peMgr.cfg.noAccept {
+			peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+		}
 	}
 
 	return PeMgrEnoNone
@@ -1192,7 +1197,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			NodeId: rsp.peNode.ID,
 		}
 
-		tabEno := peMgr.tabMgr.TabBucketAddNode(&n, &lastQuery, &lastPing, &lastPong)
+		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
 
 			log.LogCallerFileLine("peMgrHandshakeRsp: "+
@@ -1206,7 +1211,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		// should not care the result returned from interface of table module.
 		//
 
-		tabEno = peMgr.tabMgr.TabUpdateNode(&n)
+		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
 
 			log.LogCallerFileLine("peMgrHandshakeRsp: "+
@@ -1613,7 +1618,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	// Check if the accepter task paused, resume it if necessary
 	//
 
-	if peMgr.acceptPaused == true {
+	if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true {
 		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
 	}
 

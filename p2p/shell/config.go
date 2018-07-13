@@ -33,6 +33,13 @@ func ShellDefaultConfig() *config.Config {
 }
 
 //
+// get default bootstrap node configuration
+//
+func ShellDefaultBootstrapConfig() *config.Config {
+	return config.P2pDefaultBootstrapConfig()
+}
+
+//
 // Set configuration
 //
 func ShellSetConfig(name string, cfg *config.Config) (string, config.P2pCfgErrno) {

@@ -226,6 +226,7 @@ type Cfg4PeerManager struct {
 	SubNetIdList		[]SubNetworkID			// sub network identity list. do not put the identity
 												// of the local node in this list.
 	NoDial				bool					// do not dial outbound
+	NoAccept			bool					// do not accept inbound
 	BootstrapNode		bool					// local is a bootstrap node
 	ProtoNum			uint32					// local protocol number
 	Protocols			[]Protocol				// local protocol table
@@ -288,7 +289,7 @@ var dftLocal = Node {
 var config = make(map[string] *Config)
 
 //
-// Get default config
+// Get default non-bootstrap node config
 //
 func P2pDefaultConfig() *Config {
 
@@ -309,6 +310,40 @@ func P2pDefaultConfig() *Config {
 		NoDial:					false,
 		NoAccept:				false,
 		BootstrapNode:			false,
+		Local:					dftLocal,
+		ProtoNum:				1,
+		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
+		SubNetMaxPeers:			map[SubNetworkID]int{},
+		SubNetMaxOutbounds:		map[SubNetworkID]int{},
+		SubNetMaxInBounds:		map[SubNetworkID]int{},
+		SubNetIdList:			[]SubNetworkID{},
+	}
+
+	return &defaultConfig
+}
+
+//
+// Get default bootstrap node config
+//
+func P2pDefaultBootstrapConfig() *Config {
+
+	var defaultConfig = Config {
+		NetworkType:			P2pNewworkTypeDynamic,
+		Name:					dftName,
+		Version:				dftVersion,
+		PrivateKey:				nil,
+		PublicKey:				nil,
+		StaticMaxPeers:			0,
+		StaticMaxInbounds:		0,
+		StaticMaxOutbounds:		0,
+		BootstrapNodes:			BootstrapNodes,
+		StaticNodes:			nil,
+		StaticNetId:			ZeroSubNet,
+		NodeDataDir:			P2pDefaultDataDir(true),
+		NodeDatabase:			datadirNodeDatabase,
+		NoDial:					true,
+		NoAccept:				true,
+		BootstrapNode:			true,
 		Local:					dftLocal,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
@@ -361,10 +396,9 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 
 	for key, maxPeers := range cfg.SubNetMaxPeers {
-		if maxPeers <= cfg.SubNetMaxOutbounds[key] + cfg.SubNetMaxInBounds[key] {
+		if maxPeers < cfg.SubNetMaxOutbounds[key] + cfg.SubNetMaxInBounds[key] {
 			log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration");
 			return name, PcfgEnoParameter
-
 		}
 	}
 
@@ -799,6 +833,7 @@ func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 		StaticNodes:		config[name].StaticNodes,
 		StaticNetId:		config[name].StaticNetId,
 		NoDial:				config[name].NoDial,
+		NoAccept:			config[name].NoAccept,
 		ProtoNum:			config[name].ProtoNum,
 		Protocols:			config[name].Protocols,
 		SubNetMaxPeers:		config[name].SubNetMaxPeers,

@@ -436,7 +436,10 @@ func (inst *neighborInst) NgbProtoFindNodeRsp(msg *um.Neighbors) NgbProtoErrno {
 	// running; 3) done the task, clean the map held by manager task...
 	//
 
+	//
 	// we must be a "FindNode" instance
+	//
+
 	if inst.msgType != um.UdpMsgTypeFindNode || inst.msgBody == nil {
 
 		log.LogCallerFileLine("NgbProtoFindNodeRsp: " +
@@ -465,9 +468,11 @@ func (inst *neighborInst) NgbProtoFindNodeRsp(msg *um.Neighbors) NgbProtoErrno {
 	//
 
 	if inst.tidFN != sch.SchInvalidTid {
+
 		if eno := inst.sdl.SchKillTimer(inst.ptn, inst.tidFN); eno != sch.SchEnoNone {
 			return NgbProtoEnoScheduler
 		}
+
 		inst.tidFN = sch.SchInvalidTid
 	}
 
