@@ -43,6 +43,9 @@ func init() {
 // Log the caller's file and line when this function called
 //
 func LogCallerFileLine(format string, args ... interface{}) {
+
+	return
+
 	logg.Logger.Infof(format, args...)
 	if !Log_DisableFileLine {
 		_, file, line, _ := runtime.Caller(1)

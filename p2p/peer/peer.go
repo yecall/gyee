@@ -87,7 +87,7 @@ const maxTcpmsgSize = 1024*1024*4					// max size of a tcpmsg package could be, 
 const durDcvFindNodeTimer = time.Second * 20		// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 
-const durStaticRetryTimer = time.Second * 4		// duration to check and retry connect to static peers
+const durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
 
 const (
 	peerIdle			= iota						// idle
@@ -1062,14 +1062,29 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	// instance connect from local to outside.
 	//
 
+	var maxInbound = 0
+
 	snid := rsp.snid
 	id := rsp.peNode.ID
 
 	if inst.dir == PeInstDirInbound {
 
-		maxInbound := peMgr.cfg.staticMaxOutbounds
-		if peMgr.cfg.networkType != config.P2pNewworkTypeStatic {
-			maxInbound = peMgr.cfg.subNetMaxInBounds[snid]
+		if peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
+			peMgr.staticSubNetIdExist(&snid) == true {
+
+			maxInbound = peMgr.cfg.staticMaxOutbounds
+
+		} else if peMgr.cfg.networkType != config.P2pNewworkTypeDynamic {
+
+			if peMgr.dynamicSubNetIdExist(&snid) == true {
+
+				maxInbound = peMgr.cfg.subNetMaxInBounds[snid]
+
+			} else if peMgr.staticSubNetIdExist(&snid) == true {
+
+				maxInbound = peMgr.cfg.staticMaxOutbounds
+
+			}
 		}
 
 		if peMgr.ibpNum[snid] >= maxInbound {
