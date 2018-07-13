@@ -973,7 +973,7 @@ func testCase4(tc *testCase) {
 
 		if loop == 0 {
 
-			bootstrapIp = p2pName2Cfg[cfgName].Local.IP
+			bootstrapIp = append(bootstrapIp, p2pName2Cfg[cfgName].Local.IP[:]...)
 			bootstrapId = fmt.Sprintf("%X", p2pName2Cfg[cfgName].Local.ID)
 			bootstrapUdp = p2pName2Cfg[cfgName].Local.UDP
 			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
