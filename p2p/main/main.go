@@ -117,7 +117,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase string = "testCase3"
+var tgtCase string = "testCase4"
 
 //
 // create test case control block by name
@@ -173,11 +173,14 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 			fmt.Sprintf("%x", snid),
 			fmt.Sprintf("%X", id))
 
+		doneMapLock.Unlock()
 		return
 	}
 
 	tcb := newTcb(tgtCase)
 	doneMap[p2pInst][idEx] = tcb
+
+	doneMapLock.Unlock()
 
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,
@@ -195,6 +198,8 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 
 
 	var tmHandler = func() {
+
+		doneMapLock.Lock()
 
 		tcb.txSeq++
 
@@ -222,9 +227,9 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 					fmt.Sprintf("%X", id))
 			}
 		}
-	}
 
-	doneMapLock.Unlock()
+		doneMapLock.Unlock()
+	}
 
 	tm := time.NewTicker(time.Second * 1)
 	defer tm.Stop()
@@ -534,7 +539,7 @@ func testCase1(tc *testCase) {
 
 	log.LogCallerFileLine("testCase1: going to start ycp2p ...")
 
-	var p2pInstNum = 32
+	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
 	var bootstrapId string = ""
@@ -620,7 +625,7 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
-	var p2pInstNum = 32
+	var p2pInstNum = 8
 
 	var staticNodeIdList = []*config.Node{}
 
@@ -844,7 +849,7 @@ func testCase4(tc *testCase) {
 
 	log.LogCallerFileLine("testCase4: going to start ycp2p ...")
 
-	var p2pInstNum = 16
+	var p2pInstNum = 8
 
 	var bootstrapIp net.IP
 	var bootstrapId string = ""
@@ -929,16 +934,11 @@ func testCase4(tc *testCase) {
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
-				snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
-				snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
+				snid0 := config.SubNetworkID{0xff, byte(idx & 0x0f)}
 				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
-				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
 				myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
-				myCfg.SubNetMaxInBounds[snid0] = config.MaxInbounds
-				myCfg.SubNetMaxOutbounds[snid0] = config.MaxOutbounds
-				myCfg.SubNetMaxPeers[snid1] = config.MaxPeers
-				myCfg.SubNetMaxInBounds[snid1] = config.MaxInbounds
-				myCfg.SubNetMaxOutbounds[snid1] = config.MaxOutbounds
+				myCfg.SubNetMaxInBounds[snid0] = config.MaxPeers
+				myCfg.SubNetMaxOutbounds[snid0] = 0
 			}
 		} else {
 			snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}

@@ -33,6 +33,7 @@ import (
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	golog	"log"
 )
 
 //
@@ -365,6 +366,14 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 			peMgr.ibpNum[snid] = 0
 			peMgr.obpNum[snid] = 0
 		}
+		if len(peMgr.cfg.staticNodes) > 0 {
+			staticSnid := peMgr.cfg.staticSubNetId
+			peMgr.nodes[staticSnid] = make(map[config.NodeID]*peerInstance)
+			peMgr.workers[staticSnid] = make(map[config.NodeID]*peerInstance)
+			peMgr.wrkNum[staticSnid] = 0
+			peMgr.ibpNum[staticSnid] = 0
+			peMgr.obpNum[staticSnid] = 0
+		}
 	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
 		staticSnid := peMgr.cfg.staticSubNetId
 		peMgr.nodes[staticSnid] = make(map[config.NodeID]*peerInstance)
@@ -500,7 +509,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	var rsp = msg.(*sch.MsgDcvFindNodeRsp)
-	if peMgr.subNetIdExist(&rsp.Snid) != true {
+	if peMgr.dynamicSubNetIdExist(&rsp.Snid) != true {
 		log.LogCallerFileLine("peMgrDcvFindNodeRsp: subnet not exist")
 		return PeMgrEnoNotfound
 	}
@@ -760,16 +769,18 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 
 	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
 
-		if peMgr.subNetIdExist(snid) == true {
+		if peMgr.dynamicSubNetIdExist(snid) == true {
 
 			return peMgr.peMgrDynamicSubNetOutbound(snid)
 
-		}
+		} else if peMgr.staticSubNetIdExist(snid) {
 
-		return PeMgrEnoNotfound
+			return peMgr.peMgrStaticSubNetOutbound()
+
+		}
 	}
 
-	return PeMgrEnoConfig
+	return PeMgrEnoNotfound
 }
 
 //
@@ -1635,13 +1646,16 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	var tid int
 
 	log.LogCallerFileLine("peMgrAsk4More: " +
-		"configuration name: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d",
+		"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d",
 		peMgr.cfg.cfgName,
 		*snid,
 		peMgr.obpNum[*snid],
 		peMgr.ibpNum[*snid],
 		peMgr.ibpTotalNum,
 		peMgr.wrkNum[*snid])
+
+
+	peMgr.logPeerStat()
 
 	//
 	// no discovering needed for static nodes, only dynamics need it
@@ -2469,7 +2483,8 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	// check subnet identity
 	//
 
-	if inst.peMgr.subNetIdExist(&hs.Snid) != true {
+	if inst.peMgr.dynamicSubNetIdExist(&hs.Snid) == false &&
+		inst.peMgr.staticSubNetIdExist(&hs.Snid) == false {
 
 		log.LogCallerFileLine("piHandshakeInbound: " +
 			"local node does not attach to subnet: %x",
@@ -3171,13 +3186,9 @@ func (peMgr *PeerManager)updateStaticStatus(snid SubNetworkID, id config.NodeID,
 //
 // Check if we have sub network identity as "snid"
 //
-func (peMgr *PeerManager)subNetIdExist(snid *SubNetworkID) bool {
+func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
 
-	if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
-
-		return peMgr.cfg.staticSubNetId == *snid
-
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
 
 		for _, id := range peMgr.cfg.subNetIdList {
 
@@ -3188,4 +3199,80 @@ func (peMgr *PeerManager)subNetIdExist(snid *SubNetworkID) bool {
 	}
 
 	return false
+}
+
+//
+// Check if specific subnet is current static sub network identity
+//
+func (peMgr *PeerManager)staticSubNetIdExist(snid *SubNetworkID) bool {
+
+	if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
+
+		return peMgr.cfg.staticSubNetId == *snid
+
+	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+
+		return len(peMgr.cfg.staticNodes) > 0 && peMgr.cfg.staticSubNetId == *snid
+	}
+
+	return false
+}
+
+//
+// Print peer statistics
+//
+func (peMgr *PeerManager)logPeerStat() {
+
+	var obpNumSum = 0
+	var ibpNumSum = 0
+	var wrkNumSum = 0
+
+	var ibpNumTotal = peMgr.ibpTotalNum
+
+	for _, num := range peMgr.obpNum {
+		obpNumSum += num
+	}
+
+	for _, num := range peMgr.ibpNum {
+		ibpNumSum += num
+	}
+
+	for _, num := range peMgr.wrkNum {
+		wrkNumSum += num
+	}
+
+	var dbgMsg = ""
+
+	strSum := fmt.Sprintf("============================ logPeerStat: ============================\n" +
+		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d\n",
+		peMgr.cfg.cfgName,
+		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum)
+
+	dbgMsg += strSum
+
+	var subNetIdList = make([]SubNetworkID, 0)
+
+	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+		subNetIdList = append(subNetIdList, peMgr.cfg.subNetIdList...)
+		if len(peMgr.cfg.staticNodes) > 0 {
+			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
+		}
+	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
+		if len(peMgr.cfg.staticNodes) > 0 {
+			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
+		}
+	}
+
+	for _, snid := range subNetIdList {
+		strSubnet := fmt.Sprintf("logPeerStat: p2pInst: %s, subnet: %x, obpNumSum: %d, ibpNumSum: %d, wrkNumSum: %d\n",
+			peMgr.cfg.cfgName,
+			snid,
+			peMgr.obpNum[snid],
+			peMgr.ibpNum[snid],
+			peMgr.wrkNum[snid])
+		dbgMsg += strSubnet
+	}
+
+	//log.LogCallerFileLine("%s", dbgMsg)
+	golog.Printf("%s", dbgMsg)
 }
