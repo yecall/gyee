@@ -162,6 +162,7 @@ type PeerManager struct {
 	Lock4Cb			sync.Mutex						// lock for indication callback
 	P2pIndHandler	P2pIndCallback					// indication callback installed by p2p user from shell
 
+	ssTid			int								// statistics timer identity
 	staticsStatus	map[config.NodeID]int			// statu about static nodes
 }
 
@@ -223,6 +224,9 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	case sch.EvSchPoweroff:
 		eno = peMgr.peMgrPoweroff(ptn)
+
+	case sch.EvPeTestStatTimer:
+		peMgr.logPeerStat()
 
 	case sch.EvPeMgrStartReq:
 		eno = peMgr.peMgrStartReq(msg.Body)
@@ -490,6 +494,29 @@ func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
 
+	//
+	// set timer to debug print statistics about peer managers for test cases
+	//
+
+	var td = sch.TimerDescription {
+		Name:	"_ptsTimer",
+		Utid:	sch.PeTestStatTimerId,
+		Tmt:	sch.SchTmTypePeriod,
+		Dur:	time.Second * 2,
+		Extra:	nil,
+	}
+
+	if peMgr.ssTid != sch.SchInvalidTid {
+		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.ssTid)
+		peMgr.ssTid = sch.SchInvalidTid
+	}
+
+	var eno sch.SchErrno
+	eno, peMgr.ssTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td)
+	if eno != sch.SchEnoNone || peMgr.ssTid == sch.SchInvalidTid {
+		log.LogCallerFileLine("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
+	}
+
 	return PeMgrEnoNone
 }
 
@@ -704,7 +731,8 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	//
 
 	if peMgr.ibpTotalNum++; peMgr.ibpTotalNum >= peMgr.cfg.ibpNumTotal {
-		if !peMgr.cfg.noAccept {
+		if !peMgr.cfg.noAccept && !peMgr.acceptPaused {
+			log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, cfgName: %s", peMgr.cfg.cfgName)
 			peMgr.acceptPaused = peMgr.accepter.PauseAccept()
 		}
 	}
@@ -988,6 +1016,14 @@ func (peMgr *PeerManager)peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 
 				return eno
 			}
+
+			//
+			// since an outbound instance killed, we need to drive ourself to startup outbound
+			//
+
+			var schMsg = sch.SchMessage{}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &rsp.snid)
+			peMgr.sdl.SchSendMessage(&schMsg)
 		}
 
 		return PeMgrEnoNone
@@ -1053,6 +1089,12 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			return eno
 		}
 
+		if rsp.dir == PeInstDirOutbound {
+			var schMsg = sch.SchMessage{}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &rsp.snid)
+			peMgr.sdl.SchSendMessage(&schMsg)
+		}
+
 		return PeMgrEnoNone
 	}
 
@@ -1106,6 +1148,21 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				return eno
 			}
 
+			//
+			// update ibpTotalNum and resume accepter if necessary
+			//
+
+			if peMgr.ibpTotalNum--; peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
+
+				if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true {
+
+					log.LogCallerFileLine("peMgrHandshakeRsp: " +
+						"going to resume accepter, cfgName: %s", peMgr.cfg.cfgName)
+
+					peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
+				}
+			}
+
 			return PeMgrEnoResource
 		}
 
@@ -1127,6 +1184,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 			dupInst := peMgr.nodes[snid][id]
 			cmp := inst.state.compare(dupInst.state)
+			obKilled := false
 
 			if cmp < 0 {
 				ptn2Kill = rsp.ptn
@@ -1134,6 +1192,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			} else if cmp > 0 {
 				ptn2Kill = dupInst.ptnMe
 				node2Kill = &dupInst.node
+				obKilled = dupInst.dir == PeInstDirOutbound
 			} else {
 				if rand.Int() & 0x01 == 0 {
 					ptn2Kill = rsp.ptn
@@ -1141,6 +1200,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				} else {
 					ptn2Kill = dupInst.ptnMe
 					node2Kill = &dupInst.node
+					obKilled = dupInst.dir == PeInstDirOutbound
 				}
 			}
 
@@ -1174,6 +1234,17 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 			if ptn2Kill == rsp.ptn {
 				return PeMgrEnoDuplicaated
+			}
+
+			//
+			// If the killed on is an outbound instance, we need to send EvPeOutboundReq
+			// to peer manager so it can try outgoing connection.
+			//
+
+			if obKilled {
+				var schMsg= sch.SchMessage{}
+				peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
+				peMgr.sdl.SchSendMessage(&schMsg)
 			}
 		}
 	}
@@ -1410,6 +1481,11 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	// is not required to be closed by the peer manager, but the connection had
 	// been closed for some other reasons.
 	//
+	// Notice: we need EvPeOutboundReq to be sent to drive the outbound, when an
+	// inbound instance killed, in currently implement, we have to send EvPeOutboundReq
+	// in handshake procedure when instances killed and we had to do the same in
+	// pingpong procedure.
+	//
 
 	var ind = msg.(*MsgCloseInd)
 
@@ -1645,6 +1721,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	//
 
 	if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true {
+		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to resume accepter, cfgName: %s", peMgr.cfg.cfgName)
 		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
 	}
 
@@ -1668,9 +1745,6 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		peMgr.ibpNum[*snid],
 		peMgr.ibpTotalNum,
 		peMgr.wrkNum[*snid])
-
-
-	peMgr.logPeerStat()
 
 	//
 	// no discovering needed for static nodes, only dynamics need it
@@ -1845,9 +1919,10 @@ var peerInstDefault = peerInstance {
 // EvPeConnOutRsp message
 //
 type msgConnOutRsp struct {
-	result	PeMgrErrno		// result of outbound connect action
-	peNode 	*config.Node	// target node
-	ptn		interface{}		// pointer to task instance node of sender
+	result	PeMgrErrno				// result of outbound connect action
+	snid	config.SubNetworkID		// sub network identity
+	peNode 	*config.Node			// target node
+	ptn		interface{}			// pointer to task instance node of sender
 }
 
 //
@@ -1855,6 +1930,7 @@ type msgConnOutRsp struct {
 //
 type msgHandshakeRsp struct {
 	result	PeMgrErrno			// result of handshake action
+	dir		int					// inbound or outbound
 	snid	config.SubNetworkID	// sub network identity
 	peNode 	*config.Node		// target node
 	ptn		interface{}			// pointer to task instance node of sender
@@ -2006,9 +2082,10 @@ func (inst *peerInstance)piConnOutReq(msg interface{}) PeMgrErrno {
 
 	var schMsg = sch.SchMessage{}
 	var rsp = msgConnOutRsp {
-		result:eno,
-		peNode:&inst.node,
-		ptn: inst.ptnMe,
+		result:	eno,
+		snid:	inst.snid,
+		peNode:	&inst.node,
+		ptn:	inst.ptnMe,
 	}
 
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptnMe, inst.ptnMgr, sch.EvPeConnOutRsp, &rsp)
@@ -2081,6 +2158,7 @@ func (inst *peerInstance)piHandshakeReq(msg interface{}) PeMgrErrno {
 
 	var rsp = msgHandshakeRsp {
 		result:	eno,
+		dir:	inst.dir,
 		snid:	inst.snid,
 		peNode:	&inst.node,
 		ptn:	inst.ptnMe,
@@ -3258,10 +3336,10 @@ func (peMgr *PeerManager)logPeerStat() {
 
 	var dbgMsg = ""
 
-	strSum := fmt.Sprintf("============================ logPeerStat: ============================\n" +
-		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d\n",
+	strSum := fmt.Sprintf("================================= logPeerStat: =================================\n" +
+		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d, accepting: %t\n",
 		peMgr.cfg.cfgName,
-		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum)
+		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum, !peMgr.acceptPaused)
 
 	dbgMsg += strSum
 

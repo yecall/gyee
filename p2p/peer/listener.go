@@ -487,8 +487,7 @@ acceptLoop:
 	if accepter.curError != nil && accepter.event != sch.SchEnoNone {
 
 		//
-		// This is the normal case: the loop is broken by manager task, or
-		// errors fired from underlying network.
+		// This is the normal case: the loop is broken by manager task killing the accepter
 		//
 
 		log.LogCallerFileLine("PeerAcceptProc: broken for event: %d", accepter.event)
@@ -534,7 +533,7 @@ func (accepter *acceptTskCtrlBlock)PauseAccept() bool {
 // Resume accept
 //
 func (accepter *acceptTskCtrlBlock)ResumeAccept() bool {
-	log.LogCallerFileLine("PauseAccept: try to resume accepting inbound")
+	log.LogCallerFileLine("ResumeAccept: try to resume accepting inbound")
 	accepter.lockAccept.Unlock()
 	return true
 }

@@ -117,7 +117,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase string = "testCase4"
+var tgtCase string = "testCase2"
 
 //
 // create test case control block by name
@@ -625,7 +625,7 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 16
 
 	var staticNodeIdList = []*config.Node{}
 
