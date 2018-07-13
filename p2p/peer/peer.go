@@ -1067,6 +1067,15 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		return PeMgrEnoNotfound
 	}
 
+	if inst.snid != rsp.snid || inst.dir != rsp.dir {
+
+		log.LogCallerFileLine("peMgrHandshakeRsp: " +
+			"response mismatched with instance, rsp: %s",
+			fmt.Sprintf("%+v", *rsp))
+
+		return PeMgrEnoParameter
+	}
+
 	//
 	// Check result, if failed, kill the instance
 	//
@@ -1089,10 +1098,16 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			return eno
 		}
 
-		if rsp.dir == PeInstDirOutbound {
+		if inst.dir == PeInstDirOutbound {
+
+			//
+			// send EvPeOutboundReq to drive outbound
+			//
+
 			var schMsg = sch.SchMessage{}
-			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &rsp.snid)
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
 			peMgr.sdl.SchSendMessage(&schMsg)
+
 		}
 
 		return PeMgrEnoNone
@@ -1146,21 +1161,6 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 					snid, rsp.peNode.ID)
 
 				return eno
-			}
-
-			//
-			// update ibpTotalNum and resume accepter if necessary
-			//
-
-			if peMgr.ibpTotalNum--; peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
-
-				if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true {
-
-					log.LogCallerFileLine("peMgrHandshakeRsp: " +
-						"going to resume accepter, cfgName: %s", peMgr.cfg.cfgName)
-
-					peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
-				}
 			}
 
 			return PeMgrEnoResource
@@ -1720,7 +1720,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	// Check if the accepter task paused, resume it if necessary
 	//
 
-	if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true {
+	if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true  && peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
 		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to resume accepter, cfgName: %s", peMgr.cfg.cfgName)
 		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
 	}

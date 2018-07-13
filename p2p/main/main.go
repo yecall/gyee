@@ -625,7 +625,7 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
-	var p2pInstNum = 16
+	var p2pInstNum = 32
 
 	var staticNodeIdList = []*config.Node{}
 
