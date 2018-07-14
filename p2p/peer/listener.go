@@ -26,7 +26,7 @@ import (
 	"fmt"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	log	"github.com/yeeco/gyee/p2p/logger"
+	log		"github.com/yeeco/gyee/p2p/logger"
 	"sync"
 )
 

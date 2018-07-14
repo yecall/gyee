@@ -27,13 +27,14 @@ import (
 	"time"
 	"fmt"
 	"net"
+	"sync"
 	"os/signal"
 	shell	"github.com/yeeco/gyee/p2p/shell"
 	peer	"github.com/yeeco/gyee/p2p/peer"
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	"sync"
+	"math/rand"
 )
 
 //
@@ -523,7 +524,7 @@ func testCase0(tc *testCase) {
 		return
 	}
 
-	log.LogCallerFileLine("testCase0: ycp2p started, eno: %d", eno)
+	log.LogCallerFileLine("testCase0: ycp2p started, cofig: %s", cfgName)
 
 	//
 	// wait os interrupt signal
@@ -612,7 +613,7 @@ func testCase1(tc *testCase) {
 			return
 		}
 
-		log.LogCallerFileLine("testCase1: ycp2p started, cofig: %s, eno: %d", cfgName, eno)
+		log.LogCallerFileLine("testCase1: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -625,13 +626,14 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
-	var p2pInstNum = 32
+	var p2pInstNum = 9
+	var cfgName = ""
 
 	var staticNodeIdList = []*config.Node{}
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
-		cfgName := fmt.Sprintf("p2pInst%d", loop)
+		cfgName = fmt.Sprintf("p2pInst%d", loop)
 		log.LogCallerFileLine("testCase2: prepare node identity: %s ...", cfgName)
 
 		dftCfg := shell.ShellDefaultConfig()
@@ -680,9 +682,11 @@ func testCase2(tc *testCase) {
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNewworkTypeStatic
 		myCfg.StaticNetId = config.ZeroSubNet
-		myCfg.StaticMaxPeers = config.MaxPeers
+
+		/*myCfg.StaticMaxPeers = config.MaxPeers
 		myCfg.StaticMaxOutbounds = config.MaxOutbounds
-		myCfg.StaticMaxInbounds = config.MaxInbounds
+		myCfg.StaticMaxInbounds = config.MaxInbounds*/
+
 		myCfg.Local = *staticNodeIdList[loop]
 
 		for idx, n := range staticNodeIdList {
@@ -690,6 +694,10 @@ func testCase2(tc *testCase) {
 				myCfg.StaticNodes = append(myCfg.StaticNodes, n)
 			}
 		}
+
+		myCfg.StaticMaxPeers = len(myCfg.StaticNodes)	        // config.MaxPeers
+		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes) / 2	// config.MaxOutbounds
+		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes) / 2	// config.MaxInbounds
 
 		cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
 		p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
@@ -699,9 +707,22 @@ func testCase2(tc *testCase) {
 			log.LogCallerFileLine("testCase2: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
-		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
-		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
+		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
+	}
+
+	var p2pInstList = []*sch.Scheduler{}
+	for p2pInst, _ := range p2pInst2Cfg {
+		p2pInstList = append(p2pInstList, p2pInst)
+	}
+
+	for piNum := len(p2pInstList); piNum > 0; piNum-- {
+
+		pidx := rand.Intn(piNum)
+		p2pInst := p2pInstList[pidx]
+		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
+
+		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase2: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -712,7 +733,7 @@ func testCase2(tc *testCase) {
 			return
 		}
 
-		log.LogCallerFileLine("testCase2: ycp2p started, cofig: %s, eno: %d", cfgName, eno)
+		log.LogCallerFileLine("testCase2: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -836,7 +857,7 @@ func testCase3(tc *testCase) {
 			return
 		}
 
-		log.LogCallerFileLine("testCase3: ycp2p started, cofig: %s, eno: %d", cfgName, eno)
+		log.LogCallerFileLine("testCase3: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -918,9 +939,6 @@ func testCase4(tc *testCase) {
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNewworkTypeDynamic
 		myCfg.StaticNetId = config.ZeroSubNet
-		myCfg.StaticMaxPeers = config.MaxPeers
-		myCfg.StaticMaxOutbounds = config.MaxOutbounds
-		myCfg.StaticMaxInbounds = config.MaxInbounds
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(30303 + loop)
 		myCfg.Local.TCP = uint16(30303 + loop)
@@ -931,6 +949,10 @@ func testCase4(tc *testCase) {
 				myCfg.StaticNodes = append(myCfg.StaticNodes, n)
 			}
 		}
+
+		myCfg.StaticMaxPeers = len(myCfg.StaticNodes)		// config.MaxPeers
+		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes)	// config.MaxOutbounds
+		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)	// config.MaxInbounds
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
@@ -1007,7 +1029,7 @@ func testCase4(tc *testCase) {
 			return
 		}
 
-		log.LogCallerFileLine("testCase4: ycp2p started, cofig: %s, eno: %d", cfgName, eno)
+		log.LogCallerFileLine("testCase4: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()

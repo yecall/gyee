@@ -27,13 +27,13 @@ import (
 	"fmt"
 	"sync"
 	"math/rand"
+	golog	"log"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	golog	"log"
 )
 
 //
@@ -149,8 +149,8 @@ type PeerManager struct {
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
-	nodes			map[SubNetworkID]map[config.NodeID]*peerInstance	// map peer node identity to instance pointer
-	workers			map[SubNetworkID]map[config.NodeID]*peerInstance	// map peer node identity to pointer of instance in work
+	nodes			map[SubNetworkID]map[config.NodeID][2]*peerInstance	// map peer node identity to instance pointer
+	workers			map[SubNetworkID]map[config.NodeID][2]*peerInstance	// map peer node identity to pointer of instance in work
 	wrkNum			map[SubNetworkID]int			// worker peer number
 	ibpNum			map[SubNetworkID]int			// active inbound peer number
 	obpNum			map[SubNetworkID]int			// active outbound peer number
@@ -185,8 +185,8 @@ func NewPeerMgr() *PeerManager {
 		tabMgr:			nil,
 		accepter:		nil,
 		peers:        	map[interface{}]*peerInstance{},
-		nodes:        	map[SubNetworkID]map[config.NodeID]*peerInstance{},
-		workers:      	map[SubNetworkID]map[config.NodeID]*peerInstance{},
+		nodes:        	map[SubNetworkID]map[config.NodeID][2]*peerInstance{},
+		workers:      	map[SubNetworkID]map[config.NodeID][2]*peerInstance{},
 		wrkNum:       	map[SubNetworkID]int{},
 		ibpNum:       	map[SubNetworkID]int{},
 		obpNum:       	map[SubNetworkID]int{},
@@ -364,24 +364,24 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
 		for _, snid := range peMgr.cfg.subNetIdList {
-			peMgr.nodes[snid] = make(map[config.NodeID]*peerInstance)
-			peMgr.workers[snid] = make(map[config.NodeID]*peerInstance)
+			peMgr.nodes[snid] = make(map[config.NodeID][2]*peerInstance)
+			peMgr.workers[snid] = make(map[config.NodeID][2]*peerInstance)
 			peMgr.wrkNum[snid] = 0
 			peMgr.ibpNum[snid] = 0
 			peMgr.obpNum[snid] = 0
 		}
 		if len(peMgr.cfg.staticNodes) > 0 {
 			staticSnid := peMgr.cfg.staticSubNetId
-			peMgr.nodes[staticSnid] = make(map[config.NodeID]*peerInstance)
-			peMgr.workers[staticSnid] = make(map[config.NodeID]*peerInstance)
+			peMgr.nodes[staticSnid] = make(map[config.NodeID][2]*peerInstance)
+			peMgr.workers[staticSnid] = make(map[config.NodeID][2]*peerInstance)
 			peMgr.wrkNum[staticSnid] = 0
 			peMgr.ibpNum[staticSnid] = 0
 			peMgr.obpNum[staticSnid] = 0
 		}
 	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
 		staticSnid := peMgr.cfg.staticSubNetId
-		peMgr.nodes[staticSnid] = make(map[config.NodeID]*peerInstance)
-		peMgr.workers[staticSnid] = make(map[config.NodeID]*peerInstance)
+		peMgr.nodes[staticSnid] = make(map[config.NodeID][2]*peerInstance)
+		peMgr.workers[staticSnid] = make(map[config.NodeID][2]*peerInstance)
 		peMgr.wrkNum[staticSnid] = 0
 		peMgr.ibpNum[staticSnid] = 0
 		peMgr.obpNum[staticSnid] = 0
@@ -847,13 +847,19 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 	}
 
 	//
-	// Create outbound instances for candidates if any
+	// Create outbound instances for candidates if any.
+	// Notice: we should pick candidates in random order then always from the
+	// head on, for one node can only accept limited inbounds.
 	//
 
 	var failed = 0
 	var ok = 0
 
-	for _, n := range candidates {
+	for cdNum := len(candidates); cdNum > 0; cdNum-- {
+
+		idx := rand.Intn(cdNum)
+		n := candidates[idx]
+		candidates = append(candidates[:idx], candidates[idx+1:]...)
 
 		if eno := peMgr.peMgrCreateOutboundInst(&snid, n); eno != PeMgrEnoNone {
 
@@ -1008,7 +1014,7 @@ func (peMgr *PeerManager)peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 
 		if _, lived := peMgr.peers[rsp.ptn]; lived {
 
-			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, PeInstDirOutbound); eno != PeMgrEnoNone {
 
 				log.LogCallerFileLine("peMgrConnOutRsp: "+
 					"peMgrKillInst failed, eno: %d",
@@ -1089,7 +1095,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 		peMgr.updateStaticStatus(rsp.snid, rsp.peNode.ID, peerKilling)
 
-		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
 
 			log.LogCallerFileLine("peMgrHandshakeRsp: " +
 				"peMgrKillInst failed, node: %s",
@@ -1120,41 +1126,47 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	//
 
 	var maxInbound = 0
+	var maxOutbound = 0
+	var maxPeers = 0
 
 	snid := rsp.snid
 	id := rsp.peNode.ID
 
+	if peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
+		peMgr.staticSubNetIdExist(&snid) == true {
+
+		maxInbound = peMgr.cfg.staticMaxInBounds
+		maxOutbound = peMgr.cfg.staticMaxOutbounds
+		maxPeers = peMgr.cfg.staticMaxPeers
+
+	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+
+		if peMgr.dynamicSubNetIdExist(&snid) == true {
+
+			maxInbound = peMgr.cfg.subNetMaxInBounds[snid]
+			maxOutbound = peMgr.cfg.subNetMaxOutbounds[snid]
+			maxPeers = peMgr.cfg.subNetMaxPeers[snid]
+
+		} else if peMgr.staticSubNetIdExist(&snid) == true {
+
+			maxInbound = peMgr.cfg.staticMaxInBounds
+			maxOutbound = peMgr.cfg.staticMaxOutbounds
+			maxPeers = peMgr.cfg.staticMaxPeers
+
+		}
+	}
+
 	if inst.dir == PeInstDirInbound {
 
-		if peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
-			peMgr.staticSubNetIdExist(&snid) == true {
-
-			maxInbound = peMgr.cfg.staticMaxOutbounds
-
-		} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
-
-			if peMgr.dynamicSubNetIdExist(&snid) == true {
-
-				maxInbound = peMgr.cfg.subNetMaxInBounds[snid]
-
-			} else if peMgr.staticSubNetIdExist(&snid) == true {
-
-				maxInbound = peMgr.cfg.staticMaxOutbounds
-
-			}
-		}
-
-		if peMgr.ibpNum[snid] >= maxInbound {
+		if peMgr.ibpNum[snid] >= maxInbound || peMgr.wrkNum[snid] >= maxPeers {
 
 			log.LogCallerFileLine("peMgrHandshakeRsp: " +
-				"too much inbound, subnet: %x, ibpNum: %d, max: %d",
-				snid,
-				peMgr.ibpNum[snid],
-				maxInbound)
+				"too much inbound, subnet: %x",
+				snid)
 
 			peMgr.updateStaticStatus(snid, rsp.peNode.ID, peerKilling)
 
-			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
 
 				log.LogCallerFileLine("peMgrHandshakeRsp: "+
 					"peMgrKillInst failed, subnet: %x, node: %X",
@@ -1166,7 +1178,13 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			return PeMgrEnoResource
 		}
 
-		if _, dup := peMgr.nodes[snid][id]; dup {
+		if peMgr.isStaticSubNetId(snid) {
+
+			var instList = peMgr.workers[snid][id]
+			instList[PeInstInPos] = inst
+			peMgr.workers[snid][id] = instList
+
+		} else if _, dup := peMgr.nodes[snid][id]; dup {
 
 			log.LogCallerFileLine("peMgrHandshakeRsp: "+
 				"duplicated, node: %s",
@@ -1179,10 +1197,15 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			// in "handshook" state.
 			//
 
+			if peMgr.nodes[snid][id][PeInstInPos] != nil {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				return PeMgrEnoDuplicaated
+			}
+
 			var ptn2Kill interface{} = nil
 			var node2Kill *config.Node = nil
 
-			dupInst := peMgr.nodes[snid][id]
+			dupInst := peMgr.nodes[snid][id][PeInstOutPos]
 			cmp := inst.state.compare(dupInst.state)
 			obKilled := false
 
@@ -1194,7 +1217,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				node2Kill = &dupInst.node
 				obKilled = dupInst.dir == PeInstDirOutbound
 			} else {
-				if rand.Int() & 0x01 == 0 {
+				if rand.Int()&0x01 == 0 {
 					ptn2Kill = rsp.ptn
 					node2Kill = rsp.peNode
 				} else {
@@ -1213,19 +1236,19 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			// above of this function(handshake response handler) please.
 			//
 
-			log.LogCallerFileLine("peMgrHandshakeRsp: " +
+			log.LogCallerFileLine("peMgrHandshakeRsp: "+
 				"node2Kill: %s",
 				fmt.Sprintf("%X", *node2Kill))
 
 			peMgr.updateStaticStatus(snid, node2Kill.ID, peerKilling)
 
-			if eno := peMgr.peMgrKillInst(ptn2Kill, node2Kill); eno != PeMgrEnoNone {
+			if eno := peMgr.peMgrKillInst(ptn2Kill, node2Kill, inst.dir); eno != PeMgrEnoNone {
 
 				log.LogCallerFileLine("peMgrHandshakeRsp: "+
 					"peMgrKillInst failed, node: %s",
 					fmt.Sprintf("%X", rsp.peNode.ID))
 
-				return eno
+					return eno
 			}
 
 			//
@@ -1242,10 +1265,50 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			//
 
 			if obKilled {
-				var schMsg= sch.SchMessage{}
+				var schMsg = sch.SchMessage{}
 				peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
 				peMgr.sdl.SchSendMessage(&schMsg)
 			}
+		}
+
+		var instList = peMgr.workers[snid][id]
+		instList[PeInstInPos] = inst
+		instList[PeInstOutPos] = nil
+		peMgr.workers[snid][id] = instList
+
+		peMgr.ibpNum[snid]++
+
+	} else if inst.dir == PeInstDirOutbound {
+
+		if peMgr.obpNum[snid] >= maxOutbound || peMgr.wrkNum[snid] >= maxPeers {
+
+			log.LogCallerFileLine("peMgrHandshakeRsp: " +
+				"too much outbound, subnet: %x",
+				snid)
+
+			peMgr.updateStaticStatus(snid, rsp.peNode.ID, peerKilling)
+
+			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
+
+				log.LogCallerFileLine("peMgrHandshakeRsp: "+
+					"peMgrKillInst failed, subnet: %x, node: %X",
+					snid, rsp.peNode.ID)
+
+				return eno
+			}
+
+			return PeMgrEnoResource
+		}
+
+		if peMgr.isStaticSubNetId(snid) {
+			var instList = peMgr.workers[snid][id]
+			instList[PeInstOutPos] = inst
+			peMgr.workers[snid][id] = instList
+		} else {
+			var instList = peMgr.workers[snid][id]
+			instList[PeInstInPos] = nil
+			instList[PeInstOutPos] = inst
+			peMgr.workers[snid][id] = instList
 		}
 	}
 
@@ -1264,14 +1327,15 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	peMgr.updateStaticStatus(snid, rsp.peNode.ID, peerActivated)
 
-	inst.state = peInstStateActivated
-	peMgr.workers[snid][id] = inst
 	peMgr.wrkNum[snid]++
 
-	if inst.dir == PeInstDirInbound {
-		peMgr.nodes[snid][id] = inst
-		peMgr.ibpNum[snid]++
+	if peMgr.workers[snid][id][PeInstInPos] != nil &&
+		peMgr.workers[snid][id][PeInstOutPos] != nil {
+
+		peMgr.wrkNum[snid]--
 	}
+
+	inst.state = peInstStateActivated
 
 	//
 	// Since the peer node is accepted and handshake is passed here now,
@@ -1346,7 +1410,7 @@ func (peMgr *PeerManager)peMgrPingpongRsp(msg interface{}) PeMgrErrno {
 			"outbound failed, result: %d, node: %s",
 			rsp.result, config.P2pNodeId2HexString(rsp.peNode.ID))
 
-		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode); eno != PeMgrEnoNone {
+		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, rsp.dir); eno != PeMgrEnoNone {
 
 			log.LogCallerFileLine("peMgrPingpongRsp: " +
 				"kill instance failed, inst: %s, node: %s",
@@ -1373,29 +1437,30 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 	var req = msg.(*sch.MsgPeCloseReq)
 	var snid = req.Snid
 
-	inst := peMgr.nodes[snid][req.Node.ID]
+	for _, inst := range peMgr.nodes[snid][req.Node.ID] {
 
-	if inst == nil {
-		log.LogCallerFileLine("peMgrCloseReq: none of instance for subnet: %x, id: %x", snid, req.Node.ID)
-		return PeMgrEnoNotfound
+		if inst == nil {
+			log.LogCallerFileLine("peMgrCloseReq: none of instance for subnet: %x, id: %x", snid, req.Node.ID)
+			return PeMgrEnoNotfound
+		}
+
+		if inst.killing {
+			log.LogCallerFileLine("peMgrCloseReq: try to kill same instance twice")
+			return PeMgrEnoDuplicaated
+		}
+
+		//
+		// Send close-request to instance
+		//
+
+		var schMsg= sch.SchMessage{}
+
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
+		peMgr.sdl.SchSendMessage(&schMsg)
+
+		inst.killing = true
+		peMgr.updateStaticStatus(snid, req.Node.ID, peerKilling)
 	}
-
-	if inst.killing {
-		log.LogCallerFileLine("peMgrCloseReq: try to kill same instance twice")
-		return PeMgrEnoDuplicaated
-	}
-
-	//
-	// Send close-request to instance
-	//
-
-	var schMsg = sch.SchMessage{}
-
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
-	peMgr.sdl.SchSendMessage(&schMsg)
-
-	inst.killing = true
-	peMgr.updateStaticStatus(snid, req.Node.ID, peerKilling)
 
 	return PeMgrEnoNone
 }
@@ -1425,7 +1490,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 			cfm.result, config.P2pNodeId2HexString(cfm.peNode.ID))
 	}
 
-	if eno = peMgr.peMgrKillInst(cfm.ptn, cfm.peNode); eno != PeMgrEnoNone {
+	if eno = peMgr.peMgrKillInst(cfm.ptn, cfm.peNode, cfm.dir); eno != PeMgrEnoNone {
 
 		log.LogCallerFileLine("peMgrConnCloseCfm: " +
 			"kill instance failed, inst: %s, node: %s",
@@ -1434,8 +1499,6 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 		return PeMgrEnoScheduler
 	}
-
-	peMgr.updateStaticStatus(cfm.snid, cfm.peNode.ID, peerIdle)
 
 	//
 	// callback to the user of p2p to tell peer closed
@@ -1493,7 +1556,7 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	// Do not care the result, kill always
 	//
 
-	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode); eno != PeMgrEnoNone {
+	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {
 
 		log.LogCallerFileLine("peMgrConnCloseInd: " +
 			"kill instance failed, inst: %s, node: %s",
@@ -1613,7 +1676,11 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 
 	peInst.ptnMe = ptnInst
 	peMgr.peers[peInst.ptnMe] = peInst
-	peMgr.nodes[*snid][peInst.node.ID] = peInst
+
+	var instList = peMgr.nodes[*snid][peInst.node.ID]
+	instList[PeInstOutPos] = peInst
+	peMgr.nodes[*snid][peInst.node.ID] = instList
+
 	peMgr.obpNum[*snid]++
 
 	//
@@ -1630,7 +1697,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 //
 // Kill specific instance
 //
-func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgrErrno {
+func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
 
 	if ptn == nil && node == nil {
 		log.LogCallerFileLine("peMgrKillInst: invalid parameters")
@@ -1645,6 +1712,11 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 			config.P2pNodeId2HexString(node.ID))
 
 		return PeMgrEnoNotfound
+	}
+
+	if peInst.dir != dir {
+		log.LogCallerFileLine("peMgrKillInst: invalid parameters")
+		return PeMgrEnoParameter
 	}
 
 	if peInst.ppTid != sch.SchInvalidTid {
@@ -1673,20 +1745,48 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 
 	if peInst.state == peInstStateActivated {
 
-		delete(peMgr.workers[snid], id)
-		peMgr.wrkNum[snid]--
+		if peMgr.isStaticSubNetId(snid) == true {
+
+			var instList = peMgr.workers[snid][id]
+			instList[dir] = nil
+			peMgr.workers[snid][id] = instList
+
+			if peMgr.workers[snid][id][PeInstOutPos] == nil &&
+				peMgr.workers[snid][id][PeInstInPos] == nil {
+
+				delete(peMgr.workers[snid], id)
+				peMgr.wrkNum[snid]--
+
+			}
+
+		} else {
+
+			delete(peMgr.workers[snid], id)
+			peMgr.wrkNum[snid]--
+		}
 	}
 
 	if peInst.dir == PeInstDirOutbound {
 
-		delete(peMgr.nodes[snid], id)
+		if peMgr.workers[snid][id][PeInstOutPos] == nil &&
+			peMgr.workers[snid][id][PeInstInPos] == nil {
+
+			delete(peMgr.nodes[snid], id)
+		}
+
 		delete(peMgr.peers, ptn)
 
 	} else if peInst.dir == PeInstDirInbound {
 
 		delete(peMgr.peers, ptn)
+
 		if peInst.state == peInstStateActivated {
-			delete(peMgr.nodes[snid], id)
+
+			if peMgr.workers[snid][id][PeInstOutPos] == nil &&
+				peMgr.workers[snid][id][PeInstInPos] == nil {
+
+				delete(peMgr.nodes[snid], id)
+			}
 		}
 	}
 
@@ -1714,14 +1814,24 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node) PeMgr
 	// Try update static ndoe status
 	//
 
-	peMgr.updateStaticStatus(snid, node.ID, peerIdle)
+	if peMgr.workers[snid][id][PeInstOutPos] == nil &&
+		peMgr.workers[snid][id][PeInstInPos] == nil {
+
+		peMgr.updateStaticStatus(snid, node.ID, peerIdle)
+	}
+
 
 	//
 	// Check if the accepter task paused, resume it if necessary
 	//
 
-	if peMgr.cfg.noAccept == false && peMgr.acceptPaused == true  && peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
-		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to resume accepter, cfgName: %s", peMgr.cfg.cfgName)
+	if peMgr.cfg.noAccept == false &&
+		peMgr.acceptPaused == true  &&
+			peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
+
+		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: " +
+			"going to resume accepter, cfgName: %s", peMgr.cfg.cfgName)
+
 		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
 	}
 
@@ -1831,8 +1941,10 @@ const (
 type peerInstState int	// instance state type
 
 const PeInstDirNull			= 0		// null, so connection should be nil
-const PeInstDirOutbound		= +1	// outbound connection
-const PeInstDirInbound		= -1	// inbound connection
+const PeInstDirOutbound		= 1		// outbound connection
+const PeInstDirInbound		= 0		// inbound connection
+const PeInstOutPos			= 1		// outbound position
+const PeInstInPos			= 0		// inbound position
 
 const PeInstMailboxSize 	= 32				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
@@ -1941,6 +2053,7 @@ type msgHandshakeRsp struct {
 //
 type msgPingpongRsp struct {
 	result	PeMgrErrno		// result of pingpong action
+	dir		int				// direction
 	peNode 	*config.Node	// target node
 	ptn		interface{}		// pointer to task instance node of sender
 }
@@ -1950,6 +2063,7 @@ type msgPingpongRsp struct {
 //
 type MsgCloseCfm struct {
 	result	PeMgrErrno			// result of pingpong action
+	dir		int					// direction
 	snid	config.SubNetworkID	// sub network identity
 	peNode 	*config.Node		// target node
 	ptn		interface{}			// pointer to task instance node of sender
@@ -1960,6 +2074,7 @@ type MsgCloseCfm struct {
 //
 type MsgCloseInd struct {
 	cause	PeMgrErrno			// tell why it's closed
+	dir		int					// direction
 	snid	config.SubNetworkID	// sub network identity
 	peNode 	*config.Node		// target node
 	ptn		interface{}			// pointer to task instance node of sender
@@ -2351,6 +2466,7 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 
 	var req = MsgCloseCfm {
 		result: PeMgrEnoNone,
+		dir:	inst.dir,
 		snid:	inst.snid,
 		peNode:	&node,
 		ptn:	inst.ptnMe,
@@ -2771,8 +2887,8 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 
 	for _, pid := range pkg.IdList {
 
-		if inst = peMgr.workers[pkg.SubNetId][pid]; inst == nil {
-
+		instList := peMgr.getWorkerInst(pkg.SubNetId, &pid)
+		if instList == nil {
 			log.LogCallerFileLine("SendPackage: " +
 				"instance not exist, id: %s",
 				fmt.Sprintf("%X", pid))
@@ -2781,6 +2897,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 			continue
 		}
 
+		inst = instList[0]
 		inst.p2pkgLock.Lock()
 
 		if len(inst.p2pkgTx) >= PeInstMaxP2packages {
@@ -2812,39 +2929,28 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 //
 func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 
-	//
-	// Notice: this function should only be called to kill instance when it
-	// is in active state(peInstStateActivated), if it's not the case, one
-	// should call peMgrKillInst to do that, see it pls.
-	//
+	var instList = []*peerInstance{}
 
-	//
-	// get instance by its' identity passed in
-	//
-
-	var inst *peerInstance = nil
-
-	if inst = peMgr.workers[*snid][config.NodeID(*id)]; inst == nil {
+	if instList = peMgr.getWorkerInst(*snid, id); instList == nil {
 
 		log.LogCallerFileLine("ClosePeer: " +
 			"instance not exist, id: %s",
 			fmt.Sprintf("%X", *id))
 
-		return PeMgrEnoUnknown
+		return PeMgrEnoNotfound
 	}
 
-	//
-	// send close-request to peer manager
-	//
+	for _, inst := range instList {
 
-	var req = sch.MsgPeCloseReq {
-		Ptn:	inst.ptnMe,
-		Node:	inst.node,
+		var req = sch.MsgPeCloseReq{
+			Ptn:  inst.ptnMe,
+			Node: inst.node,
+		}
+
+		var schMsg= sch.SchMessage{}
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
+		peMgr.sdl.SchSendMessage(&schMsg)
 	}
-
-	var schMsg = sch.SchMessage{}
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
-	peMgr.sdl.SchSendMessage(&schMsg)
 
 	return PeMgrEnoNone
 }
@@ -3309,6 +3415,61 @@ func (peMgr *PeerManager)staticSubNetIdExist(snid *SubNetworkID) bool {
 	}
 
 	return false
+}
+
+//
+// Check if specific subnet identity is static
+//
+func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {
+
+	return	(peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
+		peMgr.staticSubNetIdExist(&snid) == true) ||
+		(peMgr.cfg.networkType == config.P2pNewworkTypeDynamic &&
+			peMgr.staticSubNetIdExist(&snid) == true)
+}
+
+//
+// Get worker instance for peer
+//
+func (peMgr *PeerManager) getWorkerInst(snid SubNetworkID, pid *PeerId) []*peerInstance {
+
+	var instList = []*peerInstance{}
+
+	instOut := peMgr.workers[snid][*pid][PeInstOutPos]
+	instIn := peMgr.workers[snid][*pid][PeInstInPos]
+
+	if peMgr.isStaticSubNetId(snid) == false {
+
+		if instOut != nil && instIn != nil {
+			return nil
+		}
+
+		if instOut == nil && instIn == nil {
+			return nil
+		}
+
+		if instOut != nil {
+			instList = append(instList, instOut)
+		} else {
+			instList = append(instList, instIn)
+		}
+
+	} else {
+
+		if instOut == nil && instIn == nil {
+			return nil
+		}
+
+		if instOut != nil {
+			instList = append(instList, instOut)
+		}
+
+		if instIn != nil {
+			instList = append(instList, instIn)
+		}
+	}
+
+	return instList
 }
 
 //
