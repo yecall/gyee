@@ -1035,7 +1035,7 @@ func testCase4(tc *testCase) {
 		}
 	}
 
-	if eno = shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
+	if eno := shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -1048,7 +1048,7 @@ func testCase4(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -1059,6 +1059,7 @@ func testCase4(tc *testCase) {
 			return
 		}
 
+		cfgName := p2pInst.SchGetP2pCfgName()
 		log.LogCallerFileLine("testCase4: ycp2p started, cofig: %s", cfgName)
 	}
 
