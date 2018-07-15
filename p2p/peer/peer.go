@@ -745,8 +745,15 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	if peMgr.ibpTotalNum++; peMgr.ibpTotalNum >= peMgr.cfg.ibpNumTotal {
 		if !peMgr.cfg.noAccept && !peMgr.acceptPaused {
-			log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, cfgName: %s", peMgr.cfg.cfgName)
-			peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+
+			//
+			// Notice: we can not pause accepter simply, a duration of delay should
+			// be apply before pausing it, we do not pause it now and consider the
+			// delay later.
+			//
+
+			//log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, cfgName: %s", peMgr.cfg.cfgName)
+			//peMgr.acceptPaused = peMgr.accepter.PauseAccept()
 		}
 	}
 
