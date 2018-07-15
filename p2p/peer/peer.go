@@ -853,16 +853,6 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		Dir:	PeInstOutPos,
 	}
 
-
-	{
-		var ss []int
-		for _, s := range peMgr.staticsStatus {
-			ss = append(ss, s)
-		}
-		golog.Printf("peMgrStaticSubNetOutbound: staticsStatus: %x", ss)
-	}
-
-
 	for _, n := range peMgr.cfg.staticNodes {
 
 		idEx.Id = n.ID
@@ -891,10 +881,6 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		n := candidates[idx]
 		idEx.Id = n.ID
 		candidates = append(candidates[:idx], candidates[idx+1:]...)
-
-		{
-			golog.Printf("peMgrStaticSubNetOutbound: connect to node: %+v", n)
-		}
 
 		if eno := peMgr.peMgrCreateOutboundInst(&snid, n); eno != PeMgrEnoNone {
 
@@ -978,13 +964,6 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	maxOutbound := peMgr.cfg.subNetMaxOutbounds[*snid]
 
 	for _, n := range candidates {
-
-
-		{
-			golog.Printf("peMgrDynamicSubNetOutbound: p2pInst: %s, target: subnet: %x, node: %+v",
-				peMgr.cfg.cfgName, *snid, n)
-		}
-
 
 		if eno := peMgr.peMgrCreateOutboundInst(snid, n); eno != PeMgrEnoNone {
 
@@ -1882,8 +1861,8 @@ const PeInstInPos			= 0		// inbound position
 
 const PeInstMailboxSize 	= 32				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
-const PeInstMaxPingpongCnt	= 4					// max pingpong counter value
-const PeInstPingpongCycle	= time.Second *2	// pingpong period
+const PeInstMaxPingpongCnt	= 8					// max pingpong counter value
+const PeInstPingpongCycle	= time.Second * 16	// pingpong period
 
 type peerInstance struct {
 	sdl			*sch.Scheduler				// pointer to scheduler
