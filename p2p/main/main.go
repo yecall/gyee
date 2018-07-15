@@ -881,6 +881,7 @@ func testCase4(tc *testCase) {
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
+	var p2pInstBootstrap *sch.Scheduler = nil
 
 	var staticNodeIdList = []*config.Node{}
 
@@ -954,9 +955,9 @@ func testCase4(tc *testCase) {
 			}
 		}
 
-		myCfg.StaticMaxPeers = len(myCfg.StaticNodes)		// config.MaxPeers
-		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes)	// config.MaxOutbounds
-		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)	// config.MaxInbounds
+		myCfg.StaticMaxPeers = len(myCfg.StaticNodes)     // config.MaxPeers
+		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes) // config.MaxOutbounds
+		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)  // config.MaxInbounds
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
@@ -1005,14 +1006,14 @@ func testCase4(tc *testCase) {
 			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
 
 			ipv4 := bootstrapIp.To4()
-			url := []string {
+			url := []string{
 				fmt.Sprintf("%s@%d.%d.%d.%d:%d:%d",
 					bootstrapId,
-					ipv4[0],ipv4[1],ipv4[2],ipv4[3],
+					ipv4[0], ipv4[1], ipv4[2], ipv4[3],
 					bootstrapUdp,
 					bootstrapTcp),
 			}
-			bootstrapNodes = append(bootstrapNodes,config.P2pSetupBootstrapNodes(url)...)
+			bootstrapNodes = append(bootstrapNodes, config.P2pSetupBootstrapNodes(url)...)
 		}
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
@@ -1021,6 +1022,31 @@ func testCase4(tc *testCase) {
 			return
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
+
+		if loop == 0 {
+			p2pInstBootstrap = p2pInst
+		}
+	}
+
+	var p2pInstList = []*sch.Scheduler{}
+	for p2pInst := range p2pInst2Cfg {
+		if p2pInst != p2pInstBootstrap {
+			p2pInstList = append(p2pInstList, p2pInst)
+		}
+	}
+
+	if eno = shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
+		return
+	}
+
+	for piNum := len(p2pInstList); piNum > 0; piNum-- {
+
+		time.Sleep(time.Second * 2)
+
+		pidx := rand.Intn(piNum)
+		p2pInst := p2pInstList[pidx]
+		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
