@@ -140,8 +140,8 @@ type Protocol struct {
 //
 
 const (
-	P2pNewworkTypeDynamic	= 0			// neighbor discovering needed
-	P2pNewworkTypeStatic	= 1			// no discovering
+	P2pNetworkTypeDynamic	= 0			// neighbor discovering needed
+	P2pNetworkTypeStatic	= 1			// no discovering
 )
 
 type Config struct {
@@ -294,7 +294,7 @@ var config = make(map[string] *Config)
 func P2pDefaultConfig() *Config {
 
 	var defaultConfig = Config {
-		NetworkType:			P2pNewworkTypeDynamic,
+		NetworkType:			P2pNetworkTypeDynamic,
 		Name:					dftName,
 		Version:				dftVersion,
 		PrivateKey:				nil,
@@ -328,7 +328,7 @@ func P2pDefaultConfig() *Config {
 func P2pDefaultBootstrapConfig() *Config {
 
 	var defaultConfig = Config {
-		NetworkType:			P2pNewworkTypeDynamic,
+		NetworkType:			P2pNetworkTypeDynamic,
 		Name:					dftName,
 		Version:				dftVersion,
 		PrivateKey:				nil,

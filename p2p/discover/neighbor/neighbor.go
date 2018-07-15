@@ -749,7 +749,7 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 	// if static network, no neighbor manager needed
 	//
 
-	if ngbMgr.cfg.NetworkType == config.P2pNewworkTypeStatic {
+	if ngbMgr.cfg.NetworkType == config.P2pNetworkTypeStatic {
 
 		log.LogCallerFileLine("tabMgrPoweron: static type, tabMgr is not needed")
 
@@ -1539,7 +1539,7 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 	ngbMgr.cfg.NetworkType	= ptCfg.NetworkType
 	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
 
-	if len(ngbMgr.cfg.SubNetIdList) == 0 && ngbMgr.cfg.NetworkType == config.P2pNewworkTypeDynamic {
+	if len(ngbMgr.cfg.SubNetIdList) == 0 && ngbMgr.cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList, config.AnySubNet)
 	}
 

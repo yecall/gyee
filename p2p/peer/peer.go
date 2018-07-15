@@ -310,7 +310,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	// with static network type that tabMgr and dcvMgr would be done while power on
 	//
 
-	if cfg.NetworkType == config.P2pNewworkTypeDynamic {
+	if cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		peMgr.tabMgr = peMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
 		_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 		_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
@@ -363,14 +363,14 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.staticsStatus[idEx] = peerIdle
 	}
 
-	if len(peMgr.cfg.subNetIdList) == 0 && peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	if len(peMgr.cfg.subNetIdList) == 0 && peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		peMgr.cfg.subNetIdList = append(peMgr.cfg.subNetIdList, config.AnySubNet)
 		peMgr.cfg.subNetMaxPeers[config.AnySubNet] = config.MaxPeers
 		peMgr.cfg.subNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
 		peMgr.cfg.subNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
 	}
 
-	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		for _, snid := range peMgr.cfg.subNetIdList {
 			peMgr.nodes[snid] = make(map[PeerIdEx]*peerInstance)
 			peMgr.workers[snid] = make(map[PeerIdEx]*peerInstance)
@@ -386,7 +386,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 			peMgr.ibpNum[staticSnid] = 0
 			peMgr.obpNum[staticSnid] = 0
 		}
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
+	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
 		staticSnid := peMgr.cfg.staticSubNetId
 		peMgr.nodes[staticSnid] = make(map[PeerIdEx]*peerInstance)
 		peMgr.workers[staticSnid] = make(map[PeerIdEx]*peerInstance)
@@ -633,11 +633,11 @@ func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErrn
 	nwt := peMgr.cfg.networkType
 	snid := msg.(*SubNetworkID)
 
-	if nwt == config.P2pNewworkTypeStatic {
+	if nwt == config.P2pNetworkTypeStatic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.staticMaxOutbounds {
 			return PeMgrEnoNone
 		}
-	} else if nwt == config.P2pNewworkTypeDynamic {
+	} else if nwt == config.P2pNetworkTypeDynamic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.subNetMaxOutbounds[*snid] {
 			return PeMgrEnoNone
 		}
@@ -799,7 +799,7 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 			return eno
 		}
 
-		if peMgr.cfg.networkType != config.P2pNewworkTypeStatic {
+		if peMgr.cfg.networkType != config.P2pNetworkTypeStatic {
 
 			for _, id := range peMgr.cfg.subNetIdList {
 
@@ -810,12 +810,12 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 			}
 		}
 
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
+	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic &&
 		*snid == peMgr.cfg.staticSubNetId {
 
 		return peMgr.peMgrStaticSubNetOutbound()
 
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	} else if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 
 		if peMgr.dynamicSubNetIdExist(snid) == true {
 
@@ -1144,14 +1144,14 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	var maxPeers = 0
 	snid := rsp.snid
 
-	if peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
+	if peMgr.cfg.networkType == config.P2pNetworkTypeStatic &&
 		peMgr.staticSubNetIdExist(&snid) == true {
 
 		maxInbound = peMgr.cfg.staticMaxInBounds
 		maxOutbound = peMgr.cfg.staticMaxOutbounds
 		maxPeers = peMgr.cfg.staticMaxPeers
 
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	} else if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 
 		if peMgr.dynamicSubNetIdExist(&snid) == true {
 
@@ -1253,7 +1253,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.wrkNum[snid]++
 
 	if inst.dir == PeInstDirInbound  &&
-		inst.peMgr.cfg.networkType != config.P2pNewworkTypeStatic {
+		inst.peMgr.cfg.networkType != config.P2pNetworkTypeStatic {
 
 		lastQuery := time.Time{}
 		lastPing := time.Now()
@@ -3255,7 +3255,7 @@ func (peMgr *PeerManager)updateStaticStatus(snid SubNetworkID, idEx PeerIdEx, st
 //
 func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
 
-	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 
 		for _, id := range peMgr.cfg.subNetIdList {
 
@@ -3273,11 +3273,11 @@ func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
 //
 func (peMgr *PeerManager)staticSubNetIdExist(snid *SubNetworkID) bool {
 
-	if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
+	if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
 
 		return peMgr.cfg.staticSubNetId == *snid
 
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	} else if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 
 		return len(peMgr.cfg.staticNodes) > 0 && peMgr.cfg.staticSubNetId == *snid
 	}
@@ -3290,9 +3290,9 @@ func (peMgr *PeerManager)staticSubNetIdExist(snid *SubNetworkID) bool {
 //
 func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {
 
-	return	(peMgr.cfg.networkType == config.P2pNewworkTypeStatic &&
+	return	(peMgr.cfg.networkType == config.P2pNetworkTypeStatic &&
 		peMgr.staticSubNetIdExist(&snid) == true) ||
-		(peMgr.cfg.networkType == config.P2pNewworkTypeDynamic &&
+		(peMgr.cfg.networkType == config.P2pNetworkTypeDynamic &&
 			peMgr.staticSubNetIdExist(&snid) == true)
 }
 
@@ -3388,12 +3388,12 @@ func (peMgr *PeerManager)logPeerStat() {
 
 	var subNetIdList = make([]SubNetworkID, 0)
 
-	if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
+	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		subNetIdList = append(subNetIdList, peMgr.cfg.subNetIdList...)
 		if len(peMgr.cfg.staticNodes) > 0 {
 			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
 		}
-	} else if peMgr.cfg.networkType == config.P2pNewworkTypeStatic {
+	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
 		if len(peMgr.cfg.staticNodes) > 0 {
 			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
 		}

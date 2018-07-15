@@ -258,7 +258,7 @@ func (lsnMgr *ListenerManager) procPoweron(ptn interface{}) sch.SchErrno {
 	// if it's a static type, no listener manager needed
 	//
 
-	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {
+	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
 		log.LogCallerFileLine("procPoweron: static type, lsnMgr is not needed")
 		sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return sch.SchEnoNone

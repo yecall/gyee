@@ -132,7 +132,7 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	// if it's a static type, no discover manager needed
 	//
 
-	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {
+	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
 
 		log.LogCallerFileLine("DcvMgrPoweron: static type, dcvMgr is not needed")
 

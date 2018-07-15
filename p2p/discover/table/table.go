@@ -1199,7 +1199,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 
 	sdl := sch.SchGetScheduler(ptn)
 
-	if sdl.SchGetP2pConfig().NetworkType == config.P2pNewworkTypeStatic {
+	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
 
 		log.LogCallerFileLine("ndbcPoweron: static type, nodeDbCleaner is not needed")
 
@@ -1323,9 +1323,9 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	//
 
 	tabMgr.networkType = cfg.NetworkType
-	if tabMgr.networkType == config.P2pNewworkTypeStatic {
+	if tabMgr.networkType == config.P2pNetworkTypeStatic {
 		tabMgr.snid = config.ZeroSubNet
-	} else if tabMgr.networkType == config.P2pNewworkTypeDynamic && len(tabCfg.subNetIdList) == 0 {
+	} else if tabMgr.networkType == config.P2pNetworkTypeDynamic && len(tabCfg.subNetIdList) == 0 {
 		tabMgr.snid = AnySubNet
 	} else {
 		tabMgr.snid = config.ZeroSubNet

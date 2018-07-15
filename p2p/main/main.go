@@ -119,7 +119,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase3"
+var tgtCase = "testCase2"
 
 //
 // create test case control block by name
@@ -687,7 +687,7 @@ func testCase2(tc *testCase) {
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
-		myCfg.NetworkType = config.P2pNewworkTypeStatic
+		myCfg.NetworkType = config.P2pNetworkTypeStatic
 		myCfg.StaticNetId = config.ZeroSubNet
 		myCfg.Local = *staticNodeIdList[loop]
 
@@ -781,7 +781,7 @@ func testCase3(tc *testCase) {
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
-		myCfg.NetworkType = config.P2pNewworkTypeDynamic
+		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(30303 + loop)
 		myCfg.Local.TCP = uint16(30303 + loop)
@@ -942,7 +942,7 @@ func testCase4(tc *testCase) {
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
-		myCfg.NetworkType = config.P2pNewworkTypeDynamic
+		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.StaticNetId = config.ZeroSubNet
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(30303 + loop)
