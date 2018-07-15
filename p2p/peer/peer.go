@@ -47,7 +47,7 @@ const (
 	PeMgrEnoResource
 	PeMgrEnoOs
 	PeMgrEnoMessage
-	PeMgrEnoDuplicaated
+	PeMgrEnoDuplicated
 	PeMgrEnoNotfound
 	PeMgrEnoInternal
 	PeMgrEnoPingpongTh
@@ -1120,18 +1120,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if rsp.result != PeMgrEnoNone {
 
-		log.LogCallerFileLine("peMgrHandshakeRsp: " +
-			"handshake failed, result: %d, node: %s",
-			rsp.result,
-			fmt.Sprintf("%X", rsp.peNode.ID))
-
-
 		peMgr.updateStaticStatus(rsp.snid, idEx, peerKilling)
-
-		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
-			log.LogCallerFileLine("peMgrHandshakeRsp: peMgrKillInst failed, node: %X", rsp.peNode.ID)
-			return eno
-		}
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 
 		if inst.dir == PeInstDirOutbound {
 
@@ -1150,6 +1140,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	//
 
 	var maxInbound = 0
+	var maxOutbound = 0
 	var maxPeers = 0
 	snid := rsp.snid
 
@@ -1157,6 +1148,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peMgr.staticSubNetIdExist(&snid) == true {
 
 		maxInbound = peMgr.cfg.staticMaxInBounds
+		maxOutbound = peMgr.cfg.staticMaxOutbounds
 		maxPeers = peMgr.cfg.staticMaxPeers
 
 	} else if peMgr.cfg.networkType == config.P2pNewworkTypeDynamic {
@@ -1164,14 +1156,21 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		if peMgr.dynamicSubNetIdExist(&snid) == true {
 
 			maxInbound = peMgr.cfg.subNetMaxInBounds[snid]
+			maxOutbound = peMgr.cfg.subNetMaxOutbounds[snid]
 			maxPeers = peMgr.cfg.subNetMaxPeers[snid]
 
 		} else if peMgr.staticSubNetIdExist(&snid) == true {
 
 			maxInbound = peMgr.cfg.staticMaxInBounds
+			maxOutbound = peMgr.cfg.staticMaxOutbounds
 			maxPeers = peMgr.cfg.staticMaxPeers
-
 		}
+	}
+
+	if peMgr.wrkNum[snid] >= maxPeers {
+		peMgr.updateStaticStatus(snid, idEx, peerKilling)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		return PeMgrEnoResource
 	}
 
 	if inst.dir == PeInstDirInbound {
@@ -1181,91 +1180,27 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		if peMgr.isStaticSubNetId(snid) {
 
 			if _, dup := peMgr.workers[snid][idEx]; dup {
-
-				log.LogCallerFileLine("peMgrHandshakeRsp: static inbound duplicated to inbound")
-				if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
-					log.LogCallerFileLine("peMgrHandshakeRsp: peMgrKillInst failed, node: %X", rsp.peNode.ID)
-					return eno
-				}
-
-				return PeMgrEnoDuplicaated
-
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				return PeMgrEnoDuplicated
 			}
 
 			peMgr.workers[snid][idEx] = inst
 
 		} else {
 
-			if peMgr.ibpNum[snid] >= maxInbound || peMgr.wrkNum[snid] >= maxPeers {
-
-				log.LogCallerFileLine("peMgrHandshakeRsp: too much dynamic inbound")
-				if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
-					log.LogCallerFileLine("peMgrHandshakeRsp: peMgrKillInst failed, node: %X", rsp.peNode.ID)
-					return eno
-				}
-
+			if peMgr.ibpNum[snid] >= maxInbound {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoResource
 			}
 
 			if _, dup := peMgr.workers[snid][idEx]; dup {
-
-				log.LogCallerFileLine("peMgrHandshakeRsp: dynamic inbound duplicated to inbound")
-				if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
-					log.LogCallerFileLine("peMgrHandshakeRsp: peMgrKillInst failed, node: %X", rsp.peNode.ID)
-					return eno
-				}
-
-				return PeMgrEnoDuplicaated
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				return PeMgrEnoDuplicated
 			}
 
 			idEx.Dir = PeInstOutPos
-
-			if _, dup := peMgr.nodes[snid][idEx]; dup {
-
-				log.LogCallerFileLine("peMgrHandshakeRsp: dynamic inbound duplicated to outbound")
-
-				var ptn2Kill interface{} = nil
-				var node2Kill *config.Node = nil
-
-				dupInst := peMgr.nodes[snid][idEx]
-				cmp := inst.state.compare(dupInst.state)
-				obKilled := false
-
-				if cmp < 0 {
-					ptn2Kill = rsp.ptn
-					node2Kill = rsp.peNode
-				} else if cmp > 0 {
-					ptn2Kill = dupInst.ptnMe
-					node2Kill = &dupInst.node
-					obKilled = dupInst.dir == PeInstDirOutbound
-				} else {
-					if rand.Int()&0x01 == 0 {
-						ptn2Kill = rsp.ptn
-						node2Kill = rsp.peNode
-					} else {
-						ptn2Kill = dupInst.ptnMe
-						node2Kill = &dupInst.node
-						obKilled = dupInst.dir == PeInstDirOutbound
-					}
-				}
-				_ = node2Kill
-
-				if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
-					log.LogCallerFileLine("peMgrHandshakeRsp: peMgrKillInst failed, node: %X", rsp.peNode.ID)
-					return eno
-				}
-
-				if ptn2Kill == rsp.ptn {
-					return PeMgrEnoDuplicaated
-				}
-
-				if obKilled {
-					var schMsg= sch.SchMessage{}
-					peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
-					peMgr.sdl.SchSendMessage(&schMsg)
-				}
-
-				return PeMgrEnoDuplicaated
+			if peMgr.instStateCmpKill(inst, rsp.ptn, snid, rsp.peNode, idEx) == PeMgrEnoDuplicated {
+				return PeMgrEnoDuplicated
 			}
 		}
 
@@ -1276,18 +1211,33 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	} else if inst.dir == PeInstDirOutbound {
 
-		if peMgr.wrkNum[snid] >= maxPeers {
+		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstOutPos}
 
-			log.LogCallerFileLine("peMgrHandshakeRsp: too much outbound")
+		if peMgr.isStaticSubNetId(snid) {
 
-			peMgr.updateStaticStatus(snid, idEx, peerKilling)
-
-			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
-				log.LogCallerFileLine("peMgrHandshakeRsp: peMgrKillInst failed, node: %X", rsp.peNode.ID)
-				return eno
+			if _, dup := peMgr.workers[snid][idEx]; dup {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				return PeMgrEnoDuplicated
 			}
 
-			return PeMgrEnoResource
+			peMgr.workers[snid][idEx] = inst
+
+		} else {
+
+			if peMgr.obpNum[snid] >= maxOutbound {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				return PeMgrEnoResource
+			}
+
+			if _, dup := peMgr.workers[snid][idEx]; dup {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				return PeMgrEnoDuplicated
+			}
+
+			idEx.Dir = PeInstInPos
+			if peMgr.instStateCmpKill(inst, rsp.ptn, snid, rsp.peNode, idEx) == PeMgrEnoDuplicated {
+				return PeMgrEnoDuplicated
+			}
 		}
 
 		idEx.Dir = PeInstDirOutbound
@@ -1399,7 +1349,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 
 	if inst.killing {
 		log.LogCallerFileLine("peMgrCloseReq: try to kill same instance twice")
-		return PeMgrEnoDuplicaated
+		return PeMgrEnoDuplicated
 	}
 
 	//
@@ -1860,7 +1810,7 @@ const (
 
 type peerInstState int	// instance state type
 
-const PeInstDirNull			= 0		// null, so connection should be nil
+const PeInstDirNull			= -1		// null, so connection should be nil
 const PeInstDirOutbound		= 1		// outbound connection
 const PeInstDirInbound		= 0		// inbound connection
 const PeInstOutPos			= 1		// outbound position
@@ -3354,6 +3304,57 @@ func (peMgr *PeerManager) getWorkerInst(snid SubNetworkID, idEx *PeerIdEx) *peer
 }
 
 //
+// Compare two duplicated instances state to kill one
+//
+func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, snid SubNetworkID, node *config.Node, idEx PeerIdEx) PeMgrErrno {
+
+	if _, dup := peMgr.nodes[snid][idEx]; dup {
+
+		var ptn2Kill interface{} = nil
+		var node2Kill *config.Node = nil
+
+		dupInst := peMgr.nodes[snid][idEx]
+		cmp := inst.state.compare(dupInst.state)
+		obKilled := false
+
+		if cmp < 0 {
+			ptn2Kill = ptn
+			node2Kill = node
+		} else if cmp > 0 {
+			ptn2Kill = dupInst.ptnMe
+			node2Kill = &dupInst.node
+			obKilled = dupInst.dir == PeInstDirOutbound
+		} else {
+			if rand.Int()&0x01 == 0 {
+				ptn2Kill = ptn
+				node2Kill = node
+			} else {
+				ptn2Kill = dupInst.ptnMe
+				node2Kill = &dupInst.node
+				obKilled = dupInst.dir == PeInstDirOutbound
+			}
+		}
+		_ = node2Kill
+
+		peMgr.peMgrKillInst(ptn, node, inst.dir)
+
+		if ptn2Kill == ptn {
+			return PeMgrEnoDuplicated
+		}
+
+		if obKilled {
+			var schMsg = sch.SchMessage{}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
+			peMgr.sdl.SchSendMessage(&schMsg)
+		}
+
+		return PeMgrEnoDuplicated
+	}
+
+	return PeMgrEnoNone
+}
+
+//
 // Print peer statistics
 //
 func (peMgr *PeerManager)logPeerStat() {
@@ -3411,3 +3412,5 @@ func (peMgr *PeerManager)logPeerStat() {
 	//log.LogCallerFileLine("%s", dbgMsg)
 	golog.Printf("%s", dbgMsg)
 }
+
+

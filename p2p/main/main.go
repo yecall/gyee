@@ -119,7 +119,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase4"
+var tgtCase = "testCase3"
 
 //
 // create test case control block by name
@@ -955,9 +955,9 @@ func testCase4(tc *testCase) {
 			}
 		}
 
-		myCfg.StaticMaxPeers = len(myCfg.StaticNodes)     // config.MaxPeers
-		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes) // config.MaxOutbounds
-		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)  // config.MaxInbounds
+		myCfg.StaticMaxPeers = len(myCfg.StaticNodes) * 2	// config.MaxPeers
+		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes)	// config.MaxOutbounds
+		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes) 	// config.MaxInbounds
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
