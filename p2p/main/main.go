@@ -119,7 +119,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase3"
+var tgtCase = "testCase2"
 
 //
 // create test case control block by name
@@ -633,7 +633,7 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
-	var p2pInstNum = 12
+	var p2pInstNum = 8
 	var cfgName = ""
 
 	var staticNodeIdList = []*config.Node{}
@@ -689,11 +689,6 @@ func testCase2(tc *testCase) {
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNewworkTypeStatic
 		myCfg.StaticNetId = config.ZeroSubNet
-
-		/*myCfg.StaticMaxPeers = config.MaxPeers
-		myCfg.StaticMaxOutbounds = config.MaxOutbounds
-		myCfg.StaticMaxInbounds = config.MaxInbounds*/
-
 		myCfg.Local = *staticNodeIdList[loop]
 
 		for idx, n := range staticNodeIdList {
@@ -702,9 +697,9 @@ func testCase2(tc *testCase) {
 			}
 		}
 
-		myCfg.StaticMaxPeers = len(myCfg.StaticNodes) * 2	// config.MaxPeers
-		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes)	// config.MaxOutbounds
-		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)	// config.MaxInbounds
+		myCfg.StaticMaxPeers = len(myCfg.StaticNodes) * 2
+		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes)
+		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)
 
 		cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
 		p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
@@ -724,6 +719,8 @@ func testCase2(tc *testCase) {
 	}
 
 	for piNum := len(p2pInstList); piNum > 0; piNum-- {
+
+		time.Sleep(time.Second * 2)
 
 		pidx := rand.Intn(piNum)
 		p2pInst := p2pInstList[pidx]

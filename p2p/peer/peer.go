@@ -1221,7 +1221,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				return PeMgrEnoResource
 			}
 
-			if _, dup := peMgr.nodes[snid][idEx]; dup {
+			if _, dup := peMgr.workers[snid][idEx]; dup {
 
 				log.LogCallerFileLine("peMgrHandshakeRsp: dynamic inbound duplicated to inbound")
 				if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir); eno != PeMgrEnoNone {
@@ -1278,10 +1278,13 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 					peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
 					peMgr.sdl.SchSendMessage(&schMsg)
 				}
+
+				return PeMgrEnoDuplicaated
 			}
 		}
 
 		idEx.Dir = PeInstInPos
+		peMgr.nodes[snid][idEx] = inst
 		peMgr.workers[snid][idEx] = inst
 		peMgr.ibpNum[snid]++
 
@@ -1310,8 +1313,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
 
-	peMgr.wrkNum[snid]++
 	inst.state = peInstStateActivated
+	peMgr.wrkNum[snid]++
 
 	if inst.dir == PeInstDirInbound  &&
 		inst.peMgr.cfg.networkType != config.P2pNewworkTypeStatic {
