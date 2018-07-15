@@ -66,6 +66,7 @@ type Protocol struct {
 //
 type Handshake struct {
 	Snid		SubNetworkID	// sub network identity
+	Dir			int				// direct
 	NodeId		config.NodeID	// node identity
 	IP			net.IP			// ip address
 	UDP			uint32			// udp port number

@@ -36,7 +36,7 @@ var (
 )
 
 func init() {
-	Log_DisableFileLine = true
+	Log_DisableFileLine = false
 }
 
 //
@@ -44,7 +44,7 @@ func init() {
 //
 func LogCallerFileLine(format string, args ... interface{}) {
 
-	//return
+	return
 
 	logg.Logger.Infof(format, args...)
 	if !Log_DisableFileLine {

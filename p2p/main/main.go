@@ -57,6 +57,7 @@ var (
 type peerIdEx struct {
 	subNetId	peer.SubNetworkID
 	nodeId		peer.PeerId
+	dir			int
 }
 
 //
@@ -118,7 +119,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase string = "testCase2"
+var tgtCase = "testCase3"
 
 //
 // create test case control block by name
@@ -148,7 +149,9 @@ func newTcb(name string) *testCaseCtrlBlock {
 //
 // Tx routine
 //
-func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
+func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
+
+	const dataTxApply = false
 
 	//
 	// This demo simply apply timer with 1s cycle and then sends a string
@@ -159,6 +162,7 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 	idEx := peerIdEx {
 		subNetId:	snid,
 		nodeId:		id,
+		dir:		dir,
 	}
 
 	doneMapLock.Lock()
@@ -204,28 +208,31 @@ func txProc(p2pInst *sch.Scheduler, snid peer.SubNetworkID, id peer.PeerId) {
 
 		tcb.txSeq++
 
-		pkg.IdList = make([]peer.PeerId, 1)
+		if dataTxApply {
 
-		for id := range doneMap[p2pInst] {
+			pkg.IdList = make([]peer.PeerId, 1)
 
-			txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
-				"to: subnet: %s\n, id: %s\n",
-				tcb.txSeq,
-				fmt.Sprintf("%x", snid),
-				fmt.Sprintf("%X", id))
+			for id := range doneMap[p2pInst] {
 
-			pkg.SubNetId = id.subNetId
-			pkg.IdList[0] = id.nodeId
-			pkg.Payload = []byte(txString)
-			pkg.PayloadLength = len(pkg.Payload)
-
-			if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
-
-				log.LogCallerFileLine("txProc: "+
-					"send package failed, eno: %d, subnet: %s, id: %s",
-					eno,
+				txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
+					"to: subnet: %s\n, id: %s\n",
+					tcb.txSeq,
 					fmt.Sprintf("%x", snid),
 					fmt.Sprintf("%X", id))
+
+				pkg.SubNetId = id.subNetId
+				pkg.IdList[0] = id.nodeId
+				pkg.Payload = []byte(txString)
+				pkg.PayloadLength = len(pkg.Payload)
+
+				if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
+
+					log.LogCallerFileLine("txProc: "+
+						"send package failed, eno: %d, subnet: %s, id: %s",
+						eno,
+						fmt.Sprintf("%x", snid),
+						fmt.Sprintf("%X", id))
+				}
 			}
 		}
 
@@ -320,7 +327,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
 
-		go txProc(p2pInst, snid, peerId)
+		go txProc(p2pInst, pap.PeerInfo.Dir, snid, peerId)
 
 	case shell.P2pIndConnStatus:
 
@@ -626,7 +633,7 @@ func testCase2(tc *testCase) {
 
 	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
 
-	var p2pInstNum = 9
+	var p2pInstNum = 12
 	var cfgName = ""
 
 	var staticNodeIdList = []*config.Node{}
@@ -695,9 +702,9 @@ func testCase2(tc *testCase) {
 			}
 		}
 
-		myCfg.StaticMaxPeers = len(myCfg.StaticNodes)	        // config.MaxPeers
-		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes) / 2	// config.MaxOutbounds
-		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes) / 2	// config.MaxInbounds
+		myCfg.StaticMaxPeers = len(myCfg.StaticNodes) * 2	// config.MaxPeers
+		myCfg.StaticMaxOutbounds = len(myCfg.StaticNodes)	// config.MaxOutbounds
+		myCfg.StaticMaxInbounds = len(myCfg.StaticNodes)	// config.MaxInbounds
 
 		cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
 		p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
@@ -712,7 +719,7 @@ func testCase2(tc *testCase) {
 	}
 
 	var p2pInstList = []*sch.Scheduler{}
-	for p2pInst, _ := range p2pInst2Cfg {
+	for p2pInst := range p2pInst2Cfg {
 		p2pInstList = append(p2pInstList, p2pInst)
 	}
 

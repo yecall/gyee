@@ -1308,7 +1308,7 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	rsp.Result = NgbMgrEnoNone
 	rsp.FindNode = findNode
 
-	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode);
+	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
 
 	//

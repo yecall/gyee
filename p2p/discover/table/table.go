@@ -2585,7 +2585,7 @@ func (tabMgr *TableManager)tabActiveQueryInst() TabMgrErrno {
 		}
 
 		if len(tabMgr.queryPending) <= 0 {
-			break;
+			break
 		}
 
 		//

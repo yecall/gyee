@@ -391,13 +391,13 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxInBounds),
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxOutbounds); !(m1 && m2 && m3) {
 
-		log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration");
+		log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration")
 		return name, PcfgEnoParameter
 	}
 
 	for key, maxPeers := range cfg.SubNetMaxPeers {
 		if maxPeers < cfg.SubNetMaxOutbounds[key] + cfg.SubNetMaxInBounds[key] {
-			log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration");
+			log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration")
 			return name, PcfgEnoParameter
 		}
 	}

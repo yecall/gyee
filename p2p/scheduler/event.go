@@ -260,6 +260,7 @@ type MsgPeCloseReq struct {
 	Ptn		interface{}			// pointer to peer task instance node
 	Snid	config.SubNetworkID	// sub network identity
 	Node	config.Node			// peer node
+	Dir		int					// direction
 }
 
 //
