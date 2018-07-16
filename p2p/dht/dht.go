@@ -23,6 +23,7 @@ package dht
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -59,6 +60,34 @@ func (dhtMgr *DhtManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 // Table manager entry
 //
 func (dhtMgr *DhtManager)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno = sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+		eno = dhtMgr.dhtMgrPoweron(ptn)
+	case sch.EvSchPoweroff:
+		eno = dhtMgr.dhtMgrPoweroff(ptn)
+	default:
+	}
+
+	return eno
+}
+
+//
+//
+// Poweron handler
+func (dhtMgr *DhtManager)dhtMgrPoweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
+
+//
+// poweroff handler
+//
+func (dhtMgr *DhtManager)dhtMgrPoweroff(ptn interface{}) sch.SchErrno {
+	log.LogCallerFileLine("dhtMgrPoweroff: task will be done")
+	sdl := sch.SchGetScheduler(ptn)
+	return sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}
+
 

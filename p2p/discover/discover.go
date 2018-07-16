@@ -164,12 +164,14 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 //
 func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 
+	log.LogCallerFileLine("DcvMgrPoweroff: task will be done")
+
 	sdl := sch.SchGetScheduler(ptn)
-	sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	if sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+		return DcvMgrEnoNone
+	}
 
-	log.LogCallerFileLine("DcvMgrPoweroff: task done")
-
-	return DcvMgrEnoNone
+	return DcvMgrEnoScheduler
 }
 
 //

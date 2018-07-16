@@ -23,6 +23,7 @@ package chunker
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -58,6 +59,35 @@ func (dhtchMgr *DhtChunkerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.S
 // Table manager entry
 //
 func (dhtchMgr *DhtChunkerManager)dhtchMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno = sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+		eno = dhtchMgr.dhtchMgrPoweron(ptn)
+	case sch.EvSchPoweroff:
+		eno = dhtchMgr.dhtchMgrPoweroff(ptn)
+	default:
+	}
+
+	return eno
+}
+
+//
+//
+// Poweron handler
+func (dhtchMgr *DhtChunkerManager)dhtchMgrPoweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
+
+//
+// poweroff handler
+//
+func (dhtchMgr *DhtChunkerManager)dhtchMgrPoweroff(ptn interface{}) sch.SchErrno {
+	log.LogCallerFileLine("dhtchMgrPoweroff: task will be done")
+	sdl := sch.SchGetScheduler(ptn)
+	return sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}
+
+
 

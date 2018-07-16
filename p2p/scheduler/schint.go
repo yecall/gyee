@@ -46,7 +46,7 @@ const schMaxMbSize = SchMaxMbSize
 //
 // Watch dog
 //
-type schWatchDog SchWatchDog
+type schWatchDog = SchWatchDog
 
 //
 // Mail box
@@ -137,8 +137,7 @@ type schTaskNode struct {
 // internal modle ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
-const schTaskNodePoolSize		= 1024					// task node pool size, must be (2^n)
-type schTaskName 	string								// task name
+const schTaskNodePoolSize = 1024						// task node pool size, must be (2^n)
 var schTaskNodePool	[schTaskNodePoolSize]schTaskNode	// task node pool
 
 type scheduler struct {
@@ -153,7 +152,7 @@ type scheduler struct {
 	tkFree				*schTaskNode						// free task queue
 	freeSize			int									// number of nodes in free
 	tkBusy				*schTaskNode						// busy task queue in scheduling
-	tkMap				map[schTaskName]*schTaskNode		// map task name to pointer of running task node
+	tkMap				map[string]*schTaskNode				// map task name to pointer of running task node
 	busySize			int									// number of nodes in busy
 	tmFree				*schTmcbNode						// free timer node queue
 	tmFreeSize			int									// free timer node queue size

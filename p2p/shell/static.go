@@ -35,6 +35,7 @@ import (
 	dhtst	"github.com/yeeco/gyee/p2p/dht/storer"
 	dhtsy	"github.com/yeeco/gyee/p2p/dht/syncer"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	"time"
 )
 
 //
@@ -77,7 +78,7 @@ func P2pCreateStaticTaskTab() []sch.TaskStaticDescription {
 //
 // Poweron order of static user tasks
 //
-var TaskStaticPoweronOrder = []string {
+var taskStaticPoweronOrder = []string {
 	dcv.DcvMgrName,
 	tab.TabMgrName,
 	tab.NdbcName,
@@ -94,42 +95,16 @@ var TaskStaticPoweronOrder = []string {
 }
 
 //
-// Append a static user task to table TaskStaticTab
-//
-func AppendStaticTasks(
-	tab		[]sch.TaskStaticDescription,
-	name	string,
-	tep		sch.SchUserTaskInf,
-	dcb		func(interface{})sch.SchErrno,
-	dog		sch.SchWatchDog) sch.SchErrno {
-
-	log.LogCallerFileLine("AppendStaticTasks: " +
-		"static task would be appended: \n" +
-		"name: %s\n" +
-		"tep: %p\n" +
-		"dcb: %p\n" +
-		"dog: %+v",
-		name,
-		tep,
-		dcb,
-		dog)
-
-	tab = append(tab, sch.TaskStaticDescription{Name:name, Tep:tep, DieCb:dcb, Wd:dog})
-
-	return sch.SchEnoNone
-}
-
-//
-// Init p2p
+// Create p2p instance
 //
 func P2pCreateInstance(cfg *config.Config) (*sch.Scheduler, sch.SchErrno) {
 	return sch.SchSchedulerInit(cfg)
 }
 
 //
-// Start p2p
+// Start p2p instance
 //
-func P2pStart(sdl *sch.Scheduler) (sch.SchErrno) {
+func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 
 	//
 	// Start all static tasks
@@ -137,7 +112,7 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno) {
 
 	var eno sch.SchErrno
 
-	eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(), TaskStaticPoweronOrder)
+	eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(), taskStaticPoweronOrder)
 
 	if eno != sch.SchEnoNone {
 		return eno
@@ -174,6 +149,57 @@ func P2pStart(sdl *sch.Scheduler) (sch.SchErrno) {
 
 	return sch.SchEnoNone
 }
+
+//
+// Stop p2p instance
+//
+func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
+
+	//
+	// Send poweroff message to all static tasks if it's still exist.
+	// Notice: some tasks might be not alived, according to the network
+	// type, they might be done when they receive the poweron message.
+	//
+
+	powerOff := sch.SchMessage {
+		Id:		sch.EvSchPoweroff,
+		Body:	nil,
+	}
+
+	for _, taskName := range taskStaticPoweronOrder {
+		if sdl.SchTaskExist(taskName) == true {
+			sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff)
+		}
+	}
+
+	log.LogCallerFileLine("P2pStop: total tasks: %d", sdl.SchGetTaskNumber())
+	log.LogCallerFileLine("P2pStop: wait all tasks to be done ...")
+
+	//
+	// just wait all to be done
+	//
+
+	seconds := 0
+	tasks := 0
+
+	for {
+
+		time.Sleep(time.Second * 1)
+		seconds++
+
+		tasks = sdl.SchGetTaskNumber()
+
+		if tasks == 0 {
+			log.LogCallerFileLine("P2pStop: all tasks are done")
+			break;
+		}
+
+		log.LogCallerFileLine("P2pStop: wait seconds: %d, remain tasks: %d", seconds, tasks)
+	}
+
+	return sch.SchEnoNone
+}
+
 
 
 

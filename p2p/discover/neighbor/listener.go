@@ -302,15 +302,14 @@ func (lsnMgr *ListenerManager) procPoweron(ptn interface{}) sch.SchErrno {
 //
 func (lsnMgr *ListenerManager) procPoweroff() sch.SchErrno {
 
+	log.LogCallerFileLine("procPoweroff: task will be done")
+
 	//
 	// Stop reader task
 	//
 
 	if eno := lsnMgr.procStop(); eno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("procPoweroff: " +
-			"procStop failed, eno: %d",
-			eno)
+		log.LogCallerFileLine("procPoweroff: procStop failed, eno: %d", eno)
 	}
 
 	//

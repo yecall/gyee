@@ -508,20 +508,18 @@ func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 //
 func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 
-	if ptn == nil {
-		log.LogCallerFileLine("tabMgrPoweroff: invalid parameters")
-		return TabMgrEnoParameter
-	}
+	log.LogCallerFileLine("tabMgrPoweroff: task will be done")
 
 	if tabMgr.nodeDb != nil {
 		tabMgr.nodeDb.close()
 		tabMgr.nodeDb = nil
 	}
 
-	tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	if tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+		return TabMgrEnoScheduler
+	}
 
-	log.LogCallerFileLine("tabMgrPoweroff: task done")
-	return TabMgrEnoScheduler
+	return TabMgrEnoNone
 }
 
 //
@@ -1238,17 +1236,16 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 //
 func (ndbc *NodeDbCleaner)ndbcPoweroff(ptn interface{}) TabMgrErrno {
 
-	if ptn == nil {
-		log.LogCallerFileLine("ndbcPoweroff: invalid parameters")
-		return TabMgrEnoParameter
-	}
+	log.LogCallerFileLine("ndbcPoweroff: task will be done")
 
 	if ndbc.tid != sch.SchInvalidTid {
 		ndbc.sdl.SchKillTimer(ptn, ndbc.tid)
 		ndbc.tid = sch.SchInvalidTid
 	}
 
-	ndbc.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	if ndbc.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+		return TabMgrEnoScheduler
+	}
 
 	return TabMgrEnoNone
 }

@@ -51,6 +51,7 @@ type ListenerManager struct {
 // Create listener manager
 //
 func NewLsnMgr() *ListenerManager {
+
 	var lsnMgr = ListenerManager {
 		name: PeerLsnMgrName,
 	}
@@ -182,7 +183,7 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 //
 func (lsnMgr *ListenerManager)lsnMgrPoweroff() sch.SchErrno {
 
-	log.LogCallerFileLine("lsnMgrPoweroff: poweroff, done")
+	log.LogCallerFileLine("lsnMgrPoweroff: task will be done")
 
 	//
 	// kill accepter task if needed
@@ -191,6 +192,10 @@ func (lsnMgr *ListenerManager)lsnMgrPoweroff() sch.SchErrno {
 	if _, ptn := lsnMgr.sdl.SchGetTaskNodeByName(PeerAccepterName); ptn != nil {
 		lsnMgr.lsnMgrStop()
 	}
+
+	//
+	// done ourself
+	//
 
 	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptn, sch.SchEnoKilled)
 }

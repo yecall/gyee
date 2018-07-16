@@ -23,6 +23,7 @@ package route
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -59,6 +60,34 @@ func (dhtrMgr *DhtRouteManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchM
 // Table manager entry
 //
 func (dhtrMgr *DhtRouteManager) dhtroMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno = sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+		eno = dhtrMgr.dhtrMgrPoweron(ptn)
+	case sch.EvSchPoweroff:
+		eno = dhtrMgr.dhtrMgrPoweroff(ptn)
+	default:
+	}
+
+	return eno
+}
+
+//
+//
+// Poweron handler
+func (dhtMgr *DhtRouteManager)dhtrMgrPoweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
+
+//
+// poweroff handler
+//
+func (dhtMgr *DhtRouteManager)dhtrMgrPoweroff(ptn interface{}) sch.SchErrno {
+	log.LogCallerFileLine("dhtrMgrPoweroff: task will be done")
+	sdl := sch.SchGetScheduler(ptn)
+	return sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}
+
 

@@ -32,6 +32,7 @@ import (
 // Default task node for scheduler to send event
 //
 const rawSchTaskName = "schTsk"
+const RawSchTaskName = rawSchTaskName
 
 var rawSchTsk = schTaskNode {
 	task: schTask{name:rawSchTaskName,},
@@ -67,7 +68,7 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 	// make maps
 	//
 
-	sdl.tkMap = make(map[schTaskName] *schTaskNode)
+	sdl.tkMap = make(map[string] *schTaskNode)
 	sdl.tmMap = make(map[*schTmcbNode] *schTaskNode)
 
 	//
@@ -745,7 +746,7 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 	ptn.task.mailbox.size	= taskDesc.MbSize
 	ptn.task.done			= make(chan SchErrno, 1)
 	ptn.task.stopped		= make(chan bool, 1)
-	ptn.task.dog			= schWatchDog(*taskDesc.Wd)
+	ptn.task.dog			= *taskDesc.Wd
 	ptn.task.dieCb			= taskDesc.DieCb
 	ptn.task.userData		= taskDesc.UserDa
 
@@ -775,7 +776,7 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 
 		log.LogCallerFileLine("schCreateTask: task with empty name")
 
-	} else if _, dup := sdl.tkMap[schTaskName(ptn.task.name)]; dup == true {
+	} else if _, dup := sdl.tkMap[ptn.task.name]; dup == true {
 
 		log.LogCallerFileLine("schCreateTask: " +
 			"duplicated task name: %s",
@@ -787,7 +788,7 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 
 	} else {
 
-		sdl.tkMap[schTaskName(ptn.task.name)] = ptn
+		sdl.tkMap[ptn.task.name] = ptn
 	}
 
 	sdl.lock.Unlock()
@@ -1047,7 +1048,7 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	if len(ptn.task.name) > 0 {
 
 		sdl.lock.Lock()
-		delete(sdl.tkMap, schTaskName(ptn.task.name))
+		delete(sdl.tkMap, ptn.task.name)
 		sdl.lock.Unlock()
 	}
 
@@ -1336,11 +1337,15 @@ func (sdl *scheduler)schGetTaskNodeByName(name string) (SchErrno, *schTaskNode) 
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 
-	if ptn, err := sdl.tkMap[schTaskName(name)]; ptn == nil || !err {
+	if name == RawSchTaskName {
+		return SchEnoNone, &rawSchTsk
+	}
+
+	if ptn, err := sdl.tkMap[name]; ptn == nil || !err {
 		return SchEnoNotFound, nil
 	}
 
-	return SchEnoNone, sdl.tkMap[schTaskName(name)]
+	return SchEnoNone, sdl.tkMap[name]
 }
 
 //
@@ -1418,6 +1423,16 @@ func (sdl *scheduler)schGetTaskName(ptn *schTaskNode) string {
 		return ""
 	}
 	return ptn.task.name
+}
+
+//
+// Get task number
+//
+func (sdl *scheduler)schGetTaskNumber() int {
+	sdl.lock.Lock()
+	tn := len(sdl.tkMap)
+	sdl.lock.Unlock()
+	return tn
 }
 
 //

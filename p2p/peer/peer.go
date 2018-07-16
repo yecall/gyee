@@ -445,16 +445,31 @@ func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
 //
 func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 
-	log.LogCallerFileLine("peMgrPoweroff: pwoeroff received, done the task")
+	log.LogCallerFileLine("peMgrPoweroff: task will be done")
 
-	for snid, tid := range peMgr.tidFindNode {
-		if tid != sch.SchInvalidTid {
-			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
-			peMgr.tidFindNode[snid] = sch.SchInvalidTid
-		}
+	//
+	// send poweroff to kill all peer instance tasks
+	//
+
+	powerOff := sch.SchMessage {
+		Id:		sch.EvSchPoweroff,
+		Body:	nil,
 	}
 
-	peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	peMgr.sdl.SchSetSender(&powerOff, peMgr.ptnMe)
+
+	for _, peerInst := range peMgr.peers {
+		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
+		peMgr.sdl.SchSendMessage(&powerOff)
+	}
+
+	//
+	// done ourself
+	//
+
+	if peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+		return PeMgrEnoScheduler
+	}
 
 	return PeMgrEnoNone
 }

@@ -239,10 +239,7 @@ func (sdl *Scheduler)SchStopTask(ptn interface{}) SchErrno {
 }
 
 //
-// Get user task node pointer: the return type is a pointer a user task named by parameter
-// "name" passed in. but the user caller need not to know details about the task node pointed
-// by that pointer returned. any actions to the task should be carried out by calling funcs
-// exported here in this file, which would call into the core of the scheduler.
+// Get user task node pointer
 //
 func (sdl *Scheduler)SchGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
 	return sdl.schGetTaskNodeByName(name)
@@ -271,6 +268,22 @@ func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *S
 
 func (sdl *Scheduler)SchSendMessage(msg *SchMessage) SchErrno {
 	return sdl.schSendMsg((*schMessage)(msg))
+}
+
+//
+// Set sender of message
+//
+func (sdl *Scheduler)SchSetSender(msg *SchMessage, sender interface{}) SchErrno {
+	msg.sender = sender.(*schTaskNode)
+	return SchEnoNone
+}
+
+//
+// Set receiver of message
+//
+func (sdl *Scheduler)SchSetRecver(msg *SchMessage, recver interface{}) SchErrno {
+	msg.recver = recver.(*schTaskNode)
+	return SchEnoNone
 }
 
 //
@@ -348,6 +361,21 @@ func (sdl *Scheduler)SchSetUserDataArea(ptn interface{}, uda interface{}) SchErr
 //
 func (sdl *Scheduler)SchGetTaskName(ptn interface{}) string {
 	return sdl.schGetTaskName(ptn.(*schTaskNode))
+}
+
+//
+// Get task number
+//
+func (sdl *Scheduler)SchGetTaskNumber() int {
+	return sdl.schGetTaskNumber()
+}
+
+//
+// Test if task exist with specific name
+//
+func (sdl *Scheduler)SchTaskExist(name string) bool {
+	eno, ptn := sdl.SchGetTaskNodeByName(name)
+	return eno == SchEnoNone && ptn != nil
 }
 
 //

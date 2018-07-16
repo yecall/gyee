@@ -698,15 +698,24 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	case sch.EvSchPoweroff:
 		return ngbMgr.PoweroffHandler(ptn)
 
+	//
 	// udpmsg from udp listener task
+	//
+
 	case sch.EvNblMsgInd:
 		eno = ngbMgr.UdpMsgInd(msg.Body.(*UdpMsgInd))
 
-	// request to find node from table task
+	//
+	// findnode request from table task
+	//
+
 	case sch.EvNblFindNodeReq:
 		eno = ngbMgr.FindNodeReq(msg.Body.(*um.FindNode))
 
-	// request to ping from table task
+	//
+	// ping request from table task
+	//
+
 	case sch.EvNblPingpongReq:
 		eno = ngbMgr.PingpongReq(msg.Body.(*um.Ping))
 
@@ -778,7 +787,31 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("PoweroffHandler: done for poweroff event")
+
+	log.LogCallerFileLine("PoweroffHandler: task will be done")
+
+	//
+	// send poweroff to kill all peer instance tasks
+	//
+
+	powerOff := sch.SchMessage {
+		Id:		sch.EvSchPoweroff,
+		Body:	nil,
+	}
+
+	ngbMgr.sdl.SchSetSender(&powerOff, ngbMgr.ptnMe)
+
+	for _, ngbInst := range ngbMgr.ngbMap {
+		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
+		ngbMgr.sdl.SchSendMessage(&powerOff)
+	}
+
+	ngbMgr.lock.Unlock()
+
+	//
+	// done ourself
+	//
+
 	return ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
@@ -896,9 +929,11 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 			return NgbMgrEnoUdp
 		}
 	} else {
+
 		log.LogCallerFileLine("PingHandler: " +
 			"invalid buffer, buf: %p, length: %d",
 			interface{}(buf), bytes)
+
 		return NgbMgrEnoEncode
 	}
 

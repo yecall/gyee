@@ -22,6 +22,7 @@ package syncer
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -57,7 +58,38 @@ func (dhtsyMgr *DhtSyncerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.Sc
 // sync manager entry
 //
 func (dhtsyMgr *DhtSyncerManager)dhtsyMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno= sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+		eno = dhtsyMgr.dhtsyMgrPoweron(ptn)
+	case sch.EvSchPoweroff:
+		eno = dhtsyMgr.dhtsyMgrPoweroff(ptn)
+	default:
+	}
+
+	return eno
+}
+
+//
+//
+// Poweron handler
+func (dhtsyMgr *DhtSyncerManager)dhtsyMgrPoweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
+
+//
+// poweroff handler
+//
+func (dhtsyMgr *DhtSyncerManager)dhtsyMgrPoweroff(ptn interface{}) sch.SchErrno {
+	log.LogCallerFileLine("dhtsyMgrPoweroff: task will be done")
+	sdl := sch.SchGetScheduler(ptn)
+	return sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}
+
+
+
+
 
 

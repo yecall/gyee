@@ -23,6 +23,7 @@ package retriver
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -58,6 +59,32 @@ func (dhtreMgr *DhtRetriverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.
 // retrive manager entry
 //
 func (dhtreMgr *DhtRetriverManager)dhtreMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno = sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+		eno = dhtreMgr.dhtreMgrPoweron(ptn)
+	case sch.EvSchPoweroff:
+		eno = dhtreMgr.dhtreMgrPoweroff(ptn)
+	default:
+	}
+
+	return eno
+}
+
+//
+//
+// Poweron handler
+func (dhtreMgr *DhtRetriverManager)dhtreMgrPoweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// poweroff handler
+//
+func (dhtreMgr *DhtRetriverManager)dhtreMgrPoweroff(ptn interface{}) sch.SchErrno {
+	log.LogCallerFileLine("dhtreMgrPoweroff: task will be done")
+	sdl := sch.SchGetScheduler(ptn)
+	return sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}

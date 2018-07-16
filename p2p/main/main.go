@@ -119,7 +119,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase2"
+var tgtCase = "testCase4"
 
 //
 // create test case control block by name

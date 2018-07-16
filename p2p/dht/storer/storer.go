@@ -23,6 +23,7 @@ package storer
 
 import (
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -58,7 +59,35 @@ func (dhtstMgr *DhtStorerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.Sc
 // store manager entry
 //
 func (dhtstMgr *DhtStorerManager)dhtstMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno = sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+		eno = dhtstMgr.dhtstMgrPoweron(ptn)
+	case sch.EvSchPoweroff:
+		eno = dhtstMgr.dhtstMgrPoweroff(ptn)
+	default:
+	}
+
+	return eno
+}
+
+//
+//
+// Poweron handler
+func (dhtstMgr *DhtStorerManager)dhtstMgrPoweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
+
+//
+// poweroff handler
+//
+func (dhtstMgr *DhtStorerManager)dhtstMgrPoweroff(ptn interface{}) sch.SchErrno {
+	log.LogCallerFileLine("dhtstMgrPoweroff: task will be done")
+	sdl := sch.SchGetScheduler(ptn)
+	return sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}
+
 
 
