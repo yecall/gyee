@@ -168,10 +168,10 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
-		return DcvMgrEnoNone
+		return DcvMgrEnoScheduler
 	}
 
-	return DcvMgrEnoScheduler
+	return DcvMgrEnoNone
 }
 
 //

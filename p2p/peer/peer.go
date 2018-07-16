@@ -49,6 +49,7 @@ const (
 	PeMgrEnoMessage
 	PeMgrEnoDuplicated
 	PeMgrEnoNotfound
+	PeMgrEnoMismatched
 	PeMgrEnoInternal
 	PeMgrEnoPingpongTh
 	PeMgrEnoUnknown
@@ -1988,6 +1989,9 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 
 	switch msg.Id {
 
+	case sch.EvSchPoweroff:
+		eno = pi.piPoweroff(ptn)
+
 	case sch.EvPeConnOutReq:
 		eno = pi.piConnOutReq(msg.Body)
 
@@ -2020,6 +2024,57 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	}
 
 	return sch.SchEnoNone
+}
+
+//
+// power off handler
+//
+func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
+
+	if inst.ptnMe != ptn {
+		return PeMgrEnoMismatched
+	}
+
+	log.LogCallerFileLine("piPoweroff: " +
+		"task will be done, name: %s",
+		inst.sdl.SchGetTaskName(inst.ptnMe))
+
+	//
+	// done Tx and Rx routines
+	//
+
+	if inst.rxDone != nil {
+		inst.rxDone <- PeMgrEnoNone
+		<-inst.rxExit
+		close(inst.rxDone)
+		inst.rxDone = nil
+	}
+
+	if inst.txDone != nil {
+		inst.txDone <- PeMgrEnoNone
+		<-inst.txExit
+		close(inst.txDone)
+		inst.txDone = nil
+	}
+
+	//
+	// close the connection
+	//
+
+	if inst.conn != nil {
+		inst.conn.Close()
+		inst.conn = nil
+	}
+
+	//
+	// done ourself
+	//
+
+	if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
+		return PeMgrEnoScheduler
+	}
+
+	return PeMgrEnoNone
 }
 
 //
@@ -3373,6 +3428,8 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 // Print peer statistics
 //
 func (peMgr *PeerManager)logPeerStat() {
+
+	return
 
 	var obpNumSum = 0
 	var ibpNumSum = 0

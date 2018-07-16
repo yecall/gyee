@@ -22,6 +22,8 @@
 package shell
 
 import (
+	"time"
+	golog	"log"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
@@ -35,7 +37,6 @@ import (
 	dhtst	"github.com/yeeco/gyee/p2p/dht/storer"
 	dhtsy	"github.com/yeeco/gyee/p2p/dht/syncer"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"time"
 )
 
 //
@@ -167,13 +168,19 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 	}
 
 	for _, taskName := range taskStaticPoweronOrder {
-		if sdl.SchTaskExist(taskName) == true {
-			sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff)
+		if sdl.SchTaskExist(taskName) != true {
+			golog.Printf("P2pStop: task not exist: %s", taskName)
+			continue
+		}
+		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
+			golog.Printf("P2pStop: SchSendMessageByName failed, eno: %d, task: %s", eno, taskName)
+		} else {
+			golog.Printf("P2pStop: SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s", eno, taskName)
 		}
 	}
 
-	log.LogCallerFileLine("P2pStop: total tasks: %d", sdl.SchGetTaskNumber())
-	log.LogCallerFileLine("P2pStop: wait all tasks to be done ...")
+	golog.Printf("P2pStop: total tasks: %d", sdl.SchGetTaskNumber())
+	golog.Printf("P2pStop: wait all tasks to be done ...")
 
 	//
 	// just wait all to be done
@@ -190,11 +197,11 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			log.LogCallerFileLine("P2pStop: all tasks are done")
+			golog.Printf("P2pStop: all tasks are done")
 			break;
 		}
 
-		log.LogCallerFileLine("P2pStop: wait seconds: %d, remain tasks: %d", seconds, tasks)
+		golog.Printf("P2pStop: wait seconds: %d, remain tasks: %d", seconds, tasks)
 	}
 
 	return sch.SchEnoNone

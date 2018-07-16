@@ -119,6 +119,9 @@ func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.
 
 	switch msg.Id {
 
+	case sch.EvSchPoweroff:
+		protoEno = inst.NgbProtoPoweroff(ptn)
+
 	case sch.EvNblFindNodeReq:
 		protoEno = inst.NgbProtoFindNodeReq(ptn, msg.Body.(*um.FindNode))
 
@@ -153,6 +156,25 @@ func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.
 	return sch.SchEnoNone
 }
 
+//
+// power off handler
+//
+func (inst *neighborInst) NgbProtoPoweroff(ptn interface{}) NgbProtoErrno {
+
+	if ptn != inst.ptn {
+		return NgbMgrEnoMismatched
+	}
+
+	log.LogCallerFileLine("NgbProtoPoweroff: " +
+		"task will be done, name: %s",
+		inst.sdl.SchGetTaskName(inst.ptn))
+
+	if inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+		return NgbProtoEnoScheduler
+	}
+
+	return NgbProtoEnoNone
+}
 //
 // FindNode request handler
 //
@@ -799,8 +821,9 @@ func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
 		Body:	nil,
 	}
 
-	ngbMgr.sdl.SchSetSender(&powerOff, ngbMgr.ptnMe)
+	ngbMgr.lock.Lock()
 
+	ngbMgr.sdl.SchSetSender(&powerOff, ngbMgr.ptnMe)
 	for _, ngbInst := range ngbMgr.ngbMap {
 		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
 		ngbMgr.sdl.SchSendMessage(&powerOff)

@@ -1015,6 +1015,17 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	}
 
 	//
+	// remove name to task node pointer map
+	//
+
+	if len(ptn.task.name) > 0 {
+
+		sdl.lock.Lock()
+		delete(sdl.tkMap, ptn.task.name)
+		sdl.lock.Unlock()
+	}
+
+	//
 	// clean the user task control block
 	//
 
@@ -1039,17 +1050,6 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 			eno)
 
 		return  eno
-	}
-
-	//
-	// remove name to task node pointer map
-	//
-
-	if len(ptn.task.name) > 0 {
-
-		sdl.lock.Lock()
-		delete(sdl.tkMap, ptn.task.name)
-		sdl.lock.Unlock()
 	}
 
 	return SchEnoNone

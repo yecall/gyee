@@ -614,10 +614,22 @@ _loop:
 // Check if an error can be ignored while reading
 //
 func (rd *UdpReaderTask) canErrIgnored(err error) bool {
+
 	const WSAEMSGSIZE = syscall.Errno(10040)
+
 	if opErr, ok := err.(*net.OpError); ok {
-		return opErr.Temporary() || opErr.Err.(*os.SyscallError).Err == WSAEMSGSIZE
+
+		if opErr.Temporary() {
+			return true
+		}
+
+		if sce, ok := opErr.Err.(*os.SyscallError); ok {
+			if sce.Err == WSAEMSGSIZE {
+				return true
+			}
+		}
 	}
+
 	return false
 }
 
