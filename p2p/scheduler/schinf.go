@@ -50,7 +50,8 @@ const (
 	SchEnoDuplicated	SchErrno = 13	// duplicated
 	SchEnoSuspended		SchErrno = 14	// user task is suspended for some reasons
 	SchEnoUnknown		SchErrno = 15	// unknowns
-	SchEnoMax			SchErrno = 16	// just for bound checking
+	SchEnoPowerOff		SchErrno = 16	// in power off stage
+	SchEnoMax			SchErrno = 17	// just for bound checking
 )
 
 var SchErrnoDescription = []string {
@@ -354,6 +355,13 @@ func (sdl *Scheduler)SchGetUserDataArea(ptn interface{}) interface{} {
 //
 func (sdl *Scheduler)SchSetUserDataArea(ptn interface{}, uda interface{}) SchErrno {
 	return sdl.schSetUserDataArea(ptn.(*schTaskNode), uda)
+}
+
+//
+// Set the power off stage flag to tell the scheduler it's going to be turn off
+//
+func (sdl *Scheduler)SchSetPoweroffStage() SchErrno {
+	return sdl.schSetPoweroffStage()
 }
 
 //

@@ -159,6 +159,7 @@ type scheduler struct {
 	tmMap				map[*schTmcbNode]*schTaskNode		// map busy timer node pointer to its' owner task node pointer
 	schTaskNodePool		[schTaskNodePoolSize]schTaskNode	// task node pool
 	schTimerNodePool	[schTimerNodePoolSize]schTmcbNode	// timer node pool
+	powerOff			bool								// power off stage flag
 }
 
 //

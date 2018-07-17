@@ -449,6 +449,14 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	log.LogCallerFileLine("peMgrPoweroff: task will be done")
 
 	//
+	// disable peer status indication callback
+	//
+
+	peMgr.Lock4Cb.Lock()
+	peMgr.P2pIndHandler = nil
+	peMgr.Lock4Cb.Unlock()
+
+	//
 	// send poweroff to kill all peer instance tasks
 	//
 
@@ -460,6 +468,7 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	peMgr.sdl.SchSetSender(&powerOff, peMgr.ptnMe)
 
 	for _, peerInst := range peMgr.peers {
+		SetP2pkgCallback(nil, peerInst.ptnMe)
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
 		peMgr.sdl.SchSendMessage(&powerOff)
 	}
@@ -1432,9 +1441,6 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		}
 
 		peMgr.P2pIndHandler(P2pIndPeerClosed, &para)
-
-	} else {
-		log.LogCallerFileLine("peMgrConnCloseCfm: indication callback not installed yet")
 	}
 
 	peMgr.Lock4Cb.Unlock()
@@ -1498,9 +1504,6 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 		}
 
 		peMgr.P2pIndHandler(P2pIndPeerClosed, &para)
-
-	} else {
-		log.LogCallerFileLine("peMgrConnCloseInd: indication callback not installed yet")
 	}
 
 	peMgr.Lock4Cb.Unlock()
@@ -1821,7 +1824,6 @@ const (
 	peInstStateConnected		// outbound connected, need handshake
 	peInstStateHandshook		// handshook
 	peInstStateActivated		// actived in working
-	peInstStateKilledReq		// peer manager is required to kill the instance
 )
 
 type peerInstState int	// instance state type
@@ -2040,21 +2042,24 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 		inst.sdl.SchGetTaskName(inst.ptnMe))
 
 	//
-	// done Tx and Rx routines
+	// done Tx and Rx routines if peer activated
 	//
 
-	if inst.rxDone != nil {
-		inst.rxDone <- PeMgrEnoNone
-		<-inst.rxExit
-		close(inst.rxDone)
-		inst.rxDone = nil
-	}
+	if inst.state == peInstStateActivated {
 
-	if inst.txDone != nil {
-		inst.txDone <- PeMgrEnoNone
-		<-inst.txExit
-		close(inst.txDone)
-		inst.txDone = nil
+		if inst.rxDone != nil {
+			inst.rxDone <- PeMgrEnoNone
+			<-inst.rxExit
+			close(inst.rxDone)
+			inst.rxDone = nil
+		}
+
+		if inst.txDone != nil {
+			inst.txDone <- PeMgrEnoNone
+			<-inst.txExit
+			close(inst.txDone)
+			inst.txDone = nil
+		}
 	}
 
 	//
@@ -2312,9 +2317,6 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 			}
 
 			inst.peMgr.P2pIndHandler(P2pIndConnStatus, &para)
-
-		} else {
-			log.LogCallerFileLine("piPingpongReq: indication callback not installed yet")
 		}
 
 		inst.peMgr.Lock4Cb.Unlock()
@@ -2490,9 +2492,6 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 		}
 
 		inst.peMgr.P2pIndHandler(P2pIndPeerActivated, &para)
-
-	} else {
-		log.LogCallerFileLine("piEstablishedInd: indication callback not installed yet")
 	}
 
 	inst.peMgr.Lock4Cb.Unlock()
@@ -2572,9 +2571,6 @@ func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 			}
 
 			inst.peMgr.P2pIndHandler(P2pIndConnStatus, &para)
-
-		} else {
-			log.LogCallerFileLine("piPingpongTimerHandler: indication callback not installed yet")
 		}
 
 		inst.peMgr.Lock4Cb.Unlock()
@@ -2772,8 +2768,7 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 func SetP2pkgCallback(cb interface{}, ptn interface{}) PeMgrErrno {
 
 	if ptn == nil {
-		log.LogCallerFileLine("SetP2pkgCallback: invalid parameters")
-		return PeMgrEnoParameter
+		log.LogCallerFileLine("SetP2pkgCallback: setting nil callback")
 	}
 
 	sdl := sch.SchGetScheduler(ptn)
@@ -2794,7 +2789,12 @@ func SetP2pkgCallback(cb interface{}, ptn interface{}) PeMgrErrno {
 	if inst.p2pkgRx != nil {
 		log.LogCallerFileLine("SetP2pkgCallback: old one will be overlapped")
 	}
-	inst.p2pkgRx = cb.(P2pPkgCallback)
+
+	if cb != nil {
+		inst.p2pkgRx = cb.(P2pPkgCallback)
+	} else {
+		inst.p2pkgRx = nil
+	}
 
 	return PeMgrEnoNone
 }
@@ -2988,9 +2988,6 @@ txBreak:
 					}
 
 					inst.peMgr.P2pIndHandler(P2pIndConnStatus, &info)
-
-				} else {
-					log.LogCallerFileLine("piTx: indication callback not installed yet")
 				}
 
 				inst.peMgr.Lock4Cb.Unlock()
@@ -3087,9 +3084,6 @@ rxBreak:
 				}
 
 				inst.peMgr.P2pIndHandler(P2pIndConnStatus, &info)
-
-			} else {
-				log.LogCallerFileLine("piRx: indication callback not installed yet")
 			}
 
 			inst.peMgr.Lock4Cb.Unlock()
@@ -3135,9 +3129,6 @@ rxBreak:
 				pkgCb.Payload		= append(pkgCb.Payload, upkg.Payload...)
 
 				inst.p2pkgRx(&pkgCb)
-
-			} else {
-				log.LogCallerFileLine("piRx: package callback not installed yet")
 			}
 
 			inst.p2pkgLock.Unlock()

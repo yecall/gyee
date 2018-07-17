@@ -63,6 +63,7 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 	//
 
 	sdl.p2pCfg = cfg
+	sdl.powerOff = false
 
 	//
 	// make maps
@@ -162,10 +163,14 @@ taskLoop:
 		case msg := <-*queMsg:
 
 			//
-			// call handler
+			// call handler, but if in power off stage, we discard all except poweroff
 			//
 
-			proc(ptn, (*SchMessage)(&msg))
+			if (sdl.powerOff == false) || (sdl.powerOff == true && msg.Id == EvSchPoweroff) {
+
+				proc(ptn, (*SchMessage)(&msg))
+
+			}
 
 		case eno = <-*done:
 
@@ -173,10 +178,7 @@ taskLoop:
 			// done
 			//
 
-			if eno != SchEnoNone {
-				log.LogCallerFileLine("schCommonTask: done with eno: %d", eno)
-			}
-
+			log.LogCallerFileLine("schCommonTask: done with eno: %d, task: %s", eno, ptn.task.name)
 			break taskLoop
 		}
 	}
@@ -266,7 +268,7 @@ timerLoop:
 
 				task.lock.Lock()
 
-				if eno := schSendTimerEvent(ptm); eno != SchEnoNone {
+				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone {
 
 					log.LogCallerFileLine("schTimerCommonTask: " +
 						"send timer event failed, eno: %d, task: %s",
@@ -337,7 +339,7 @@ absTimerLoop:
 				task.lock.Lock()
 				sdl.lock.Lock()
 
-				if eno := schSendTimerEvent(ptm); eno != SchEnoNone {
+				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone {
 
 					log.LogCallerFileLine("schTimerCommonTask: "+
 						"send timer event failed, eno: %d, task: %s",
@@ -675,7 +677,20 @@ func (sdl *scheduler)schTaskBusyDeque(ptn *schTaskNode) SchErrno {
 //
 // Send timer event to user task when timer expired
 //
-func schSendTimerEvent(ptm *schTmcbNode) SchErrno {
+func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
+
+	//
+	// if in power off stage, discard the message
+	//
+
+	if sdl.powerOff == true {
+		log.LogCallerFileLine("schSendTimerEvent: in power off stage")
+		return SchEnoPowerOff
+	}
+
+	//
+	// put timer expired event into target task mail box
+	//
 
 	var task = &ptm.tmcb.taskNode.task
 	var msg = schMessage{
@@ -696,6 +711,15 @@ func schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 type schTaskDescription SchTaskDescription
 
 func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, interface{}){
+
+	//
+	// failed if in power off stage
+	//
+
+	if sdl.powerOff == true {
+		log.LogCallerFileLine("schCreateTask: in power off stage")
+		return SchEnoPowerOff, nil
+	}
 
 	var eno SchErrno
 	var ptn *schTaskNode
@@ -982,9 +1006,8 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 			//
 
 			log.LogCallerFileLine("schStopTaskEx: "+
-				"dieCb failed, task: %s, eno: %d",
-				ptn.task.name,
-				eno)
+				"dieCb failed, eno: %d, task: %s",
+				eno, ptn.task.name)
 		}
 	}
 
@@ -995,8 +1018,8 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	if eno = sdl.schKillTaskTimers(&ptn.task); eno != SchEnoNone {
 
 		log.LogCallerFileLine("schStopTaskEx: " +
-			"schKillTaskTimers faild, eno: %d",
-			eno)
+			"schKillTaskTimers faild, eno: %d， task: %s",
+			eno, ptn.task.name)
 
 		return eno
 	}
@@ -1008,8 +1031,8 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	if eno := sdl.schTaskBusyDeque(ptn); eno != SchEnoNone {
 
 		log.LogCallerFileLine("schStopTaskEx: " +
-			"schTaskBusyDeque failed, eno: %d",
-			eno)
+			"schTaskBusyDeque failed, eno: %d, task: %s",
+			eno, ptn.task.name)
 
 		return eno
 	}
@@ -1029,11 +1052,14 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	// clean the user task control block
 	//
 
+	taskName := make([]byte,0)
+	taskName = append(taskName, ([]byte)(ptn.task.name)...)
+
 	if eno = sdl.schTcbClean(&ptn.task); eno != SchEnoNone {
 
 		log.LogCallerFileLine("schStopTaskEx: " +
-			"schTcbClean faild, eno: %d",
-			eno)
+			"schTcbClean faild, eno: %d, task: %s",
+			eno, ptn.task.name)
 
 		return eno
 	}
@@ -1045,9 +1071,8 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	if eno = sdl.schRetTaskNode(ptn); eno != SchEnoNone {
 
 		log.LogCallerFileLine("schStopTaskEx: " +
-			"schRetTimerNode failed, task: %s, eno: %d",
-			ptn.task.name,
-			eno)
+			"schRetTimerNode failed, eno: %d, task: %s",
+			eno, string(taskName))
 
 		return  eno
 	}
@@ -1117,6 +1142,15 @@ func (sdl *scheduler)schDeleteTask(name string) SchErrno {
 func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	//
+	// failed if in power off stage
+	//
+
+	if sdl.powerOff == true && msg.Id != EvSchPoweroff {
+		log.LogCallerFileLine("schSendMsg: in power off stage")
+		return SchEnoPowerOff
+	}
+
+	//
 	// check the message to be sent
 	//
 
@@ -1159,6 +1193,15 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 // those extra put into timer when it's created.
 //
 func (sdl *scheduler)schSetTimer(ptn *schTaskNode, tdc *timerDescription) (SchErrno, int) {
+
+	//
+	// failed if in power off stage
+	//
+
+	if sdl.powerOff == true {
+		log.LogCallerFileLine("schSetTimer: in power off stage")
+		return SchEnoPowerOff, SchInvalidTid
+	}
 
 	//
 	// Here we had got a task node, since the timer is still not in running,
@@ -1299,10 +1342,9 @@ func (sdl *scheduler)schKillTimer(ptn *schTaskNode, tid int) SchErrno {
 //
 func (sdl *scheduler)schKillTaskTimers(task *schTask) SchErrno {
 
-	task.lock.Lock()
-	defer task.lock.Unlock()
-
 	for tm, idx := range task.tmIdxTab {
+
+		task.lock.Lock()
 
 		if tm != task.tmTab[idx] {
 
@@ -1312,10 +1354,13 @@ func (sdl *scheduler)schKillTaskTimers(task *schTask) SchErrno {
 				idx,
 				task.tmTab[idx])
 
+			task.lock.Unlock()
+
 			return SchEnoInternal
 		}
 
 		tm.tmcb.stop<-true
+		task.lock.Unlock()
 
 		if stopped := <-tm.tmcb.stopped; stopped != true {
 
@@ -1415,6 +1460,13 @@ func (sdl *scheduler)schSetUserDataArea(ptn *schTaskNode, uda interface{}) SchEr
 	return SchEnoNone
 }
 
+//
+// Set the power off stage flag to tell the scheduler it's going to be turn off
+//
+func (sdl *scheduler)schSetPoweroffStage() SchErrno {
+	sdl.powerOff = true
+	return SchEnoNone
+}
 //
 // Get task name
 //

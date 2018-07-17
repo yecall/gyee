@@ -157,30 +157,37 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 
 	//
-	// Send poweroff message to all static tasks if it's still exist.
-	// Notice: some tasks might be not alived, according to the network
-	// type, they might be done when they receive the poweron message.
+	// Set power off stage first, and after that, we send poweroff message
+	// to all static tasks if it's still exist.
+	// Notice: some tasks might be not alived, according to the network type,
+	// they might be done when they receive the poweron message.
 	//
+
+	p2pInstName := sdl.SchGetP2pCfgName()
 
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
 
+	sdl.SchSetPoweroffStage()
+
 	for _, taskName := range taskStaticPoweronOrder {
+
 		if sdl.SchTaskExist(taskName) != true {
-			golog.Printf("P2pStop: task not exist: %s", taskName)
+			golog.Printf("P2pStop: p2pInst: %s, task not exist: %s", p2pInstName, taskName)
 			continue
 		}
+
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
-			golog.Printf("P2pStop: SchSendMessageByName failed, eno: %d, task: %s", eno, taskName)
+			golog.Printf("P2pStop: p2pInst: %s, SchSendMessageByName failed, eno: %d, task: %s", p2pInstName, eno, taskName)
 		} else {
-			golog.Printf("P2pStop: SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s", eno, taskName)
+			golog.Printf("P2pStop: p2pInst: %s, SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s", p2pInstName, eno, taskName)
 		}
 	}
 
-	golog.Printf("P2pStop: total tasks: %d", sdl.SchGetTaskNumber())
-	golog.Printf("P2pStop: wait all tasks to be done ...")
+	golog.Printf("P2pStop: p2pInst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	golog.Printf("P2pStop: p2pInst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
 	// just wait all to be done
@@ -191,25 +198,18 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 
 	for {
 
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second )
 		seconds++
 
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			golog.Printf("P2pStop: all tasks are done")
+			golog.Printf("P2pStop: p2pInst: %s, all tasks are done", p2pInstName)
 			break;
 		}
 
-		golog.Printf("P2pStop: wait seconds: %d, remain tasks: %d", seconds, tasks)
+		golog.Printf("P2pStop: p2pInst: %s, wait seconds: %d, remain tasks: %d", p2pInstName, seconds, tasks)
 	}
 
 	return sch.SchEnoNone
 }
-
-
-
-
-
-
-

@@ -115,7 +115,19 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 //
 func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 
-	log.LogCallerFileLine("lsnMgrPoweron: poweron, carry out task initilization")
+	log.LogCallerFileLine("lsnMgrPoweron: poweron, carry out task initialization")
+
+	//
+	// if does not accept inbound, done this task
+	//
+
+	sdl := sch.SchGetScheduler(ptn)
+
+	if sdl.SchGetP2pConfig().NoAccept == true {
+		log.LogCallerFileLine("lsnMgrPoweron: do not accept, lsnMgr is not needed")
+		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return sch.SchEnoNone
+	}
 
 	//
 	// Keep ourselves task node pointer;
