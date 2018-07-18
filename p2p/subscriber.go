@@ -20,9 +20,17 @@
 
 package p2p
 
-type Message struct {
-	msgType  string
-	from     string
-	data     []byte
+type Subscriber struct {
+	id interface{}
+	msgChan chan Message
+	msgType string
 }
 
+
+func NewSubscriber(id interface{}, msgChan chan Message, msgType string ) *Subscriber {
+	return &Subscriber{
+		id,
+		msgChan,
+		msgType,
+	}
+}

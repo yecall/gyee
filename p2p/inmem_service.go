@@ -23,45 +23,62 @@ package p2p
 import (
 	"github.com/yeeco/gyee/utils"
 	"sync"
+	"container/list"
 )
 
 type InmemService struct {
+	subscribers  *sync.Map
+	hub          *InmemHub
+	element      *list.Element  //这个搞法有点丑陋的，不过反正是测试代码没关系
 }
 
 func NewInmemService() (*InmemService, error) {
 
-	is := &InmemService{}
+	is := &InmemService{
+		subscribers: new(sync.Map),
+		hub:GetInmemHub(),
+	}
 	return is, nil
 }
 
 func (is *InmemService) Start() error {
+	is.hub.AddNode(is)
 	return nil
 }
 
 func (is *InmemService) Stop() {
-
+    is.hub.RemoveNode(is)
+    return
 }
 
-func (is *InmemService) BroadcastMessage() error {
+func (is *InmemService) BroadcastMessage(message Message) error {
 	return nil
 }
 
-func (is *InmemService) BroadcastMessageOsn() error {
+func (is *InmemService) BroadcastMessageOsn(message Message) error {
 	return nil
 }
 
-func (is *InmemService) Register() {
+func (is *InmemService) Register(subscriber *Subscriber) {
 
 }
 
-func (is *InmemService) UnRegister() {
+func (is *InmemService) UnRegister(subscriber *Subscriber) {
+
+}
+
+func (is *InmemService) dhtGetValue(key interface{}) []byte {
+	return nil
+}
+
+func (is *InmemService) dhtSetValue(key interface{}, value []byte) {
 
 }
 
 //Inmem Hub for all InmemService
 //模拟消息的延迟，丢失，dht检索
 type InmemHub struct {
-	nodes []*InmemService
+	nodes list.List
 	dht   *utils.LRU
 }
 
@@ -79,5 +96,9 @@ func GetInmemHub() *InmemHub {
 }
 
 func (ih *InmemHub) AddNode(node *InmemService) {
-	ih.nodes = append(ih.nodes, node)
+	node.element = ih.nodes.PushBack(node)
+}
+
+func (ih *InmemHub) RemoveNode(node *InmemService) {
+	ih.nodes.Remove(node.element)
 }
