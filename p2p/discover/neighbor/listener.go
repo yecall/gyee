@@ -26,6 +26,7 @@ import (
 	"net"
 	"fmt"
 	"time"
+	"sync"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	config	"github.com/yeeco/gyee/p2p/config"
 	umsg	"github.com/yeeco/gyee/p2p/discover/udpmsg"
@@ -54,6 +55,7 @@ type ListenerManager struct {
 	state		int					// state
 	ptnMe		interface{}			// pointer to myself task
 	ptnReader	interface{}			// pointer to udp reader task
+	lock		sync.Mutex			// lock for stop udp reader
 }
 
 //
@@ -383,6 +385,9 @@ func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
 
 	var eno sch.SchErrno
+
+	lsnMgr.lock.Lock()
+	defer lsnMgr.lock.Unlock()
 
 	//
 	// check if we can stop

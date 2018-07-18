@@ -1431,8 +1431,7 @@ func (sdl *scheduler)schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 	// when coming here, it just the "done" fired, it's still not killed really,
 	// see function schCommonTask for more pls. we could not try to poll the
 	// "stopped" signal here, since we need our task to try the "done" we fired
-	// above, there the "stopped" would be fired, but no one would care it is the
-	// case.
+	// above, there the "stopped" would be fired, but no one would care it.
 	//
 
 	return SchEnoNone
