@@ -20,16 +20,31 @@
 
 package p2p
 
-
-const (
-    MessageTypeTx = "tx"
-    MessageTypeEvent = "ev"
-    MessageTypeBlock = "blk"
+import (
+	"testing"
+	"os"
+	"os/signal"
+	"syscall"
+	"fmt"
 )
 
-type Message struct {
-	msgType  string
-	from     string
-	data     []byte
-}
+func TestInmemService(t *testing.T){
+	ia, _ := NewInmemService()
+	ib, _ := NewInmemService()
+	ia.Start()
+	ib.Start()
+	c := make(chan Message, 1)
+	sub := NewSubscriber(nil, c, MessageTypeTx )
+    ib.Register(sub)
 
+	ia.BroadcastMessage(Message{msgType:MessageTypeTx})
+	msg := <-c
+	fmt.Println(msg.msgType)
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigc)
+	<-sigc
+
+	ia.Stop()
+	ib.Stop()
+}

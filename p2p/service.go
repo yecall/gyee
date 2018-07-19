@@ -40,7 +40,11 @@ type Service interface {
 	Start() error
 	Stop()
 	BroadcastMessage(message Message) error
+	//如果在多个子网，随机选一个。如果单一子网，直接发布。
 	BroadcastMessageOsn(message Message) error
 	Register(subscriber *Subscriber)
 	UnRegister(subscriber *Subscriber)
+    DhtGetValue(key []byte) ([]byte, error)
+    DhtSetValue(key []byte, value []byte) error
+
 }

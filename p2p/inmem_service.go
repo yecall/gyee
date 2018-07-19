@@ -21,64 +21,115 @@
 package p2p
 
 import (
-	"github.com/yeeco/gyee/utils"
+	"errors"
 	"sync"
-	"container/list"
+
+	"github.com/yeeco/gyee/utils"
+	"github.com/yeeco/gyee/utils/logging"
+	"fmt"
 )
 
 type InmemService struct {
-	subscribers  *sync.Map
-	hub          *InmemHub
-	element      *list.Element  //这个搞法有点丑陋的，不过反正是测试代码没关系
+	subscribers      *sync.Map
+	hub              *InmemHub
+	receiveMessageCh chan Message
+
+	lock   sync.RWMutex
+	quitCh chan struct{}
+	wg     sync.WaitGroup
 }
 
 func NewInmemService() (*InmemService, error) {
 
 	is := &InmemService{
-		subscribers: new(sync.Map),
-		hub:GetInmemHub(),
+		subscribers:      new(sync.Map),
+		hub:              GetInmemHub(),
+		receiveMessageCh: make(chan Message),
+		quitCh:           make(chan struct{}),
 	}
 	return is, nil
 }
 
 func (is *InmemService) Start() error {
+	is.lock.Lock()
+	defer is.lock.Unlock()
 	is.hub.AddNode(is)
+	go is.loop()
 	return nil
 }
 
 func (is *InmemService) Stop() {
-    is.hub.RemoveNode(is)
-    return
+	is.lock.Lock()
+	defer is.lock.Unlock()
+	is.hub.RemoveNode(is)
+	close(is.quitCh)
+	is.wg.Wait()
+	return
+}
+
+func (is *InmemService) loop() {
+	is.wg.Add(1)
+	defer is.wg.Done()
+	logging.Logger.Info("InmemService loop...")
+	fmt.Println("test")
+	for {
+		select {
+		case <-is.quitCh:
+			logging.Logger.Info("InmemService loop end.")
+			return
+		case message := <-is.receiveMessageCh:
+			t, _ := is.subscribers.Load(message.msgType)
+			if t != nil {
+				s, _ := t.(*sync.Map)
+				s.Range(func(key, value interface{}) bool {
+                     key.(*Subscriber).msgChan <- message
+                     return true
+				})
+			}
+		}
+	}
 }
 
 func (is *InmemService) BroadcastMessage(message Message) error {
-	return nil
+	return is.hub.Broadcast(message)
 }
 
 func (is *InmemService) BroadcastMessageOsn(message Message) error {
+	is.BroadcastMessage(message)
 	return nil
 }
 
 func (is *InmemService) Register(subscriber *Subscriber) {
-
+	is.lock.Lock()
+	defer is.lock.Unlock()
+	t := subscriber.msgType
+	m, _ := is.subscribers.LoadOrStore(t, new(sync.Map))
+	m.(*sync.Map).Store(subscriber, true)
 }
 
 func (is *InmemService) UnRegister(subscriber *Subscriber) {
-
+	is.lock.Lock()
+	defer is.lock.Unlock()
+	t := subscriber.msgType
+	m, _ := is.subscribers.Load(t)
+	if m == nil {
+		return
+	}
+	m.(*sync.Map).Delete(subscriber)
 }
 
-func (is *InmemService) dhtGetValue(key interface{}) []byte {
-	return nil
+func (is *InmemService) DhtGetValue(key []byte) ([]byte, error) {
+	return is.hub.GetValue(key)
 }
 
-func (is *InmemService) dhtSetValue(key interface{}, value []byte) {
-
+func (is *InmemService) DhtSetValue(key []byte, value []byte) error {
+	return is.hub.SetValue(key, value)
 }
 
 //Inmem Hub for all InmemService
 //模拟消息的延迟，丢失，dht检索
 type InmemHub struct {
-	nodes list.List
+	nodes map[*InmemService]bool
 	dht   *utils.LRU
 }
 
@@ -88,17 +139,37 @@ var once sync.Once
 func GetInmemHub() *InmemHub {
 	once.Do(func() {
 		instance = &InmemHub{
-			nodes: nil,
-			dht: utils.NewLRU(10000, nil),
+			nodes: make(map[*InmemService] bool),
+			dht:   utils.NewLRU(10000, nil),
 		}
 	})
 	return instance
 }
 
 func (ih *InmemHub) AddNode(node *InmemService) {
-	node.element = ih.nodes.PushBack(node)
+	ih.nodes[node] = true
 }
 
 func (ih *InmemHub) RemoveNode(node *InmemService) {
-	ih.nodes.Remove(node.element)
+	delete(ih.nodes, node)
+}
+
+func (ih *InmemHub) Broadcast(message Message) error {
+	for n, _ := range ih.nodes {
+		n.receiveMessageCh <- message
+	}
+	return nil
+}
+
+func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
+	v, ok := ih.dht.Get(key)
+	if ok {
+		return v.([]byte), nil
+	}
+	return nil, errors.New("key not existed")
+}
+
+func (ih *InmemHub) SetValue(key []byte, value []byte) error {
+	ih.dht.Add(key, value)
+	return nil
 }
