@@ -22,11 +22,12 @@ package p2p
 
 import (
 	"errors"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
-	"fmt"
 )
 
 type InmemService struct {
@@ -37,6 +38,12 @@ type InmemService struct {
 	lock   sync.RWMutex
 	quitCh chan struct{}
 	wg     sync.WaitGroup
+
+	//用于模拟收发消息的延迟和丢失
+	outDelay  int  //ms
+	outMiss   int  //0-100
+	inDelay   int
+	inMiss    int
 }
 
 func NewInmemService() (*InmemService, error) {
@@ -46,6 +53,10 @@ func NewInmemService() (*InmemService, error) {
 		hub:              GetInmemHub(),
 		receiveMessageCh: make(chan Message),
 		quitCh:           make(chan struct{}),
+		outDelay: 500,
+		outMiss: 20,
+		inDelay: 100,
+		inMiss: 0,
 	}
 	return is, nil
 }
@@ -71,7 +82,6 @@ func (is *InmemService) loop() {
 	is.wg.Add(1)
 	defer is.wg.Done()
 	logging.Logger.Info("InmemService loop...")
-	fmt.Println("test")
 	for {
 		select {
 		case <-is.quitCh:
@@ -82,8 +92,8 @@ func (is *InmemService) loop() {
 			if t != nil {
 				s, _ := t.(*sync.Map)
 				s.Range(func(key, value interface{}) bool {
-                     key.(*Subscriber).msgChan <- message
-                     return true
+					key.(*Subscriber).msgChan <- message
+					return true
 				})
 			}
 		}
@@ -91,7 +101,7 @@ func (is *InmemService) loop() {
 }
 
 func (is *InmemService) BroadcastMessage(message Message) error {
-	return is.hub.Broadcast(message)
+	return is.hub.Broadcast(is, message)
 }
 
 func (is *InmemService) BroadcastMessageOsn(message Message) error {
@@ -139,7 +149,7 @@ var once sync.Once
 func GetInmemHub() *InmemHub {
 	once.Do(func() {
 		instance = &InmemHub{
-			nodes: make(map[*InmemService] bool),
+			nodes: make(map[*InmemService]bool),
 			dht:   utils.NewLRU(10000, nil),
 		}
 	})
@@ -154,9 +164,17 @@ func (ih *InmemHub) RemoveNode(node *InmemService) {
 	delete(ih.nodes, node)
 }
 
-func (ih *InmemHub) Broadcast(message Message) error {
+func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
 	for n, _ := range ih.nodes {
-		n.receiveMessageCh <- message
+		if n != from {
+			if rand.Intn(100) < from.outMiss {
+				return nil //drop the message
+			}
+			go func() {
+				time.Sleep(time.Duration(rand.Intn(from.outDelay)) * time.Millisecond)
+				n.receiveMessageCh <- message
+			}()
+		}
 	}
 	return nil
 }

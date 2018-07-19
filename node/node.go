@@ -69,7 +69,7 @@ type Node struct {
 	ipcEndpoint string
 }
 
-func New(conf *config.Config) (*Node, error) {
+func NewNode(conf *config.Config) (*Node, error) {
 	logging.Logger.Info("Create new node")
 	if conf.DataDir != "" {
 		absdatadir, err := filepath.Abs(conf.DataDir)
