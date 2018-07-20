@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
+	"fmt"
 )
 
 type InmemService struct {
@@ -47,7 +47,6 @@ type InmemService struct {
 }
 
 func NewInmemService() (*InmemService, error) {
-
 	is := &InmemService{
 		subscribers:      new(sync.Map),
 		hub:              GetInmemHub(),
@@ -140,7 +139,7 @@ func (is *InmemService) DhtSetValue(key []byte, value []byte) error {
 //模拟消息的延迟，丢失，dht检索
 type InmemHub struct {
 	nodes map[*InmemService]bool
-	dht   *utils.LRU
+	dht  map[string][]byte
 }
 
 var instance *InmemHub
@@ -150,7 +149,7 @@ func GetInmemHub() *InmemHub {
 	once.Do(func() {
 		instance = &InmemHub{
 			nodes: make(map[*InmemService]bool),
-			dht:   utils.NewLRU(10000, nil),
+			dht:   make(map[string][]byte),
 		}
 	})
 	return instance
@@ -168,26 +167,27 @@ func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
 	for n, _ := range ih.nodes {
 		if n != from {
 			if rand.Intn(100) < from.outMiss {
-				return nil //drop the message
+				//fmt.Println("drop:", message.from, message.msgType)
+				continue
 			}
-			go func() {
-				time.Sleep(time.Duration(rand.Intn(from.outDelay)) * time.Millisecond)
-				n.receiveMessageCh <- message
-			}()
+			go func(to *InmemService) {
+				time.Sleep(time.Duration(rand.Intn(from.outDelay)+from.outDelay/2) * time.Millisecond)
+				to.receiveMessageCh <- message
+			}(n)
 		}
 	}
 	return nil
 }
 
 func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
-	v, ok := ih.dht.Get(key)
+	v, ok := ih.dht[string(key)]
 	if ok {
-		return v.([]byte), nil
+		return v, nil
 	}
 	return nil, errors.New("key not existed")
 }
 
 func (ih *InmemHub) SetValue(key []byte, value []byte) error {
-	ih.dht.Add(key, value)
+	ih.dht[string(key)] = value
 	return nil
 }

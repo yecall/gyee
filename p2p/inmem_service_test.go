@@ -21,30 +21,92 @@
 package p2p
 
 import (
+	"math/rand"
 	"testing"
-	"os"
-	"os/signal"
-	"syscall"
+	//"os"
+	//"os/signal"
+	//"syscall"
 	"fmt"
+	"time"
 )
 
-func TestInmemService(t *testing.T){
+func TestInmemService(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	ia, _ := NewInmemService()
-	ib, _ := NewInmemService()
 	ia.Start()
-	ib.Start()
-	c := make(chan Message, 1)
-	sub := NewSubscriber(nil, c, MessageTypeTx )
-    ib.Register(sub)
+	ca := make(chan Message, 1)
+	sa := NewSubscriber(nil, ca, MessageTypeTx)
+	ia.Register(sa)
 
-	ia.BroadcastMessage(Message{msgType:MessageTypeTx})
-	msg := <-c
-	fmt.Println(msg.msgType)
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigc)
-	<-sigc
+	ib, _ := NewInmemService()
+	ib.Start()
+	cb := make(chan Message, 1)
+	sb := NewSubscriber(nil, cb, MessageTypeTx)
+	ib.Register(sb)
+
+	ic, _ := NewInmemService()
+	ic.Start()
+	cc := make(chan Message, 1)
+	sc := NewSubscriber(nil, cc, MessageTypeTx)
+	ic.Register(sc)
+
+	id, _ := NewInmemService()
+	id.Start()
+	cd := make(chan Message, 1)
+	sd := NewSubscriber(nil, cd, MessageTypeTx)
+	sde := NewSubscriber(nil, cd, MessageTypeEvent)
+	id.Register(sd)
+	id.Register(sde)
+
+	go func() {
+		for {
+			select {
+			case message := <-ca:
+				fmt.Printf("A receive %v from %v\n", message.msgType, message.from)
+			case message := <-cb:
+				fmt.Printf("B receive %v from %v\n", message.msgType, message.from)
+			case message := <-cc:
+				fmt.Printf("C receive %v from %v\n", message.msgType, message.from)
+			case message := <-cd:
+				fmt.Printf("D receive %v from %v\n", message.msgType, message.from)
+			}
+		}
+	}()
+
+	ia.BroadcastMessage(Message{msgType: MessageTypeTx, from: "A"})
+	ia.BroadcastMessage(Message{msgType: MessageTypeEvent, from: "A"})
+	ib.BroadcastMessage(Message{msgType: MessageTypeTx, from: "B"})
+	ic.BroadcastMessage(Message{msgType: MessageTypeTx, from: "C"})
+	id.BroadcastMessage(Message{msgType: MessageTypeTx, from: "D"})
+
+	time.Sleep(2 * time.Second)
+	id.UnRegister(sd)
+	fmt.Println()
+
+	ia.BroadcastMessage(Message{msgType: MessageTypeTx, from: "A"})
+	ia.BroadcastMessage(Message{msgType: MessageTypeEvent, from: "A"})
+	ib.BroadcastMessage(Message{msgType: MessageTypeTx, from: "B"})
+	ic.BroadcastMessage(Message{msgType: MessageTypeTx, from: "C"})
+	id.BroadcastMessage(Message{msgType: MessageTypeTx, from: "D"})
+
+	time.Sleep(2 * time.Second)
+
+	ia.DhtSetValue([]byte("keyA"), []byte("valueA"))
+	v, err := ib.DhtGetValue([]byte("keyA"))
+	fmt.Println("dht:", string(v), err)
+
+	n, err := ib.DhtGetValue([]byte("key not existed"))
+	fmt.Println("dht:", string(n), err)
+
+	//sigc := make(chan os.Signal, 1)
+	//signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	//defer signal.Stop(sigc)
+	//<-sigc
+
+	time.Sleep(time.Second)
 
 	ia.Stop()
 	ib.Stop()
+	ic.Stop()
+	id.Stop()
 }
