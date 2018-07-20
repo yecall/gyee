@@ -21,9 +21,9 @@
 package p2p
 
 type Subscriber struct {
-	id interface{}
-	msgChan chan Message
-	msgType string
+	ID interface{}
+	MsgChan chan Message
+	MsgType string
 }
 
 

@@ -28,8 +28,8 @@ const (
 )
 
 type Message struct {
-	msgType  string
-	from     string
-	data     []byte
+	MsgType  string
+	From     string
+	Data     []byte
 }
 

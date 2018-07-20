@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/yeeco/gyee/utils/logging"
-	"fmt"
 )
 
 type InmemService struct {
@@ -87,11 +86,11 @@ func (is *InmemService) loop() {
 			logging.Logger.Info("InmemService loop end.")
 			return
 		case message := <-is.receiveMessageCh:
-			t, _ := is.subscribers.Load(message.msgType)
+			t, _ := is.subscribers.Load(message.MsgType)
 			if t != nil {
 				s, _ := t.(*sync.Map)
 				s.Range(func(key, value interface{}) bool {
-					key.(*Subscriber).msgChan <- message
+					key.(*Subscriber).MsgChan <- message
 					return true
 				})
 			}
@@ -111,7 +110,7 @@ func (is *InmemService) BroadcastMessageOsn(message Message) error {
 func (is *InmemService) Register(subscriber *Subscriber) {
 	is.lock.Lock()
 	defer is.lock.Unlock()
-	t := subscriber.msgType
+	t := subscriber.MsgType
 	m, _ := is.subscribers.LoadOrStore(t, new(sync.Map))
 	m.(*sync.Map).Store(subscriber, true)
 }
@@ -119,7 +118,7 @@ func (is *InmemService) Register(subscriber *Subscriber) {
 func (is *InmemService) UnRegister(subscriber *Subscriber) {
 	is.lock.Lock()
 	defer is.lock.Unlock()
-	t := subscriber.msgType
+	t := subscriber.MsgType
 	m, _ := is.subscribers.Load(t)
 	if m == nil {
 		return

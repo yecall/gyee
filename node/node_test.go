@@ -23,9 +23,11 @@ package node
 import (
 	"testing"
 
-	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/utils/logging"
 	"path/filepath"
+
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/p2p"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 func TestNode(t *testing.T) {
@@ -44,6 +46,9 @@ func TestNode(t *testing.T) {
 	}
 	node1.Start()
 	node2.Start()
+
+	node1.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: "node1"})
+	node1.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeBlock, From: "node2"})
 
 	node1.WaitForShutdown()
 }

@@ -62,32 +62,32 @@ func TestInmemService(t *testing.T) {
 		for {
 			select {
 			case message := <-ca:
-				fmt.Printf("A receive %v from %v\n", message.msgType, message.from)
+				fmt.Printf("A receive %v from %v\n", message.MsgType, message.From)
 			case message := <-cb:
-				fmt.Printf("B receive %v from %v\n", message.msgType, message.from)
+				fmt.Printf("B receive %v from %v\n", message.MsgType, message.From)
 			case message := <-cc:
-				fmt.Printf("C receive %v from %v\n", message.msgType, message.from)
+				fmt.Printf("C receive %v from %v\n", message.MsgType, message.From)
 			case message := <-cd:
-				fmt.Printf("D receive %v from %v\n", message.msgType, message.from)
+				fmt.Printf("D receive %v from %v\n", message.MsgType, message.From)
 			}
 		}
 	}()
 
-	ia.BroadcastMessage(Message{msgType: MessageTypeTx, from: "A"})
-	ia.BroadcastMessage(Message{msgType: MessageTypeEvent, from: "A"})
-	ib.BroadcastMessage(Message{msgType: MessageTypeTx, from: "B"})
-	ic.BroadcastMessage(Message{msgType: MessageTypeTx, from: "C"})
-	id.BroadcastMessage(Message{msgType: MessageTypeTx, from: "D"})
+	ia.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "A"})
+	ia.BroadcastMessage(Message{MsgType: MessageTypeEvent, From: "A"})
+	ib.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "B"})
+	ic.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "C"})
+	id.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "D"})
 
 	time.Sleep(2 * time.Second)
 	id.UnRegister(sd)
 	fmt.Println()
 
-	ia.BroadcastMessage(Message{msgType: MessageTypeTx, from: "A"})
-	ia.BroadcastMessage(Message{msgType: MessageTypeEvent, from: "A"})
-	ib.BroadcastMessage(Message{msgType: MessageTypeTx, from: "B"})
-	ic.BroadcastMessage(Message{msgType: MessageTypeTx, from: "C"})
-	id.BroadcastMessage(Message{msgType: MessageTypeTx, from: "D"})
+	ia.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "A"})
+	ia.BroadcastMessage(Message{MsgType: MessageTypeEvent, From: "A"})
+	ib.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "B"})
+	ic.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "C"})
+	id.BroadcastMessage(Message{MsgType: MessageTypeTx, From: "D"})
 
 	time.Sleep(2 * time.Second)
 

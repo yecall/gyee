@@ -83,18 +83,17 @@ func NewNode(conf *config.Config) (*Node, error) {
 		config: conf,
 	}
 
-	core, err := core.NewCore(node, conf)
-	if err != nil {
-		logging.Logger.Panic(err)
-	}
-
 	p2p, err := p2p.NewInmemService()
 	if err != nil {
 		logging.Logger.Panic(err)
 	}
-
-	node.core = core
 	node.p2p = p2p
+
+	core, err := core.NewCore(node, conf)
+	if err != nil {
+		logging.Logger.Panic(err)
+	}
+	node.core = core
 
 	return node, nil
 }
@@ -216,6 +215,10 @@ func (n *Node) startIPC() error {
 //get the node id of self
 func (n *Node) NodeID() string{
 	return "aaaa"
+}
+
+func (n *Node) P2pService() p2p.Service{
+	return n.p2p
 }
 
 //TODO:for test, remove later
