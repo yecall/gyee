@@ -44,11 +44,21 @@ func TestNode(t *testing.T) {
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}
+
+	config3 := config.GetDefaultConfig()
+	config3.DataDir = filepath.Join(config3.DataDir, "node3")
+	node3, err := NewNode(config3)
+	if err != nil {
+		logging.Logger.Fatal(err)
+	}
+
 	node1.Start()
 	node2.Start()
+	node3.Start()
 
 	node1.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: "node1"})
-	node1.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeBlock, From: "node2"})
+	node2.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeBlock, From: "node2"})
+	node3.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeEvent, From: "node3"})
 
 	node1.WaitForShutdown()
 }

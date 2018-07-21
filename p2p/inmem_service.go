@@ -52,7 +52,7 @@ func NewInmemService() (*InmemService, error) {
 		receiveMessageCh: make(chan Message),
 		quitCh:           make(chan struct{}),
 		outDelay: 500,
-		outMiss: 20,
+		outMiss: 10,
 		inDelay: 100,
 		inMiss: 0,
 	}

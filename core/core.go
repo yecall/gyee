@@ -47,6 +47,7 @@ import (
 	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/core/yvm"
 	"github.com/yeeco/gyee/utils/logging"
+	"github.com/yeeco/gyee/p2p"
 )
 
 type Core struct {
@@ -57,6 +58,8 @@ type Core struct {
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
+
+	subscriber     *p2p.Subscriber
 
 	lock           sync.RWMutex
 	quitCh         chan struct{}
@@ -97,6 +100,10 @@ func (c *Core) Start() error {
 		c.tetris = tetris
 		c.tetrisOutputCh = tetris.OutputCh
 		c.tetris.Start()
+
+		c.subscriber = p2p.NewSubscriber(c, make(chan p2p.Message), p2p.MessageTypeEvent)
+		p2p := c.node.P2pService()
+		p2p.Register(c.subscriber)
 	}
 
 	go c.loop()
@@ -107,6 +114,10 @@ func (c *Core) Stop() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	logging.Logger.Info("Core Stop...")
+
+	p2p := c.node.P2pService()
+	p2p.UnRegister(c.subscriber)
+
 	c.tetris.Stop()
 	c.blockChain.Stop()
 	//c.quitCh <- struct{}{}
@@ -125,8 +136,10 @@ func (c *Core) loop() {
 			logging.Logger.Info("Core loop end.")
 			return
 		case <- c.tetrisOutputCh:
-
+		case msg := <-c.subscriber.MsgChan:
+			logging.Logger.Info("core receive ", msg.MsgType, " ", msg.From)
 		}
+
 	}
 }
 // implements of interface

@@ -37,12 +37,12 @@ import (
 )
 
 type BlockPool struct {
-	core           *Core
-	messageHandler *p2p.Subscriber
+	core       *Core
+	subscriber *p2p.Subscriber
 
-	lock           sync.RWMutex
-	quitCh         chan struct{}
-	wg             sync.WaitGroup
+	lock   sync.RWMutex
+	quitCh chan struct{}
+	wg     sync.WaitGroup
 }
 
 func NewBlockPool(core *Core) (*BlockPool, error) {
@@ -59,9 +59,9 @@ func (bp *BlockPool) Start() {
 	defer bp.lock.Unlock()
 	logging.Logger.Info("BlockPool Start...")
 
-	bp.messageHandler = p2p.NewSubscriber(bp, make(chan p2p.Message), p2p.MessageTypeBlock)
+	bp.subscriber = p2p.NewSubscriber(bp, make(chan p2p.Message), p2p.MessageTypeBlock)
 	p2p := bp.core.node.P2pService()
-	p2p.Register(bp.messageHandler)
+	p2p.Register(bp.subscriber)
 
 	go bp.loop()
 }
@@ -72,7 +72,7 @@ func (bp *BlockPool) Stop() {
 	logging.Logger.Info("BlockPool Stop...")
 
 	p2p := bp.core.node.P2pService()
-	p2p.UnRegister(bp.messageHandler)
+	p2p.UnRegister(bp.subscriber)
 
 	close(bp.quitCh)
 	bp.wg.Wait()
@@ -88,8 +88,8 @@ func (bp *BlockPool) loop() {
 		case <-bp.quitCh:
 			logging.Logger.Info("BlockPool loop end.")
 			return
-		case msg := <-bp.messageHandler.MsgChan:
-           logging.Logger.Info("block pool receive ", msg.MsgType, msg.From)
+		case msg := <-bp.subscriber.MsgChan:
+			logging.Logger.Info("block pool receive ", msg.MsgType, " ", msg.From)
 		}
 	}
 }

@@ -108,9 +108,8 @@ func (n *Node) Start() error {
 	}
 
 	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
-
-	n.core.Start()
 	n.p2p.Start()
+	n.core.Start()
 
 	n.startIPC()
 
@@ -122,15 +121,17 @@ func (n *Node) Stop() error {
 	defer n.lock.Unlock()
 	logging.Logger.Info("Node Stop...")
 	n.core.Stop()
+	n.p2p.Stop()
 
 	if err := n.unlockDataDir(); err != nil {
 		logging.Logger.Println(err)
+		return err
 	}
 	close(n.stop)
 	return nil
 }
 
-func (n *Node) WaitForShutdown() error {
+func (n *Node) WaitForShutdown() {
 	n.lock.Lock()
 	n.stop = make(chan struct{})
 	n.lock.Unlock()
@@ -145,7 +146,7 @@ func (n *Node) WaitForShutdown() error {
 	}()
 
 	<-n.stop
-	return nil
+	return
 }
 
 func (n *Node) lockDataDir() error {

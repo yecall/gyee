@@ -36,8 +36,8 @@ import (
 )
 
 type TransactionPool struct {
-	core           *Core
-	messageHandler *p2p.Subscriber
+	core       *Core
+	subscriber *p2p.Subscriber
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -58,9 +58,9 @@ func (tp *TransactionPool) Start() {
 	defer tp.lock.Unlock()
 	logging.Logger.Info("TransactionPool Start...")
 
-	tp.messageHandler = p2p.NewSubscriber(tp, make(chan p2p.Message), p2p.MessageTypeTx)
+	tp.subscriber = p2p.NewSubscriber(tp, make(chan p2p.Message), p2p.MessageTypeTx)
 	p2p := tp.core.node.P2pService()
-	p2p.Register(tp.messageHandler)
+	p2p.Register(tp.subscriber)
 
 	go tp.loop()
 }
@@ -71,7 +71,7 @@ func (tp *TransactionPool) Stop() {
 	logging.Logger.Info("TransactionPool Stop...")
 
 	p2p := tp.core.node.P2pService()
-	p2p.UnRegister(tp.messageHandler)
+	p2p.UnRegister(tp.subscriber)
 
 	close(tp.quitCh)
 	tp.wg.Wait()
@@ -87,8 +87,8 @@ func (tp *TransactionPool) loop() {
 		case <-tp.quitCh:
 			logging.Logger.Info("TransactionPool loop end.")
 			return
-		case msg := <-tp.messageHandler.MsgChan:
-			logging.Logger.Info("tx pool receive ", msg.MsgType, msg.From)
+		case msg := <-tp.subscriber.MsgChan:
+			logging.Logger.Info("tx pool receive ", msg.MsgType, " ", msg.From)
 		}
 	}
 }
