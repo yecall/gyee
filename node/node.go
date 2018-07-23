@@ -57,6 +57,7 @@ import (
 )
 
 type Node struct {
+	name           string  //for test purpose
 	config         *config.Config
 	core           *core.Core
 	accountManager *accounts.Manager
@@ -95,6 +96,7 @@ func NewNode(conf *config.Config) (*Node, error) {
 	}
 	node.core = core
 
+	node.stop = make(chan struct{})
 	return node, nil
 }
 
@@ -102,6 +104,7 @@ func (n *Node) Start() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	logging.Logger.Info("Node Start...")
+
 	if err := n.lockDataDir(); err != nil {
 		logging.Logger.Println(err)
 		return err
@@ -132,9 +135,6 @@ func (n *Node) Stop() error {
 }
 
 func (n *Node) WaitForShutdown() {
-	n.lock.Lock()
-	n.stop = make(chan struct{})
-	n.lock.Unlock()
     logging.Logger.Info("Node Wait for shutdown...")
 	go func() {
 		sigc := make(chan os.Signal, 1)
@@ -142,7 +142,7 @@ func (n *Node) WaitForShutdown() {
 		defer signal.Stop(sigc)
 		<-sigc
 		logging.Logger.Info("Got interrupt, shutting down...")
-		go n.Stop()
+		n.Stop()
 	}()
 
 	<-n.stop
@@ -216,6 +216,10 @@ func (n *Node) startIPC() error {
 //get the node id of self
 func (n *Node) NodeID() string{
 	return "aaaa"
+}
+
+func (n *Node) NodeName() string{
+	return n.name
 }
 
 func (n *Node) P2pService() p2p.Service{

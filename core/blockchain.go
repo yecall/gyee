@@ -109,3 +109,5 @@ func (b *BlockChain) GetValidators() map[string]uint {
 		"dddd": 4,
 	}
 }
+
+//非验证节点，是否需要启txPool?

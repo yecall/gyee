@@ -21,44 +21,47 @@
 package node
 
 import (
-	"testing"
-
 	"path/filepath"
+	"testing"
 
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p"
 	"github.com/yeeco/gyee/utils/logging"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
 )
 
+const testNodeNumber = 4
+
+var nodes [testNodeNumber]*Node
+
 func TestNode(t *testing.T) {
-	config1 := config.GetDefaultConfig()
-	config1.DataDir = filepath.Join(config1.DataDir, "node1")
-	node1, err := NewNode(config1)
-	if err != nil {
-		logging.Logger.Fatal(err)
+	for i := 0; i < testNodeNumber; i++ {
+		config := config.GetDefaultConfig()
+		name := "node" + strconv.Itoa(i)
+		config.DataDir = filepath.Join(config.DataDir, name)
+		var err error
+		nodes[i], err = NewNode(config)
+		if err != nil {
+			logging.Logger.Fatal(err)
+		}
+		nodes[i].name = name
+		nodes[i].Start()
 	}
 
-	config2 := config.GetDefaultConfig()
-	config2.DataDir = filepath.Join(config2.DataDir, "node2")
-	node2, err := NewNode(config2)
-	if err != nil {
-		logging.Logger.Fatal(err)
+	for i := 0; i < testNodeNumber; i++ {
+		nodes[i].p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: nodes[i].name})
 	}
 
-	config3 := config.GetDefaultConfig()
-	config3.DataDir = filepath.Join(config3.DataDir, "node3")
-	node3, err := NewNode(config3)
-	if err != nil {
-		logging.Logger.Fatal(err)
+
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigc)
+	<-sigc
+	logging.Logger.Info("Got interrupt, shutting down...")
+	for i := 0; i < testNodeNumber; i++ {
+		nodes[i].Stop()
 	}
-
-	node1.Start()
-	node2.Start()
-	node3.Start()
-
-	node1.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: "node1"})
-	node2.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeBlock, From: "node2"})
-	node3.p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeEvent, From: "node3"})
-
-	node1.WaitForShutdown()
 }

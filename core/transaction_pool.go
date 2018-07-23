@@ -92,3 +92,7 @@ func (tp *TransactionPool) loop() {
 		}
 	}
 }
+
+func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
+	tp.core.node.P2pService().BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: "node1"})
+}
