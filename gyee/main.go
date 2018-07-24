@@ -74,6 +74,7 @@ func main() {
 func gyee(ctx *cli.Context) error {
 	//create and start the node
 	//logging.Logger.SetLevel(logrus.WarnLevel)
+
 	config := config.GetConfig(ctx)
 	node, err := node.NewNode(config)
 	if err != nil {

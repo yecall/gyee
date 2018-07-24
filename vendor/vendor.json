@@ -24,6 +24,12 @@
 			"tree": true
 		},
 		{
+			"checksumSHA1": "sSvhhLQJQmFxgWhN8wBvhxzcss4=",
+			"path": "github.com/peterh/liner",
+			"revision": "161ea9c37d6d4e97afe7f8f9cde7e647d49bd091",
+			"revisionTime": "2018-02-18T20:22:56Z"
+		},
+		{
 			"checksumSHA1": "/jrPYC6jxg8mtWFFhMT5TyOowEM=",
 			"path": "github.com/rifflock/lfshook",
 			"revision": "62f5e0662816a462697d29f396fd19376d17f65b",

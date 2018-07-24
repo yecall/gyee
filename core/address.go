@@ -25,3 +25,7 @@ import "github.com/yeeco/gyee/crypto"
 type Address struct{
 	address crypto.Hash
 }
+
+func (a *Address) String() string {
+	return ""
+}

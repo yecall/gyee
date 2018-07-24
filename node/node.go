@@ -60,7 +60,7 @@ type Node struct {
 	name           string  //for test purpose
 	config         *config.Config
 	core           *core.Core
-	accountManager *accounts.Manager
+	accountManager *accounts.AccountManager
 	p2p            p2p.Service
 	rpc            grpc.RPCServer
 
@@ -220,6 +220,10 @@ func (n *Node) NodeID() string{
 
 func (n *Node) NodeName() string{
 	return n.name
+}
+
+func (n *Node) AccountManager() *accounts.AccountManager{
+    return n.accountManager
 }
 
 func (n *Node) P2pService() p2p.Service{
