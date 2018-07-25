@@ -44,3 +44,14 @@ func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, er
 func (am *AccountManager) Accounts() []*core.Address{
 	return nil
 }
+
+func (am *AccountManager) ResetPassword(address *core.Address, oldPass []byte, newPass []byte) error {
+	return nil
+}
+
+func (am *AccountManager) Import(keyContent []byte, passphrase []byte) (*core.Address, error) {
+	return nil, nil
+}
+
+//TODO：实现这几个func
+//TODO：需要搞定keystore的问题

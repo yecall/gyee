@@ -50,7 +50,10 @@ func init() {
 		config.DataDirFlag,
 	}
 	app.Commands = []cli.Command{
-		ConsoleCommand,
+		//ConsoleCommand,
+		consoleCommand,
+		configCommand,
+		accountCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 	app.Before = func(ctx *cli.Context) error {

@@ -22,10 +22,12 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 
-	"github.com/yeeco/gyee/gyee/console"
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/gyee/console"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/utils/logging"
 )
@@ -75,7 +77,7 @@ func accountCreate(ctx *cli.Context) error {
 
 	passphrase := ctx.Args().First()
 	if len(passphrase) == 0 {
-		passphrase = ""
+		passphrase = getPassPhrase("Please input passphrase", true)
 	}
 
 	address, err := node.AccountManager().CreateNewAccount([]byte(passphrase))
@@ -94,13 +96,48 @@ func accountList(ctx *cli.Context) error {
 }
 
 func accountResetPassword(ctx *cli.Context) error {
-	//node := makeNode(ctx)
+	if len(ctx.Args()) == 0 {
+		logging.Logger.Fatal("No accounts specified")
+	}
+
+	address := ctx.Args().First()
+	addr, err := core.AddressParse(address)
+	if err != nil {
+		logging.Logger.Fatalf("address %s parse failed:%s", address, err)
+	}
+	oldPass := getPassPhrase("Please input current passphrase", false)
+	newPass := getPassPhrase("Please input new passphrase", true)
+
+	node := makeNode(ctx)
+	err = node.AccountManager().ResetPassword(addr, []byte(oldPass), []byte(newPass))
+	if err != nil {
+		logging.Logger.Fatalf("reset password failed:%s,%s", address, err)
+	}
+
+	fmt.Printf("Password resetted for address:%s\n", addr.String())
 	return nil
 }
 
 func accountImport(ctx *cli.Context) error {
 	//node := makeNode(ctx)
+	if len(ctx.Args()) == 0 {
+		logging.Logger.Fatal("No keyfile specified")
+	}
+	keyfile := ctx.Args().First()
+	content, err := ioutil.ReadFile(keyfile)
+	if err != nil {
+		logging.Logger.Fatalf("file read failed:%s", err)
+	}
 
+	node := makeNode(ctx)
+	pass := getPassPhrase("Please input passphrase for file", false)
+
+	addr, err := node.AccountManager().Import(content, []byte(pass))
+	if err != nil {
+		logging.Logger.Fatalf("Key import failed:%s", err)
+	}
+
+	fmt.Printf("Import address:%s\n", addr.String())
 	return nil
 }
 
@@ -118,17 +155,23 @@ func getPassPhrase(prompt string, confirmation bool) string {
 		fmt.Println(prompt)
 	}
 
-	passphrase, err := console.Stdin.PromptPassphrase("Passphrase: ")
-	if err != nil {
-		logging.Logger.Fatalf("Failed to read passphrase: %v", err)
-	}
-	if confirmation {
-		confirm, err := console.Stdin.PromptPassphrase("Repeat passphrase: ")
+	passphrase := ""
+	for passphrase == "" {
+		var err error
+		passphrase, err = console.Stdin.PromptPassphrase("Passphrase: ")
 		if err != nil {
-			logging.Logger.Fatalf("Failed to read passphrase confirmation: %v", err)
+			logging.Logger.Fatalf("Failed to read passphrase: %v", err)
 		}
-		if passphrase != confirm {
-			logging.Logger.Fatalf("Passphrases do not match")
+
+		if confirmation {
+			confirm, err := console.Stdin.PromptPassphrase("Repeat passphrase: ")
+			if err != nil {
+				logging.Logger.Fatalf("Failed to read passphrase confirmation: %v", err)
+			}
+			if passphrase != confirm {
+				fmt.Println("Passphrases do not match, try it again")
+				passphrase = ""
+			}
 		}
 	}
 

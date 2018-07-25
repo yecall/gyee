@@ -29,3 +29,8 @@ type Address struct{
 func (a *Address) String() string {
 	return ""
 }
+
+
+func AddressParse(s string) (*Address, error) {
+	return nil, nil
+}
