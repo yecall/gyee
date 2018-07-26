@@ -54,6 +54,8 @@ func init() {
 		consoleCommand,
 		configCommand,
 		accountCommand,
+		licenseCommand,
+		versionCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 	app.Before = func(ctx *cli.Context) error {
