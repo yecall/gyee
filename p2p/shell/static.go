@@ -30,12 +30,6 @@ import (
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
 			"github.com/yeeco/gyee/p2p/peer"
-			"github.com/yeeco/gyee/p2p/dht"
-	dhtro	"github.com/yeeco/gyee/p2p/dht/router"
-	dhtch	"github.com/yeeco/gyee/p2p/dht/chunker"
-	dhtre	"github.com/yeeco/gyee/p2p/dht/retriver"
-	dhtst	"github.com/yeeco/gyee/p2p/dht/storer"
-	dhtsy	"github.com/yeeco/gyee/p2p/dht/syncer"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -66,13 +60,6 @@ func P2pCreateStaticTaskTab() []sch.TaskStaticDescription {
 		{	Name:ngb.NgbMgrName,		Tep:ngb.NewNgbMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
 		{	Name:peer.PeerLsnMgrName,	Tep:peer.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
 		{	Name:peer.PeerMgrName,		Tep:peer.NewPeerMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-
-		{	Name:dht.DhtMgrName,		Tep:dht.NewDhtMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:dhtro.DhtroMgrName,	Tep:dhtro.NewDhtrMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:dhtch.DhtchMgrName,	Tep:dhtch.NewDhtchMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:dhtre.DhtreMgrName,	Tep:dhtre.NewDhtreMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:dhtst.DhtstMgrName,	Tep:dhtst.NewDhtstMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:dhtsy.DhtsyMgrName,	Tep:dhtsy.NewDhtsyMgr(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
 	}
 }
 
@@ -87,12 +74,6 @@ var taskStaticPoweronOrder = []string {
 	ngb.NgbMgrName,
 	peer.PeerMgrName,
 	peer.PeerLsnMgrName,
-	dht.DhtMgrName,
-	dhtro.DhtroMgrName,
-	dhtch.DhtchMgrName,
-	dhtre.DhtreMgrName,
-	dhtst.DhtstMgrName,
-	dhtsy.DhtsyMgrName,
 }
 
 //
@@ -180,9 +161,16 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 		}
 
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
-			golog.Printf("P2pStop: p2pInst: %s, SchSendMessageByName failed, eno: %d, task: %s", p2pInstName, eno, taskName)
+
+			golog.Printf("P2pStop: p2pInst: %s, " +
+				"SchSendMessageByName failed, eno: %d, task: %s",
+				p2pInstName, eno, taskName)
+
 		} else {
-			golog.Printf("P2pStop: p2pInst: %s, SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s", p2pInstName, eno, taskName)
+
+			golog.Printf("P2pStop: p2pInst: %s, " +
+				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
+				p2pInstName, eno, taskName)
 		}
 	}
 
@@ -208,7 +196,9 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 			break;
 		}
 
-		golog.Printf("P2pStop: p2pInst: %s, wait seconds: %d, remain tasks: %d", p2pInstName, seconds, tasks)
+		golog.Printf("P2pStop: " +
+			"p2pInst: %s, wait seconds: %d, remain tasks: %d",
+			p2pInstName, seconds, tasks)
 	}
 
 	return sch.SchEnoNone
