@@ -57,9 +57,10 @@ import (
 )
 
 type Node struct {
+	name           string  //for test purpose
 	config         *config.Config
 	core           *core.Core
-	accountManager *accounts.Manager
+	accountManager *accounts.AccountManager
 	p2p            p2p.Service
 	rpc            grpc.RPCServer
 
@@ -69,7 +70,7 @@ type Node struct {
 	ipcEndpoint string
 }
 
-func New(conf *config.Config) (*Node, error) {
+func NewNode(conf *config.Config) (*Node, error) {
 	logging.Logger.Info("Create new node")
 	if conf.DataDir != "" {
 		absdatadir, err := filepath.Abs(conf.DataDir)
@@ -83,19 +84,19 @@ func New(conf *config.Config) (*Node, error) {
 		config: conf,
 	}
 
-	core, err := core.NewCore(node, conf)
-	if err != nil {
-		logging.Logger.Panic(err)
-	}
-
 	p2p, err := p2p.NewInmemService()
 	if err != nil {
 		logging.Logger.Panic(err)
 	}
-
-	node.core = core
 	node.p2p = p2p
 
+	core, err := core.NewCore(node, conf)
+	if err != nil {
+		logging.Logger.Panic(err)
+	}
+	node.core = core
+
+	node.stop = make(chan struct{})
 	return node, nil
 }
 
@@ -103,15 +104,15 @@ func (n *Node) Start() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	logging.Logger.Info("Node Start...")
+
 	if err := n.lockDataDir(); err != nil {
 		logging.Logger.Println(err)
 		return err
 	}
 
 	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
-
-	n.core.Start()
 	n.p2p.Start()
+	n.core.Start()
 
 	n.startIPC()
 
@@ -123,18 +124,17 @@ func (n *Node) Stop() error {
 	defer n.lock.Unlock()
 	logging.Logger.Info("Node Stop...")
 	n.core.Stop()
+	n.p2p.Stop()
 
 	if err := n.unlockDataDir(); err != nil {
 		logging.Logger.Println(err)
+		return err
 	}
 	close(n.stop)
 	return nil
 }
 
-func (n *Node) WaitForShutdown() error {
-	n.lock.Lock()
-	n.stop = make(chan struct{})
-	n.lock.Unlock()
+func (n *Node) WaitForShutdown() {
     logging.Logger.Info("Node Wait for shutdown...")
 	go func() {
 		sigc := make(chan os.Signal, 1)
@@ -142,11 +142,11 @@ func (n *Node) WaitForShutdown() error {
 		defer signal.Stop(sigc)
 		<-sigc
 		logging.Logger.Info("Got interrupt, shutting down...")
-		go n.Stop()
+		n.Stop()
 	}()
 
 	<-n.stop
-	return nil
+	return
 }
 
 func (n *Node) lockDataDir() error {
@@ -216,6 +216,18 @@ func (n *Node) startIPC() error {
 //get the node id of self
 func (n *Node) NodeID() string{
 	return "aaaa"
+}
+
+func (n *Node) NodeName() string{
+	return n.name
+}
+
+func (n *Node) AccountManager() *accounts.AccountManager{
+    return n.accountManager
+}
+
+func (n *Node) P2pService() p2p.Service{
+	return n.p2p
 }
 
 //TODO:for test, remove later

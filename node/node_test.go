@@ -20,8 +20,48 @@
 
 package node
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/p2p"
+	"github.com/yeeco/gyee/utils/logging"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+)
+
+const testNodeNumber = 4
+
+var nodes [testNodeNumber]*Node
 
 func TestNode(t *testing.T) {
+	for i := 0; i < testNodeNumber; i++ {
+		config := config.GetDefaultConfig()
+		name := "node" + strconv.Itoa(i)
+		config.DataDir = filepath.Join(config.DataDir, name)
+		var err error
+		nodes[i], err = NewNode(config)
+		if err != nil {
+			logging.Logger.Fatal(err)
+		}
+		nodes[i].name = name
+		nodes[i].Start()
+	}
 
+	for i := 0; i < testNodeNumber; i++ {
+		nodes[i].p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: nodes[i].name})
+	}
+
+
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigc)
+	<-sigc
+	logging.Logger.Info("Got interrupt, shutting down...")
+	for i := 0; i < testNodeNumber; i++ {
+		nodes[i].Stop()
+	}
 }

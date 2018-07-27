@@ -19,3 +19,31 @@
  */
 
 package main
+
+import (
+	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/gyee/console"
+)
+
+var (
+	consoleCommand = cli.Command{
+		Name:        "console",
+		Usage:       "Start an interactive JavaScript console",
+		Category:    "CONSOLE COMMANDS",
+		Description: "",
+		Action:      config.MergeFlags(consoleStart),
+	}
+)
+
+func consoleStart(ctx *cli.Context) error {
+	//node := makeNode(ctx)
+    console := console.NewConsole()
+    console.Setup()
+    console.Interactive()
+    defer console.Stop()
+
+	return nil
+}
+
+//TODO:console如何与node连接上，ipc

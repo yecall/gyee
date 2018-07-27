@@ -20,6 +20,38 @@
 
 package accounts
 
-type Manager struct {
-	Accounts map[string]*Account
+import "github.com/yeeco/gyee/core"
+
+type AccountManager struct {
+	accounts map[string]*Account
 }
+
+func NewAccountManager() *AccountManager {
+	//accounts := Accounts{}
+	//accounts.Accounts = make(map[string]*Account)
+	//err := accounts.LoadFromFile()
+	//if err != nil {
+	//	log.Println(err)
+	//}
+	//return &accounts
+	return nil
+}
+
+func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, error){
+	return nil, nil
+}
+
+func (am *AccountManager) Accounts() []*core.Address{
+	return nil
+}
+
+func (am *AccountManager) ResetPassword(address *core.Address, oldPass []byte, newPass []byte) error {
+	return nil
+}
+
+func (am *AccountManager) Import(keyContent []byte, passphrase []byte) (*core.Address, error) {
+	return nil, nil
+}
+
+//TODO：实现这几个func
+//TODO：需要搞定keystore的问题

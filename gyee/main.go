@@ -50,7 +50,12 @@ func init() {
 		config.DataDirFlag,
 	}
 	app.Commands = []cli.Command{
-		ConsoleCommand,
+		//ConsoleCommand,
+		consoleCommand,
+		configCommand,
+		accountCommand,
+		licenseCommand,
+		versionCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 	app.Before = func(ctx *cli.Context) error {
@@ -74,8 +79,9 @@ func main() {
 func gyee(ctx *cli.Context) error {
 	//create and start the node
 	//logging.Logger.SetLevel(logrus.WarnLevel)
+
 	config := config.GetConfig(ctx)
-	node, err := node.New(config)
+	node, err := node.NewNode(config)
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}

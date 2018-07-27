@@ -18,31 +18,36 @@
  *
  */
 
- /*
+/*
  接收tx
  验证
  提交给共识模块
  拉取tx
 
-  */
+*/
 
 package core
 
 import (
 	"sync"
 
+	"github.com/yeeco/gyee/p2p"
 	"github.com/yeeco/gyee/utils/logging"
 )
 
 type TransactionPool struct {
+	core       *Core
+	subscriber *p2p.Subscriber
+
 	lock   sync.RWMutex
 	quitCh chan struct{}
 	wg     sync.WaitGroup
 }
 
-func NewTransactionPool() (*TransactionPool, error) {
+func NewTransactionPool(core *Core) (*TransactionPool, error) {
 	logging.Logger.Info("Create New TransactionPool")
 	bp := &TransactionPool{
+		core:   core,
 		quitCh: make(chan struct{}),
 	}
 	return bp, nil
@@ -52,6 +57,11 @@ func (tp *TransactionPool) Start() {
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
 	logging.Logger.Info("TransactionPool Start...")
+
+	tp.subscriber = p2p.NewSubscriber(tp, make(chan p2p.Message), p2p.MessageTypeTx)
+	p2p := tp.core.node.P2pService()
+	p2p.Register(tp.subscriber)
+
 	go tp.loop()
 }
 
@@ -59,6 +69,10 @@ func (tp *TransactionPool) Stop() {
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
 	logging.Logger.Info("TransactionPool Stop...")
+
+	p2p := tp.core.node.P2pService()
+	p2p.UnRegister(tp.subscriber)
+
 	close(tp.quitCh)
 	tp.wg.Wait()
 }
@@ -73,6 +87,12 @@ func (tp *TransactionPool) loop() {
 		case <-tp.quitCh:
 			logging.Logger.Info("TransactionPool loop end.")
 			return
+		case msg := <-tp.subscriber.MsgChan:
+			logging.Logger.Info("tx pool receive ", msg.MsgType, " ", msg.From)
 		}
 	}
+}
+
+func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
+	tp.core.node.P2pService().BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: "node1"})
 }

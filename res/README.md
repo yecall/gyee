@@ -7,3 +7,8 @@ go-bindata -pkg res -debug -o res.go ./...
 
 Relaease:
 go-bindata -pkg res -o res.go ./...
+
+
+
+memo：
+1. bignumber.js是从ethereum中copy过来的

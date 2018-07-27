@@ -1,6 +1,6 @@
 # This is a TOML document for default config
 
-name = "default config"
+name = "default"
 
 [rpc]
 ipcpath = "gyee.ipc"

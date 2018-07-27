@@ -19,3 +19,52 @@
  */
 
 package main
+
+import (
+	"fmt"
+
+	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/version"
+)
+
+var (
+	versionCommand = cli.Command{
+		Action:    config.MergeFlags(printVersion),
+		Name:      "version",
+		Usage:     "Print version numbers",
+		ArgsUsage: " ",
+		Category:  "MISC COMMANDS",
+	}
+	licenseCommand = cli.Command{
+		Action:    config.MergeFlags(printLicense),
+		Name:      "license",
+		Usage:     "Display license information",
+		ArgsUsage: " ",
+		Category:  "MISC COMMANDS",
+	}
+)
+
+func printVersion(ctx *cli.Context) error {
+	version.PrintVersion()
+	//node := makeNode(ctx)
+	//
+	//fmt.Println("Version:", version)
+	//if commit != "" {
+	//	fmt.Println("Git Commit:", commit)
+	//}
+	//fmt.Println("Protocol Versions:", node.NebProtocolID)
+	//fmt.Println("Protocol ClientVersion:", net.ClientVersion)
+	//fmt.Printf("Chain Id: %d\n", node.Config().Chain.ChainId)
+	//fmt.Println("Go Version:", runtime.Version())
+	//fmt.Println("Operating System:", runtime.GOOS)
+	//fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
+	//fmt.Printf("GOROOT=%s\n", runtime.GOROOT())
+	return nil
+}
+
+func printLicense(_ *cli.Context) error {
+	fmt.Println("The preferred license for the Gyee Open Source Project is the GNU Lesser General Public License Version 3.0 (“LGPL v3”), which is commercial friendly, and encourage developers or companies modify and publish their changes.")
+
+	return nil
+}

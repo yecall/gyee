@@ -26,18 +26,25 @@ p2p_service: 全广播p2p network
 osn_service: overlay sub-network
 还有一个做法是hash全网广播，内容接收者自己去dht取？
 消息类型：
-1. tx，node发出，临时dht存储，发往validator group
-2. block header：validator发出，发往全体。
+1. tx，node发出，临时dht存储，发往validator group，发自己所在子网
+2. block header：validator发出，发往全体。全体
 3. block：dht存储
-4. event：validator发出，临时dht存储，发往validator group
+4. event：validator发出，临时dht存储，发往validator group，随机选取子网
 
+注册消息处理handler，dispatch message
+消息去重
+消息格式：消息类型及payload？由应用层自己去解析
  */
 
 type Service interface {
 	Start() error
 	Stop()
-	BroadcastMessage() error
-	BroadcastMessageOsn() error
-	Register()
-	UnRegister()
+	BroadcastMessage(message Message) error
+	//如果在多个子网，随机选一个。如果单一子网，直接发布。
+	BroadcastMessageOsn(message Message) error
+	Register(subscriber *Subscriber)
+	UnRegister(subscriber *Subscriber)
+    DhtGetValue(key []byte) ([]byte, error)
+    DhtSetValue(key []byte, value []byte) error
+
 }

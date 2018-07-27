@@ -19,3 +19,18 @@
  */
 
 package core
+
+type Transaction struct{
+    from  *Address
+    to    *Address
+	//TODO：这个要uint128或者uint256，待定
+    value uint64
+    nonce uint64
+    timestamp int64
+	//TODO：这个要定义一个类型
+    data []byte
+    chainID uint32
+
+}
+
+//最小transaction字节数？

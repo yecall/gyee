@@ -73,13 +73,13 @@ type MetricsConfig struct {
 type MiscConfig struct {
 }
 
-var DefaultConfig = Config{
-	Name:    "gyee",
-	DataDir: utils.DefaultDataDir(),
-	Rpc: &RpcConfig{
-		IpcPath: "gyee.ipc",
-	},
-}
+//var DefaultConfig = Config{
+//	Name:    "gyee",
+//	DataDir: utils.DefaultDataDir(),
+//	Rpc: &RpcConfig{
+//		IpcPath: "gyee.ipc",
+//	},
+//}
 
 func GetConfig(ctx *cli.Context) *Config {
 	//config := DefaultConfig

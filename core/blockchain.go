@@ -41,12 +41,12 @@ type BlockChain struct {
 
 func NewBlockChain(core *Core) (*BlockChain, error) {
 	logging.Logger.Info("Create New Blockchain")
-	bp, err := NewBlockPool()
+	bp, err := NewBlockPool(core)
 	if err != nil {
 
 	}
 
-	tp, err := NewTransactionPool()
+	tp, err := NewTransactionPool(core)
 	if err != nil {
 
 	}
@@ -109,3 +109,5 @@ func (b *BlockChain) GetValidators() map[string]uint {
 		"dddd": 4,
 	}
 }
+
+//非验证节点，是否需要启txPool?
