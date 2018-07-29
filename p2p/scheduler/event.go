@@ -237,7 +237,7 @@ const (
 	EvPeerEstBase			= 1800
 	EvPePingpongTimer		= EvTimerBase	+ PePingpongTimerId
 	EvPeDcvFindNodeTimer	= EvTimerBase	+ PeDcvFindNodeTimerId
-	EvPeTestStatTimer		= EvTimerBase + PeTestStatTimerId
+	EvPeTestStatTimer		= EvTimerBase	+ PeTestStatTimerId
 	EvPeConnOutReq			= EvPeerEstBase + 1
 	EvPeConnOutRsp			= EvPeerEstBase + 2
 	EvPeHandshakeReq		= EvPeerEstBase + 3
@@ -266,14 +266,96 @@ type MsgPeCloseReq struct {
 //
 // DHT manager event
 //
-const EvDhtMgrBase = 1900
+const (
+	EvDhtMgrBase			= 1900
+	EvDhtMgrFindPeerReq		= EvDhtMgrBase + 1
+	EvDhtMgrFindPeerRsp		= EvDhtMgrBase + 2
+	EvDhtMgrPutProviderReq	= EvDhtMgrBase + 3
+	EvDhtMgrPutProviderRsp	= EvDhtMgrBase + 4
+	EvDhtMgrGetProviderReq	= EvDhtMgrBase + 5
+	EvDhtMgrGetProviderRsp	= EvDhtMgrBase + 6
+	EvDhtMgrPutValueReq		= EvDhtMgrBase + 7
+	EvDhtMgrPutValueRsp		= EvDhtMgrBase + 8
+	EvDhtMgrGetValueReq		= EvDhtMgrBase + 9
+	EvDhtMgrGetValueRsp		= EvDhtMgrBase + 10
+)
 
 //
-// DHT peer lookup on Tcp event
+// DHT listener manager event
 //
-const EvDhtPeerLkBase = 2000
+const (
+	EvDhtLsnMgrBase			= 2000
+	EvDhtLsnMgrStartReq		= EvDhtLsnMgrBase + 1
+	EvDhtLsnMgrStopReq		= EvDhtLsnMgrBase + 2
+	EvDhtLsnMgrPauseReq		= EvDhtLsnMgrBase + 3
+	EvDhtLsnMgrAcceptInd	= EvDhtLsnMgrBase + 4
+	EvDhtLsnMgrStatusInd	= EvDhtLsnMgrBase + 5
+)
 
 //
-// DHT provider event
+// DHT connection manager event
 //
-const EvDhtPrdBase = 2100
+const (
+	EvDhtConMgrBase			= 2100
+	EvDhtConMgrConnectReq	= EvDhtConMgrBase + 1
+	EvDhtConMgrConnectRsp	= EvDhtConMgrBase + 2
+	EvDhtConMgrSendReq		= EvDhtConMgrBase + 3
+	EvDhtConMgrSendRsp		= EvDhtConMgrBase + 4
+	EvDhtConMgrCloseReq		= EvDhtConMgrBase + 5
+	EvDhtConMgrCloseRsp		= EvDhtConMgrBase + 6
+)
+
+//
+// DHT connection instance event
+//
+const (
+	EvDhtConInstBase		= 2200
+	EvDhtConInstMsgInd		= EvDhtConInstBase + 1
+	EvDhtConInstStatusInd	= EvDhtConInstBase + 2
+	EvDhtConInstCloseReq	= EvDhtConInstBase + 3
+	EvDhtConInstCloseRsp	= EvDhtConInstBase + 4
+)
+
+//
+// DHT query manager event
+//
+const (
+	EvDhtQryMgrBase				= 2300
+	EvDhtQryMgrQueryStartReq	= EvDhtQryMgrBase + 1
+	EvDhtQryMgrQueryStartRsp	= EvDhtQryMgrBase + 2
+	EvDhtQryMgrQueryStopReq		= EvDhtQryMgrBase + 3
+	EvDhtQryMgrQueryStopRsp		= EvDhtQryMgrBase + 4
+	EvDhtQryMgrQueryResultInd	= EvDhtQryMgrBase + 5
+)
+
+//
+// DHT query instance event
+//
+const (
+	EvDhtQryInstBase			= 2400
+	EvDhtQryInstStopReq			= EvDhtQryInstBase + 1
+	EvDhtQryInstStopRsp			= EvDhtQryInstBase + 2
+	EvDhtQryInstResultInd		= EvDhtQryInstBase + 3
+)
+
+//
+// DHT route manager event
+//
+const (
+	EvDhtRutMgrBase				= 2500
+	EvDhtRutMgrNearestReq		= EvDhtRutMgrBase + 1
+	EvDhtRutMgrNearestRsp		= EvDhtRutMgrBase + 2
+	EvDhtRutMgrUpdateReq		= EvDhtRutMgrBase + 3
+)
+
+//
+// DHT provider manager event
+//
+const (
+	EvDhtPrdMgrBase				= 2600
+	EvDhtPrdMgrAddProviderReq	= EvDhtPrdMgrBase + 1
+	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
+	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 3
+	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 4
+	EvDhtPrdMgrUpdateReq		= EvDhtPrdMgrBase + 5
+)

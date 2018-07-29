@@ -60,6 +60,23 @@ func (conMgr *ConMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (conMgr *ConMgr)connMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	return sch.SchEnoNone
+	eno := sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	case sch.EvDhtLsnMgrAcceptInd:
+	case sch.EvDhtConMgrConnectReq:
+	case sch.EvDhtLsnMgrStatusInd:
+	case sch.EvDhtConMgrSendReq:
+	case sch.EvDhtConMgrCloseReq:
+	case sch.EvDhtConInstMsgInd:
+	case sch.EvDhtConInstStatusInd:
+	case sch.EvDhtConInstCloseRsp:
+	default:
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
 }
 

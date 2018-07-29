@@ -60,5 +60,28 @@ func (dhtMgr *DhtMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	return sch.SchEnoNone
+	var eno = sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	case sch.EvDhtMgrFindPeerReq:
+	case sch.EvDhtMgrPutProviderReq:
+	case sch.EvDhtMgrGetProviderReq:
+	case sch.EvDhtMgrPutValueReq:
+	case sch.EvDhtMgrGetValueReq:
+	case sch.EvDhtRutMgrNearestRsp:
+	case sch.EvDhtQryMgrQueryStartRsp:
+	case sch.EvDhtQryMgrQueryStopRsp:
+	case sch.EvDhtQryMgrQueryResultInd:
+	case sch.EvDhtPrdMgrGetProviderRsp:
+	case sch.EvDhtPrdMgrAddProviderRsp:
+	case sch.EvDhtConMgrConnectRsp:
+	case sch.EvDhtConMgrSendRsp:
+	case sch.EvDhtConMgrCloseRsp:
+	default:
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
 }

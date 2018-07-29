@@ -60,5 +60,18 @@ func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	return sch.SchEnoNone
+	eno := sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	case sch.EvDhtQryMgrQueryStartReq:
+	case sch.EvDhtQryMgrQueryStopReq:
+	case sch.EvDhtQryInstResultInd:
+	case sch.EvDhtQryInstStopRsp:
+	default:
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
 }

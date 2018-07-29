@@ -60,5 +60,17 @@ func (lsnMgr *LsnMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	return sch.SchEnoNone
+	eno := sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	case sch.EvDhtLsnMgrStartReq:
+	case sch.EvDhtLsnMgrStopReq:
+	case sch.EvDhtLsnMgrPauseReq:
+	default:
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
 }

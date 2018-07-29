@@ -61,5 +61,17 @@ func (prdMgr *PrdMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	return sch.SchEnoNone
+	eno := sch.SchEnoUnknown
+
+	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	case sch.EvDhtPrdMgrAddProviderReq:
+	case sch.EvDhtPrdMgrGetProviderReq:
+	case sch.EvDhtPrdMgrUpdateReq:
+	default:
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
 }
