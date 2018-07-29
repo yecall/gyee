@@ -29,7 +29,8 @@ import (
 	dcv		"github.com/yeeco/gyee/p2p/discover"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
-			"github.com/yeeco/gyee/p2p/peer"
+	peer	"github.com/yeeco/gyee/p2p/peer"
+	dht		"github.com/yeeco/gyee/p2p/dht"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -43,24 +44,48 @@ var noDog = sch.SchWatchDog {
 //
 // Create description about static tasks
 //
-func P2pCreateStaticTaskTab() []sch.TaskStaticDescription {
 
-	return []sch.TaskStaticDescription {
+type P2pType int
 
-		//
-		// Following are static tasks for ycp2p module internal. Notice that fields of struct
-		// sch.TaskStaticDescription like MbSize, Wd, Flag will be set to default values internal
-		// scheduler, please see function schimplSchedulerStart for details pls.
-		//
+const (
+	P2P_TYPE_CHAIN	P2pType = 0
+	P2P_TYPE_DHT	P2pType = 1
+)
 
-		{	Name:dcv.DcvMgrName,		Tep:dcv.NewDcvMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:tab.TabMgrName,		Tep:tab.NewTabMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:tab.NdbcName,			Tep:tab.NewNdbCleaner(),	MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:ngb.LsnMgrName,		Tep:ngb.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:ngb.NgbMgrName,		Tep:ngb.NewNgbMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:peer.PeerLsnMgrName,	Tep:peer.NewLsnMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
-		{	Name:peer.PeerMgrName,		Tep:peer.NewPeerMgr(),		MbSize:-1,	DieCb: nil,		Wd:noDog,	Flag:sch.SchCreatedSuspend},
+func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
+
+	//
+	// Following are static tasks for ycp2p module internal. Notice that fields of struct
+	// sch.TaskStaticDescription like MbSize, Wd, Flag will be set to default values internal
+	// scheduler, please see function schimplSchedulerStart for details pls.
+	//
+
+	if what == P2P_TYPE_CHAIN {
+
+		return []sch.TaskStaticDescription{
+			{Name: dcv.DcvMgrName,		Tep: dcv.NewDcvMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: tab.NdbcName,		Tep: tab.NewNdbCleaner(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: ngb.LsnMgrName,		Tep: ngb.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: ngb.NgbMgrName,		Tep: ngb.NewNgbMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: peer.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+		}
+
+	} else if what == P2P_TYPE_DHT {
+
+		return []sch.TaskStaticDescription{
+			{Name: dht.DhtMgrName,	Tep: dht.NewDhtMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.LsnMgrName,	Tep: dht.NewLsnMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.PrdMgrName,	Tep: dht.NewPrdMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.QryMgrName,	Tep: dht.NewQryMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.RutMgrName,	Tep: dht.NewRutMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.ConMgrName,	Tep: dht.NewConMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+		}
 	}
+
+	log.LogCallerFileLine("P2pCreateStaticTaskTab: invalid type: %d", what)
+	return nil
 }
 
 //
@@ -86,7 +111,7 @@ func P2pCreateInstance(cfg *config.Config) (*sch.Scheduler, sch.SchErrno) {
 //
 // Start p2p instance
 //
-func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
+func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
 
 	//
 	// Start all static tasks
@@ -94,7 +119,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 
 	var eno sch.SchErrno
 
-	eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(), taskStaticPoweronOrder)
+	eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder)
 
 	if eno != sch.SchEnoNone {
 		return eno

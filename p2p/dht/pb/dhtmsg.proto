@@ -1,0 +1,146 @@
+/*
+ *  Copyright (C) 2017 gyee authors
+ *
+ *  This file is part of the gyee library.
+ *
+ *  the gyee library is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  the gyee library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+//
+// The definition about DHT Protocol messages in form of protobuf
+// specification.
+//
+
+syntax = "proto2";
+package dhtmsg.pb;
+
+message DhtMessage {
+    enum MessageType {
+        FINDNODE            = 0;
+        NEIGHBORS           = 1;
+        PUTVALUE            = 2;
+        GETVALUE_REQ        = 3;
+        GETVALUE_RSP        = 4;
+        PUTPROVIDER         = 5;
+        GETPROVIDER_REQ     = 6;
+        GETPROVIDER_RSP     = 7;
+        PING                = 8;
+        PONG                = 9;
+    }
+
+    enum ConnectionType {
+        CONT_NO             = 0;
+        CONT_YES            = 1;
+        CONT_MAY            = 2;
+        CONT_FAILED         = 3;
+    }
+
+    message Node {
+        required bytes          IP              = 1;
+        required uint32         UDP             = 2;
+        required uint32         TCP             = 3;
+        required bytes          NodeId          = 4;
+        required ConnectionType ConnType        = 5;
+    }
+
+    message Value {
+        required bytes          Key             = 1;
+        required bytes          Val             = 2;
+    }
+
+    message Provider {
+        required bytes          Key             = 1;
+        required Node           Node            = 2;
+    }
+
+    message FindNode {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        required bytes          Target          = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message Neighbors {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated Node           Nodes           = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message PutValue {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated Value          Values          = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message GetValueReq {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated bytes          Keys            = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message GetValueRsp {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated Value          Values          = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message PutProvider {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated Provider       Providers       = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message GetProviderReq {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated bytes          key             = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message GetProviderRsp {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated Provider       Providers       = 3;
+        required uint64         Id              = 4;
+        optional bytes          Extra           = 5;
+    }
+
+    message Ping {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        required uint64         Id              = 3;
+        optional bytes          Extra           = 4;
+    }
+
+    message Pong {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        required uint64         Id              = 3;
+        optional bytes          Extra           = 4;
+    }
+}

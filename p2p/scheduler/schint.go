@@ -174,4 +174,11 @@ const (
 	PeerLsnMgrName		= "PeerLsnMgr"		// tcp peer listener
 	PeerAccepterName	= "peerAccepter"	// tcp accepter
 	PeerMgrName			= "PeerMgr"			// tcp peer manager
+
+	DhtMgrName			= "DhtMgr"			// dht manager
+	DhtLsnMgrName		= "DhtLsnMgr"		// dht listner manager
+	DhtPrdMgrName		= "DhtPrdMgr"		// dht provider manager
+	DhtQryMgrName		= "DhtQryMgr"		// dht query manager
+	DhtRutMgrName		= "DhtRutMgr"		// dht route manager
+	DhtConMgrName		= "DhtConMgr"		// dht connection manager
 )

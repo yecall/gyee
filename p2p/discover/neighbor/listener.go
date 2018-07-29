@@ -81,7 +81,7 @@ func NewLsnMgr() *ListenerManager {
 		ptnReader: nil,
 	}
 
-	lsnMgr.tep			= lsnMgr.lsnMgrProc
+	lsnMgr.tep = lsnMgr.lsnMgrProc
 	return &lsnMgr
 }
 

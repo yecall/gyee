@@ -24,7 +24,7 @@ package discover
 import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	log	"github.com/yeeco/gyee/p2p/logger"
+	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
 
@@ -57,9 +57,7 @@ type DiscoverManager struct {
 
 
 //
-// Init, we put more in poweron event handler. We can't init the entry point filed
-// "tep" with dcvMgr declartion which would result in complier "initialization loop"
-// error.
+// Create discover manager
 //
 func NewDcvMgr() *DiscoverManager {
 	var dcvMgr = DiscoverManager {
