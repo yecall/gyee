@@ -21,6 +21,22 @@
 package accounts
 
 import "github.com/yeeco/gyee/core"
+/*
+account manager的功能分类：
+1、支持console和ipc的账户功能，create、list、reset、delete等
+2、account的keystore文件的load、save等，import，export
+3、account的lock、unlock
+4、account来签名交易，签名block，签名hash等
+
+keystore package：
+1、set、get、delete、list
+2、lock、unlock、getunlock
+
+cipher：
+1、scrypt
+2、argon2
+3、balloon hashing?
+ */
 
 type AccountManager struct {
 	accounts map[string]*Account
