@@ -143,4 +143,16 @@ message DhtMessage {
         required uint64         Id              = 3;
         optional bytes          Extra           = 4;
     }
+
+    required MessageType        msgType         = 1;
+    optional FindNode           findNode        = 2;
+    optional Neighbors          neighbors       = 3;
+    optional PutValue           putValue        = 4;
+    optional GetValueReq        getValueReq     = 5;
+    optional GetValueRsp        getValueRsp     = 6;
+    optional PutProvider        putProvider     = 7;
+    optional GetProviderReq     gutProviderReq  = 8;
+    optional GetProviderRsp     gutProviderRsp  = 9;
+    optional Ping               ping            = 10;
+    optional Pong               pong            = 11;
 }
