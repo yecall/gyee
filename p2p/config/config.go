@@ -271,6 +271,7 @@ type Cfg4Protocols struct {
 // Configuration about dht route manager
 //
 type Cfg4DhtRouteManager struct {
+	NodeId			NodeID			// local node identity
 	RandomQryNum	int				// times to try query for a random peer identity
 	Period			time.Duration	// timer period to fire a bootstrap
 }
@@ -907,6 +908,7 @@ func P2pConfig4Protocols(name string) *Cfg4Protocols {
 // Get configuration for dht route manager
 //
 func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
+	config[name].dhtRutCfg.NodeId = config[name].Local.ID
 	return &config[name].dhtRutCfg
 }
 

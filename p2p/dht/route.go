@@ -23,6 +23,7 @@ package dht
 import (
 	"time"
 	"crypto/rand"
+	"container/list"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	log	"github.com/yeeco/gyee/p2p/logger"
 	cfg "github.com/yeeco/gyee/p2p/config"
@@ -34,16 +35,43 @@ import (
 const RutMgrName = sch.DhtRutMgrName
 
 //
+// Hash type
+//
+const HashLength = 32					// 32 bytes(256 bits) hash applied
+type Hash [HashLength]byte
+
+//
+// Latency measurement
+//
+type rutMgrPeerMetric struct {
+	peerId		cfg.NodeID				// peer identity
+	ltnSamples	[]time.Duration			// latency samples
+	ewma		time.Duration			// exponentially-weighted moving avg
+}
+
+//
+// Route table
+//
+type rutMgrRouteTable struct {
+	localId			*cfg.NodeID							// local node identity
+	bucketTab		[]*list.List						// buckets
+	metricTab		map[cfg.NodeID]*rutMgrPeerMetric	// metric table about peers
+}
+
+//
 // Route manager
 //
 type RutMgr struct {
-	sdl			*sch.Scheduler		// pointer to scheduler
-	name		string				// my name
-	tep			sch.SchUserTaskEp	// task entry
-	ptnMe		interface{}			// pointer to task node of myself
-	ptnQryMgr	interface{}			// pointer to query manager task node
-	bpCfg		bootstrapPolicy		// bootstrap policy configuration
-	bpTid		int					// bootstrap timer identity
+	sdl				*sch.Scheduler		// pointer to scheduler
+	name			string				// my name
+	tep				sch.SchUserTaskEp	// task entry
+	ptnMe			interface{}			// pointer to task node of myself
+	ptnQryMgr		interface{}			// pointer to query manager task node
+	bpCfg			bootstrapPolicy		// bootstrap policy configuration
+	bpTid			int					// bootstrap timer identity
+	distLookupTab	[]int				// log2 distance lookup table for a xor byte
+	localNodeId		cfg.NodeID			// local node identity
+	rutTab			rutMgrRouteTable	// route table
 }
 
 //
@@ -65,15 +93,20 @@ var defautBspCfg = bootstrapPolicy {
 func NewRutMgr() *RutMgr {
 
 	rutMgr := RutMgr{
-		sdl:		nil,
-		name:		RutMgrName,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnQryMgr:	nil,
-		bpCfg:		defautBspCfg,
-		bpTid:		sch.SchInvalidTid,
+		sdl:			nil,
+		name:			RutMgrName,
+		tep:			nil,
+		ptnMe:			nil,
+		ptnQryMgr:		nil,
+		bpCfg:			defautBspCfg,
+		bpTid:			sch.SchInvalidTid,
+		distLookupTab:	[]int{},
+		localNodeId:	cfg.NodeID{},
+		rutTab:			rutMgrRouteTable{},
 	}
 
+	rutMgrSetupLog2DistLKT(rutMgr.distLookupTab)
+	rutMgr.rutMgrSetupRouteTable()
 	rutMgr.tep = rutMgr.rutMgrProc
 
 	return &rutMgr
@@ -170,7 +203,7 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 
 		var msg = sch.SchMessage{}
 		var req = sch.MsgDhtQryMgrQueryStartReq {
-			Target: RutMgrRandomPeerId(),
+			Target: rutMgrRandomPeerId(),
 		}
 
 		sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
@@ -200,6 +233,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 func (rutMgr *RutMgr)getRouteConfig() DhtErrno {
 
 	rutCfg := cfg.P2pConfig4DhtRouteManager(RutMgrName)
+	rutMgr.localNodeId = rutCfg.NodeId
 	rutMgr.bpCfg.randomQryNum = rutCfg.RandomQryNum
 	rutMgr.bpCfg.period = rutCfg.Period
 
@@ -252,8 +286,86 @@ func (rutMgr *RutMgr)stopBspTimer() DhtErrno {
 //
 // Build random node identity
 //
-func RutMgrRandomPeerId() cfg.NodeID {
+func rutMgrRandomPeerId() cfg.NodeID {
 	var nid cfg.NodeID
 	rand.Read(nid[:])
 	return nid
+}
+
+//
+// Setup lookup table
+//
+func rutMgrSetupLog2DistLKT(lkt []int) DhtErrno {
+	var n uint
+	var b uint
+	lkt[0] = 8
+	for n = 0; n < 8; n++ {
+		for b = 1<<n; b < 1<<(n+1); b++ {
+			lkt[b] = int(8 - n - 1)
+		}
+	}
+	return DhtEnoNone
+}
+
+//
+// Caculate the distance between two nodes.
+// Notice: the return "d" more larger, it's more closer
+//
+func (rutMgr *RutMgr)rutMgrLog2Dist(h1 Hash, h2 Hash) int {
+	var d = 0
+	for i, b := range h2 {
+		delta := rutMgr.distLookupTab[h1[i] ^ b]
+		d += delta
+		if delta != 8 {
+			break
+		}
+	}
+	return d
+}
+
+//
+// Setup route table
+//
+func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
+	rutMgr.rutTab.localId = &rutMgr.localNodeId
+	rutMgr.rutTab.bucketTab = make([]*list.List, 0)
+	rutMgr.rutTab.metricTab = make(map[cfg.NodeID]*rutMgrPeerMetric, 0)
+	return DhtEnoNone
+}
+
+//
+// Metric sample input
+//
+func (rutMgr *RutMgr) rutMgrMetricSample(id cfg.NodeID, latency time.Duration) DhtErrno {
+
+	if m, dup := rutMgr.rutTab.metricTab[id]; dup {
+		m.ltnSamples = append(m.ltnSamples, latency)
+		return rutMgr.rutMgrMetricUpdate(id)
+	}
+
+	rutMgr.rutTab.metricTab[id] = &rutMgrPeerMetric {
+		peerId:		id,
+		ltnSamples: []time.Duration{latency},
+		ewma:		latency,
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Metric update EWMA about latency
+//
+func (rutMgr *RutMgr) rutMgrMetricUpdate(id cfg.NodeID) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Metric get EWMA latency of peer
+//
+func (rutMgr *RutMgr) rutMgrMetricGetEWMA(id cfg.NodeID) (DhtErrno, time.Duration){
+	mt := rutMgr.rutTab.metricTab
+	if m, ok := mt[id]; ok {
+		return DhtEnoNone, m.ewma
+	}
+	return DhtEnoNotFound, -1
 }

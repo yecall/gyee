@@ -1400,7 +1400,7 @@ func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno 
 }
 
 //
-// Setup lookup table for bytes
+// Setup lookup table
 //
 func tabSetupLog2DistanceLookupTable(lkt []int) TabMgrErrno {
 	var n uint
@@ -1588,7 +1588,7 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*N
 
 				//
 				// if we are fetching nodes to which we would query, we need to check the time
-				// we had queried them last time eo escape the case to query too frequency.
+				// we had queried them last time to escape the case that query too frequency.
 				//
 
 				if forWhat == Closest4Querying {

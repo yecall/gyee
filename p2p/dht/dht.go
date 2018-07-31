@@ -39,6 +39,7 @@ const (
 	DhtEnoNone	= iota
 	DhtEnoParameter
 	DhtEnoScheduler
+	DhtEnoNotFound
 	DhtEnoOs
 	DhtEnoUnknown
 )
