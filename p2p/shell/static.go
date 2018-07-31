@@ -89,9 +89,9 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 }
 
 //
-// Poweron order of static user tasks
+// Poweron order of static user tasks for chain application
 //
-var taskStaticPoweronOrder = []string {
+var taskStaticPoweronOrder4Chain = []string {
 	dcv.DcvMgrName,
 	tab.TabMgrName,
 	tab.NdbcName,
@@ -99,6 +99,18 @@ var taskStaticPoweronOrder = []string {
 	ngb.NgbMgrName,
 	peer.PeerMgrName,
 	peer.PeerLsnMgrName,
+}
+
+//
+// Poweron order of static user tasks for dht application
+//
+var taskStaticPoweronOrder4Dht = [] string {
+	dht.DhtMgrName,
+	dht.QryMgrName,
+	dht.PrdMgrName,
+	dht.ConMgrName,
+	dht.LsnMgrName,
+	dht.RutMgrName,
 }
 
 //
@@ -119,7 +131,14 @@ func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
 
 	var eno sch.SchErrno
 
-	eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder)
+	switch what {
+	case P2P_TYPE_CHAIN:
+		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Chain)
+	case P2P_TYPE_DHT:
+		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Dht)
+	default:
+		eno = sch.SchEnoParameter
+	}
 
 	if eno != sch.SchEnoNone {
 		return eno
@@ -178,7 +197,7 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 
 	sdl.SchSetPoweroffStage()
 
-	for _, taskName := range taskStaticPoweronOrder {
+	for _, taskName := range taskStaticPoweronOrder4Chain {
 
 		if sdl.SchTaskExist(taskName) != true {
 			golog.Printf("P2pStop: p2pInst: %s, task not exist: %s", p2pInstName, taskName)

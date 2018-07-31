@@ -27,6 +27,7 @@ import (
 const QryMgrName = sch.DhtQryMgrName
 
 type QryMgr struct {
+	sdl		*sch.Scheduler		// pointer to scheduler
 	name	string				// my name
 	tep		sch.SchUserTaskEp	// task entry
 	ptnMe	interface{}			// pointer to task node of myself
@@ -38,6 +39,7 @@ type QryMgr struct {
 func NewQryMgr() *QryMgr {
 
 	qryMgr := QryMgr{
+		sdl:	nil,
 		name:	QryMgrName,
 		tep:	nil,
 		ptnMe:	nil,

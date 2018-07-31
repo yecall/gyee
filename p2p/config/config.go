@@ -41,6 +41,7 @@ import (
 	"errors"
 
 	log "github.com/yeeco/gyee/p2p/logger"
+	"time"
 )
 
 
@@ -145,6 +146,11 @@ const (
 )
 
 type Config struct {
+
+	//
+	// Chain application part
+	//
+
 	CfgName				string					// configureation name
 	Version				string					// p2p version
 	Name				string					// node name
@@ -170,6 +176,12 @@ type Config struct {
 	SubNetMaxInBounds	map[SubNetworkID]int	// max concurrency inbounds
 	SubNetIdList		[]SubNetworkID			// sub network identity list. do not put the identity
 												// of the local node in this list.
+
+	//
+	// DHT application part
+	//
+
+	dhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
 }
 
 //
@@ -256,6 +268,14 @@ type Cfg4Protocols struct {
 }
 
 //
+// Configuration about dht route manager
+//
+type Cfg4DhtRouteManager struct {
+	RandomQryNum	int				// times to try query for a random peer identity
+	Period			time.Duration	// timer period to fire a bootstrap
+}
+
+//
 // Default version string, formated as "M.m0.m1.m2"
 //
 const dftVersion = "0.1.0.0"
@@ -294,6 +314,11 @@ var config = make(map[string] *Config)
 func P2pDefaultConfig() *Config {
 
 	var defaultConfig = Config {
+
+		//
+		// Chain application part
+		//
+
 		NetworkType:			P2pNetworkTypeDynamic,
 		Name:					dftName,
 		Version:				dftVersion,
@@ -317,6 +342,15 @@ func P2pDefaultConfig() *Config {
 		SubNetMaxOutbounds:		map[SubNetworkID]int{},
 		SubNetMaxInBounds:		map[SubNetworkID]int{},
 		SubNetIdList:			[]SubNetworkID{},
+
+		//
+		// DHT application part
+		//
+
+		dhtRutCfg: Cfg4DhtRouteManager {
+			RandomQryNum:	1,
+			Period:			time.Minute * 1,
+		},
 	}
 
 	return &defaultConfig
@@ -844,7 +878,7 @@ func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 }
 
 //
-// Get configuration op table manager
+// Get configuration of table manager
 //
 func P2pConfig4TabManager(name string) *Cfg4TabManager {
 	return &Cfg4TabManager {
@@ -867,6 +901,13 @@ func P2pConfig4Protocols(name string) *Cfg4Protocols {
 		ProtoNum: config[name].ProtoNum,
 		Protocols: config[name].Protocols,
 	}
+}
+
+//
+// Get configuration for dht route manager
+//
+func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
+	return &config[name].dhtRutCfg
 }
 
 //

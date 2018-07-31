@@ -24,8 +24,28 @@ import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
+
+//
+// Dht manager name registered in scheduler
+//
 const DhtMgrName = sch.DhtMgrName
 
+//
+// errno for route manager
+//
+type DhtErrno int
+
+const (
+	DhtEnoNone	= iota
+	DhtEnoParameter
+	DhtEnoScheduler
+	DhtEnoOs
+	DhtEnoUnknown
+)
+
+//
+// Dht manager control block
+//
 type DhtMgr struct {
 	name	string				// my name
 	tep		sch.SchUserTaskEp	// task entry

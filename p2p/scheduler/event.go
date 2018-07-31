@@ -329,6 +329,13 @@ const (
 )
 
 //
+// EvDhtQryMgrQueryStartReq
+//
+type MsgDhtQryMgrQueryStartReq struct {
+	Target	config.NodeID
+}
+
+//
 // DHT query instance event
 //
 const (
@@ -341,12 +348,37 @@ const (
 //
 // DHT route manager event
 //
+const DhtRutBootstrapTimerId	= 0
 const (
 	EvDhtRutMgrBase				= 2500
+	EvDhtRutBootstrapTimer		= EvTimerBase + DhtRutBootstrapTimerId
 	EvDhtRutMgrNearestReq		= EvDhtRutMgrBase + 1
 	EvDhtRutMgrNearestRsp		= EvDhtRutMgrBase + 2
 	EvDhtRutMgrUpdateReq		= EvDhtRutMgrBase + 3
 )
+
+//
+// EvDhtRutMgrNearestReq
+//
+type MsgDhtRutMgrNearestReq struct {
+	max		int				// max items returned could be
+	target	config.NodeID	// target peer identity
+}
+
+//
+// EvDhtRutMgrNearestRsp
+//
+type MsgDhtRutMgrNearestRsp struct {
+	target	config.NodeID	// target peer identity
+	nodes	[]config.Node	// nearest nodes table
+}
+
+//
+// EvDhtRutMgrUpdateReq
+//
+type MsgDhtRutMgrUpdateReq struct {
+	seens	[]config.Node	// nearest nodes table
+}
 
 //
 // DHT provider manager event

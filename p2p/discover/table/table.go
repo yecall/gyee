@@ -1284,11 +1284,6 @@ func (ndbc *NodeDbCleaner)ndbcAutoCleanTimerHandler() TabMgrErrno {
 func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 
 	if tabCfg == nil {
-		log.LogCallerFileLine("tabGetConfig: invalid parameters")
-		return TabMgrEnoParameter
-	}
-
-	if tabCfg == nil {
 		log.LogCallerFileLine("tabGetConfig: invalid parameter(s)")
 		return TabMgrEnoParameter
 	}
