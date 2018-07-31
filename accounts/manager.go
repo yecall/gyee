@@ -24,9 +24,11 @@ import "github.com/yeeco/gyee/core"
 /*
 account manager的功能分类：
 1、支持console和ipc的账户功能，create、list、reset、delete等
-2、account的keystore文件的load、save等，import，export
+2、account的keystore文件的load、save等，import，export? 这部分还是放在keystore里？
 3、account的lock、unlock
 4、account来签名交易，签名block，签名hash等
+
+unlock的时候，可不可以记录来源？比如console中，rpc中，wallet中等区分
 
 keystore package：
 1、set、get、delete、list

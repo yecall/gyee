@@ -1,18 +1,22 @@
-// Copyright 2015 The go-ethereum Authors
-// This file is part of the go-ethereum library.
-//
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+/*
+ *  Copyright (C) 2017 gyee authors
+ *
+ *  This file is part of the gyee library.
+ *
+ *  The gyee library is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  The gyee library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 // Package secp256k1 wraps the bitcoin secp256k1 C library.
 package secp256k1
@@ -59,7 +63,34 @@ var (
 	ErrInvalidPubkey       = errors.New("invalid public key")
 	ErrSignFailed          = errors.New("signing failed")
 	ErrRecoverFailed       = errors.New("recovery failed")
+	ErrGetPublicKeyFailed  = errors.New("private key to public failed")
 )
+
+
+func GetPublicKey(seckey []byte) ([]byte, error) {
+
+	var pubkey C.secp256k1_pubkey
+	result := int(C.secp256k1_ec_pubkey_create(context, &pubkey, cBuf(seckey)))
+	if result != 1 {
+		return nil, ErrGetPublicKeyFailed
+	}
+
+	output := make([]C.uchar, 65)
+	outputLen := C.size_t(65)
+	result = int(C.secp256k1_ec_pubkey_serialize(context, &output[0], &outputLen, &pubkey, C.SECP256K1_EC_UNCOMPRESSED))
+	if result != 1 {
+		return nil, ErrGetPublicKeyFailed
+	}
+	return goBytes(output, C.int(outputLen)), nil
+}
+
+func cBuf(goSlice []byte) *C.uchar {
+	return (*C.uchar)(unsafe.Pointer(&goSlice[0]))
+}
+
+func goBytes(cSlice []C.uchar, size C.int) []byte {
+	return C.GoBytes(unsafe.Pointer(&cSlice[0]), size)
+}
 
 // Sign creates a recoverable ECDSA signature.
 // The produced signature is in the 65-byte [R || S || V] format where V is 0 or 1.

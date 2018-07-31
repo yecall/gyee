@@ -24,21 +24,30 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/hex"
-	"errors"
 
+
+	"bytes"
+	"encoding/json"
+
+	uuid "github.com/satori/go.uuid"
 	"github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/crypto/random"
 	"golang.org/x/crypto/scrypt"
-	"bytes"
-	"encoding/json"
 )
 
 const (
 	// ScryptKDF name
 	ScryptKDF = "scrypt"
 
+	//N: General work factor, iteration count.
+	//r: blocksize in use for underlying hash; fine-tunes the relative memory-cost.
+	//p: parallelization factor; fine-tunes the relative cpu-cost.
+
+	// N:18, P:1 -> Using 256MB memory and taking approximately 1s CPU time on a modern processor.
+	// N:12, P:6 -> Using 4MB memory and taking approximately 100ms CPU time on a modern processor.
+
 	// StandardScryptN N parameter of Scrypt encryption algorithm
-	StandardScryptN = 1 << 12 //TODO: check 1<<12 vs 1<<18
+	StandardScryptN = 1 << 17
 
 	// StandardScryptR r parameter of Scrypt encryption algorithm
 	StandardScryptR = 8
@@ -49,69 +58,47 @@ const (
 	// ScryptDKLen get derived key length
 	ScryptDKLen = 32
 
-	// cipher the name of cipher
-	cipherName = "aes-128-ctr"
-
 	// version compatible with ethereum, the version start with 3
 	version3       = 3
 	currentVersion = 4
-
-	// mac calculate hash type
-	macHash = "sha3256"
 )
-
-var (
-	// ErrVersionInvalid version not supported
-	ErrVersionInvalid = errors.New("version not supported")
-
-	// ErrKDFInvalid cipher not supported
-	ErrKDFInvalid = errors.New("kdf not supported")
-
-	// ErrCipherInvalid cipher not supported
-	ErrCipherInvalid = errors.New("cipher not supported")
-
-	// ErrDecrypt decrypt failed
-	ErrDecrypt = errors.New("could not decrypt key with given passphrase")
-)
-
-type cipherparamsJSON struct {
-	IV string `json:"iv"`
-}
-
-type cryptoJSON struct {
-	Cipher       string                 `json:"cipher"`
-	CipherText   string                 `json:"ciphertext"`
-	CipherParams cipherparamsJSON       `json:"cipherparams"`
-	KDF          string                 `json:"kdf"`
-	KDFParams    map[string]interface{} `json:"kdfparams"`
-	MAC          string                 `json:"mac"`
-	MACHash      string                 `json:"machash"`
-}
-
-type encryptedKeyJSON struct {
-	Address string     `json:"address"`
-	Crypto  cryptoJSON `json:"crypto"`
-	ID      string     `json:"id"`
-	Version int        `json:"version"`
-}
 
 type Scrypt struct {
+	N int
+	R int
+	P int
 }
 
 func NewScrypt() *Scrypt {
-	return nil
+	s := &Scrypt{
+		N:StandardScryptN,
+		R:StandardScryptR,
+		P:StandardScryptP,
+	}
+	return s
 }
 
 func (s *Scrypt) Encrypt(data []byte, passphrase []byte) ([]byte, error) {
-	crypto, err := s.scryptEncrypt(data, passphrase, StandardScryptN, StandardScryptR, StandardScryptP)
+	crypto, err := s.scryptEncrypt(data, passphrase, s.N, s.R, s.P)
 	if err != nil {
 		return nil, err
 	}
-    return json.Marshal(crypto)
+	return json.Marshal(crypto)
 }
 
 func (s *Scrypt) EncryptKey(address string, data []byte, passphrase []byte) ([]byte, error) {
-	return nil, nil
+	crypto, err := s.scryptEncrypt(data, passphrase, s.N, s.R, s.P)
+	if err != nil {
+		return nil, err
+	}
+	uuid, _ := uuid.NewV4()
+	encryptedKeyJSON := encryptedKeyJSON{
+		address,
+		*crypto,
+		uuid.String(),
+		currentVersion,
+	}
+	return json.Marshal(encryptedKeyJSON)
 }
 
 func (s *Scrypt) Decrypt(data []byte, passphrase []byte) ([]byte, error) {
@@ -123,7 +110,15 @@ func (s *Scrypt) Decrypt(data []byte, passphrase []byte) ([]byte, error) {
 }
 
 func (s *Scrypt) DecryptKey(keyjson []byte, passphrase []byte) ([]byte, error) {
-	return nil, nil
+	keyJSON := new(encryptedKeyJSON)
+	if err := json.Unmarshal(keyjson, keyJSON); err != nil {
+		return nil, err
+	}
+	version := keyJSON.Version
+	if version != currentVersion && version != version3 {
+		return nil, ErrVersionInvalid
+	}
+	return s.scryptDecrypt(&keyJSON.Crypto, passphrase, version)
 }
 
 func (s *Scrypt) scryptEncrypt(data []byte, passphrase []byte, N, r, p int) (*cryptoJSON, error) {
@@ -176,7 +171,6 @@ func (s *Scrypt) aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
 	stream.XORKeyStream(outText, inText)
 	return outText, err
 }
-
 
 func (s *Scrypt) scryptDecrypt(crypto *cryptoJSON, passphrase []byte, version int) ([]byte, error) {
 
@@ -241,13 +235,4 @@ func (s *Scrypt) scryptDecrypt(crypto *cryptoJSON, passphrase []byte, version in
 		return nil, err
 	}
 	return key, nil
-}
-
-// because json.Unmarshal change int to float64, convert to int
-func ensureInt(x interface{}) int {
-	res, ok := x.(int)
-	if !ok {
-		res = int(x.(float64))
-	}
-	return res
 }

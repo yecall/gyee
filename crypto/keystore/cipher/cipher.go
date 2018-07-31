@@ -20,6 +20,8 @@
 
 package cipher
 
+import "errors"
+
 type Cipher interface {
 	Encrypt(data []byte, passphrase []byte) ([]byte, error)
 
@@ -28,4 +30,56 @@ type Cipher interface {
 	Decrypt(data []byte, passphrase []byte) ([]byte, error)
 
 	DecryptKey(keyjson []byte, passphrase []byte) ([]byte, error)
+}
+
+type cipherparamsJSON struct {
+	IV string `json:"iv"`
+}
+
+type cryptoJSON struct {
+	Cipher       string                 `json:"cipher"`
+	CipherText   string                 `json:"ciphertext"`
+	CipherParams cipherparamsJSON       `json:"cipherparams"`
+	KDF          string                 `json:"kdf"`
+	KDFParams    map[string]interface{} `json:"kdfparams"`
+	MAC          string                 `json:"mac"`
+	MACHash      string                 `json:"machash"`
+}
+
+type encryptedKeyJSON struct {
+	Address string     `json:"address"`
+	Crypto  cryptoJSON `json:"crypto"`
+	ID      string     `json:"id"`
+	Version int        `json:"version"`
+}
+
+const (
+	// cipher the name of cipher
+	cipherName = "aes-128-ctr"
+
+	// mac calculate hash type
+	macHash = "sha3256"
+)
+
+var (
+	// ErrVersionInvalid version not supported
+	ErrVersionInvalid = errors.New("version not supported")
+
+	// ErrKDFInvalid cipher not supported
+	ErrKDFInvalid = errors.New("kdf not supported")
+
+	// ErrCipherInvalid cipher not supported
+	ErrCipherInvalid = errors.New("cipher not supported")
+
+	// ErrDecrypt decrypt failed
+	ErrDecrypt = errors.New("could not decrypt key with given passphrase")
+)
+
+// because json.Unmarshal change int to float64, convert to int
+func ensureInt(x interface{}) int {
+	res, ok := x.(int)
+	if !ok {
+		res = int(x.(float64))
+	}
+	return res
 }

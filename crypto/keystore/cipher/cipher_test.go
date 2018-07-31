@@ -30,20 +30,43 @@ import (
 func Test_Cipher_Scrypt(t *testing.T) {
 	passphrase := []byte("passphrase")
 	data, _ := hex.DecodeString("0eb3be2db3a534c192be5570c6c42f59")
-	scrypt := NewScrypt()
-	got, err := scrypt.Encrypt(data, passphrase)
+	var cipher Cipher
+	cipher = NewScrypt()
+	got, err := cipher.EncryptKey("address00000",data, passphrase)
 	if err != nil {
 		t.Errorf("Encrypt() error, %v", err)
 		return
 	}
+	fmt.Println(string(got))
 
-	want, err := scrypt.Decrypt(got, passphrase)
+	want, err := cipher.DecryptKey(got, passphrase)
 	if err != nil {
 		t.Errorf("Decrypt() error, %v", err)
 		return
 	}
 
+	if !reflect.DeepEqual(data, want) {
+		t.Errorf("Decrypt() = %v, data %v", want, data)
+	}
+}
+
+func Test_Cipher_Argon2(t *testing.T) {
+	passphrase := []byte("passphrase")
+	data, _ := hex.DecodeString("0eb3be2db3a534c192be5570c6c42f59")
+	var cipher Cipher
+	cipher = NewArgon2()
+	got, err := cipher.EncryptKey("address00000",data, passphrase)
+	if err != nil {
+		t.Errorf("Encrypt() error, %v", err)
+		return
+	}
 	fmt.Println(string(got))
+
+	want, err := cipher.DecryptKey(got, passphrase)
+	if err != nil {
+		t.Errorf("Decrypt() error, %v", err)
+		return
+	}
 
 	if !reflect.DeepEqual(data, want) {
 		t.Errorf("Decrypt() = %v, data %v", want, data)

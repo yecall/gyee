@@ -20,6 +20,10 @@
 
 package keystore
 
+//keystore package：
+//1、set、get、delete、list
+//2、lock、unlock、getunlock
+
 type Keystore struct {
 
 }
