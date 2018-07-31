@@ -24,15 +24,21 @@ import (
 	"time"
 	"crypto/rand"
 	"container/list"
+	"crypto/sha256"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	log	"github.com/yeeco/gyee/p2p/logger"
-	cfg "github.com/yeeco/gyee/p2p/config"
+	config "github.com/yeeco/gyee/p2p/config"
 )
 
 //
 // Route manager name registered in scheduler
 //
 const RutMgrName = sch.DhtRutMgrName
+
+//
+// Max nearest peers can be retrieved for a time
+//
+const rutMgrMaxNearest = 32
 
 //
 // Hash type
@@ -44,18 +50,26 @@ type Hash [HashLength]byte
 // Latency measurement
 //
 type rutMgrPeerMetric struct {
-	peerId		cfg.NodeID				// peer identity
+	peerId		config.NodeID			// peer identity
 	ltnSamples	[]time.Duration			// latency samples
 	ewma		time.Duration			// exponentially-weighted moving avg
+}
+
+//
+// Node in bucket
+//
+type rutMgrBucketNode struct {
+	node	config.Node					// common node
+	hash	Hash						// hash from node.ID
 }
 
 //
 // Route table
 //
 type rutMgrRouteTable struct {
-	localId			*cfg.NodeID							// local node identity
+	shaLocal		Hash								// local node identity hash
 	bucketTab		[]*list.List						// buckets
-	metricTab		map[cfg.NodeID]*rutMgrPeerMetric	// metric table about peers
+	metricTab		map[config.NodeID]*rutMgrPeerMetric	// metric table about peers
 }
 
 //
@@ -70,7 +84,7 @@ type RutMgr struct {
 	bpCfg			bootstrapPolicy		// bootstrap policy configuration
 	bpTid			int					// bootstrap timer identity
 	distLookupTab	[]int				// log2 distance lookup table for a xor byte
-	localNodeId		cfg.NodeID			// local node identity
+	localNodeId		config.NodeID		// local node identity
 	rutTab			rutMgrRouteTable	// route table
 }
 
@@ -101,12 +115,10 @@ func NewRutMgr() *RutMgr {
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
 		distLookupTab:	[]int{},
-		localNodeId:	cfg.NodeID{},
+		localNodeId:	config.NodeID{},
 		rutTab:			rutMgrRouteTable{},
 	}
 
-	rutMgrSetupLog2DistLKT(rutMgr.distLookupTab)
-	rutMgr.rutMgrSetupRouteTable()
 	rutMgr.tep = rutMgr.rutMgrProc
 
 	return &rutMgr
@@ -138,7 +150,8 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = rutMgr.bootstarpTimerHandler()
 
 	case sch.EvDhtRutMgrNearestReq:
-		eno = rutMgr.nearestReq(msg.Body.(*sch.MsgDhtRutMgrNearestReq))
+		sender := rutMgr.sdl.SchGetSender(msg)
+		eno = rutMgr.nearestReq(sender, msg.Body.(*sch.MsgDhtRutMgrNearestReq))
 
 	case sch.EvDhtRutMgrUpdateReq:
 		eno = rutMgr.updateReq(msg.Body.(*sch.MsgDhtRutMgrUpdateReq))
@@ -173,6 +186,16 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	if dhtEno := rutMgr.getRouteConfig(); dhtEno != DhtEnoNone {
 		log.LogCallerFileLine("poweron: getRouteConfig failed, dhtEno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
+
+	if dhtEno := rutMgrSetupLog2DistLKT(rutMgr.distLookupTab); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("poweron: rutMgrSetupLog2DistLKT failed, dhtEno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
+
+	if dhtEno := rutMgr.rutMgrSetupRouteTable(); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("poweron: rutMgrSetupRouteTable failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -216,8 +239,115 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 //
 // Nearest peer request handler
 //
-func (rutMgr *RutMgr)nearestReq(req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
-	return sch.SchEnoNone
+func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
+
+	if tskSender == nil || req == nil {
+		log.LogCallerFileLine("nearestReq: " +
+			"invalid parameters, tskSender: %p, req: %p",
+			tskSender, req)
+		return sch.SchEnoParameter
+	}
+
+	var nearest = make([]*rutMgrBucketNode, 0, rutMgrMaxNearest)
+	var nearestDist = make([]int, 0, rutMgrMaxNearest)
+
+	var count = 0
+	var dhtEno DhtErrno = DhtEnoNone
+
+	ht := rutMgrNodeId2Hash(req.Target)
+	dt := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, ht)
+	size := req.Max
+
+	var addClosest = func (bk *list.List) int {
+		count = len(nearest)
+			if bk != nil {
+			for el := bk.Front(); el != nil; el = el.Next() {
+				peer := el.Value.(*rutMgrBucketNode)
+				nearest = append(nearest, peer)
+				dt := rutMgr.rutMgrLog2Dist(ht, &peer.hash)
+				nearestDist = append(nearestDist, dt)
+				if count++; count >= size {
+					break
+				}
+			}
+		}
+
+		return count
+	}
+
+	if size <= 0 || size > rutMgrMaxNearest {
+		log.LogCallerFileLine("nearestReq: " +
+			"invalid size: %d, min: 1, max: %d",
+			req.Max, rutMgrMaxNearest)
+
+		dhtEno = DhtEnoParameter
+		goto _rsp2Sender
+	}
+
+	//
+	// the most closest bank
+	//
+
+	if bk := rutMgr.rutTab.bucketTab[dt]; bk != nil {
+		if addClosest(bk) >= size {
+			goto _rsp2Sender
+		}
+	}
+
+	//
+	// the second closest bank
+	//
+
+	for loop := dt + 1; loop < cap(rutMgr.rutTab.bucketTab); loop++ {
+		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
+			if addClosest(bk) >= size {
+				goto _rsp2Sender
+			}
+		}
+	}
+
+	if dt <= 0 { goto _rsp2Sender }
+
+	//
+	// the last bank
+	//
+
+	for loop := dt - 1; loop >= 0; loop-- {
+		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
+			if addClosest(bk) >= size {
+				goto _rsp2Sender
+			}
+		}
+	}
+
+	//
+	// response to the sender
+	//
+
+_rsp2Sender:
+
+	var rsp = sch.MsgDhtRutMgrNearestRsp {
+		Eno:	int(dhtEno),
+		Target:	req.Target,
+		Peers:	nil,
+		Dists:	nil,
+	}
+	var schMsg sch.SchMessage
+
+	if dhtEno == DhtEnoNone && len(nearest) > 0 {
+		rutMgrSortPeer(nearest, nearestDist)
+		rsp.Peers = nearest
+		rsp.Dists = nearestDist
+	}
+
+	rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
+	rutMgr.sdl.SchSendMessage(&schMsg)
+
+	if dhtEno == DhtEnoNone  {
+		return sch.SchEnoNone
+	}
+
+	return sch.SchEnoUserTask
 }
 
 //
@@ -232,7 +362,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 //
 func (rutMgr *RutMgr)getRouteConfig() DhtErrno {
 
-	rutCfg := cfg.P2pConfig4DhtRouteManager(RutMgrName)
+	rutCfg := config.P2pConfig4DhtRouteManager(RutMgrName)
 	rutMgr.localNodeId = rutCfg.NodeId
 	rutMgr.bpCfg.randomQryNum = rutCfg.RandomQryNum
 	rutMgr.bpCfg.period = rutCfg.Period
@@ -286,10 +416,17 @@ func (rutMgr *RutMgr)stopBspTimer() DhtErrno {
 //
 // Build random node identity
 //
-func rutMgrRandomPeerId() cfg.NodeID {
-	var nid cfg.NodeID
+func rutMgrRandomPeerId() config.NodeID {
+	var nid config.NodeID
 	rand.Read(nid[:])
 	return nid
+}
+
+//
+// Build hash from node identity
+//
+func rutMgrRandomHashPeerId() *Hash {
+	return rutMgrNodeId2Hash(rutMgrRandomPeerId())
 }
 
 //
@@ -311,7 +448,7 @@ func rutMgrSetupLog2DistLKT(lkt []int) DhtErrno {
 // Caculate the distance between two nodes.
 // Notice: the return "d" more larger, it's more closer
 //
-func (rutMgr *RutMgr)rutMgrLog2Dist(h1 Hash, h2 Hash) int {
+func (rutMgr *RutMgr)rutMgrLog2Dist(h1 *Hash, h2 *Hash) int {
 	var d = 0
 	for i, b := range h2 {
 		delta := rutMgr.distLookupTab[h1[i] ^ b]
@@ -327,16 +464,16 @@ func (rutMgr *RutMgr)rutMgrLog2Dist(h1 Hash, h2 Hash) int {
 // Setup route table
 //
 func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
-	rutMgr.rutTab.localId = &rutMgr.localNodeId
+	rutMgr.rutTab.shaLocal = *rutMgrNodeId2Hash(rutMgr.localNodeId)
 	rutMgr.rutTab.bucketTab = make([]*list.List, 0)
-	rutMgr.rutTab.metricTab = make(map[cfg.NodeID]*rutMgrPeerMetric, 0)
+	rutMgr.rutTab.metricTab = make(map[config.NodeID]*rutMgrPeerMetric, 0)
 	return DhtEnoNone
 }
 
 //
 // Metric sample input
 //
-func (rutMgr *RutMgr) rutMgrMetricSample(id cfg.NodeID, latency time.Duration) DhtErrno {
+func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration) DhtErrno {
 
 	if m, dup := rutMgr.rutTab.metricTab[id]; dup {
 		m.ltnSamples = append(m.ltnSamples, latency)
@@ -355,17 +492,58 @@ func (rutMgr *RutMgr) rutMgrMetricSample(id cfg.NodeID, latency time.Duration) D
 //
 // Metric update EWMA about latency
 //
-func (rutMgr *RutMgr) rutMgrMetricUpdate(id cfg.NodeID) DhtErrno {
+func (rutMgr *RutMgr) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
 	return DhtEnoNone
 }
 
 //
 // Metric get EWMA latency of peer
 //
-func (rutMgr *RutMgr) rutMgrMetricGetEWMA(id cfg.NodeID) (DhtErrno, time.Duration){
+func (rutMgr *RutMgr) rutMgrMetricGetEWMA(id config.NodeID) (DhtErrno, time.Duration){
 	mt := rutMgr.rutTab.metricTab
 	if m, ok := mt[id]; ok {
 		return DhtEnoNone, m.ewma
 	}
 	return DhtEnoNotFound, -1
+}
+
+//
+// Node identity to hash(sha)
+//
+func rutMgrNodeId2Hash(id config.NodeID) *Hash {
+	h := sha256.Sum256(id[:])
+	return (*Hash)(&h)
+}
+
+//
+// Sort peers with distance
+//
+func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
+
+	if len(ps) == 0 || len(ds) == 0 {
+		return
+	}
+
+	li := new(list.List)
+	for i, d := range ds {
+		inserted := false
+		for el := li.Front(); el != nil; el = el.Next() {
+			if d < ds[el.Value.(int)] {
+				li.InsertBefore(i, el)
+				inserted = true
+				break;
+			}
+		}
+		if !inserted {
+			li.PushBack(i)
+		}
+	}
+
+	i := 0
+	for el := li.Front(); el != nil; el = el.Next() {
+		pi := el.Value.(int)
+		ps[i], ps[pi] = ps[pi], ps[i]
+		ds[i], ds[pi] = ds[pi], ds[i]
+		i++
+	}
 }

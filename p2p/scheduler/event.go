@@ -32,6 +32,7 @@ import (
 	"net"
 	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
+	"time"
 )
 
 //
@@ -361,23 +362,26 @@ const (
 // EvDhtRutMgrNearestReq
 //
 type MsgDhtRutMgrNearestReq struct {
-	max		int				// max items returned could be
-	target	config.NodeID	// target peer identity
+	Max		int					// max items returned could be
+	Target	config.NodeID		// target peer identity
 }
 
 //
 // EvDhtRutMgrNearestRsp
 //
 type MsgDhtRutMgrNearestRsp struct {
-	target	config.NodeID	// target peer identity
-	nodes	[]config.Node	// nearest nodes table
+	Eno		int					// result code
+	Target	config.NodeID		// target peer identity
+	Peers	interface{}			// nearest nodes table
+	Dists	interface{}			// distances of nearest nodes
 }
 
 //
 // EvDhtRutMgrUpdateReq
 //
 type MsgDhtRutMgrUpdateReq struct {
-	seens	[]config.Node	// nearest nodes table
+	seens	[]config.Node		// nodes seen
+	duras	[]time.Duration		// durations about seen nodes
 }
 
 //

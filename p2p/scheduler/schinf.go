@@ -280,11 +280,25 @@ func (sdl *Scheduler)SchSetSender(msg *SchMessage, sender interface{}) SchErrno 
 }
 
 //
+// Get sender of message
+//
+func (sdl *Scheduler)SchGetSender(msg *SchMessage) interface{} {
+	return msg.sender
+}
+
+//
 // Set receiver of message
 //
 func (sdl *Scheduler)SchSetRecver(msg *SchMessage, recver interface{}) SchErrno {
 	msg.recver = recver.(*schTaskNode)
 	return SchEnoNone
+}
+
+//
+// Set receiver of message
+//
+func (sdl *Scheduler)SchGetRecver(msg *SchMessage) interface{} {
+	return msg.recver
 }
 
 //
