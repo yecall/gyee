@@ -157,6 +157,7 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = rutMgr.updateReq(msg.Body.(*sch.MsgDhtRutMgrUpdateReq))
 
 	default:
+		log.LogCallerFileLine("rutMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -212,7 +213,7 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 func (rutMgr *RutMgr)poweroff(ptn interface{}) sch.SchErrno {
 	log.LogCallerFileLine("poweroff: task will be done")
-	return sch.SchGetScheduler(ptn).SchTaskDone(ptn, sch.SchEnoKilled)
+	return rutMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
 //
@@ -354,6 +355,11 @@ _rsp2Sender:
 // Update route table request handler
 //
 func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
+	if req == nil {
+		log.LogCallerFileLine("updateReq: invalid prameter")
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -525,6 +531,7 @@ func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
 	}
 
 	li := new(list.List)
+
 	for i, d := range ds {
 		inserted := false
 		for el := li.Front(); el != nil; el = el.Next() {
