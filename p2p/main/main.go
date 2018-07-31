@@ -523,7 +523,7 @@ func testCase0(tc *testCase) {
 	// start p2p instance
 	//
 
-	if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+	if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -620,7 +620,7 @@ func testCase1(tc *testCase) {
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
-		if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+		if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase1: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -737,7 +737,7 @@ func testCase2(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase2: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -861,7 +861,7 @@ func testCase3(tc *testCase) {
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
-		if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+		if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase3: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -1046,7 +1046,7 @@ func testCase4(tc *testCase) {
 		}
 	}
 
-	if eno := shell.P2pStart(p2pInstBootstrap, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+	if eno := shell.P2pStart(p2pInstBootstrap, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -1059,7 +1059,7 @@ func testCase4(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -1245,7 +1245,7 @@ func testCase5(tc *testCase) {
 		}
 	}
 
-	if eno := shell.P2pStart(p2pInstBootstrap, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+	if eno := shell.P2pStart(p2pInstBootstrap, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase5: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -1258,7 +1258,7 @@ func testCase5(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_DHT); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase5: P2pStart failed, eno: %d", eno)
 			return
 		}
