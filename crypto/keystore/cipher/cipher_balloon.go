@@ -20,6 +20,11 @@
 
 package cipher
 
+/*
+reference from: https://github.com/nogoegst/balloon
+这个不是官方实现，只能用于测试目的
+ */
+
 import (
 	"bytes"
 	"crypto/aes"
@@ -27,53 +32,51 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
+	"github.com/nogoegst/balloon"
 	"github.com/satori/go.uuid"
 	"github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/crypto/random"
-	"golang.org/x/crypto/argon2"
+
+	"golang.org/x/crypto/blake2b"
 )
 
 const (
-	// Argon2KDF name
-	Argon2KDF = "argon2id"
+	// BalloonKDF name
+	BalloonKDF = "balloon"
 
-	StandardArgon2Time = 4
+	StandardBalloonTime = 16
 
-	StandardArgon2Memory = 256 * 1024
+	StandardBalloonSpace = 8 * 1024
 
-	StandardArgon2Threads = 4
+	// BalloonDKLen get derived key length
+	BalloonDKLen = 64
 
-	// Argon2DKLen get derived key length
-	Argon2DKLen = 64
-
-	Argon2CipherName = "aes-256-ctr"
+	BalloonCipherName = "aes-256-ctr"
 )
 
-type Argon2 struct {
-	Time    uint32
-	Memory  uint32
-	Threads uint8
+type Balloon struct {
+	Time  uint64
+	Space uint64
 }
 
-func NewArgon2() *Argon2 {
-	ar := &Argon2{
-		Time:    StandardArgon2Time,
-		Memory:  StandardArgon2Memory,
-		Threads: StandardArgon2Threads,
+func NewBalloon() *Balloon {
+	b := &Balloon{
+		Time:  StandardBalloonTime,
+		Space: StandardBalloonSpace,
 	}
-	return ar
+	return b
 }
 
-func (a *Argon2) Encrypt(data []byte, passphrase []byte) ([]byte, error) {
-	crypto, err := a.scryptEncrypt(data, passphrase, a.Time, a.Memory, a.Threads)
+func (b *Balloon) Encrypt(data []byte, passphrase []byte) ([]byte, error) {
+	crypto, err := b.scryptEncrypt(data, passphrase, b.Time, b.Space)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(crypto)
 }
 
-func (a *Argon2) EncryptKey(address string, data []byte, passphrase []byte) ([]byte, error) {
-	crypto, err := a.scryptEncrypt(data, passphrase, a.Time, a.Memory, a.Threads)
+func (b *Balloon) EncryptKey(address string, data []byte, passphrase []byte) ([]byte, error) {
+	crypto, err := b.scryptEncrypt(data, passphrase, b.Time, b.Space)
 	if err != nil {
 		return nil, err
 	}
@@ -87,45 +90,46 @@ func (a *Argon2) EncryptKey(address string, data []byte, passphrase []byte) ([]b
 	return json.Marshal(encryptedKeyJSON)
 }
 
-func (a *Argon2) Decrypt(data []byte, passphrase []byte) ([]byte, error) {
+func (b *Balloon) Decrypt(data []byte, passphrase []byte) ([]byte, error) {
 	crypto := new(cryptoJSON)
 	if err := json.Unmarshal(data, crypto); err != nil {
 		return nil, err
 	}
-	return a.scryptDecrypt(crypto, passphrase)
+	return b.scryptDecrypt(crypto, passphrase)
 }
 
-func (a *Argon2) DecryptKey(keyjson []byte, passphrase []byte) ([]byte, error) {
+func (b *Balloon) DecryptKey(keyjson []byte, passphrase []byte) ([]byte, error) {
 	keyJSON := new(encryptedKeyJSON)
 	if err := json.Unmarshal(keyjson, keyJSON); err != nil {
 		return nil, err
 	}
-	return a.scryptDecrypt(&keyJSON.Crypto, passphrase)
+	return b.scryptDecrypt(&keyJSON.Crypto, passphrase)
 }
 
-func (a *Argon2) scryptEncrypt(data []byte, passphrase []byte, t, m uint32, th uint8) (*cryptoJSON, error) {
-	salt := random.GetEntropyCSPRNG(Argon2DKLen)
-	derivedKey := argon2.IDKey(passphrase, salt, t, m, th, Argon2DKLen)
-	//derivedKey, err := scrypt.Key(passphrase, salt, N, r, p, Argon2DKLen)
+func (b *Balloon) scryptEncrypt(data []byte, passphrase []byte, t, s uint64) (*cryptoJSON, error) {
+	salt := random.GetEntropyCSPRNG(BalloonDKLen)
+	//derivedKey := argon2.IDKey(passphrase, salt, t, m, th, BalloonDKLen)
+	//derivedKey, err := scrypt.Key(passphrase, salt, N, r, p, BalloonDKLen)
+	h, _ := blake2b.New512(nil)
+	derivedKey := balloon.Balloon(h, passphrase, salt, s, t)
 	//if err != nil {
 	//	return nil, err
 	//}
 	encryptKey := derivedKey[:32]
 
 	iv := random.GetEntropyCSPRNG(aes.BlockSize) // 16
-	cipherText, err := a.aesCTRXOR(encryptKey, data, iv)
+	cipherText, err := b.aesCTRXOR(encryptKey, data, iv)
 	if err != nil {
 		return nil, err
 	}
 
 	//mac := hash.Sha3256(derivedKey[16:32], cipherText) // version3: deprecated
-	mac := hash.Sha3256(derivedKey[32:64], cipherText, iv, []byte(Argon2CipherName))
+	mac := hash.Sha3256(derivedKey[32:64], cipherText, iv, []byte(BalloonCipherName))
 
 	scryptParamsJSON := make(map[string]interface{}, 5)
 	scryptParamsJSON["time"] = t
-	scryptParamsJSON["memory"] = m
-	scryptParamsJSON["threads"] = th
-	scryptParamsJSON["dklen"] = Argon2DKLen
+	scryptParamsJSON["space"] = s
+	scryptParamsJSON["dklen"] = BalloonDKLen
 	scryptParamsJSON["salt"] = hex.EncodeToString(salt)
 
 	cipherParamsJSON := cipherparamsJSON{
@@ -133,10 +137,10 @@ func (a *Argon2) scryptEncrypt(data []byte, passphrase []byte, t, m uint32, th u
 	}
 
 	crypto := &cryptoJSON{
-		Cipher:       Argon2CipherName,
+		Cipher:       BalloonCipherName,
 		CipherText:   hex.EncodeToString(cipherText),
 		CipherParams: cipherParamsJSON,
-		KDF:          Argon2KDF,
+		KDF:          BalloonKDF,
 		KDFParams:    scryptParamsJSON,
 		MAC:          hex.EncodeToString(mac),
 		MACHash:      macHash,
@@ -144,7 +148,7 @@ func (a *Argon2) scryptEncrypt(data []byte, passphrase []byte, t, m uint32, th u
 	return crypto, nil
 }
 
-func (a *Argon2) aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
+func (b *Balloon) aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
 	aesBlock, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -155,9 +159,9 @@ func (a *Argon2) aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
 	return outText, err
 }
 
-func (a *Argon2) scryptDecrypt(crypto *cryptoJSON, passphrase []byte) ([]byte, error) {
+func (b *Balloon) scryptDecrypt(crypto *cryptoJSON, passphrase []byte) ([]byte, error) {
 
-	if crypto.Cipher != Argon2CipherName {
+	if crypto.Cipher != BalloonCipherName {
 		return nil, ErrCipherInvalid
 	}
 
@@ -181,13 +185,14 @@ func (a *Argon2) scryptDecrypt(crypto *cryptoJSON, passphrase []byte) ([]byte, e
 		return nil, err
 	}
 
-	dklen := ensureInt(crypto.KDFParams["dklen"])
+	//dklen := ensureInt(crypto.KDFParams["dklen"])
 	var derivedKey = []byte{}
-	if crypto.KDF == Argon2KDF {
+	if crypto.KDF == BalloonKDF {
 		t := ensureInt(crypto.KDFParams["time"])
-		m := ensureInt(crypto.KDFParams["memory"])
-		th := ensureInt(crypto.KDFParams["threads"])
-		derivedKey = argon2.IDKey(passphrase, salt, uint32(t), uint32(m), uint8(th), uint32(dklen))
+		s := ensureInt(crypto.KDFParams["space"])
+		//derivedKey = argon2.IDKey(passphrase, salt, uint32(t), uint32(m), uint8(th), uint32(dklen))
+		h, _ := blake2b.New512(nil)
+		derivedKey = balloon.Balloon(h, passphrase, salt, uint64(s), uint64(t))
 		//if err != nil {
 		//	return nil, err
 		//}
@@ -201,7 +206,7 @@ func (a *Argon2) scryptDecrypt(crypto *cryptoJSON, passphrase []byte) ([]byte, e
 		return nil, ErrDecrypt
 	}
 
-	key, err := a.aesCTRXOR(derivedKey[:32], cipherText, iv)
+	key, err := b.aesCTRXOR(derivedKey[:32], cipherText, iv)
 	if err != nil {
 		return nil, err
 	}

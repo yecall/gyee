@@ -58,6 +58,8 @@ const (
 	// ScryptDKLen get derived key length
 	ScryptDKLen = 32
 
+	ScryptCipherName = "aes-128-ctr"
+
 	// version compatible with ethereum, the version start with 3
 	version3       = 3
 	currentVersion = 4
@@ -136,7 +138,7 @@ func (s *Scrypt) scryptEncrypt(data []byte, passphrase []byte, N, r, p int) (*cr
 	}
 
 	//mac := hash.Sha3256(derivedKey[16:32], cipherText) // version3: deprecated
-	mac := hash.Sha3256(derivedKey[16:32], cipherText, iv, []byte(cipherName))
+	mac := hash.Sha3256(derivedKey[16:32], cipherText, iv, []byte(ScryptCipherName))
 
 	scryptParamsJSON := make(map[string]interface{}, 5)
 	scryptParamsJSON["n"] = N
@@ -150,7 +152,7 @@ func (s *Scrypt) scryptEncrypt(data []byte, passphrase []byte, N, r, p int) (*cr
 	}
 
 	crypto := &cryptoJSON{
-		Cipher:       cipherName,
+		Cipher:       ScryptCipherName,
 		CipherText:   hex.EncodeToString(cipherText),
 		CipherParams: cipherParamsJSON,
 		KDF:          ScryptKDF,
@@ -174,7 +176,7 @@ func (s *Scrypt) aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
 
 func (s *Scrypt) scryptDecrypt(crypto *cryptoJSON, passphrase []byte, version int) ([]byte, error) {
 
-	if crypto.Cipher != cipherName {
+	if crypto.Cipher != ScryptCipherName {
 		return nil, ErrCipherInvalid
 	}
 

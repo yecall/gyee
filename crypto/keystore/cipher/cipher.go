@@ -54,8 +54,8 @@ type encryptedKeyJSON struct {
 }
 
 const (
-	// cipher the name of cipher
-	cipherName = "aes-128-ctr"
+	//// cipher the name of cipher
+	//cipherName = "aes-128-ctr"
 
 	// mac calculate hash type
 	macHash = "sha3256"
