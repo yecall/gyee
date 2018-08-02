@@ -380,8 +380,8 @@ type MsgDhtRutMgrNearestRsp struct {
 // EvDhtRutMgrUpdateReq
 //
 type MsgDhtRutMgrUpdateReq struct {
-	seens	[]config.Node		// nodes seen
-	duras	[]time.Duration		// durations about seen nodes
+	Seens	[]config.Node		// nodes seen
+	Duras	[]time.Duration		// durations about seen nodes
 }
 
 //

@@ -33,23 +33,19 @@ import (
 //
 // Route manager name registered in scheduler
 //
-const RutMgrName = sch.DhtRutMgrName
-
-//
-// Max nearest peers can be retrieved for a time
-//
-const rutMgrMaxNearest = 32
+const (
+	RutMgrName = sch.DhtRutMgrName		// Route manager name registered in scheduler
+	rutMgrMaxNearest = 32				// Max nearest peers can be retrieved for a time
+	rutMgrBucketSize = 32				// bucket size
+	HashByteLength = 32					// 32 bytes(256 bits) hash applied
+	HashBitLength = HashByteLength * 8	// hash bits
+	rutMgrMaxLatency = time.Second * 60	// max latency in metric
+)
 
 //
 // Hash type
 //
-const HashLength = 32					// 32 bytes(256 bits) hash applied
-type Hash [HashLength]byte
-
-//
-// bucket size
-//
-const rutMgrBucketSize = 32
+type Hash [HashByteLength]byte
 
 //
 // Latency measurement
@@ -66,6 +62,7 @@ type rutMgrPeerMetric struct {
 type rutMgrBucketNode struct {
 	node	config.Node					// common node
 	hash	Hash						// hash from node.ID
+	dist	int							// distance between this node and local
 }
 
 //
@@ -76,6 +73,7 @@ type rutMgrRouteTable struct {
 	bucketSize		int									// max peers can be held in one list
 	bucketTab		[]*list.List						// buckets
 	metricTab		map[config.NodeID]*rutMgrPeerMetric	// metric table about peers
+	maxLatency		time.Duration						// max latency
 }
 
 //
@@ -305,7 +303,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 	// the second closest bank
 	//
 
-	for loop := dt + 1; loop < cap(rutMgr.rutTab.bucketTab); loop++ {
+	for loop := dt + 1; loop < len(rutMgr.rutTab.bucketTab); loop++ {
 		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
 			if addClosest(bk) >= size {
 				goto _rsp2Sender
@@ -362,9 +360,28 @@ _rsp2Sender:
 //
 func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
-	if req == nil {
+	if req == nil || len(req.Seens) != len(req.Duras) || len(req.Seens) == 0 {
 		log.LogCallerFileLine("updateReq: invalid prameter")
 		return sch.SchEnoUserTask
+	}
+
+	rt := &rutMgr.rutTab
+
+	for idx, n := range req.Seens {
+
+		hash := rutMgrNodeId2Hash(n.ID)
+		dist := rutMgr.rutMgrLog2Dist(&rt.shaLocal, hash)
+		dur := req.Duras[idx]
+
+		rt.rutMgrMetricSample(n.ID, dur)
+
+		bn := rutMgrBucketNode {
+			node:	n,
+			hash:	*hash,
+			dist:	dist,
+		}
+
+		rt.update(&bn, dist)
 	}
 
 	return sch.SchEnoNone
@@ -480,7 +497,8 @@ func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
 	rt := &rutMgr.rutTab
 	rt.shaLocal = *rutMgrNodeId2Hash(rutMgr.localNodeId)
 	rt.bucketSize = rutMgrBucketSize
-	rt.bucketTab = make([]*list.List, 0)
+	rt.maxLatency = rutMgrMaxLatency
+	rt.bucketTab = make([]*list.List, 0, HashBitLength + 1)
 	rt.metricTab = make(map[config.NodeID]*rutMgrPeerMetric, 0)
 	return DhtEnoNone
 }
@@ -488,14 +506,14 @@ func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
 //
 // Metric sample input
 //
-func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration) DhtErrno {
+func (rt *rutMgrRouteTable) rutMgrMetricSample(id config.NodeID, latency time.Duration) DhtErrno {
 
-	if m, dup := rutMgr.rutTab.metricTab[id]; dup {
+	if m, dup := rt.metricTab[id]; dup {
 		m.ltnSamples = append(m.ltnSamples, latency)
-		return rutMgr.rutMgrMetricUpdate(id)
+		return rt.rutMgrMetricUpdate(id)
 	}
 
-	rutMgr.rutTab.metricTab[id] = &rutMgrPeerMetric {
+	rt.metricTab[id] = &rutMgrPeerMetric {
 		peerId:		id,
 		ltnSamples: []time.Duration{latency},
 		ewma:		latency,
@@ -507,15 +525,15 @@ func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration
 //
 // Metric update EWMA about latency
 //
-func (rutMgr *RutMgr) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
+func (rt *rutMgrRouteTable) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
 	return DhtEnoNone
 }
 
 //
 // Metric get EWMA latency of peer
 //
-func (rutMgr *RutMgr) rutMgrMetricGetEWMA(id config.NodeID) (DhtErrno, time.Duration){
-	mt := rutMgr.rutTab.metricTab
+func (rt *rutMgrRouteTable) rutMgrMetricGetEWMA(id config.NodeID) (DhtErrno, time.Duration){
+	mt := rt.metricTab
 	if m, ok := mt[id]; ok {
 		return DhtEnoNone, m.ewma
 	}
@@ -562,4 +580,120 @@ func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
 		ds[i], ds[pi] = ds[pi], ds[i]
 		i++
 	}
+}
+
+//
+// Lookup node
+//
+func (rutMgr *RutMgr)find(id config.NodeID) (DhtErrno, *list.Element) {
+	hash := rutMgrNodeId2Hash(id)
+	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
+	return rutMgr.rutTab.find(id, dist)
+}
+
+//
+// Lookup node in buckets
+//
+func (rt *rutMgrRouteTable)find(id config.NodeID, dist int) (DhtErrno, *list.Element) {
+
+	if dist >= len(rt.bucketTab) {
+		return DhtEnoNotFound, nil
+	}
+
+	li := rt.bucketTab[dist]
+	for el := li.Front(); el != nil; el.Next() {
+		if el.Value.(*rutMgrBucketNode).node.ID == id {
+			return DhtEnoNone, el
+		}
+	}
+
+	return DhtEnoNotFound, nil
+}
+
+//
+// Update route table
+//
+func (rt *rutMgrRouteTable)update(bn *rutMgrBucketNode, dist int) DhtErrno {
+
+	tail := len(rt.bucketTab)
+	if tail == 0 {
+		rt.bucketTab[0] = list.New()
+	} else {
+		tail--
+	}
+
+	if eno, el := rt.find(bn.node.ID, dist); eno == DhtEnoNone && el != nil {
+		rt.bucketTab[dist].MoveToFront(el)
+		return DhtEnoNone
+	}
+
+	eno, ewma := rt.rutMgrMetricGetEWMA(bn.node.ID)
+	if eno != DhtEnoNone {
+		log.LogCallerFileLine("update: " +
+			"rutMgrMetricGetEWMA failed, eno: %d, ewma: %d",
+			eno, ewma)
+		return eno
+	}
+
+	if ewma > rt.maxLatency {
+		log.LogCallerFileLine("update: " +
+			"discarded, ewma: %d,  maxLatency: %d",
+			ewma, rt.maxLatency)
+		return DhtEnoNone
+	}
+
+	tailBucket := rt.bucketTab[tail]
+	if tailBucket.PushBack(bn); tailBucket.Len() > rt.bucketSize {
+		rt.split(tailBucket, tail)
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Split the tail bucket
+//
+func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
+
+	if len(rt.bucketTab) - 1 != dist {
+		log.LogCallerFileLine("split: can only split the tail bucket")
+		return DhtEnoParameter
+	}
+
+	if li.Len() == 0 {
+		log.LogCallerFileLine("split: empty bucket")
+		return DhtEnoParameter
+	}
+
+	newLi := list.New()
+
+	var el = li.Front()
+	var elNext *list.Element = nil
+
+	for {
+		elNext = el.Next()
+		bn := el.Value.(rutMgrBucketNode)
+		if bn.dist > dist {
+			newLi.PushBack(el)
+			li.Remove(el)
+		}
+		if elNext == nil {
+			break
+		}
+		el = elNext
+	}
+
+	for li.Len() > rt.bucketSize {
+		li.Remove(li.Back())
+	}
+
+	if newLi.Len() != 0 {
+		rt.bucketTab = append(rt.bucketTab, newLi)
+	}
+
+	if newLi.Len() > rt.bucketSize {
+		rt.split(newLi, dist + 1)
+	}
+
+	return DhtEnoNone
 }
