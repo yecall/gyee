@@ -47,6 +47,11 @@ const HashLength = 32					// 32 bytes(256 bits) hash applied
 type Hash [HashLength]byte
 
 //
+// bucket size
+//
+const rutMgrBucketSize = 32
+
+//
 // Latency measurement
 //
 type rutMgrPeerMetric struct {
@@ -68,6 +73,7 @@ type rutMgrBucketNode struct {
 //
 type rutMgrRouteTable struct {
 	shaLocal		Hash								// local node identity hash
+	bucketSize		int									// max peers can be held in one list
 	bucketTab		[]*list.List						// buckets
 	metricTab		map[config.NodeID]*rutMgrPeerMetric	// metric table about peers
 }
@@ -355,6 +361,7 @@ _rsp2Sender:
 // Update route table request handler
 //
 func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
+
 	if req == nil {
 		log.LogCallerFileLine("updateReq: invalid prameter")
 		return sch.SchEnoUserTask
@@ -470,9 +477,11 @@ func (rutMgr *RutMgr)rutMgrLog2Dist(h1 *Hash, h2 *Hash) int {
 // Setup route table
 //
 func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
-	rutMgr.rutTab.shaLocal = *rutMgrNodeId2Hash(rutMgr.localNodeId)
-	rutMgr.rutTab.bucketTab = make([]*list.List, 0)
-	rutMgr.rutTab.metricTab = make(map[config.NodeID]*rutMgrPeerMetric, 0)
+	rt := &rutMgr.rutTab
+	rt.shaLocal = *rutMgrNodeId2Hash(rutMgr.localNodeId)
+	rt.bucketSize = rutMgrBucketSize
+	rt.bucketTab = make([]*list.List, 0)
+	rt.metricTab = make(map[config.NodeID]*rutMgrPeerMetric, 0)
 	return DhtEnoNone
 }
 
@@ -530,7 +539,7 @@ func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
 		return
 	}
 
-	li := new(list.List)
+	li := list.New()
 
 	for i, d := range ds {
 		inserted := false
