@@ -40,6 +40,7 @@ const (
 	DhtEnoParameter
 	DhtEnoScheduler
 	DhtEnoNotFound
+	DhtEnoResource
 	DhtEnoUnknown
 )
 

@@ -40,6 +40,7 @@ const (
 	HashByteLength = 32					// 32 bytes(256 bits) hash applied
 	HashBitLength = HashByteLength * 8	// hash bits
 	rutMgrMaxLatency = time.Second * 60	// max latency in metric
+	rutMgrMaxNofifee = 64				// max notifees could be
 )
 
 //
@@ -77,27 +78,44 @@ type rutMgrRouteTable struct {
 }
 
 //
+// Notifee
+//
+
+type rutMgrNotifeeId struct {
+	task			interface{}			// destionation task
+	target			config.NodeID		// target aimed at
+}
+
+type rutMgrNotifee struct {
+	id				rutMgrNotifeeId		// notifee identity
+	max				int					// max nearest asked for
+	nearests		[]*rutMgrBucketNode	// nearest peers
+	dists			[]int				// distances of nearest peers
+}
+
+//
 // Route manager
 //
 type RutMgr struct {
-	sdl				*sch.Scheduler		// pointer to scheduler
-	name			string				// my name
-	tep				sch.SchUserTaskEp	// task entry
-	ptnMe			interface{}			// pointer to task node of myself
-	ptnQryMgr		interface{}			// pointer to query manager task node
-	bpCfg			bootstrapPolicy		// bootstrap policy configuration
-	bpTid			int					// bootstrap timer identity
-	distLookupTab	[]int				// log2 distance lookup table for a xor byte
-	localNodeId		config.NodeID		// local node identity
-	rutTab			rutMgrRouteTable	// route table
+	sdl				*sch.Scheduler							// pointer to scheduler
+	name			string									// my name
+	tep				sch.SchUserTaskEp						// task entry
+	ptnMe			interface{}								// pointer to task node of myself
+	ptnQryMgr		interface{}								// pointer to query manager task node
+	bpCfg			bootstrapPolicy							// bootstrap policy configuration
+	bpTid			int										// bootstrap timer identity
+	distLookupTab	[]int									// log2 distance lookup table for a xor byte
+	localNodeId		config.NodeID							// local node identity
+	rutTab			rutMgrRouteTable						// route table
+	ntfTab			map[rutMgrNotifeeId]*rutMgrNotifee		// notifee table
 }
 
 //
 // Bootstrap policy configuration
 //
 type bootstrapPolicy struct {
-	randomQryNum	int				// times to try query for a random peer identity
-	period			time.Duration	// timer period to fire a bootstrap
+	randomQryNum	int					// times to try query for a random peer identity
+	period			time.Duration		// timer period to fire a bootstrap
 }
 
 var defautBspCfg = bootstrapPolicy {
@@ -121,6 +139,7 @@ func NewRutMgr() *RutMgr {
 		distLookupTab:	[]int{},
 		localNodeId:	config.NodeID{},
 		rutTab:			rutMgrRouteTable{},
+		ntfTab:			make(map[rutMgrNotifeeId]*rutMgrNotifee, 0),
 	}
 
 	rutMgr.tep = rutMgr.rutMgrProc
@@ -253,83 +272,10 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		return sch.SchEnoParameter
 	}
 
-	var nearest = make([]*rutMgrBucketNode, 0, rutMgrMaxNearest)
-	var nearestDist = make([]int, 0, rutMgrMaxNearest)
-
-	var count = 0
-	var dhtEno DhtErrno = DhtEnoNone
-
-	ht := rutMgrNodeId2Hash(req.Target)
-	dt := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, ht)
-	size := req.Max
-
-	var addClosest = func (bk *list.List) int {
-		count = len(nearest)
-			if bk != nil {
-			for el := bk.Front(); el != nil; el = el.Next() {
-				peer := el.Value.(*rutMgrBucketNode)
-				nearest = append(nearest, peer)
-				dt := rutMgr.rutMgrLog2Dist(ht, &peer.hash)
-				nearestDist = append(nearestDist, dt)
-				if count++; count >= size {
-					break
-				}
-			}
-		}
-
-		return count
+	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
+	if dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("nearestReq: rutMgrNearest failed, eno: %d", dhtEno)
 	}
-
-	if size <= 0 || size > rutMgrMaxNearest {
-		log.LogCallerFileLine("nearestReq: " +
-			"invalid size: %d, min: 1, max: %d",
-			req.Max, rutMgrMaxNearest)
-
-		dhtEno = DhtEnoParameter
-		goto _rsp2Sender
-	}
-
-	//
-	// the most closest bank
-	//
-
-	if bk := rutMgr.rutTab.bucketTab[dt]; bk != nil {
-		if addClosest(bk) >= size {
-			goto _rsp2Sender
-		}
-	}
-
-	//
-	// the second closest bank
-	//
-
-	for loop := dt + 1; loop < len(rutMgr.rutTab.bucketTab); loop++ {
-		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
-			if addClosest(bk) >= size {
-				goto _rsp2Sender
-			}
-		}
-	}
-
-	if dt <= 0 { goto _rsp2Sender }
-
-	//
-	// the last bank
-	//
-
-	for loop := dt - 1; loop >= 0; loop-- {
-		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
-			if addClosest(bk) >= size {
-				goto _rsp2Sender
-			}
-		}
-	}
-
-	//
-	// response to the sender
-	//
-
-_rsp2Sender:
 
 	var rsp = sch.MsgDhtRutMgrNearestRsp {
 		Eno:	int(dhtEno),
@@ -340,7 +286,6 @@ _rsp2Sender:
 	var schMsg sch.SchMessage
 
 	if dhtEno == DhtEnoNone && len(nearest) > 0 {
-		rutMgrSortPeer(nearest, nearestDist)
 		rsp.Peers = nearest
 		rsp.Dists = nearestDist
 	}
@@ -348,11 +293,11 @@ _rsp2Sender:
 	rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
 	rutMgr.sdl.SchSendMessage(&schMsg)
 
-	if dhtEno == DhtEnoNone  {
-		return sch.SchEnoNone
+	if dhtEno != DhtEnoNone  {
+		return sch.SchEnoUserTask
 	}
 
-	return sch.SchEnoUserTask
+	return sch.SchEnoNone
 }
 
 //
@@ -382,6 +327,11 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 		rt.update(&bn, dist)
+	}
+
+	if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("updateReq: rutMgrNotify failed, eno: %d", dhtEno)
+		return sch.SchEnoUserTask
 	}
 
 	return sch.SchEnoNone
@@ -585,7 +535,7 @@ func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
 //
 // Lookup node
 //
-func (rutMgr *RutMgr)find(id config.NodeID) (DhtErrno, *list.Element) {
+func (rutMgr *RutMgr)rutMgrFind(id config.NodeID) (DhtErrno, *list.Element) {
 	hash := rutMgrNodeId2Hash(id)
 	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
 	return rutMgr.rutTab.find(id, dist)
@@ -696,4 +646,165 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 	}
 
 	return DhtEnoNone
+}
+
+//
+// Register notifee
+//
+func (rutMgr *RutMgr)rutMgrNotifeeReg(
+	task	interface{},
+	id		*config.NodeID,
+	max		int,
+	bns		[]*rutMgrBucketNode,
+	ds		[]int) DhtErrno {
+
+	if len(rutMgr.ntfTab) >= rutMgrMaxNofifee {
+		log.LogCallerFileLine("rutMgrNotifeeReg: too much notifees, max: %d", rutMgrMaxNofifee)
+		return DhtEnoResource
+	}
+
+	nid := rutMgrNotifeeId {
+		task:	task,
+		target:	*id,
+	}
+
+	ntfe := rutMgrNotifee {
+		id:			nid,
+		max:		max,
+		nearests:	bns,
+		dists:		ds,
+	}
+
+	rutMgr.ntfTab[nid] = &ntfe
+
+	return DhtEnoNone
+}
+
+//
+// Notify those tasks whom registered with notifees
+//
+func (rutMgr *RutMgr)rutMgrNotify() DhtErrno {
+
+	var ind = sch.MsgDhtRutMgrNotificationInd{}
+	var msg = sch.SchMessage{}
+	var failCnt = 0
+
+	for key, ntf := range rutMgr.ntfTab {
+
+		task := ntf.id.task
+		target := &ntf.id.target
+		size := ntf.max
+
+		eno, nearest, dist := rutMgr.rutMgrNearest(target, size)
+		if eno != DhtEnoNone {
+			log.LogCallerFileLine("rutMgrNotify: rutMgrNearest failed, eno: %d", eno)
+			failCnt++
+			continue
+		}
+
+		rutMgr.ntfTab[key].nearests = nearest
+		rutMgr.ntfTab[key].dists = dist
+
+		ind.Target = *target
+		ind.Peers = nearest
+		ind.Dists = dist
+
+		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, task, sch.EvDhtRutMgrNotificationInd, &ind)
+		rutMgr.sdl.SchSendMessage(&msg)
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Get nearest peers for target
+//
+func (rutMgr *RutMgr)rutMgrNearest(target *config.NodeID, size int) (DhtErrno, []*rutMgrBucketNode, []int){
+
+	var nearest = make([]*rutMgrBucketNode, 0, rutMgrMaxNearest)
+	var nearestDist = make([]int, 0, rutMgrMaxNearest)
+
+	var count = 0
+	var dhtEno DhtErrno = DhtEnoNone
+
+	ht := rutMgrNodeId2Hash(*target)
+	dt := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, ht)
+
+	var addClosest = func (bk *list.List) int {
+		count = len(nearest)
+		if bk != nil {
+			for el := bk.Front(); el != nil; el = el.Next() {
+				peer := el.Value.(*rutMgrBucketNode)
+				nearest = append(nearest, peer)
+				dt := rutMgr.rutMgrLog2Dist(ht, &peer.hash)
+				nearestDist = append(nearestDist, dt)
+				if count++; count >= size {
+					break
+				}
+			}
+		}
+
+		return count
+	}
+
+	if size <= 0 || size > rutMgrMaxNearest {
+		log.LogCallerFileLine("rutMgrNearest: " +
+			"invalid size: %d, min: 1, max: %d",
+			size, rutMgrMaxNearest)
+
+		dhtEno = DhtEnoParameter
+		goto _done
+	}
+
+	//
+	// the most closest bank
+	//
+
+	if bk := rutMgr.rutTab.bucketTab[dt]; bk != nil {
+		if addClosest(bk) >= size {
+			goto _done
+		}
+	}
+
+	//
+	// the second closest bank
+	//
+
+	for loop := dt + 1; loop < len(rutMgr.rutTab.bucketTab); loop++ {
+		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
+			if addClosest(bk) >= size {
+				goto _done
+			}
+		}
+	}
+
+	if dt <= 0 { goto _done }
+
+	//
+	// the last bank
+	//
+
+	for loop := dt - 1; loop >= 0; loop-- {
+		if bk := rutMgr.rutTab.bucketTab[loop]; bk != nil {
+			if addClosest(bk) >= size {
+				goto _done
+			}
+		}
+	}
+
+	//
+	// response to the sender
+	//
+
+_done:
+
+	if dhtEno != DhtEnoNone  {
+		return dhtEno, nil, nil
+	}
+
+	if len(nearest) > 0 {
+		rutMgrSortPeer(nearest, nearestDist)
+	}
+
+	return DhtEnoNone, nearest, nearestDist
 }

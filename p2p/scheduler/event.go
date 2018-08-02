@@ -173,21 +173,21 @@ type NblPingRsp struct {
 // EvNblPingedInd
 //
 type NblPingedInd struct {
-	Ping		*um.Ping		// ping from remote node
+	Ping		*um.Ping			// ping from remote node
 }
 
 //
 // EvNblPongedInd
 //
 type NblPongedInd struct {
-	Pong		*um.Pong		// pong from remote node
+	Pong		*um.Pong			// pong from remote node
 }
 
 //
 // EvNblQueriedInd
 //
 type NblQueriedInd struct {
-	FindNode	*um.FindNode	// findnode from remote node
+	FindNode	*um.FindNode		// findnode from remote node
 }
 
 //
@@ -205,8 +205,8 @@ const (
 // EvNblDataReq
 //
 type NblDataReq struct {
-	Payload	[]byte			// payload
-	TgtAddr	*net.UDPAddr	// target address
+	Payload	[]byte					// payload
+	TgtAddr	*net.UDPAddr			// target address
 }
 
 //
@@ -258,10 +258,10 @@ const (
 // EvPeCloseReq
 //
 type MsgPeCloseReq struct {
-	Ptn		interface{}			// pointer to peer task instance node
-	Snid	config.SubNetworkID	// sub network identity
-	Node	config.Node			// peer node
-	Dir		int					// direction
+	Ptn		interface{}				// pointer to peer task instance node
+	Snid	config.SubNetworkID		// sub network identity
+	Node	config.Node				// peer node
+	Dir		int						// direction
 }
 
 //
@@ -333,7 +333,14 @@ const (
 // EvDhtQryMgrQueryStartReq
 //
 type MsgDhtQryMgrQueryStartReq struct {
-	Target	config.NodeID
+	Target	config.NodeID			// target node identity
+}
+
+//
+// EvDhtQryMgrQueryStartReq
+//
+type MsgDhtQryMgrQueryStopReq struct {
+	Target	config.NodeID			// target node identity
 }
 
 //
@@ -347,6 +354,24 @@ const (
 )
 
 //
+// EvDhtQryInstResultInd
+//
+type MsgDhtQryInstResultInd struct {
+	From		config.Node			// the peer who tells us
+	Target		config.NodeID		// target node identity
+	Peers		[]*config.Node		// neighbors of target
+	Latency		time.Duration		// latency about response to request
+}
+
+//
+// EvDhtQryInstStopRsp
+//
+type MsgDhtQryInstStopRsp struct {
+	To			config.Node			// whom is queried by the instance
+	Target		config.NodeID		// target node identity
+}
+
+//
 // DHT route manager event
 //
 const DhtRutBootstrapTimerId	= 0
@@ -356,32 +381,44 @@ const (
 	EvDhtRutMgrNearestReq		= EvDhtRutMgrBase + 1
 	EvDhtRutMgrNearestRsp		= EvDhtRutMgrBase + 2
 	EvDhtRutMgrUpdateReq		= EvDhtRutMgrBase + 3
+	EvDhtRutMgrNotificationInd	= EvDhtRutMgrBase + 4
 )
 
 //
 // EvDhtRutMgrNearestReq
 //
 type MsgDhtRutMgrNearestReq struct {
-	Max		int					// max items returned could be
-	Target	config.NodeID		// target peer identity
+	Max			int					// max items returned could be
+	Target		config.NodeID		// target peer identity
+	NtfReq		bool				// ask for notification when route updated
+	Task		interface{}			// task who loves the notification
 }
 
 //
 // EvDhtRutMgrNearestRsp
 //
 type MsgDhtRutMgrNearestRsp struct {
-	Eno		int					// result code
-	Target	config.NodeID		// target peer identity
-	Peers	interface{}			// nearest nodes table
-	Dists	interface{}			// distances of nearest nodes
+	Eno		int						// result code
+	Target	config.NodeID			// target peer identity
+	Peers	interface{}				// nearest nodes table
+	Dists	interface{}				// distances of nearest nodes
 }
 
 //
 // EvDhtRutMgrUpdateReq
 //
 type MsgDhtRutMgrUpdateReq struct {
-	Seens	[]config.Node		// nodes seen
-	Duras	[]time.Duration		// durations about seen nodes
+	Seens	[]config.Node			// nodes seen
+	Duras	[]time.Duration			// durations about seen nodes
+}
+
+//
+// EvDhtRutMgrNotificationInd
+//
+type MsgDhtRutMgrNotificationInd struct {
+	Target	config.NodeID			// target peer identity
+	Peers	interface{}				// nearest nodes table
+	Dists	interface{}				// distances of nearest nodes
 }
 
 //
