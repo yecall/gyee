@@ -56,7 +56,7 @@ func (lsnMgr *LsnMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 }
 
 //
-// Discover manager entry
+// Listener manager entry
 //
 func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 

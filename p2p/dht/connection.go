@@ -43,7 +43,7 @@ func NewConMgr() *ConMgr {
 		ptnMe:	nil,
 	}
 
-	conMgr.tep = conMgr.connMgrProc
+	conMgr.tep = conMgr.conMgrProc
 
 	return &conMgr
 }
@@ -56,9 +56,9 @@ func (conMgr *ConMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 }
 
 //
-// Discover manager entry
+// Connection manager entry
 //
-func (conMgr *ConMgr)connMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	eno := sch.SchEnoUnknown
 

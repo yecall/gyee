@@ -31,7 +31,7 @@ import (
 )
 
 //
-// Route manager name registered in scheduler
+// Constants
 //
 const (
 	RutMgrName = sch.DhtRutMgrName		// Route manager name registered in scheduler
@@ -155,7 +155,7 @@ func (rutMgr *RutMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 }
 
 //
-// Discover manager entry
+// Route manager entry
 //
 func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
@@ -611,7 +611,7 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 	}
 
 	if li.Len() == 0 {
-		log.LogCallerFileLine("split: empty bucket")
+		log.LogCallerFileLine("split: can't split an empty bucket")
 		return DhtEnoParameter
 	}
 

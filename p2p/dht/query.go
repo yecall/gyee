@@ -21,16 +21,58 @@
 package dht
 
 import (
+	"time"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	config "github.com/yeeco/gyee/p2p/config"
+	log "github.com/yeeco/gyee/p2p/logger"
 )
 
-const QryMgrName = sch.DhtQryMgrName
+//
+// Constants
+//
+const (
+	QryMgrName = sch.DhtQryMgrName		// query manage name registered in shceduler
+	qryMgrMaxActInsts = 4				// max concurrent actived instances for one query
+	qryMgrQryExpired = time.Second * 16	// duration to get expired for a query
+)
 
+
+//
+// Query control block
+//
+type qryCtrlBlock struct {
+	target		config.NodeID							// target is looking up
+	qryHist		map[config.NodeID]*rutMgrBucketNode		// history peers had been queried
+	qryPending	map[config.NodeID]*rutMgrBucketNode		// pending peers to be queried
+	qryActived	map[config.NodeID]*qryInstCtrlBlock		// queries activated
+}
+
+//
+// Query instance control block
+//
+type qryInstCtrlBlock struct {
+	sdl			*sch.Scheduler		// pointer to scheduler
+	name		string				// instance name
+	ptnInst		interface{}			// pointer to query instance task node
+	target		config.NodeID		// target is looking up
+	to			rutMgrBucketNode	// to whom the query message sent
+	qTid		int					// query timer identity
+	begTime		time.Time			// query begin time
+	endTime		time.Time			// query end time
+}
+
+//
+// Query manager
+//
 type QryMgr struct {
-	sdl		*sch.Scheduler		// pointer to scheduler
-	name	string				// my name
-	tep		sch.SchUserTaskEp	// task entry
-	ptnMe	interface{}			// pointer to task node of myself
+	sdl			*sch.Scheduler					// pointer to scheduler
+	name		string							// query manager name
+	tep			sch.SchUserTaskEp				// task entry
+	ptnMe		interface{}						// pointer to task node of myself
+	ptnRutMgr	interface{}						// pointer to task node of route manager
+	ptnDhtMgr	interface{}						// pointer to task node of dht manager
+	instSeq		int								// query instance sequence number
+	qcbTab		map[config.NodeID]*qryCtrlBlock	// query control blocks
 }
 
 //
@@ -39,10 +81,14 @@ type QryMgr struct {
 func NewQryMgr() *QryMgr {
 
 	qryMgr := QryMgr{
-		sdl:	nil,
-		name:	QryMgrName,
-		tep:	nil,
-		ptnMe:	nil,
+		sdl:		nil,
+		name:		QryMgrName,
+		tep:		nil,
+		ptnMe:		nil,
+		ptnRutMgr:	nil,
+		ptnDhtMgr:	nil,
+		instSeq:	0,
+		qcbTab:		map[config.NodeID]*qryCtrlBlock{},
 	}
 
 	qryMgr.tep = qryMgr.qryMgrProc
@@ -58,7 +104,7 @@ func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 }
 
 //
-// Discover manager entry
+// Query manager entry
 //
 func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
@@ -88,6 +134,7 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = qryMgr.instStopRsp(msg.Body.(*sch.MsgDhtQryInstStopRsp))
 
 	default:
+		log.LogCallerFileLine("qryMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
