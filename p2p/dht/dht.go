@@ -40,6 +40,7 @@ const (
 	DhtEnoParameter
 	DhtEnoScheduler
 	DhtEnoNotFound
+	DhtEnoDuplicated
 	DhtEnoResource
 	DhtEnoUnknown
 )
@@ -91,7 +92,6 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtMgrGetProviderReq:
 	case sch.EvDhtMgrPutValueReq:
 	case sch.EvDhtMgrGetValueReq:
-	case sch.EvDhtRutMgrNearestRsp:
 	case sch.EvDhtQryMgrQueryStartRsp:
 	case sch.EvDhtQryMgrQueryStopRsp:
 	case sch.EvDhtQryMgrQueryResultInd:

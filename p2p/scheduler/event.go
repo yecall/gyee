@@ -337,7 +337,15 @@ type MsgDhtQryMgrQueryStartReq struct {
 }
 
 //
-// EvDhtQryMgrQueryStartReq
+// EvDhtQryMgrQueryStartRsp
+//
+type MsgDhtQryMgrQueryStartRsp struct {
+	Target	config.NodeID			// target node identity
+	Eno		int						// result code
+}
+
+//
+// EvDhtQryMgrQueryStopReq
 //
 type MsgDhtQryMgrQueryStopReq struct {
 	Target	config.NodeID			// target node identity
@@ -388,8 +396,8 @@ const (
 // EvDhtRutMgrNearestReq
 //
 type MsgDhtRutMgrNearestReq struct {
-	Max			int					// max items returned could be
 	Target		config.NodeID		// target peer identity
+	Max			int					// max items returned could be
 	NtfReq		bool				// ask for notification when route updated
 	Task		interface{}			// task who loves the notification
 }

@@ -159,6 +159,13 @@ func (rutMgr *RutMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("rutMgrProc: " +
+			"invalid parameters, ptn: %p, msg: %p",
+			ptn, msg)
+		return sch.SchEnoParameter
+	}
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -208,8 +215,8 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 		return eno
 	}
 
-	if dhtEno := rutMgr.getRouteConfig(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: getRouteConfig failed, dhtEno: %d", dhtEno)
+	if dhtEno := rutMgr.rutMgrGetRouteConfig(); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("poweron: rutMgrGetRouteConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -223,8 +230,8 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
-	if dhtEno := rutMgr.startBspTimer(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: startBspTimer failed, dhtEno: %d", dhtEno)
+	if dhtEno := rutMgr.rutMgrStartBspTimer(); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("poweron: rutMgrStartBspTimer failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -340,9 +347,10 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 //
 // Get route manager configuration
 //
-func (rutMgr *RutMgr)getRouteConfig() DhtErrno {
+func (rutMgr *RutMgr)rutMgrGetRouteConfig() DhtErrno {
 
-	rutCfg := config.P2pConfig4DhtRouteManager(RutMgrName)
+	cfgName := rutMgr.sdl.SchGetP2pCfgName()
+	rutCfg := config.P2pConfig4DhtRouteManager(cfgName)
 	rutMgr.localNodeId = rutCfg.NodeId
 	rutMgr.bpCfg.randomQryNum = rutCfg.RandomQryNum
 	rutMgr.bpCfg.period = rutCfg.Period
@@ -353,7 +361,7 @@ func (rutMgr *RutMgr)getRouteConfig() DhtErrno {
 //
 // Start bootstrap timer
 //
-func (rutMgr *RutMgr)startBspTimer() DhtErrno {
+func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 
 	var td = sch.TimerDescription {
 		Name:	"dhtRutBspTimer",
@@ -366,7 +374,7 @@ func (rutMgr *RutMgr)startBspTimer() DhtErrno {
 	if eno, tid := rutMgr.sdl.SchSetTimer(rutMgr.ptnMe, &td);
 	eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 
-		log.LogCallerFileLine("startBspTimer: " +
+		log.LogCallerFileLine("rutMgrStartBspTimer: " +
 			"SchSetTimer failed, eno: %d, tid: %d",
 			eno, tid)
 
@@ -379,7 +387,7 @@ func (rutMgr *RutMgr)startBspTimer() DhtErrno {
 //
 // Stop bootstrap timer
 //
-func (rutMgr *RutMgr)stopBspTimer() DhtErrno {
+func (rutMgr *RutMgr)rutMgrStopBspTimer() DhtErrno {
 
 	var dhtEno DhtErrno = DhtEnoNone
 

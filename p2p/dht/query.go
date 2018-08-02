@@ -40,8 +40,18 @@ const (
 //
 // Query control block
 //
+type QryStatus = int
+
+const (
+	qsNull		= iota		// null state
+	qsPrepare				// in preparing, waiting for the nearest response from route manager
+	qsInited				// had been initialized
+)
+
 type qryCtrlBlock struct {
+	ptnOwner	interface{}								// owner task node pointer
 	target		config.NodeID							// target is looking up
+	status		QryStatus								// query status
 	qryHist		map[config.NodeID]*rutMgrBucketNode		// history peers had been queried
 	qryPending	map[config.NodeID]*rutMgrBucketNode		// pending peers to be queried
 	qryActived	map[config.NodeID]*qryInstCtrlBlock		// queries activated
@@ -108,6 +118,13 @@ func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("qryMgrProc: " +
+			"invalid parameters, ptn: %p, msg: %p",
+			ptn, msg)
+		return sch.SchEnoParameter
+	}
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -119,7 +136,11 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = qryMgr.poweroff(ptn)
 
 	case sch.EvDhtQryMgrQueryStartReq:
-		eno = qryMgr.queryStartReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
+		sender := qryMgr.sdl.SchGetSender(msg)
+		eno = qryMgr.queryStartReq(sender, msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
+
+	case sch.EvDhtRutMgrNearestRsp:
+		eno = qryMgr.rutNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
 	case sch.EvDhtQryMgrQueryStopReq:
 		eno = qryMgr.queryStopReq(msg.Body.(*sch.MsgDhtQryMgrQueryStopReq))
@@ -145,6 +166,32 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 // Poweron handler
 //
 func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
+
+	var eno sch.SchErrno
+
+	qryMgr.ptnMe = ptn
+	if qryMgr.sdl = sch.SchGetScheduler(ptn); qryMgr.sdl == nil {
+		log.LogCallerFileLine("poweron: nil scheduler")
+		return sch.SchEnoInternal
+	}
+
+	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetTaskNodeByName(DhtMgrName);
+	eno != sch.SchEnoNone {
+		log.LogCallerFileLine("poweron: get task failed, task: %s", DhtMgrName)
+		return eno
+	}
+
+	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetTaskNodeByName(RutMgrName);
+	eno != sch.SchEnoNone {
+		log.LogCallerFileLine("poweron: get task failed, task: %s", RutMgrName)
+		return eno
+	}
+
+	if dhtEno := qryMgr.qryMgrGetConfig(); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("poweron: qryMgrGetConfig failed, dhtEno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -152,13 +199,72 @@ func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (qryMgr *QryMgr)poweroff(ptn interface{}) sch.SchErrno {
-	return sch.SchEnoNone
+
+	log.LogCallerFileLine("poweroff: task will be done ...")
+
+	po := sch.SchMessage{}
+
+	for _, qcb := range qryMgr.qcbTab {
+		for _, qry := range qcb.qryActived {
+			qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, qry.ptnInst, sch.EvSchPoweroff, nil)
+			qryMgr.sdl.SchSendMessage(&po)
+		}
+	}
+
+	return qryMgr.sdl.SchTaskDone(qryMgr.ptnMe, sch.SchEnoKilled)
 }
 
 //
 // Query start request handler
 //
-func (qryMgr *QryMgr)queryStartReq(msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
+func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
+
+	var target = msg.Target
+	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target:target, Eno:DhtEnoUnknown}
+	var qcb *qryCtrlBlock = nil
+	var schMsg = sch.SchMessage{}
+
+	var nearestReq = sch.MsgDhtRutMgrNearestReq{
+		Target:	target,
+		Max:	rutMgrMaxNearest,
+		NtfReq:	true,
+		Task:	qryMgr.ptnMe,
+	}
+
+	if _, dup := qryMgr.qcbTab[target]; dup {
+		rsp.Eno = DhtEnoDuplicated
+		goto _rsp2Sender
+	}
+
+	qcb = new(qryCtrlBlock)
+	qcb.ptnOwner = sender
+	qcb.target = target
+	qcb.status = qsNull
+	qcb.qryHist = make(map[config.NodeID]*rutMgrBucketNode, 0)
+	qcb.qryPending = make(map[config.NodeID]*rutMgrBucketNode, 0)
+	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, 0)
+
+	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
+	qryMgr.sdl.SchSendMessage(&schMsg)
+
+	rsp.Eno = DhtEnoNone
+
+_rsp2Sender:
+
+	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStartRsp, &rsp)
+	qryMgr.sdl.SchSendMessage(&schMsg)
+
+	if rsp.Eno != DhtEnoNone {
+		return sch.SchEnoUserTask
+	}
+
+	return sch.SchEnoNone
+}
+
+//
+// Nearest response handler
+//
+func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
@@ -188,4 +294,11 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 //
 func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 	return sch.SchEnoNone
+}
+
+//
+// Get query manager configuration
+//
+func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
+	return DhtEnoNone
 }
