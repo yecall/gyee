@@ -20,16 +20,25 @@
 
 package crypto
 
+/*
+test:
+1. key generate via ecdsa vs secp256k1
+2. sign&verify via ecdsa vs secp256k1
+   这儿的注意点：
+       ecdsa的签名，是有一个随机数k的，所以同样消息和私钥，每次签名的结果都是不一样的。如果随机数k重复使用，会泄露私钥
+       secp256k1曲线在这儿的签名实现中，采用rfc6979，同样消息和私钥签名的结果是一样的。
+3.
+*/
+
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"fmt"
 	"testing"
 
 	"github.com/yeeco/gyee/crypto/secp256k1"
-
-	"fmt"
-	"math/big"
-	"crypto/elliptic"
+	"github.com/yeeco/gyee/crypto/util"
 )
 
 func TestSig(t *testing.T) {
@@ -46,48 +55,18 @@ func TestNewKey(t *testing.T) {
 		fmt.Print(err)
 	}
 
-	pkey := paddedBigBytes(privateKeyECDSA.D, 32)
+	pkey := util.PaddedBigBytes(privateKeyECDSA.D, 32)
 	fmt.Println("private key:%v", pkey)
 
-	pubkeyx := paddedBigBytes(privateKeyECDSA.PublicKey.X, 32)
+	pubkeyx := util.PaddedBigBytes(privateKeyECDSA.PublicKey.X, 32)
 	fmt.Println("x:%v", pubkeyx)
 
-	pubkeyy := paddedBigBytes(privateKeyECDSA.PublicKey.Y, 32)
+	pubkeyy := util.PaddedBigBytes(privateKeyECDSA.PublicKey.Y, 32)
 	fmt.Println("y:%v", pubkeyy)
 
 	m := elliptic.Marshal(secp256k1.S256(), privateKeyECDSA.PublicKey.X, privateKeyECDSA.PublicKey.Y)
 	fmt.Println("m:%v", m)
 
 	pubkey, err := secp256k1.GetPublicKey(pkey)
-	fmt.Println( "public key:%v", pubkey)
-}
-
-
-// paddedBigBytes encodes a big integer as a big-endian byte slice.
-func paddedBigBytes(bigint *big.Int, n int) []byte {
-	if bigint.BitLen()/8 >= n {
-		return bigint.Bytes()
-	}
-	ret := make([]byte, n)
-	readBits(bigint, ret)
-	return ret
-}
-
-const (
-	// number of bits in a big.Word
-	wordBits = 32 << (uint64(^big.Word(0)) >> 63)
-	// number of bytes in a big.Word
-	wordBytes = wordBits / 8
-)
-
-// readBits encodes the absolute value of bigint as big-endian bytes.
-func readBits(bigint *big.Int, buf []byte) {
-	i := len(buf)
-	for _, d := range bigint.Bits() {
-		for j := 0; j < wordBytes && i > 0; j++ {
-			i--
-			buf[i] = byte(d)
-			d >>= 8
-		}
-	}
+	fmt.Println("public key:%v", pubkey)
 }

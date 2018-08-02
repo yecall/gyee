@@ -18,28 +18,36 @@
  *
  */
 
-package crypto
+package secp256k1
 
-import (
-	"bytes"
-	"encoding/hex"
-
-	"github.com/mr-tron/base58/base58"
-)
-
-type Hash []byte
-
-func (h Hash) Hex() string {
-	return hex.EncodeToString(h)
+type K1Key struct {
+	priKey  []byte
+	pubKey  []byte
 }
 
-func (h Hash) Base58() string {
-	return base58.Encode(h)
+func NewK1Key(privateKey, publicKey []byte) *K1Key{
+    return &K1Key{
+    	    priKey:privateKey,
+    	    pubKey:publicKey,
+	}
 }
 
-func (h Hash) Equals(b Hash) bool {
-	return bytes.Compare(h, b) == 0
+func GenerateK1Key() {
+
 }
+
+func (k *K1Key) PrivateKey() []byte {
+	return k.priKey
+}
+
+func (k *K1Key) PublicKey() []byte {
+	return k.pubKey
+}
+
+func (k *K1Key) Clear() {
+
+}
+
 
 
 

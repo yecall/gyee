@@ -18,28 +18,11 @@
  *
  */
 
-package crypto
+package keystore
 
-import (
-	"bytes"
-	"encoding/hex"
+type Key interface {
+	PublicKey() []byte
+	PrivateKey() []byte
+	Clear()
 
-	"github.com/mr-tron/base58/base58"
-)
-
-type Hash []byte
-
-func (h Hash) Hex() string {
-	return hex.EncodeToString(h)
 }
-
-func (h Hash) Base58() string {
-	return base58.Encode(h)
-}
-
-func (h Hash) Equals(b Hash) bool {
-	return bytes.Compare(h, b) == 0
-}
-
-
-
