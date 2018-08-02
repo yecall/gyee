@@ -641,13 +641,25 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 		el = elNext
 	}
 
+	//
+	// if size exceeded, remove some
+	//
+
 	for li.Len() > rt.bucketSize {
 		li.Remove(li.Back())
 	}
 
+	//
+	// append new bucket if necessary
+	//
+
 	if newLi.Len() != 0 {
 		rt.bucketTab = append(rt.bucketTab, newLi)
 	}
+
+	//
+	// recursive to split if necessary
+	//
 
 	if newLi.Len() > rt.bucketSize {
 		rt.split(newLi, dist + 1)
@@ -660,6 +672,7 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 // Register notifee
 //
 func (rutMgr *RutMgr)rutMgrNotifeeReg(
+
 	task	interface{},
 	id		*config.NodeID,
 	max		int,
@@ -809,6 +822,10 @@ _done:
 	if dhtEno != DhtEnoNone  {
 		return dhtEno, nil, nil
 	}
+
+	//
+	// sort
+	//
 
 	if len(nearest) > 0 {
 		rutMgrSortPeer(nearest, nearestDist)
