@@ -51,7 +51,7 @@ cipher：
 
 type AccountManager struct {
 	ks       *keystore.Keystore
-	accounts map[string]*Account
+	//accounts map[string]*Account
 }
 
 func NewAccountManager(config *config.Config) (*AccountManager, error) {
@@ -83,7 +83,16 @@ func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, er
 }
 
 func (am *AccountManager) Accounts() []*core.Address {
-	return nil
+	list := am.ks.List()
+	addrs := make([]*core.Address, len(list))
+	for i, item := range list {
+		addr, err := core.AddressParse(item)
+		if err != nil {
+			logging.Logger.Error("address parse:", err)
+		}
+		addrs[i] = addr
+	}
+	return addrs
 }
 
 func (am *AccountManager) ResetPassword(address *core.Address, oldPass []byte, newPass []byte) error {

@@ -19,6 +19,7 @@
  */
 
 package core
+
 /*
 The account address calculation formula is as follows:
 ```
@@ -37,10 +38,13 @@ The account address calculation formula is as follows:
 */
 
 import (
-	"github.com/yeeco/gyee/crypto"
-	"github.com/yeeco/gyee/crypto/secp256k1"
+	"bytes"
+	"encoding/hex"
+
 	"github.com/pkg/errors"
+	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/crypto/secp256k1"
 )
 
 type AddressType byte
@@ -51,17 +55,26 @@ const (
 )
 
 const (
-    AddressTypeIndex = 0
-    AddressTypeLength = 1
-    AddressNetworkIdIndex = 1
-    AddressNetworkIdLength = 1
-    AddressContentIndex = 2
-    AddressContentLength = 20
-    AddressChecksumIndex = 22
-    AddressChecksumLength = 4
-    AddressLength = AddressTypeLength + AddressNetworkIdLength + AddressContentLength + AddressChecksumLength
-    PublicKeyLength = secp256k1.PublicKeyLength
-    //TODO: 这个要从更通用的一个地方来定义
+	AddressTypeIndex       = 0
+	AddressTypeLength      = 1
+	AddressNetworkIdIndex  = 1
+	AddressNetworkIdLength = 1
+	AddressContentIndex    = 2
+	AddressContentLength   = 20
+	AddressChecksumIndex   = 22
+	AddressChecksumLength  = 4
+	AddressLength          = AddressTypeLength + AddressNetworkIdLength + AddressContentLength + AddressChecksumLength
+	PublicKeyLength        = secp256k1.PublicKeyLength
+	//TODO: 这个要从更通用的一个地方来定义
+
+	AddressStringLength = 52
+)
+
+var (
+	ErrInvalidAddress         = errors.New("address: invalid address")
+	ErrInvalidAddressFormat   = errors.New("address: invalid address format")
+	ErrInvalidAddressType     = errors.New("address: invalid address type")
+	ErrInvalidAddressChecksum = errors.New("address: invalid address checksum")
 )
 
 type Address struct {
@@ -73,29 +86,58 @@ func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {
 		return nil, errors.New("error public key length")
 	}
 	return newAddressFromPublicKey(AddressTypeAccount, pubkey)
-	return nil,nil
+	return nil, nil
 }
 
 func NewContractAddressFromData() (*Address, error) {
 	return nil, nil
 }
 
+// Bytes returns address bytes
+func (a *Address) Bytes() []byte {
+	return a.address
+}
+
+// String returns address string
 func (a *Address) String() string {
 	return a.address.Hex()
 }
 
+// AddressParse parse address string.
 func AddressParse(s string) (*Address, error) {
-	return nil, nil
+	if len(s) != AddressStringLength {
+		return nil, ErrInvalidAddressFormat
+	}
+	ab, err := hex.DecodeString(s)
+	if err != nil {
+		return nil, ErrInvalidAddressFormat
+	}
+	return AddressParseFromBytes(ab)
 }
 
-func AddressParseForBytes(b []byte) (*Address, error) {
-	return nil, nil
+// AddressParseFromBytes parse address from bytes.
+func AddressParseFromBytes(b []byte) (*Address, error) {
+	if len(b) != AddressLength || b[AddressNetworkIdIndex] != 0x05 { //TODO: network id
+		return nil, ErrInvalidAddressFormat
+	}
+
+	switch AddressType(b[AddressTypeIndex]) {
+	case AddressTypeAccount, AddressTypeContract:
+	default:
+		return nil, ErrInvalidAddressType
+	}
+
+	if !bytes.Equal(checkSum(b[:AddressChecksumIndex]), b[AddressChecksumIndex:]) {
+		return nil, ErrInvalidAddressChecksum
+	}
+
+	return &Address{address: b}, nil
 }
 
 func newAddressFromPublicKey(t AddressType, pubkey []byte) (*Address, error) {
 	buffer := make([]byte, AddressLength)
 	buffer[AddressTypeIndex] = byte(t)
-	buffer[AddressNetworkIdIndex] = 0x05  //TODO：这个要从其他地方取
+	buffer[AddressNetworkIdIndex] = 0x05 //TODO：这个要从其他地方取
 	sha := hash.Sha3256(pubkey)
 	content := hash.Ripemd160(sha)
 	copy(buffer[AddressContentIndex:AddressChecksumIndex], content)
