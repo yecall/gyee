@@ -80,7 +80,7 @@ func (k *Key) Clear() {
 }
 
 func privateKeyFromECDSA(ecdsaKey *ecdsa.PrivateKey) []byte {
-	return util.PaddedBigBytes(ecdsaKey.D, EcdsaPrivateKeyLength)
+	return util.PaddedBigBytes(ecdsaKey.D, PrivateKeyLength)
 }
 
 func publicKeyFromECDSA(ecdsaKey *ecdsa.PrivateKey) []byte {

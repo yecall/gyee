@@ -48,8 +48,9 @@ import (
 )
 
 const (
-	// EcdsaPrivateKeyLength private key length
-	EcdsaPrivateKeyLength = 32
+	// EcdsaPrivateKeyLength key length
+	PrivateKeyLength = 32
+	PublicKeyLength = 65
 )
 
 var context *C.secp256k1_context
@@ -79,7 +80,7 @@ func NewPrivateKey() []byte {
 	// in bitcoin src, they call SeckeyVerify func to verify the generated private key
 	// to make sure valid.
 	for {
-		priv = random.GetEntropyCSPRNG(EcdsaPrivateKeyLength)
+		priv = random.GetEntropyCSPRNG(PrivateKeyLength)
 		if PrivateKeyVerify(priv) {
 			break
 		}

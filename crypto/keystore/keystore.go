@@ -177,7 +177,7 @@ func (ks *Keystore) loadKeyFiles() {
 		logging.Logger.WithFields(logrus.Fields{
 			"dir": ks.ksDirPath,
 			"err": err,
-		}).Panic("")
+		}).Warn("")
 	}
 
 	ks.mu.Lock()
