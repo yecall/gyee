@@ -113,8 +113,6 @@ const MaxPeers = 16
 const MaxInbounds	= MaxPeers / 2 // +2
 const MaxOutbounds	= MaxPeers / 2 // +2
 
-
-
 //
 // Node
 //
@@ -126,14 +124,14 @@ var ZeroSubNet = SubNetworkID{0,0}			// zero sub network
 var AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
 
 type Node struct {
-	IP				net.IP			// ip address
-	UDP, TCP		uint16			// port numbers
-	ID				NodeID			// the node's public key
+	IP				net.IP					// ip address
+	UDP, TCP		uint16					// port numbers
+	ID				NodeID					// the node's public key
 }
 
 type Protocol struct {
-	Pid		uint32					// protocol identity
-	Ver		[4]byte					// protocol version: M.m0.m1.m2
+	Pid		uint32							// protocol identity
+	Ver		[4]byte							// protocol version: M.m0.m1.m2
 }
 
 //
@@ -141,8 +139,8 @@ type Protocol struct {
 //
 
 const (
-	P2pNetworkTypeDynamic	= 0			// neighbor discovering needed
-	P2pNetworkTypeStatic	= 1			// no discovering
+	P2pNetworkTypeDynamic	= 0				// neighbor discovering needed
+	P2pNetworkTypeStatic	= 1				// no discovering
 )
 
 type Config struct {
@@ -176,12 +174,12 @@ type Config struct {
 	SubNetMaxInBounds	map[SubNetworkID]int	// max concurrency inbounds
 	SubNetIdList		[]SubNetworkID			// sub network identity list. do not put the identity
 												// of the local node in this list.
-
 	//
 	// DHT application part
 	//
 
-	dhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
+	DhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
+	DhtQryCfg			Cfg4DhtQryManager		// for dht query manager
 }
 
 //
@@ -219,7 +217,6 @@ type Cfg4PeerListener struct {
 //
 // Configuration about peer manager
 //
-
 type Cfg4PeerManager struct {
 	CfgName				string					// p2p configuration name
 	NetworkType			int						// p2p network type
@@ -274,6 +271,15 @@ type Cfg4DhtRouteManager struct {
 	NodeId			NodeID			// local node identity
 	RandomQryNum	int				// times to try query for a random peer identity
 	Period			time.Duration	// timer period to fire a bootstrap
+}
+
+//
+// Configuration about dht query manager
+//
+type Cfg4DhtQryManager struct {
+	MaxActInsts    int           	// max concurrent actived instances for one query
+	QryExpired     time.Duration 	// duration to get expired for a query
+	QryInstExpired time.Duration 	// duration to get expired for a query instance
 }
 
 //
@@ -348,9 +354,15 @@ func P2pDefaultConfig() *Config {
 		// DHT application part
 		//
 
-		dhtRutCfg: Cfg4DhtRouteManager {
+		DhtRutCfg: Cfg4DhtRouteManager {
 			RandomQryNum:	1,
 			Period:			time.Minute * 1,
+		},
+
+		DhtQryCfg: Cfg4DhtQryManager {
+			MaxActInsts:	8,
+			QryExpired:		time.Second * 60,
+			QryInstExpired:	time.Second * 16,
 		},
 	}
 
@@ -908,8 +920,15 @@ func P2pConfig4Protocols(name string) *Cfg4Protocols {
 // Get configuration for dht route manager
 //
 func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
-	config[name].dhtRutCfg.NodeId = config[name].Local.ID
-	return &config[name].dhtRutCfg
+	config[name].DhtRutCfg.NodeId = config[name].Local.ID
+	return &config[name].DhtRutCfg
+}
+
+//
+// Get configuration for dht query manager
+//
+func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
+	return &config[name].DhtQryCfg
 }
 
 //

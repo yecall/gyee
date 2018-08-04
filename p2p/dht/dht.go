@@ -43,6 +43,7 @@ const (
 	DhtEnoDuplicated
 	DhtEnoResource
 	DhtEnoRoute
+	DhtEnoTimeout
 	DhtEnoUnknown
 )
 

@@ -33,10 +33,19 @@ import (
 //
 const (
 	QryMgrName = sch.DhtQryMgrName		// query manage name registered in shceduler
-	qryMgrMaxActInsts = 4				// max concurrent actived instances for one query
-	qryMgrQryExpired = time.Second * 16	// duration to get expired for a query
+	qryMgrMaxActInsts = 8				// max concurrent actived instances for one query
+	qryMgrQryExpired = time.Second * 60	// duration to get expired for a query
+	qryInstExpired = time.Second * 16	// duration to get expired for a query instance
 )
 
+//
+// Query manager configuration
+//
+type qryMgrCfg struct {
+	maxActInsts		int					// max concurrent actived instances for one query
+	qryExpired		time.Duration		// duration to get expired for a query
+	qryInstExpired	time.Duration		// duration to get expired for a query instance
+}
 
 //
 // Query control block status
@@ -74,6 +83,7 @@ type qryCtrlBlock struct {
 	qryPending	*list.List								// pending peers to be queried, with type qryPendingInfo
 	qryActived	map[config.NodeID]*qryInstCtrlBlock		// queries activated
 	qryResult	*list.List								// list of qryResultNodeInfo type object
+	qryTid		int										// query timer identity
 }
 
 //
@@ -102,12 +112,19 @@ type QryMgr struct {
 	ptnDhtMgr	interface{}						// pointer to task node of dht manager
 	instSeq		int								// query instance sequence number
 	qcbTab		map[config.NodeID]*qryCtrlBlock	// query control blocks
+	qmCfg		qryMgrCfg						// query manager configuration
 }
 
 //
 // Create query manager
 //
 func NewQryMgr() *QryMgr {
+
+	qmCfg := qryMgrCfg {
+		maxActInsts:	qryMgrMaxActInsts,
+		qryExpired:		qryMgrQryExpired,
+		qryInstExpired:	qryInstExpired,
+	}
 
 	qryMgr := QryMgr{
 		sdl:		nil,
@@ -118,6 +135,7 @@ func NewQryMgr() *QryMgr {
 		ptnDhtMgr:	nil,
 		instSeq:	0,
 		qcbTab:		map[config.NodeID]*qryCtrlBlock{},
+		qmCfg:		qmCfg,
 	}
 
 	qryMgr.tep = qryMgr.qryMgrProc
@@ -160,6 +178,10 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = qryMgr.rutNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
+
+	case sch.EvDhtQryMgrQcbTimer:
+		qcb := msg.Body.(*qryCtrlBlock)
+		eno = qryMgr.qcbTimerHandler(qcb)
 
 	case sch.EvDhtQryMgrQueryStopReq:
 		eno = qryMgr.queryStopReq(msg.Body.(*sch.MsgDhtQryMgrQueryStopReq))
@@ -261,7 +283,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.status = qsNull
 	qcb.qryHist = make(map[config.NodeID]*rutMgrBucketNode, 0)
 	qcb.qryPending = nil
-	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, 0)
+	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, qryMgr.qmCfg.maxActInsts)
 	qcb.qryResult = nil
 
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
@@ -318,8 +340,15 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		qryMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	qryOk2Sender := func() {
-
+	qryOk2Sender := func(peer *config.Node) {
+		var schMsg = sch.SchMessage{}
+		var ind = sch.MsgDhtQryMgrQueryResultInd{
+			Eno:	DhtEnoNone,
+			Target:	target,
+			Peers:	[]*config.Node{peer},
+		}
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
+		qryMgr.sdl.SchSendMessage(&schMsg)
 	}
 
 	if msg.Eno != DhtEnoNone {
@@ -342,7 +371,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	for idx, peer := range peers {
 
 		if peer.node.ID == target {
-			qryOk2Sender()
+			qryOk2Sender(&peer.node)
 			qryMgr.qryMgrDelQcb(target)
 			return sch.SchEnoNone
 		}
@@ -361,10 +390,15 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	// pending nodes to be activated.
 	//
 
-	if dhtEno = qryMgr.qryMgrQcbPutPending(qcb, peers); dhtEno == DhtEnoNone {
+	qcb.qryPending = list.New()
+	qcb.qryResult = list.New()
+
+	if dhtEno = qcb.qryMgrQcbPutPending(peers); dhtEno == DhtEnoNone {
 		if dhtEno = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
-			qcb.status = qsInited
-			return sch.SchEnoNone
+			if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
+				qcb.status = qsInited
+				return sch.SchEnoNone
+			}
 		}
 	}
 
@@ -407,6 +441,14 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 // Get query manager configuration
 //
 func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
+
+	cfg := config.P2pConfig4DhtQryManager(qryMgr.sdl.SchGetP2pCfgName())
+
+	qmCfg := &qryMgr.qmCfg
+	qmCfg.maxActInsts = cfg.MaxActInsts
+	qmCfg.qryExpired = cfg.QryExpired
+	qmCfg.qryInstExpired = cfg.QryInstExpired
+
 	return DhtEnoNone
 }
 
@@ -414,6 +456,25 @@ func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
 // Delete query control blcok from manager
 //
 func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID) DhtErrno {
+
+	qcb, ok := qryMgr.qcbTab[target]
+	if !ok { return DhtEnoNotFound }
+
+	if qcb.status != qsInited {
+		delete(qryMgr.qcbTab, target)
+		return DhtEnoNone
+	}
+
+	if qcb.qryTid != sch.SchInvalidTid {
+		qryMgr.sdl.SchKillTimer(qryMgr.ptnMe, qcb.qryTid)
+		qcb.qryTid = sch.SchInvalidTid
+	}
+
+	for _, qicb := range qcb.qryActived {
+		qryMgr.sdl.SchTaskDone(qicb.ptnInst, sch.SchEnoKilled)
+	}
+
+	delete(qryMgr.qcbTab, target)
 	return DhtEnoNone
 }
 
@@ -421,19 +482,116 @@ func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID) DhtErrno {
 // Update query result info of query control block
 //
 func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
+
+	li := qcb.qryResult
+
+	for el := li.Front(); el != nil; el = el.Next() {
+		v := el.Value.(*qryResultInfo)
+		if qri.dist < v.dist {
+			li.InsertBefore(qri, el)
+			return DhtEnoNone
+		}
+	}
+
+	li.PushBack(qri)
+
 	return DhtEnoNone
 }
 
 //
 // Put node to pending queue
 //
-func (qryMgr *QryMgr)qryMgrQcbPutPending(qcb *qryCtrlBlock, nodes []*qryPendingInfo) DhtErrno {
+func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo) DhtErrno {
+
+	li := qcb.qryPending
+
+	for _, n := range nodes {
+		for el := li.Front(); el != nil; el = el.Next() {
+			v := el.Value.(*qryPendingInfo)
+			if n.dist < v.dist {
+				li.InsertBefore(n, el)
+				break
+			}
+		}
+		li.PushBack(n)
+	}
+
 	return DhtEnoNone
 }
 
 //
 // Put node to actived queue and start query to the node
 //
-func (QryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) DhtErrno {
+func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Start timer for query control block
+//
+func (qryMgr *QryMgr)qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
+
+	var td = sch.TimerDescription {
+		Name:	"dhtQyrMgrQcbTimer",
+		Utid:	sch.DhtQryMgrQcbTimerId,
+		Tmt:	sch.SchTmTypeAbsolute,
+		Dur:	qryMgr.qmCfg.qryExpired,
+		Extra:	qcb,
+	}
+
+	tid := sch.SchInvalidTid
+	eno := sch.SchEnoUnknown
+
+	if eno, tid = qryMgr.sdl.SchSetTimer(qryMgr.ptnMe, &td);
+		eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
+		log.LogCallerFileLine("qryMgrQcbStartTimer: SchSetTimer failed, eno: %d", eno)
+		return DhtEnoScheduler
+	}
+
+	qcb.qryTid = tid
+
+	return DhtEnoNone
+}
+
+//
+// Query control block timer handler
+//
+func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
+
+	if qcb == nil {
+		return sch.SchEnoParameter
+	}
+
+	qryMgr.qryMgrResultReport(qcb)
+	qryMgr.qryMgrDelQcb(qcb.target)
+
+	return sch.SchEnoNone
+}
+
+//
+// Query result report
+//
+func (qryMgr *QryMgr)qryMgrResultReport(qcb *qryCtrlBlock) DhtErrno {
+
+	var msg = sch.SchMessage{}
+	var ind = sch.MsgDhtQryMgrQueryResultInd{
+		Eno:	DhtEnoTimeout,
+		Target:	qcb.target,
+		Peers:	nil,
+	}
+
+	li := qcb.qryResult
+	if li.Len() > 0 {
+		idx := 0
+		ind.Peers = make([]*config.Node, li.Len())
+		for el := li.Front(); el != nil; el = el.Next() {
+			v := el.Value.(*qryResultInfo)
+			ind.Peers[idx] = &v.node
+		}
+	}
+
+	qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
+	qryMgr.sdl.SchSendMessage(&msg)
+
 	return DhtEnoNone
 }

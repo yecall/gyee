@@ -320,8 +320,12 @@ const (
 //
 // DHT query manager event
 //
+const DhtQryMgrQcbTimerId	= 0
+const DhtQryMgrIcbTimerId	= 1
 const (
 	EvDhtQryMgrBase				= 2300
+	EvDhtQryMgrQcbTimer			= EvTimerBase + DhtQryMgrQcbTimerId
+	EvDhtQryMgrIcbTimer			= EvTimerBase + DhtQryMgrIcbTimerId
 	EvDhtQryMgrQueryStartReq	= EvDhtQryMgrBase + 1
 	EvDhtQryMgrQueryStartRsp	= EvDhtQryMgrBase + 2
 	EvDhtQryMgrQueryStopReq		= EvDhtQryMgrBase + 3
@@ -350,6 +354,16 @@ type MsgDhtQryMgrQueryStartRsp struct {
 type MsgDhtQryMgrQueryStopReq struct {
 	Target	config.NodeID			// target node identity
 }
+
+//
+// EvDhtQryMgrQueryResultInd
+//
+type MsgDhtQryMgrQueryResultInd struct {
+	Eno		int							// result code. notice: when timeout, closests reported
+	Target	config.NodeID				// target to be looked up
+	Peers	[]*config.Node				// peers list, if target got, it always be the first one
+}
+
 
 //
 // DHT query instance event
