@@ -21,5 +21,4 @@
 package yvm
 
 type YVM interface {
-
 }

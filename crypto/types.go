@@ -40,6 +40,3 @@ func (h Hash) Base58() string {
 func (h Hash) Equals(b Hash) bool {
 	return bytes.Compare(h, b) == 0
 }
-
-
-

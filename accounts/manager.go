@@ -20,7 +20,16 @@
 
 package accounts
 
-import "github.com/yeeco/gyee/core"
+import (
+	"path/filepath"
+
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/crypto/keystore"
+	"github.com/yeeco/gyee/crypto/secp256k1"
+	"github.com/yeeco/gyee/utils/logging"
+)
+
 /*
 account manager的功能分类：
 1、支持console和ipc的账户功能，create、list、reset、delete等
@@ -38,13 +47,17 @@ cipher：
 1、scrypt
 2、argon2
 3、balloon hashing?
- */
+*/
 
 type AccountManager struct {
+	ks       *keystore.Keystore
 	accounts map[string]*Account
 }
 
-func NewAccountManager() *AccountManager {
+func NewAccountManager(config *config.Config) (*AccountManager, error) {
+	am := &AccountManager{}
+	keydir := filepath.Join(config.DataDir, "keystore")
+	am.ks = keystore.NewKeystore(keydir)
 	//accounts := Accounts{}
 	//accounts.Accounts = make(map[string]*Account)
 	//err := accounts.LoadFromFile()
@@ -52,14 +65,24 @@ func NewAccountManager() *AccountManager {
 	//	log.Println(err)
 	//}
 	//return &accounts
-	return nil
+	return am, nil
 }
 
-func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, error){
-	return nil, nil
+func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, error) {
+    var key keystore.Key
+    key = secp256k1.GenerateKey()
+    address, err := core.NewAddressFromPublicKey(key.PublicKey())
+    if err != nil {
+    	logging.Logger.Panic("failed create account:", err)
+	}
+    err = am.ks.SetKey(address.String(), key.PrivateKey(), passphrase)
+	if err != nil {
+		logging.Logger.Panic("failed create account:", err)
+	}
+	return address, nil
 }
 
-func (am *AccountManager) Accounts() []*core.Address{
+func (am *AccountManager) Accounts() []*core.Address {
 	return nil
 }
 

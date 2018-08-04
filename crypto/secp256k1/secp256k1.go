@@ -42,8 +42,14 @@ import "C"
 
 import (
 	"errors"
+	"github.com/yeeco/gyee/crypto/random"
 	"math/big"
 	"unsafe"
+)
+
+const (
+	// EcdsaPrivateKeyLength private key length
+	EcdsaPrivateKeyLength = 32
 )
 
 var context *C.secp256k1_context
@@ -66,11 +72,30 @@ var (
 	ErrGetPublicKeyFailed  = errors.New("private key to public failed")
 )
 
+// NewPrikey generate a ecdsa private key by secp256k1
+func NewPrivateKey() []byte {
+	var priv []byte
 
-func GetPublicKey(seckey []byte) ([]byte, error) {
+	// in bitcoin src, they call SeckeyVerify func to verify the generated private key
+	// to make sure valid.
+	for {
+		priv = random.GetEntropyCSPRNG(EcdsaPrivateKeyLength)
+		if PrivateKeyVerify(priv) {
+			break
+		}
+	}
+	return priv
+}
+
+// PrikeyVerify check private is ok for secp256k1
+func PrivateKeyVerify(prikey []byte) bool {
+	return C.secp256k1_ec_seckey_verify(context, cBuf(prikey)) == 1
+}
+
+func GetPublicKey(prikey []byte) ([]byte, error) {
 
 	var pubkey C.secp256k1_pubkey
-	result := int(C.secp256k1_ec_pubkey_create(context, &pubkey, cBuf(seckey)))
+	result := int(C.secp256k1_ec_pubkey_create(context, &pubkey, cBuf(prikey)))
 	if result != 1 {
 		return nil, ErrGetPublicKeyFailed
 	}

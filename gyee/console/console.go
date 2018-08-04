@@ -23,14 +23,14 @@ package console
 import (
 	"io"
 
-	"strings"
-	"fmt"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/peterh/liner"
+	"github.com/yeeco/gyee/res"
 	"os"
 	"os/signal"
-	"github.com/yeeco/gyee/res"
+	"strings"
 )
 
 const (
@@ -48,18 +48,17 @@ type Console struct {
 	history  []string
 	bridge   *jsBridge
 	jsre     *JSRE
-	writer  io.Writer
+	writer   io.Writer
 }
-
 
 // New a console by Config, neb.config params is need
 func NewConsole() *Console {
 	c := Console{
 		prompter: Stdin,
 		promptCh: make(chan string),
-		writer: os.Stdout,
+		writer:   os.Stdout,
 	}
-	
+
 	c.bridge = newBridge("", c.prompter, c.writer)
 	c.jsre = newJSRE()
 

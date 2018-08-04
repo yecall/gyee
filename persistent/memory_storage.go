@@ -69,6 +69,6 @@ func (db *MemoryStorage) Flush() error {
 func (db *MemoryStorage) DisableBatch() {
 }
 
-func (db *MemoryStorage) Close() error{
+func (db *MemoryStorage) Close() error {
 	return nil
 }

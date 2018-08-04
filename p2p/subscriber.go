@@ -21,13 +21,12 @@
 package p2p
 
 type Subscriber struct {
-	ID interface{}
+	ID      interface{}
 	MsgChan chan Message
 	MsgType string
 }
 
-
-func NewSubscriber(id interface{}, msgChan chan Message, msgType string ) *Subscriber {
+func NewSubscriber(id interface{}, msgChan chan Message, msgType string) *Subscriber {
 	return &Subscriber{
 		id,
 		msgChan,

@@ -21,10 +21,10 @@
 package cipher
 
 import (
-	"testing"
-	"reflect"
 	"encoding/hex"
 	"fmt"
+	"reflect"
+	"testing"
 )
 
 func Test_Cipher_Scrypt(t *testing.T) {
@@ -32,7 +32,7 @@ func Test_Cipher_Scrypt(t *testing.T) {
 	data, _ := hex.DecodeString("0eb3be2db3a534c192be5570c6c42f590eb3be2db3a534c192be5570c6c42f59")
 	var cipher Cipher
 	cipher = NewScrypt()
-	got, err := cipher.EncryptKey("address00000",data, passphrase)
+	got, err := cipher.EncryptKey("address00000", data, passphrase)
 	if err != nil {
 		t.Errorf("Encrypt() error, %v", err)
 		return
@@ -55,7 +55,7 @@ func Test_Cipher_Argon2(t *testing.T) {
 	data, _ := hex.DecodeString("0eb3be2db3a534c192be5570c6c42f590eb3be2db3a534c192be5570c6c42f59")
 	var cipher Cipher
 	cipher = NewArgon2()
-	got, err := cipher.EncryptKey("address00000",data, passphrase)
+	got, err := cipher.EncryptKey("address00000", data, passphrase)
 	if err != nil {
 		t.Errorf("Encrypt() error, %v", err)
 		return
@@ -78,7 +78,7 @@ func Test_Cipher_Balloon(t *testing.T) {
 	data, _ := hex.DecodeString("0eb3be2db3a534c192be5570c6c42f590eb3be2db3a534c192be5570c6c42f59")
 	var cipher Cipher
 	cipher = NewBalloon()
-	got, err := cipher.EncryptKey("address00000",data, passphrase)
+	got, err := cipher.EncryptKey("address00000", data, passphrase)
 	if err != nil {
 		t.Errorf("Encrypt() error, %v", err)
 		return

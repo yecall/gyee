@@ -39,10 +39,10 @@ type InmemService struct {
 	wg     sync.WaitGroup
 
 	//用于模拟收发消息的延迟和丢失
-	outDelay  int  //ms
-	outMiss   int  //0-100
-	inDelay   int
-	inMiss    int
+	outDelay int //ms
+	outMiss  int //0-100
+	inDelay  int
+	inMiss   int
 }
 
 func NewInmemService() (*InmemService, error) {
@@ -51,10 +51,10 @@ func NewInmemService() (*InmemService, error) {
 		hub:              GetInmemHub(),
 		receiveMessageCh: make(chan Message),
 		quitCh:           make(chan struct{}),
-		outDelay: 500,
-		outMiss: 10,
-		inDelay: 100,
-		inMiss: 0,
+		outDelay:         500,
+		outMiss:          10,
+		inDelay:          100,
+		inMiss:           0,
 	}
 	return is, nil
 }
@@ -138,7 +138,7 @@ func (is *InmemService) DhtSetValue(key []byte, value []byte) error {
 //模拟消息的延迟，丢失，dht检索
 type InmemHub struct {
 	nodes map[*InmemService]bool
-	dht  map[string][]byte
+	dht   map[string][]byte
 }
 
 var instance *InmemHub

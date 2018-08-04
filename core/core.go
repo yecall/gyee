@@ -44,10 +44,10 @@ import (
 
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus/tetris"
-	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/core/yvm"
-	"github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/p2p"
+	"github.com/yeeco/gyee/persistent"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Core struct {
@@ -59,15 +59,15 @@ type Core struct {
 	blockChain     *BlockChain
 	yvm            yvm.YVM
 
-	subscriber     *p2p.Subscriber
+	subscriber *p2p.Subscriber
 
-	lock           sync.RWMutex
-	quitCh         chan struct{}
-	wg             sync.WaitGroup
+	lock   sync.RWMutex
+	quitCh chan struct{}
+	wg     sync.WaitGroup
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
-    logging.Logger.Info("Create new core")
+	logging.Logger.Info("Create new core")
 	core := &Core{
 		node:   node,
 		config: conf,
@@ -85,8 +85,8 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 func (c *Core) Start() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-    logging.Logger.Info("Core Start...")
-    c.blockChain.Start()
+	logging.Logger.Info("Core Start...")
+	c.blockChain.Start()
 
 	//如果开启挖矿
 	if true {
@@ -132,14 +132,15 @@ func (c *Core) loop() {
 	logging.Logger.Info("Core loop...")
 	for {
 		select {
-		case <- c.quitCh:
+		case <-c.quitCh:
 			logging.Logger.Info("Core loop end.")
 			return
-		case <- c.tetrisOutputCh:
+		case <-c.tetrisOutputCh:
 		case msg := <-c.subscriber.MsgChan:
 			logging.Logger.Info("core receive ", msg.MsgType, " ", msg.From)
 		}
 
 	}
 }
+
 // implements of interface

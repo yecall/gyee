@@ -23,6 +23,6 @@ package core
 import "github.com/yeeco/gyee/p2p"
 
 type INode interface {
-    NodeID() string
-    P2pService() p2p.Service
+	NodeID() string
+	P2pService() p2p.Service
 }

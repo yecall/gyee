@@ -22,8 +22,8 @@ package version
 
 import (
 	"fmt"
-	"runtime"
 	"os"
+	"runtime"
 )
 
 const Maj = "0"

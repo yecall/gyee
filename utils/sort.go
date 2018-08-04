@@ -22,8 +22,8 @@ package utils
 
 import (
 	"bytes"
-	"sort"
 	"github.com/yeeco/gyee/utils/logging"
+	"sort"
 )
 
 // implement `Interface` in sort package.

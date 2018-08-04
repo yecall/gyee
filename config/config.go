@@ -29,8 +29,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/urfave/cli"
-	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/res"
+	"github.com/yeeco/gyee/utils"
 )
 
 type Config struct {

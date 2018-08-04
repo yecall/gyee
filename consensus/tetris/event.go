@@ -21,12 +21,12 @@
 package tetris
 
 import (
-	"fmt"
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"github.com/yeeco/gyee/utils/logging"
 	"time"
-	"crypto/sha256"
 )
 
 const ROUND_UNDECIDED = -1
@@ -43,7 +43,7 @@ type EventBody struct {
 }
 
 type Event struct {
-	Body      EventBody
+	Body EventBody
 
 	//fields for hash & signature
 	hash      []byte
@@ -51,13 +51,13 @@ type Event struct {
 	signature string
 
 	//fields for consensus computing
-	know      map[uint] uint64
-	parents   map[uint] *Event
-	ready     bool   //event is ready if all of it's self-parent events has existed and ready
-	round     int    //event's round number
-	witness   bool
-	vote      int
-	famous    int
+	know    map[uint]uint64
+	parents map[uint]*Event
+	ready   bool //event is ready if all of it's self-parent events has existed and ready
+	round   int  //event's round number
+	witness bool
+	vote    int
+	famous  int
 }
 
 func NewEvent(height uint64, member uint, sequenceNumber uint64) Event {
@@ -69,14 +69,14 @@ func NewEvent(height uint64, member uint, sequenceNumber uint64) Event {
 	}
 
 	event := Event{
-		Body: body,
-		know: make(map[uint]uint64),
-		parents: make(map[uint] *Event),
-		ready: false,
-		round: ROUND_UNDECIDED,
+		Body:    body,
+		know:    make(map[uint]uint64),
+		parents: make(map[uint]*Event),
+		ready:   false,
+		round:   ROUND_UNDECIDED,
 		witness: false,
-		vote: 0,
-		famous: FAMOUS_UNDECIDED,
+		vote:    0,
+		famous:  FAMOUS_UNDECIDED,
 	}
 
 	event.know[member] = sequenceNumber
@@ -103,7 +103,7 @@ func (e *Event) Hash() []byte {
 		e.hash = h[:]
 	}
 
-    return e.hash
+	return e.hash
 }
 
 func (e *Event) totalTxAndEvent() int {
@@ -153,7 +153,7 @@ func (e *Event) setAppendE() {
 
 }
 
-func (e *Event)updateKnow(event *Event){
+func (e *Event) updateKnow(event *Event) {
 	e.know[e.Body.M] = e.Body.N
 	if event != nil {
 		for key, value := range event.know {

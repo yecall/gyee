@@ -22,15 +22,29 @@ package core
 
 import "github.com/yeeco/gyee/crypto"
 
-type Address struct{
+type Address struct {
 	address crypto.Hash
+}
+
+func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {
+	return nil,nil
+}
+
+func NewContractAddressFromData() (*Address, error) {
+	return nil, nil
 }
 
 func (a *Address) String() string {
 	return ""
 }
 
-
 func AddressParse(s string) (*Address, error) {
 	return nil, nil
 }
+
+func AddressParseForBytes(b []byte) (*Address, error) {
+	return nil, nil
+}
+
+
+//TODO:

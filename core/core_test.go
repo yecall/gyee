@@ -19,4 +19,3 @@
  */
 
 package core
-

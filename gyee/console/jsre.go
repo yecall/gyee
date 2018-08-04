@@ -22,8 +22,8 @@ package console
 
 import (
 	"github.com/robertkrimen/otto"
-	"strings"
 	"sort"
+	"strings"
 )
 
 // JSRE javascript runtime environment

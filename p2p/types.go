@@ -20,16 +20,14 @@
 
 package p2p
 
-
 const (
-    MessageTypeTx = "tx"
-    MessageTypeEvent = "ev"
-    MessageTypeBlock = "blk"
+	MessageTypeTx    = "tx"
+	MessageTypeEvent = "ev"
+	MessageTypeBlock = "blk"
 )
 
 type Message struct {
-	MsgType  string
-	From     string
-	Data     []byte
+	MsgType string
+	From    string
+	Data    []byte
 }
-

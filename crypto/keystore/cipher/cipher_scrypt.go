@@ -25,7 +25,6 @@ import (
 	"crypto/cipher"
 	"encoding/hex"
 
-
 	"bytes"
 	"encoding/json"
 
@@ -73,9 +72,9 @@ type Scrypt struct {
 
 func NewScrypt() *Scrypt {
 	s := &Scrypt{
-		N:StandardScryptN,
-		R:StandardScryptR,
-		P:StandardScryptP,
+		N: StandardScryptN,
+		R: StandardScryptR,
+		P: StandardScryptP,
 	}
 	return s
 }

@@ -63,7 +63,6 @@ func NewKeystore(dirPath string) *Keystore {
 	ks := &Keystore{
 		ksDirPath: dirPath,
 		cipher:    cipher.NewScrypt(),
-		//entries:   make(map[string][]byte),
 	}
 	//load from file dir
 	ks.loadKeyFiles()
@@ -199,7 +198,7 @@ func (ks *Keystore) loadKeyFiles() {
 			logging.Logger.WithFields(logrus.Fields{
 				"file": filename,
 				"err":  err,
-			}).Error("Failed to read the key file")
+			}).Warn("Failed to read the key file")
 			continue
 		}
 
@@ -209,7 +208,7 @@ func (ks *Keystore) loadKeyFiles() {
 			logging.Logger.WithFields(logrus.Fields{
 				"file": filename,
 				"err":  err,
-			}).Error("Not correct key file content")
+			}).Warn("Not correct key file content")
 			continue
 		} else {
 			_, err := core.AddressParse(keyJSON.Address)

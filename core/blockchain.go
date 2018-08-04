@@ -32,7 +32,7 @@ type BlockChain struct {
 	genesis *Block
 
 	blockPool *BlockPool
-	txPool *TransactionPool
+	txPool    *TransactionPool
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -52,11 +52,11 @@ func NewBlockChain(core *Core) (*BlockChain, error) {
 	}
 
 	bc := &BlockChain{
-		core:    core,
-		chainID: 0,
+		core:      core,
+		chainID:   0,
 		blockPool: bp,
-		txPool:tp,
-		quitCh: make(chan struct{}),
+		txPool:    tp,
+		quitCh:    make(chan struct{}),
 	}
 	return bc, nil
 }

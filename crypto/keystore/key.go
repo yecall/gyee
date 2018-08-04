@@ -24,5 +24,4 @@ type Key interface {
 	PublicKey() []byte
 	PrivateKey() []byte
 	Clear()
-
 }

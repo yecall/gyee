@@ -21,8 +21,8 @@
 package util
 
 import (
-	"math/big"
 	"crypto/ecdsa"
+	"math/big"
 )
 
 // zeroKey zeroes a private key in memory.

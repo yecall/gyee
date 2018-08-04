@@ -24,4 +24,3 @@ type RPCServer interface {
 	Start() error
 	Stop()
 }
-

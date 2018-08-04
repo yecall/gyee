@@ -27,20 +27,20 @@ import "github.com/yeeco/gyee/crypto"
  */
 
 type BlockHeader struct {
-    previousHash  crypto.Hash
-    stateRoot crypto.Hash
-    txsRoot crypto.Hash
-    eventsRoot crypto.Hash
+	previousHash crypto.Hash
+	stateRoot    crypto.Hash
+	txsRoot      crypto.Hash
+	eventsRoot   crypto.Hash
 }
 
-type BlockHeaderSignature struct{
-	Index  int
+type BlockHeaderSignature struct {
+	Index     int
 	Validator []byte
 	Signature string
-	Blooms []byte
+	Blooms    []byte
 }
 
 type Block struct {
-    header  *BlockHeader
-    signature *[]BlockHeaderSignature
+	header    *BlockHeader
+	signature *[]BlockHeaderSignature
 }

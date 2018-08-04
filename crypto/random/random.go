@@ -36,7 +36,6 @@ func GetEntropyCSPRNG(n int) []byte {
 	return buff
 }
 
-
 /*
 ！！！好的随机数是一切安全算法的根本！！！
 

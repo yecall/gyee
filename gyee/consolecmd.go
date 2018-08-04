@@ -38,10 +38,10 @@ var (
 
 func consoleStart(ctx *cli.Context) error {
 	//node := makeNode(ctx)
-    console := console.NewConsole()
-    console.Setup()
-    console.Interactive()
-    defer console.Stop()
+	console := console.NewConsole()
+	console.Setup()
+	console.Interactive()
+	defer console.Stop()
 
 	return nil
 }

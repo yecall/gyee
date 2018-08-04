@@ -35,4 +35,3 @@ type Storage interface {
 	Flush() error
 	Close() error
 }
-

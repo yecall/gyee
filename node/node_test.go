@@ -55,7 +55,6 @@ func TestNode(t *testing.T) {
 		nodes[i].p2p.BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: nodes[i].name})
 	}
 
-
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigc)

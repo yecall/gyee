@@ -23,7 +23,7 @@ package cipher
 /*
 reference from: https://github.com/nogoegst/balloon
 这个不是官方实现，只能用于测试目的
- */
+*/
 
 import (
 	"bytes"

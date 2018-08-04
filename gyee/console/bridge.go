@@ -51,7 +51,7 @@ type jsBridge struct {
 }
 
 // newBirdge create a new jsbridge with given prompter and writer
-func newBridge(/*config *nebletpb.Config*/host string, prompter UserPrompter, writer io.Writer) *jsBridge {
+func newBridge( /*config *nebletpb.Config*/ host string, prompter UserPrompter, writer io.Writer) *jsBridge {
 	bridge := &jsBridge{prompter: prompter, writer: writer}
 	//if config.GetRpc() != nil {
 	//	bridge.host = config.GetRpc().HttpListen[0]
@@ -59,7 +59,7 @@ func newBridge(/*config *nebletpb.Config*/host string, prompter UserPrompter, wr
 	//		bridge.host = "http://" + bridge.host
 	//	}
 	//} else {
-		bridge.host = "http://localhost:8685"
+	bridge.host = "http://localhost:8685"
 	//}
 	return bridge
 }

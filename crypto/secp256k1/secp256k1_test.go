@@ -43,7 +43,6 @@ func generateKeyPair() (pubkey, privkey []byte) {
 	return pubkey, paddedBigBytes(key.D, 32)
 }
 
-
 // paddedBigBytes encodes a big integer as a big-endian byte slice.
 func paddedBigBytes(bigint *big.Int, n int) []byte {
 	if bigint.BitLen()/8 >= n {

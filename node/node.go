@@ -57,7 +57,7 @@ import (
 )
 
 type Node struct {
-	name           string  //for test purpose
+	name           string //for test purpose
 	config         *config.Config
 	core           *core.Core
 	accountManager *accounts.AccountManager
@@ -83,6 +83,12 @@ func NewNode(conf *config.Config) (*Node, error) {
 	node := &Node{
 		config: conf,
 	}
+
+	am, err := accounts.NewAccountManager(conf)
+	if err != nil {
+		logging.Logger.Panic(err)
+	}
+	node.accountManager = am
 
 	p2p, err := p2p.NewInmemService()
 	if err != nil {
@@ -135,7 +141,7 @@ func (n *Node) Stop() error {
 }
 
 func (n *Node) WaitForShutdown() {
-    logging.Logger.Info("Node Wait for shutdown...")
+	logging.Logger.Info("Node Wait for shutdown...")
 	go func() {
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
@@ -214,19 +220,19 @@ func (n *Node) startIPC() error {
 }
 
 //get the node id of self
-func (n *Node) NodeID() string{
+func (n *Node) NodeID() string {
 	return "aaaa"
 }
 
-func (n *Node) NodeName() string{
+func (n *Node) NodeName() string {
 	return n.name
 }
 
-func (n *Node) AccountManager() *accounts.AccountManager{
-    return n.accountManager
+func (n *Node) AccountManager() *accounts.AccountManager {
+	return n.accountManager
 }
 
-func (n *Node) P2pService() p2p.Service{
+func (n *Node) P2pService() p2p.Service {
 	return n.p2p
 }
 
