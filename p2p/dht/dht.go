@@ -42,6 +42,7 @@ const (
 	DhtEnoNotFound
 	DhtEnoDuplicated
 	DhtEnoResource
+	DhtEnoRoute
 	DhtEnoUnknown
 )
 

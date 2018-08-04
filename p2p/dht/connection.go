@@ -24,8 +24,24 @@ import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
+//
+// Connection manager name registered in scheduler
+//
 const ConMgrName = sch.DhtConMgrName
 
+//
+// Peer connection status
+//
+type conMgrPeerConnStat int
+
+const (
+	pcsConnNo	= iota			// not connected
+	pcsConnYes					// connected
+)
+
+//
+// Connection manager
+//
 type ConMgr struct {
 	name	string				// my name
 	tep		sch.SchUserTaskEp	// task entry
@@ -73,6 +89,7 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtConInstMsgInd:
 	case sch.EvDhtConInstStatusInd:
 	case sch.EvDhtConInstCloseRsp:
+	case sch.EvDhtRutPeerRemovedInd:
 	default:
 		eno = sch.SchEnoParameter
 	}

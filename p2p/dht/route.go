@@ -102,6 +102,7 @@ type RutMgr struct {
 	tep				sch.SchUserTaskEp						// task entry
 	ptnMe			interface{}								// pointer to task node of myself
 	ptnQryMgr		interface{}								// pointer to query manager task node
+	ptnConMgr		interface{}								// pointer to connection manager task node
 	bpCfg			bootstrapPolicy							// bootstrap policy configuration
 	bpTid			int										// bootstrap timer identity
 	distLookupTab	[]int									// log2 distance lookup table for a xor byte
@@ -134,6 +135,7 @@ func NewRutMgr() *RutMgr {
 		tep:			nil,
 		ptnMe:			nil,
 		ptnQryMgr:		nil,
+		ptnConMgr:		nil,
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
 		distLookupTab:	[]int{},
@@ -208,10 +210,16 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	rutMgr.ptnMe = ptn
 	rutMgr.sdl = sch.SchGetScheduler(ptn)
+
 	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetTaskNodeByName(QryMgrName)
-	
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
-		log.LogCallerFileLine("poweron: nil task node pointer")
+		log.LogCallerFileLine("poweron: nil task node pointer, task: %s", QryMgrName)
+		return eno
+	}
+
+	eno, rutMgr.ptnConMgr = rutMgr.sdl.SchGetTaskNodeByName(ConMgrName)
+	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
+		log.LogCallerFileLine("poweron: nil task node pointer, task: %s", ConMgrName)
 		return eno
 	}
 
@@ -325,7 +333,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		dist := rutMgr.rutMgrLog2Dist(&rt.shaLocal, hash)
 		dur := req.Duras[idx]
 
-		rt.rutMgrMetricSample(n.ID, dur)
+		rutMgr.rutMgrMetricSample(n.ID, dur)
 
 		bn := rutMgrBucketNode {
 			node:	n,
@@ -333,7 +341,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			dist:	dist,
 		}
 
-		rt.update(&bn, dist)
+		rutMgr.update(&bn, dist)
 	}
 
 	if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
@@ -464,11 +472,13 @@ func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
 //
 // Metric sample input
 //
-func (rt *rutMgrRouteTable) rutMgrMetricSample(id config.NodeID, latency time.Duration) DhtErrno {
+func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration) DhtErrno {
+
+	rt := &rutMgr.rutTab
 
 	if m, dup := rt.metricTab[id]; dup {
 		m.ltnSamples = append(m.ltnSamples, latency)
-		return rt.rutMgrMetricUpdate(id)
+		return rutMgr.rutMgrMetricUpdate(id)
 	}
 
 	rt.metricTab[id] = &rutMgrPeerMetric {
@@ -483,14 +493,15 @@ func (rt *rutMgrRouteTable) rutMgrMetricSample(id config.NodeID, latency time.Du
 //
 // Metric update EWMA about latency
 //
-func (rt *rutMgrRouteTable) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
+func (rutMgr *RutMgr) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
 	return DhtEnoNone
 }
 
 //
 // Metric get EWMA latency of peer
 //
-func (rt *rutMgrRouteTable) rutMgrMetricGetEWMA(id config.NodeID) (DhtErrno, time.Duration){
+func (rutMgr *RutMgr) rutMgrMetricGetEWMA(id config.NodeID) (DhtErrno, time.Duration){
+	rt := &rutMgr.rutTab
 	mt := rt.metricTab
 	if m, ok := mt[id]; ok {
 		return DhtEnoNone, m.ewma
@@ -546,13 +557,15 @@ func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
 func (rutMgr *RutMgr)rutMgrFind(id config.NodeID) (DhtErrno, *list.Element) {
 	hash := rutMgrNodeId2Hash(id)
 	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
-	return rutMgr.rutTab.find(id, dist)
+	return rutMgr.find(id, dist)
 }
 
 //
 // Lookup node in buckets
 //
-func (rt *rutMgrRouteTable)find(id config.NodeID, dist int) (DhtErrno, *list.Element) {
+func (rutMgr *RutMgr)find(id config.NodeID, dist int) (DhtErrno, *list.Element) {
+
+	rt := &rutMgr.rutTab
 
 	if dist >= len(rt.bucketTab) {
 		return DhtEnoNotFound, nil
@@ -571,7 +584,9 @@ func (rt *rutMgrRouteTable)find(id config.NodeID, dist int) (DhtErrno, *list.Ele
 //
 // Update route table
 //
-func (rt *rutMgrRouteTable)update(bn *rutMgrBucketNode, dist int) DhtErrno {
+func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
+
+	rt := &rutMgr.rutTab
 
 	tail := len(rt.bucketTab)
 	if tail == 0 {
@@ -580,12 +595,12 @@ func (rt *rutMgrRouteTable)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 		tail--
 	}
 
-	if eno, el := rt.find(bn.node.ID, dist); eno == DhtEnoNone && el != nil {
+	if eno, el := rutMgr.find(bn.node.ID, dist); eno == DhtEnoNone && el != nil {
 		rt.bucketTab[dist].MoveToFront(el)
 		return DhtEnoNone
 	}
 
-	eno, ewma := rt.rutMgrMetricGetEWMA(bn.node.ID)
+	eno, ewma := rutMgr.rutMgrMetricGetEWMA(bn.node.ID)
 	if eno != DhtEnoNone {
 		log.LogCallerFileLine("update: " +
 			"rutMgrMetricGetEWMA failed, eno: %d, ewma: %d",
@@ -602,7 +617,7 @@ func (rt *rutMgrRouteTable)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 
 	tailBucket := rt.bucketTab[tail]
 	if tailBucket.PushBack(bn); tailBucket.Len() > rt.bucketSize {
-		rt.split(tailBucket, tail)
+		rutMgr.split(tailBucket, tail)
 	}
 
 	return DhtEnoNone
@@ -611,7 +626,9 @@ func (rt *rutMgrRouteTable)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 //
 // Split the tail bucket
 //
-func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
+func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
+
+	rt := &rutMgr.rutTab
 
 	if len(rt.bucketTab) - 1 != dist {
 		log.LogCallerFileLine("split: can only split the tail bucket")
@@ -630,7 +647,7 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 
 	for {
 		elNext = el.Next()
-		bn := el.Value.(rutMgrBucketNode)
+		bn := el.Value.(*rutMgrBucketNode)
 		if bn.dist > dist {
 			newLi.PushBack(el)
 			li.Remove(el)
@@ -646,7 +663,9 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 	//
 
 	for li.Len() > rt.bucketSize {
+		bn := li.Back().Value.(*rutMgrBucketNode)
 		li.Remove(li.Back())
+		rutMgr.rutMgrRmvNotify(bn)
 	}
 
 	//
@@ -662,7 +681,7 @@ func (rt *rutMgrRouteTable)split(li *list.List, dist int) DhtErrno {
 	//
 
 	if newLi.Len() > rt.bucketSize {
-		rt.split(newLi, dist + 1)
+		rutMgr.split(newLi, dist + 1)
 	}
 
 	return DhtEnoNone
@@ -832,4 +851,16 @@ _done:
 	}
 
 	return DhtEnoNone, nearest, nearestDist
+}
+
+//
+// Tell connection manager that peer removed so it can close the connection
+// with the peer if necessary.
+//
+func (rutMgr *RutMgr)rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
+	var msg = sch.SchMessage{}
+	var ind = sch.MsgDhtRutPeerRemovedInd{}
+	rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnConMgr, sch.EvDhtRutPeerRemovedInd, &ind)
+	rutMgr.sdl.SchSendMessage(&msg)
+	return DhtEnoNone
 }

@@ -390,6 +390,7 @@ const (
 	EvDhtRutMgrNearestRsp		= EvDhtRutMgrBase + 2
 	EvDhtRutMgrUpdateReq		= EvDhtRutMgrBase + 3
 	EvDhtRutMgrNotificationInd	= EvDhtRutMgrBase + 4
+	EvDhtRutPeerRemovedInd		= EvDhtRutMgrBase + 5
 )
 
 //
@@ -427,6 +428,13 @@ type MsgDhtRutMgrNotificationInd struct {
 	Target	config.NodeID			// target peer identity
 	Peers	interface{}				// nearest nodes table
 	Dists	interface{}				// distances of nearest nodes
+}
+
+//
+// EvDhtRutPeerRemovedInd
+//
+type MsgDhtRutPeerRemovedInd struct {
+	Target	config.NodeID			// target peer identity
 }
 
 //

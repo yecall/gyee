@@ -25,6 +25,7 @@ import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
+	"container/list"
 )
 
 //
@@ -38,23 +39,41 @@ const (
 
 
 //
-// Query control block
+// Query control block status
 //
 type QryStatus = int
 
 const (
 	qsNull		= iota		// null state
-	qsPrepare				// in preparing, waiting for the nearest response from route manager
+	qsPreparing				// in preparing, waiting for the nearest response from route manager
 	qsInited				// had been initialized
 )
 
+//
+// Query result node info
+//
+type qryResultInfo struct {
+	node	config.Node				// peer node info
+	pcs		conMgrPeerConnStat		// connection status
+	dist	int						// distance from local node
+}
+
+//
+// Query pending node info
+//
+type qryPendingInfo = rutMgrBucketNode
+
+//
+// Query control block
+//
 type qryCtrlBlock struct {
 	ptnOwner	interface{}								// owner task node pointer
 	target		config.NodeID							// target is looking up
 	status		QryStatus								// query status
 	qryHist		map[config.NodeID]*rutMgrBucketNode		// history peers had been queried
-	qryPending	map[config.NodeID]*rutMgrBucketNode		// pending peers to be queried
+	qryPending	*list.List								// pending peers to be queried, with type qryPendingInfo
 	qryActived	map[config.NodeID]*qryInstCtrlBlock		// queries activated
+	qryResult	*list.List								// list of qryResultNodeInfo type object
 }
 
 //
@@ -241,8 +260,9 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.target = target
 	qcb.status = qsNull
 	qcb.qryHist = make(map[config.NodeID]*rutMgrBucketNode, 0)
-	qcb.qryPending = make(map[config.NodeID]*rutMgrBucketNode, 0)
+	qcb.qryPending = nil
 	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, 0)
+	qcb.qryResult = nil
 
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
 	qryMgr.sdl.SchSendMessage(&schMsg)
@@ -265,7 +285,94 @@ _rsp2Sender:
 // Nearest response handler
 //
 func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
-	return sch.SchEnoNone
+
+	var dhtEno = DhtErrno(DhtEnoNone)
+	target := msg.Target
+	peers := msg.Peers.([]*rutMgrBucketNode)
+	dists := msg.Dists.([]int)
+	qcb, ok := qryMgr.qcbTab[target]
+
+	if !ok {
+		log.LogCallerFileLine("rutNearestRsp: qcb not exist, target: %x", target)
+		return sch.SchEnoNotFound
+	}
+
+	if qcb == nil {
+		log.LogCallerFileLine("rutNearestRsp: nil qcb, target: %x", target)
+		return sch.SchEnoInternal
+	}
+
+	if qcb.status != qsPreparing {
+		log.LogCallerFileLine("rutNearestRsp: qcb status mismatched, status: %d, target: %x",
+			qcb.status, target)
+		return sch.SchEnoMismatched
+	}
+
+	qryFailed2Sender := func (eno DhtErrno) {
+		var schMsg = sch.SchMessage{}
+		var rsp = sch.MsgDhtQryMgrQueryStartRsp{
+			Target:	msg.Target,
+			Eno:	int(eno),
+		}
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryStartRsp, &rsp)
+		qryMgr.sdl.SchSendMessage(&schMsg)
+	}
+
+	qryOk2Sender := func() {
+
+	}
+
+	if msg.Eno != DhtEnoNone {
+		qryFailed2Sender(DhtErrno(msg.Eno))
+		qryMgr.qryMgrDelQcb(target)
+		return sch.SchEnoNone
+	}
+
+	if len(peers) == 0 {
+		qryFailed2Sender(DhtEnoRoute)
+		qryMgr.qryMgrDelQcb(target)
+		return sch.SchEnoNone
+	}
+
+	//
+	// check if target found in local while updating the query result by the
+	// nearests reported.
+	//
+
+	for idx, peer := range peers {
+
+		if peer.node.ID == target {
+			qryOk2Sender()
+			qryMgr.qryMgrDelQcb(target)
+			return sch.SchEnoNone
+		}
+
+		qri := qryResultInfo {
+			node:	peer.node,
+			pcs:	pcsConnYes,
+			dist:	dists[idx],
+		}
+
+		qcb.qcbUpdateResult(&qri)
+	}
+
+	//
+	// start queries by putting nearests to pending queue and then putting
+	// pending nodes to be activated.
+	//
+
+	if dhtEno = qryMgr.qryMgrQcbPutPending(qcb, peers); dhtEno == DhtEnoNone {
+		if dhtEno = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
+			qcb.status = qsInited
+			return sch.SchEnoNone
+		}
+	}
+
+	log.LogCallerFileLine("rutNearestRsp: failed, dhtEno: %d", dhtEno)
+	qryFailed2Sender(dhtEno)
+	qryMgr.qryMgrDelQcb(target)
+
+	return sch.SchEnoUserTask
 }
 
 //
@@ -300,5 +407,33 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 // Get query manager configuration
 //
 func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Delete query control blcok from manager
+//
+func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Update query result info of query control block
+//
+func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Put node to pending queue
+//
+func (qryMgr *QryMgr)qryMgrQcbPutPending(qcb *qryCtrlBlock, nodes []*qryPendingInfo) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Put node to actived queue and start query to the node
+//
+func (QryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) DhtErrno {
 	return DhtEnoNone
 }
