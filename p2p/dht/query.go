@@ -309,6 +309,7 @@ _rsp2Sender:
 func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
 	var dhtEno = DhtErrno(DhtEnoNone)
+
 	target := msg.Target
 	peers := msg.Peers.([]*rutMgrBucketNode)
 	dists := msg.Dists.([]int)

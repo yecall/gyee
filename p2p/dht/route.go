@@ -250,7 +250,7 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff signal handler
 //
 func (rutMgr *RutMgr)poweroff(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("poweroff: task will be done")
+	log.LogCallerFileLine("poweroff: task will be done ...")
 	return rutMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 

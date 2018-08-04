@@ -1290,7 +1290,6 @@ func testCase5(tc *testCase) {
 
 	golog.Printf("testCase5: it's the end")
 
-
 	waitInterrupt()
 }
 
