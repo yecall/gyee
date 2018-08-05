@@ -277,9 +277,10 @@ type Cfg4DhtRouteManager struct {
 // Configuration about dht query manager
 //
 type Cfg4DhtQryManager struct {
-	MaxActInsts    int           	// max concurrent actived instances for one query
-	QryExpired     time.Duration 	// duration to get expired for a query
-	QryInstExpired time.Duration 	// duration to get expired for a query instance
+	MaxPendings		int				// max pendings can be held in the list
+	MaxActInsts		int           	// max concurrent actived instances for one query
+	QryExpired		time.Duration 	// duration to get expired for a query
+	QryInstExpired	time.Duration 	// duration to get expired for a query instance
 }
 
 //
@@ -360,6 +361,7 @@ func P2pDefaultConfig() *Config {
 		},
 
 		DhtQryCfg: Cfg4DhtQryManager {
+			MaxPendings:	32,
 			MaxActInsts:	8,
 			QryExpired:		time.Second * 60,
 			QryInstExpired:	time.Second * 16,

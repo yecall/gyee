@@ -356,6 +356,14 @@ type MsgDhtQryMgrQueryStopReq struct {
 }
 
 //
+// EvDhtQryMgrQueryStopRsp
+//
+type MsgDhtQryMgrQueryStopRsp struct {
+	Target	config.NodeID			// target node identity
+	Eno		int						// result code
+}
+
+//
 // EvDhtQryMgrQueryResultInd
 //
 type MsgDhtQryMgrQueryResultInd struct {
@@ -382,6 +390,7 @@ type MsgDhtQryInstResultInd struct {
 	From		config.Node			// the peer who tells us
 	Target		config.NodeID		// target node identity
 	Peers		[]*config.Node		// neighbors of target
+	Pcs			int					// peer connection status, see dht.conMgrPeerConnStat pls
 	Latency		time.Duration		// latency about response to request
 }
 
@@ -432,7 +441,7 @@ type MsgDhtRutMgrNearestRsp struct {
 //
 type MsgDhtRutMgrUpdateReq struct {
 	Seens	[]config.Node			// nodes seen
-	Duras	[]time.Duration			// durations about seen nodes
+	Duras	[]time.Duration			// durations/latencies about seen nodes
 }
 
 //

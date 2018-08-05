@@ -34,6 +34,7 @@ import (
 //
 const (
 	QryMgrName = sch.DhtQryMgrName		// query manage name registered in shceduler
+	qryMgrMaxPendings = 32				// max pendings can be held in the list
 	qryMgrMaxActInsts = 8				// max concurrent actived instances for one query
 	qryMgrQryExpired = time.Second * 60	// duration to get expired for a query
 	qryInstExpired = time.Second * 16	// duration to get expired for a query instance
@@ -43,6 +44,7 @@ const (
 // Query manager configuration
 //
 type qryMgrCfg struct {
+	maxPendings		int					// max pendings can be held in the list
 	maxActInsts		int					// max concurrent actived instances for one query
 	qryExpired		time.Duration		// duration to get expired for a query
 	qryInstExpired	time.Duration		// duration to get expired for a query instance
@@ -126,6 +128,7 @@ type QryMgr struct {
 func NewQryMgr() *QryMgr {
 
 	qmCfg := qryMgrCfg {
+		maxPendings:	qryMgrMaxPendings,
 		maxActInsts:	qryMgrMaxActInsts,
 		qryExpired:		qryMgrQryExpired,
 		qryInstExpired:	qryInstExpired,
@@ -190,7 +193,8 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = qryMgr.qcbTimerHandler(qcb)
 
 	case sch.EvDhtQryMgrQueryStopReq:
-		eno = qryMgr.queryStopReq(msg.Body.(*sch.MsgDhtQryMgrQueryStopReq))
+		sender := qryMgr.sdl.SchGetSender(msg)
+		eno = qryMgr.queryStopReq(sender, msg.Body.(*sch.MsgDhtQryMgrQueryStopReq))
 
 	case sch.EvDhtRutMgrNotificationInd:
 		eno = qryMgr.rutNotificationInd(msg.Body.(*sch.MsgDhtRutMgrNotificationInd))
@@ -271,6 +275,11 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	var qcb *qryCtrlBlock = nil
 	var schMsg = sch.SchMessage{}
 
+	//
+	// set "NtfReq" to be true to tell route manager that we need notifications,
+	// see handler about this event handler in route.go pls.
+	//
+
 	var nearestReq = sch.MsgDhtRutMgrNearestReq{
 		Target:	target,
 		Max:	rutMgrMaxNearest,
@@ -297,6 +306,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
 	qryMgr.sdl.SchSendMessage(&schMsg)
+	qcb.status = qsPreparing
 
 	rsp.Eno = DhtEnoNone
 
@@ -403,7 +413,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	qcb.qryPending = list.New()
 	qcb.qryResult = list.New()
 
-	if dhtEno = qcb.qryMgrQcbPutPending(peers); dhtEno == DhtEnoNone {
+	if dhtEno = qcb.qryMgrQcbPutPending(peers, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
 
 		if dhtEno, _ = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
 
@@ -427,14 +437,58 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 //
 // Query stop request handler
 //
-func (qryMgr *QryMgr)queryStopReq(msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
-	return sch.SchEnoNone
+func (qryMgr *QryMgr)queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
+
+	target := msg.Target
+	rsp := sch.MsgDhtQryMgrQueryStopRsp{Target:target, Eno:DhtEnoNone}
+
+	rsp2Sender := func (rsp *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+		var schMsg = sch.SchMessage{}
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStopRsp, rsp)
+		return qryMgr.sdl.SchSendMessage(&schMsg)
+	}
+
+	rsp.Eno = int(qryMgr.qryMgrDelQcb(target))
+
+	return rsp2Sender(&rsp)
 }
 
 //
 //Route notification handler
 //
 func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sch.SchErrno {
+
+	//
+	// we get this indication from route manager for we had reigstered to it while
+	// we handling the event EvDhtQryMgrQueryStartReq, see it pls.
+	//
+
+	var qcb *qryCtrlBlock
+
+	target := msg.Target
+	if qcb = qryMgr.qcbTab[target]; qcb == nil {
+		log.LogCallerFileLine("rutNotificationInd: target not found: %x", target)
+		return sch.SchEnoParameter
+	}
+
+	if qcb.status != qsInited {
+		log.LogCallerFileLine("rutNotificationInd: query not inited yet for target: %s", target)
+		return sch.SchEnoUserTask
+	}
+
+	qpi := msg.Peers.([]*qryPendingInfo)
+	if dhtEno := qcb.qryMgrQcbPutPending(qpi, qryMgr.qmCfg.maxPendings); dhtEno != DhtEnoNone {
+		return sch.SchEnoUserTask
+	}
+
+	//
+	// try to active more instances since pendings added
+	//
+
+	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno != DhtEnoNone {
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -449,7 +503,60 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 // Instance stop response handler
 //
 func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
-	return sch.SchEnoNone
+
+	var qcb *qryCtrlBlock
+	var icb *qryInstCtrlBlock
+
+	target := msg.Target
+	to := msg.To.ID
+
+	if qcb = qryMgr.qcbTab[target]; qcb == nil {
+		log.LogCallerFileLine("instStopRsp: target not found: %x", target)
+		return sch.SchEnoUserTask
+	}
+
+	//
+	// done the instancce task. Since here the instance tells it's stopped, we
+	// need not to send power off event, we done it directly.
+	//
+
+	if icb = qcb.qryActived[to]; icb == nil {
+		log.LogCallerFileLine("instStopRsp: instance not found: %x", to)
+		icb.sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
+		return sch.SchEnoUserTask
+	}
+
+	delete(qcb.qryActived, to)
+
+	//
+	// chcek if some activateds and pendings, if none of them, the query is over
+	// then, we can report the result about this query and free it.
+	//
+
+	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+
+		if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instStopRsp: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+
+		if dhtEno := qryMgr.qryMgrDelQcb(qcb.target); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instStopRsp: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+
+		return sch.SchEnoNone
+	}
+
+	//
+	// here we try active more instance for one had been removed
+	//
+
+	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
+		return sch.SchEnoNone
+	}
+
+	return sch.SchEnoUserTask
 }
 
 //
@@ -485,11 +592,14 @@ func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID) DhtErrno {
 		qcb.qryTid = sch.SchInvalidTid
 	}
 
-	for _, qicb := range qcb.qryActived {
-		qryMgr.sdl.SchTaskDone(qicb.ptnInst, sch.SchEnoKilled)
+	for _, icb := range qcb.qryActived {
+		po := sch.SchMessage{Id: sch.EvSchPoweroff, Body: nil}
+		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, &po)
+		icb.sdl.SchSendMessage(&po)
 	}
 
 	delete(qryMgr.qcbTab, target)
+
 	return DhtEnoNone
 }
 
@@ -516,19 +626,35 @@ func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 //
 // Put node to pending queue
 //
-func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo) DhtErrno {
+func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) DhtErrno {
 
 	li := qcb.qryPending
 
 	for _, n := range nodes {
+
+		pb := true
+
 		for el := li.Front(); el != nil; el = el.Next() {
+
 			v := el.Value.(*qryPendingInfo)
+
+			if v.node.ID == n.node.ID {
+				pb = false
+				break
+			}
+
 			if n.dist < v.dist {
 				li.InsertBefore(n, el)
+				pb = false
 				break
 			}
 		}
-		li.PushBack(n)
+
+		if pb { li.PushBack(n) }
+	}
+
+	for li.Len() > size {
+		li.Remove(li.Back())
 	}
 
 	return DhtEnoNone
