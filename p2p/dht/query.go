@@ -21,11 +21,12 @@
 package dht
 
 import (
+	"fmt"
 	"time"
+	"container/list"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
-	"container/list"
 )
 
 //
@@ -77,13 +78,15 @@ type qryPendingInfo = rutMgrBucketNode
 //
 type qryCtrlBlock struct {
 	ptnOwner	interface{}								// owner task node pointer
+	seq			int										// sequence number
 	target		config.NodeID							// target is looking up
 	status		QryStatus								// query status
-	qryHist		map[config.NodeID]*rutMgrBucketNode		// history peers had been queried
+	qryHistory	map[config.NodeID]*qryPendingInfo		// history peers had been queried
 	qryPending	*list.List								// pending peers to be queried, with type qryPendingInfo
 	qryActived	map[config.NodeID]*qryInstCtrlBlock		// queries activated
 	qryResult	*list.List								// list of qryResultNodeInfo type object
 	qryTid		int										// query timer identity
+	icbSeq		int										// query instance control block sequence number
 }
 
 //
@@ -91,10 +94,11 @@ type qryCtrlBlock struct {
 //
 type qryInstCtrlBlock struct {
 	sdl			*sch.Scheduler		// pointer to scheduler
+	seq			int					// sequence number
 	name		string				// instance name
 	ptnInst		interface{}			// pointer to query instance task node
 	target		config.NodeID		// target is looking up
-	to			rutMgrBucketNode	// to whom the query message sent
+	to			config.Node			// to whom the query message sent
 	qTid		int					// query timer identity
 	begTime		time.Time			// query begin time
 	endTime		time.Time			// query end time
@@ -113,6 +117,7 @@ type QryMgr struct {
 	instSeq		int								// query instance sequence number
 	qcbTab		map[config.NodeID]*qryCtrlBlock	// query control blocks
 	qmCfg		qryMgrCfg						// query manager configuration
+	qcbSeq		int								// query control block sequence number
 }
 
 //
@@ -136,6 +141,7 @@ func NewQryMgr() *QryMgr {
 		instSeq:	0,
 		qcbTab:		map[config.NodeID]*qryCtrlBlock{},
 		qmCfg:		qmCfg,
+		qcbSeq:		0,
 	}
 
 	qryMgr.tep = qryMgr.qryMgrProc
@@ -279,9 +285,12 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 
 	qcb = new(qryCtrlBlock)
 	qcb.ptnOwner = sender
+	qcb.seq = qryMgr.qcbSeq
+	qryMgr.qcbSeq++
+	qcb.icbSeq = 0
 	qcb.target = target
 	qcb.status = qsNull
-	qcb.qryHist = make(map[config.NodeID]*rutMgrBucketNode, 0)
+	qcb.qryHistory = make(map[config.NodeID]*rutMgrBucketNode, 0)
 	qcb.qryPending = nil
 	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, qryMgr.qmCfg.maxActInsts)
 	qcb.qryResult = nil
@@ -395,15 +404,20 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	qcb.qryResult = list.New()
 
 	if dhtEno = qcb.qryMgrQcbPutPending(peers); dhtEno == DhtEnoNone {
-		if dhtEno = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
+
+		if dhtEno, _ = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
+
 			if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
+
 				qcb.status = qsInited
+
 				return sch.SchEnoNone
 			}
 		}
 	}
 
 	log.LogCallerFileLine("rutNearestRsp: failed, dhtEno: %d", dhtEno)
+
 	qryFailed2Sender(dhtEno)
 	qryMgr.qryMgrDelQcb(target)
 
@@ -523,8 +537,87 @@ func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo) DhtErrno {
 //
 // Put node to actived queue and start query to the node
 //
-func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) DhtErrno {
-	return DhtEnoNone
+func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
+
+	if qcb.qryPending == nil || qcb.qryPending.Len() == 0 {
+		log.LogCallerFileLine("qryMgrQcbPutActived: no pending")
+		return DhtEnoNotFound, 0
+	}
+
+	if len(qcb.qryActived) == qryMgr.qmCfg.maxActInsts {
+		log.LogCallerFileLine("qryMgrQcbPutActived: no room")
+		return DhtEnoResource, 0
+	}
+
+	act := make([]*list.Element, 0)
+	cnt := 0
+	dhtEno := DhtEnoNone
+
+	for el := qcb.qryPending.Front(); el != nil; el = el.Next() {
+
+		if len(qcb.qryActived) >= qryMgr.qmCfg.maxActInsts {
+			break
+		}
+
+		pending := el.Value.(*qryPendingInfo)
+		act = append(act, el)
+
+		if _, dup := qcb.qryActived[pending.node.ID]; dup == true {
+			log.LogCallerFileLine("qryMgrQcbPutActived: duplicated node: %X", pending.node.ID)
+			continue
+		}
+
+		icb := qryInstCtrlBlock {
+			sdl:		qryMgr.sdl,
+			seq:		qcb.icbSeq,
+			name:		"qryMgrIcb" + fmt.Sprintf("%d", qcb.icbSeq),
+			ptnInst:	nil,
+			target:		qcb.target,
+			to:			pending.node,
+			qTid:		sch.SchInvalidTid,
+			begTime:	time.Time{},
+			endTime:	time.Time{},
+		}
+
+		td := sch.SchTaskDescription{
+			Name:		icb.name,
+			MbSize:		-1,
+			Ep:			NewQryInst(),
+			Wd:			&sch.SchWatchDog{HaveDog:false,},
+			Flag:		sch.SchCreatedGo,
+			DieCb:		nil,
+			UserDa:		&icb,
+		}
+
+		qcb.qryActived[icb.to.ID] = &icb
+		cnt++
+
+		eno, ptn := qryMgr.sdl.SchCreateTask(&td)
+		if eno != sch.SchEnoNone || ptn == nil {
+
+			log.LogCallerFileLine("qryMgrQcbPutActived: " +
+				"SchCreateTask failed, eno: %d, ptn: %p",
+				eno, ptn)
+
+			dhtEno = DhtEnoScheduler
+			break;
+		}
+		icb.ptnInst = ptn
+
+		po := sch.SchMessage{
+			Id:		sch.EvSchPoweron,
+			Body:	nil,
+		}
+
+		qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweron, &po)
+		qryMgr.sdl.SchSendMessage(&po)
+	}
+
+	for _, el := range act {
+		qcb.qryPending.Remove(el)
+	}
+
+	return DhtErrno(dhtEno), cnt
 }
 
 //
@@ -533,7 +626,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) DhtErrno {
 func (qryMgr *QryMgr)qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
 
 	var td = sch.TimerDescription {
-		Name:	"dhtQyrMgrQcbTimer",
+		Name:	"qryMgrQcbTimer" + fmt.Sprintf("%d", qcb.seq),
 		Utid:	sch.DhtQryMgrQcbTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	qryMgr.qmCfg.qryExpired,
