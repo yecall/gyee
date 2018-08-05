@@ -181,12 +181,21 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtRutBootstrapTimer:
 		eno = rutMgr.bootstarpTimerHandler()
 
+	case sch.EvDhtQryMgrQueryStartRsp:
+		eno = rutMgr.queryStartRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStartRsp))
+
+	case sch.EvDhtQryMgrQueryResultInd:
+		eno = rutMgr.queryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
+
 	case sch.EvDhtRutMgrNearestReq:
 		sender := rutMgr.sdl.SchGetSender(msg)
 		eno = rutMgr.nearestReq(sender, msg.Body.(*sch.MsgDhtRutMgrNearestReq))
 
 	case sch.EvDhtRutMgrUpdateReq:
 		eno = rutMgr.updateReq(msg.Body.(*sch.MsgDhtRutMgrUpdateReq))
+
+	case sch.EvDhtRutMgrStopNotifyReq:
+		eno = rutMgr.stopNotifyReq(msg.Body.(*sch.MsgDhtRutMgrStopNofiyReq))
 
 	default:
 		log.LogCallerFileLine("rutMgrProc: unknown message: %d", msg.Id)
@@ -276,6 +285,40 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 }
 
 //
+// Query startup response(for bootstrap) handler
+//
+func (rutMgr *RutMgr)queryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+
+	//
+	// do nothing, just debug out, since we had start a bootstrap timer
+	//
+
+	log.LogCallerFileLine("queryStartRsp: " +
+		"bootstrap startup response, eno: %d, target: %x",
+		msg.Eno, msg.Target)
+
+	return sch.SchEnoNone
+}
+
+//
+// Query result indication(for bootstrap) handler
+//
+func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+
+	//
+	// do not care the result, since the bootstrap procedure is just for keeping
+	// the route table in a health status than finding out the target(which is not
+	// a specific peer but just created randomly).
+	//
+
+	log.LogCallerFileLine("queryResultInd: " +
+		"bootstrap result indication, eno: %d, target: %x",
+		msg.Eno, msg.Target)
+
+	return sch.SchEnoNone
+}
+
+//
 // Nearest peer request handler
 //
 func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
@@ -349,6 +392,24 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
+	return sch.SchEnoNone
+}
+
+//
+// Stop notify request handler
+//
+func (rutMgr *RutMgr)stopNotifyReq(msg *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErrno {
+	var nfi = rutMgrNotifeeId {
+		task:	msg.Task,
+		target:	msg.Target,
+	}
+	if _, exist := rutMgr.ntfTab[nfi]; exist == false {
+		log.LogCallerFileLine("stopNotifyReq: " +
+			"notifee not found, task: %p, target: %x",
+			nfi.task, nfi.target)
+		return sch.SchEnoUserTask
+	}
+	delete(rutMgr.ntfTab, nfi)
 	return sch.SchEnoNone
 }
 
@@ -445,7 +506,10 @@ func rutMgrSetupLog2DistLKT(lkt []int) DhtErrno {
 // Notice: the return "d" more larger, it's more closer
 //
 func (rutMgr *RutMgr)rutMgrLog2Dist(h1 *Hash, h2 *Hash) int {
-	var d = 0
+	if h1 == nil {
+		h1 = &rutMgr.rutTab.shaLocal
+	}
+	d := 0
 	for i, b := range h2 {
 		delta := rutMgr.distLookupTab[h1[i] ^ b]
 		d += delta

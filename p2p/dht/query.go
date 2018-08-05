@@ -89,6 +89,7 @@ type qryCtrlBlock struct {
 	qryResult	*list.List								// list of qryResultNodeInfo type object
 	qryTid		int										// query timer identity
 	icbSeq		int										// query instance control block sequence number
+	rutNtfFlag	bool									// if notification asked for
 }
 
 //
@@ -303,6 +304,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.qryPending = nil
 	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, qryMgr.qmCfg.maxActInsts)
 	qcb.qryResult = nil
+	qcb.rutNtfFlag = nearestReq.NtfReq
 
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
 	qryMgr.sdl.SchSendMessage(&schMsg)
@@ -477,16 +479,38 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 	}
 
 	qpi := msg.Peers.([]*qryPendingInfo)
-	if dhtEno := qcb.qryMgrQcbPutPending(qpi, qryMgr.qmCfg.maxPendings); dhtEno != DhtEnoNone {
-		return sch.SchEnoUserTask
-	}
+	qcb.qryMgrQcbPutPending(qpi, qryMgr.qmCfg.maxPendings)
 
 	//
 	// try to active more instances since pendings added
 	//
 
-	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno != DhtEnoNone {
+	qryMgr.qryMgrQcbPutActived(qcb)
+
+	//
+	// check against abnormal cases
+	//
+
+	if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
+		log.LogCallerFileLine("rutNotificationInd: internal errors")
 		return sch.SchEnoUserTask
+	}
+
+	//
+	// check if query should be end
+	//
+
+	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+
+		if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("rutNotificationInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+
+		if dhtEno := qryMgr.qryMgrDelQcb(qcb.target); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("rutNotificationInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
 	}
 
 	return sch.SchEnoNone
@@ -496,6 +520,121 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 // Instance query result indication handler
 //
 func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
+
+	var qcb *qryCtrlBlock= nil
+	var qpiList = []*qryPendingInfo{}
+	var hashList = []*Hash{}
+	var distList = []int{}
+	var rutMgr = qryMgr.sdl.SchGetUserTaskIF(RutMgrName).(*RutMgr)
+
+	if len(msg.Peers) != len(msg.Pcs) {
+		log.LogCallerFileLine("instResultInd: mismatched Peers and Pcs")
+		return sch.SchEnoMismatched
+	}
+
+	if rutMgr == nil {
+		log.LogCallerFileLine("instResultInd: nil route manager")
+		return sch.SchEnoInternal
+	}
+
+	//
+	// update route manager in any cases
+	//
+
+	from := msg.From
+	latency	:= msg.Latency
+
+	updateReq2RutMgr := func (peer *config.Node, dur time.Duration) sch.SchErrno {
+		var schMsg = sch.SchMessage{}
+		var updateReq = sch.MsgDhtRutMgrUpdateReq{
+			Seens: []config.Node{
+				*peer,
+			},
+			Duras: []time.Duration{
+				dur,
+			},
+		}
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
+		return qryMgr.sdl.SchSendMessage(&schMsg)
+	}
+
+	updateReq2RutMgr(&from, latency)
+
+	//
+	// update query result
+	//
+
+	for idx, peer := range msg.Peers {
+
+		hash := rutMgrNodeId2Hash(peer.ID)
+		hashList = append(hashList, hash)
+		dist := rutMgr.rutMgrLog2Dist(nil, hash)
+		distList = append(distList, dist)
+
+		qri := qryResultInfo {
+			node:	*peer,
+			pcs:	conMgrPeerConnStat(msg.Pcs[idx]),
+			dist:	distList[idx],
+		}
+
+		qcb.qcbUpdateResult(&qri)
+	}
+
+	//
+	// check if target found: if true, query should be ended, report the result
+	//
+
+	target := msg.Target
+	if qcb = qryMgr.qcbTab[target]; qcb == nil {
+		log.LogCallerFileLine("instResultInd: not found, target: %x", target)
+		return sch.SchEnoUserTask
+	}
+
+	for _, peer := range msg.Peers {
+		if peer.ID == target {
+			qryMgr.qryMgrResultReport(qcb)
+			if dhtEno := qryMgr.qryMgrDelQcb(qcb.target); dhtEno != DhtEnoNone {
+				return sch.SchEnoUserTask
+			}
+			return sch.SchEnoNone
+		}
+	}
+
+	//
+	// put peers reported in the message into query control block pending queue,
+	// and try to active more query instance after that.
+	//
+
+	for idx, peer := range msg.Peers {
+		var qpi = qryPendingInfo {
+			node: *peer,
+			hash: *hashList[idx],
+			dist: distList[idx],
+		}
+		qpiList = append(qpiList, &qpi)
+	}
+
+	qcb.qryMgrQcbPutPending(qpiList, qryMgr.qmCfg.maxPendings)
+	qryMgr.qryMgrQcbPutActived(qcb)
+
+	//
+	// if pending queue and actived queue all are empty, we just report query
+	// result and end the query.
+	//
+
+	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+
+		if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+
+		if dhtEno := qryMgr.qryMgrDelQcb(qcb.target); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instResultInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -549,7 +688,7 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 	}
 
 	//
-	// here we try active more instance for one had been removed
+	// here we try active more instances for one had been removed
 	//
 
 	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
@@ -598,6 +737,10 @@ func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID) DhtErrno {
 		icb.sdl.SchSendMessage(&po)
 	}
 
+	if qcb.rutNtfFlag == true {
+
+	}
+
 	delete(qryMgr.qcbTab, target)
 
 	return DhtEnoNone
@@ -631,6 +774,10 @@ func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) D
 	li := qcb.qryPending
 
 	for _, n := range nodes {
+
+		if _, dup := qcb.qryHistory[n.node.ID]; dup {
+			continue
+		}
 
 		pb := true
 
@@ -716,6 +863,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		}
 
 		qcb.qryActived[icb.to.ID] = &icb
+		qcb.qryHistory[icb.to.ID] = pending
 		cnt++
 
 		eno, ptn := qryMgr.sdl.SchCreateTask(&td)

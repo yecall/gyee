@@ -389,9 +389,9 @@ const (
 type MsgDhtQryInstResultInd struct {
 	From		config.Node			// the peer who tells us
 	Target		config.NodeID		// target node identity
-	Peers		[]*config.Node		// neighbors of target
-	Pcs			int					// peer connection status, see dht.conMgrPeerConnStat pls
 	Latency		time.Duration		// latency about response to request
+	Peers		[]*config.Node		// neighbors of target
+	Pcs			[]int				// peer connection status, see dht.conMgrPeerConnStat pls
 }
 
 //
@@ -414,6 +414,7 @@ const (
 	EvDhtRutMgrUpdateReq		= EvDhtRutMgrBase + 3
 	EvDhtRutMgrNotificationInd	= EvDhtRutMgrBase + 4
 	EvDhtRutPeerRemovedInd		= EvDhtRutMgrBase + 5
+	EvDhtRutMgrStopNotifyReq	= EvDhtRutMgrBase + 6
 )
 
 //
@@ -457,6 +458,14 @@ type MsgDhtRutMgrNotificationInd struct {
 // EvDhtRutPeerRemovedInd
 //
 type MsgDhtRutPeerRemovedInd struct {
+	Target	config.NodeID			// target peer identity
+}
+
+//
+// EvDhtRutMgrStopNotifyReq
+//
+type MsgDhtRutMgrStopNofiyReq struct {
+	Task	interface{}				// owner task of the notifee registered
 	Target	config.NodeID			// target peer identity
 }
 
