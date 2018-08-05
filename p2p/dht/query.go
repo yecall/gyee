@@ -618,6 +618,15 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	qryMgr.qryMgrQcbPutActived(qcb)
 
 	//
+	// check against abnormal cases
+	//
+
+	if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
+		log.LogCallerFileLine("instResultInd: internal errors")
+		return sch.SchEnoUserTask
+	}
+
+	//
 	// if pending queue and actived queue all are empty, we just report query
 	// result and end the query.
 	//
@@ -666,6 +675,15 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 	}
 
 	delete(qcb.qryActived, to)
+
+	//
+	// check against abnormal cases
+	//
+
+	if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
+		log.LogCallerFileLine("instStopRsp: internal errors")
+		return sch.SchEnoUserTask
+	}
 
 	//
 	// chcek if some activateds and pendings, if none of them, the query is over
@@ -738,7 +756,13 @@ func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID) DhtErrno {
 	}
 
 	if qcb.rutNtfFlag == true {
-
+		var schMsg = sch.SchMessage{}
+		var req = sch.MsgDhtRutMgrStopNofiyReq {
+			Task:	qryMgr.ptnMe,
+			Target:	qcb.target,
+		}
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
+		qryMgr.sdl.SchSendMessage(&schMsg)
 	}
 
 	delete(qryMgr.qcbTab, target)
