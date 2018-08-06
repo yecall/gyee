@@ -42,9 +42,9 @@ import (
 	"encoding/hex"
 
 	"github.com/pkg/errors"
-	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/crypto/secp256k1"
+	"github.com/yeeco/gyee/common"
 )
 
 type AddressType byte
@@ -78,7 +78,7 @@ var (
 )
 
 type Address struct {
-	address crypto.Hash
+	address common.Hash
 }
 
 func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {

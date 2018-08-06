@@ -21,13 +21,17 @@
 package accounts
 
 import (
+	"errors"
 	"path/filepath"
 
+	"github.com/sirupsen/logrus"
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/crypto/keystore"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/utils/logging"
+	"fmt"
 )
 
 /*
@@ -49,8 +53,19 @@ cipher：
 3、balloon hashing?
 */
 
+var (
+	// ErrAccountNotFound account is not found.
+	ErrAccountNotFound = errors.New("account is not found")
+
+	// ErrAccountIsLocked account locked.
+	ErrAccountIsLocked = errors.New("account is locked")
+
+	// ErrInvalidSignerAddress sign addr not from
+	ErrInvalidSignerAddress = errors.New("transaction sign not use from address")
+)
+
 type AccountManager struct {
-	ks       *keystore.Keystore
+	ks *keystore.Keystore
 	//accounts map[string]*Account
 }
 
@@ -69,13 +84,13 @@ func NewAccountManager(config *config.Config) (*AccountManager, error) {
 }
 
 func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, error) {
-    var key keystore.Key
-    key = secp256k1.GenerateKey()
-    address, err := core.NewAddressFromPublicKey(key.PublicKey())
-    if err != nil {
-    	logging.Logger.Panic("failed create account:", err)
+	var key keystore.Key
+	key = secp256k1.GenerateKey()
+	address, err := core.NewAddressFromPublicKey(key.PublicKey())
+	if err != nil {
+		logging.Logger.Panic("failed create account:", err)
 	}
-    err = am.ks.SetKey(address.String(), key.PrivateKey(), passphrase)
+	err = am.ks.SetKey(address.String(), key.PrivateKey(), passphrase)
 	if err != nil {
 		logging.Logger.Panic("failed create account:", err)
 	}
@@ -105,3 +120,18 @@ func (am *AccountManager) Import(keyContent []byte, passphrase []byte) (*core.Ad
 
 //TODO：实现这几个func
 //TODO：需要搞定keystore的问题
+
+func (am *AccountManager) SignHash(address *core.Address, hash common.Hash) ([]byte, error) {
+	key, err := am.ks.GetUnlocked(address.String())
+	if err != nil {
+		logging.Logger.WithFields(logrus.Fields{
+			"err":     err,
+			"address": address,
+			"hash":    hash,
+		}).Error("Failed to get unlocked private key.")
+		return nil, ErrAccountIsLocked
+	}
+
+	fmt.Println("key:", key)
+	return nil, nil
+}

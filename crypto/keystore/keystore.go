@@ -51,10 +51,16 @@ var (
 	ErrInvalidPassphrase = errors.New("passphrase is invalid")
 )
 
+type unlocked struct{
+	key   []byte
+	timer *time.Timer
+}
+
 type Keystore struct {
 	ksDirPath string
 	cipher    cipher.Cipher
 	entries   map[string][]byte
+	unlocked  map[string]*unlocked
 
 	mu sync.RWMutex
 }
@@ -63,6 +69,7 @@ func NewKeystore(dirPath string) *Keystore {
 	ks := &Keystore{
 		ksDirPath: dirPath,
 		cipher:    cipher.NewScrypt(),
+		unlocked:  make(map[string]*unlocked),
 	}
 	//load from file dir
 	ks.loadKeyFiles()
@@ -154,15 +161,76 @@ func (ks *Keystore) Contains(address string) (bool, error) {
 }
 
 func (ks *Keystore) Lock(address string) error {
-	return nil
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	if len(address) == 0 {
+		return ErrNeedAddress
+	}
+
+	if u, ok := ks.unlocked[address]; ok {
+		u.timer.Reset(time.Duration(0))
+		return nil
+	}
+
+	return ErrNotUnlocked
 }
 
 func (ks *Keystore) Unlock(address string, passphrase []byte, timeout time.Duration) error {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	if len(address) == 0 {
+		return ErrNeedAddress
+	}
+
+	unlockedKey, ok := ks.unlocked[address]
+	if ok == true {
+	    unlockedKey.timer.Reset(timeout)
+	} else {
+		//key, err := ks.GetKey(address, passphrase)
+		entry, ok := ks.entries[address]
+		if !ok {
+			return ErrNotFound
+		}
+		key, err := ks.cipher.DecryptKey(entry, passphrase)
+		if err != nil {
+			return err
+		}
+		u := &unlocked{key:key, timer:time.NewTimer(timeout)}
+		ks.unlocked[address] = u
+		go ks.expire(address)
+	}
+
 	return nil
 }
 
-func (ks *Keystore) GetUnlocked() {
+func (ks *Keystore) expire(address string) {
+	if u, ok := ks.unlocked[address]; ok == true {
+		defer u.timer.Stop()
+		select {
+		case <-u.timer.C:
+			ks.mu.Lock()
+			util.ZeroBytes(u.key)
+			delete(ks.unlocked, address)
+			ks.mu.Unlock()
+		}
+	}
+}
 
+func (ks *Keystore) GetUnlocked(address string) ([]byte, error) {
+	if len(address) == 0 {
+		return nil, ErrNeedAddress
+	}
+
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+
+	u, ok := ks.unlocked[address]
+	if !ok {
+		return nil, ErrNotUnlocked
+	}
+    return u.key, nil
 }
 
 func (ks *Keystore) loadKeyFiles() {

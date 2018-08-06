@@ -20,17 +20,19 @@
 
 package core
 
-import "github.com/yeeco/gyee/crypto"
+import (
+	"github.com/yeeco/gyee/common"
+)
 
 /*
 
  */
 
 type BlockHeader struct {
-	previousHash crypto.Hash
-	stateRoot    crypto.Hash
-	txsRoot      crypto.Hash
-	eventsRoot   crypto.Hash
+	previousHash common.Hash
+	stateRoot    common.Hash
+	txsRoot      common.Hash
+	eventsRoot   common.Hash
 }
 
 type BlockHeaderSignature struct {
