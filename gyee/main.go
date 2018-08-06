@@ -50,7 +50,6 @@ func init() {
 		config.DataDirFlag,
 	}
 	app.Commands = []cli.Command{
-		//ConsoleCommand,
 		consoleCommand,
 		configCommand,
 		accountCommand,

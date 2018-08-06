@@ -51,7 +51,7 @@ var (
 	ErrInvalidPassphrase = errors.New("passphrase is invalid")
 )
 
-type unlocked struct{
+type unlocked struct {
 	key   []byte
 	timer *time.Timer
 }
@@ -186,7 +186,7 @@ func (ks *Keystore) Unlock(address string, passphrase []byte, timeout time.Durat
 
 	unlockedKey, ok := ks.unlocked[address]
 	if ok == true {
-	    unlockedKey.timer.Reset(timeout)
+		unlockedKey.timer.Reset(timeout)
 	} else {
 		//key, err := ks.GetKey(address, passphrase)
 		entry, ok := ks.entries[address]
@@ -197,7 +197,7 @@ func (ks *Keystore) Unlock(address string, passphrase []byte, timeout time.Durat
 		if err != nil {
 			return err
 		}
-		u := &unlocked{key:key, timer:time.NewTimer(timeout)}
+		u := &unlocked{key: key, timer: time.NewTimer(timeout)}
 		ks.unlocked[address] = u
 		go ks.expire(address)
 	}
@@ -230,7 +230,7 @@ func (ks *Keystore) GetUnlocked(address string) ([]byte, error) {
 	if !ok {
 		return nil, ErrNotUnlocked
 	}
-    return u.key, nil
+	return u.key, nil
 }
 
 func (ks *Keystore) loadKeyFiles() {

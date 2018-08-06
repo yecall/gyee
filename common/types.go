@@ -21,8 +21,8 @@
 package common
 
 import (
-	"encoding/hex"
 	"bytes"
+	"encoding/hex"
 	"github.com/mr-tron/base58/base58"
 )
 

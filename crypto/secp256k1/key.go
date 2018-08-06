@@ -50,9 +50,9 @@ func GenerateKey() *Key {
 	if err != nil {
 		fmt.Print(err)
 	}
-    key.priKey = privateKeyFromECDSA(privateKeyECDSA)
-    key.pubKey = publicKeyFromECDSA(privateKeyECDSA)
-    return key
+	key.priKey = privateKeyFromECDSA(privateKeyECDSA)
+	key.pubKey = publicKeyFromECDSA(privateKeyECDSA)
+	return key
 }
 
 //直接用k1包来产生私钥, 与上应该一样的功能

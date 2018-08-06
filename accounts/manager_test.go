@@ -26,8 +26,8 @@ import (
 
 	"time"
 
-	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"
 )
 
@@ -55,7 +55,9 @@ func Test_Unlock(t *testing.T) {
 	addr, _ := core.AddressParse("0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21")
 
 	am.ks.Unlock("0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21", []byte(passphrase), time.Duration(time.Second))
-    am.SignHash(addr, common.Hash("abc"))
-    time.Sleep(time.Duration(2) * time.Second)
-    am.SignHash(addr, common.Hash("cdf"))
+	am.SignHash(addr, common.Hash("abc"))
+	time.Sleep(time.Duration(500) * time.Millisecond)
+	am.SignHash(addr, common.Hash("abc"))
+	time.Sleep(time.Duration(2) * time.Second)
+	am.SignHash(addr, common.Hash("cdf"))
 }

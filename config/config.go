@@ -88,9 +88,9 @@ func GetConfig(ctx *cli.Context) *Config {
 	if ctx.GlobalIsSet(DataDirFlag.Name) {
 		config.DataDir = ctx.GlobalString(DataDirFlag.Name)
 	}
-	fmt.Println(config.DataDir)
-	fmt.Println(config.Name)
-	fmt.Println(config.Rpc.IpcPath)
+	//fmt.Println(config.DataDir)
+	//fmt.Println(config.Name)
+	//fmt.Println(config.Rpc.IpcPath)
 	return config
 }
 

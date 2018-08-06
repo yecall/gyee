@@ -50,7 +50,7 @@ import (
 const (
 	// EcdsaPrivateKeyLength key length
 	PrivateKeyLength = 32
-	PublicKeyLength = 65
+	PublicKeyLength  = 65
 )
 
 var context *C.secp256k1_context

@@ -24,6 +24,7 @@ import (
 	"errors"
 	"path/filepath"
 
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/config"
@@ -31,7 +32,6 @@ import (
 	"github.com/yeeco/gyee/crypto/keystore"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/utils/logging"
-	"fmt"
 )
 
 /*
@@ -85,7 +85,7 @@ func NewAccountManager(config *config.Config) (*AccountManager, error) {
 
 func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, error) {
 	var key keystore.Key
-	key = secp256k1.GenerateKey()
+	key = secp256k1.GenerateKey() //TODO：这个写成crpto模块的interface
 	address, err := core.NewAddressFromPublicKey(key.PublicKey())
 	if err != nil {
 		logging.Logger.Panic("failed create account:", err)
