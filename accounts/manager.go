@@ -32,6 +32,7 @@ import (
 	"github.com/yeeco/gyee/crypto/keystore"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/utils/logging"
+	"time"
 )
 
 /*
@@ -120,6 +121,14 @@ func (am *AccountManager) Import(keyContent []byte, passphrase []byte) (*core.Ad
 
 //TODO：实现这几个func
 //TODO：需要搞定keystore的问题
+
+func (am *AccountManager) Unlock(address *core.Address, passphrase []byte, duration time.Duration) error {
+	return am.ks.Unlock(address.String(), passphrase, duration)
+}
+
+func (am *AccountManager) Lock(address *core.Address) error {
+	return am.ks.Lock(address.String())
+}
 
 func (am *AccountManager) SignHash(address *core.Address, hash common.Hash) ([]byte, error) {
 	key, err := am.ks.GetUnlocked(address.String())
