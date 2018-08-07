@@ -93,6 +93,17 @@ type qryCtrlBlock struct {
 }
 
 //
+// Query instance status
+//
+const (
+	qisNull		= iota				// null state
+	qisInited						// had been inited to ready to start
+	qisWaitConnect					// connect request sent, wait response from connection manager task
+	qisWaitResponse					// query sent, wait response from peer
+	qisDone							// done
+)
+
+//
 // Query instance control block
 //
 type qryInstCtrlBlock struct {
@@ -100,11 +111,16 @@ type qryInstCtrlBlock struct {
 	seq			int					// sequence number
 	name		string				// instance name
 	ptnInst		interface{}			// pointer to query instance task node
+	ptnConMgr	interface{}			// pointer to connection manager task node
+	ptnQryMgr	interface{}			// pointer to query manager task node
+	status		int					// instance status
 	target		config.NodeID		// target is looking up
 	to			config.Node			// to whom the query message sent
 	qTid		int					// query timer identity
 	begTime		time.Time			// query begin time
 	endTime		time.Time			// query end time
+	conBegTime	time.Time			// time to start connection
+	conEndTime	time.Time			// time connection established
 }
 
 //
@@ -199,6 +215,9 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	case sch.EvDhtRutMgrNotificationInd:
 		eno = qryMgr.rutNotificationInd(msg.Body.(*sch.MsgDhtRutMgrNotificationInd))
+
+	case sch.EvDhtQryInstStatusInd:
+		eno = qryMgr.instStatusInd(msg.Body.(*sch.MsgDhtQryInstStatusInd))
 
 	case sch.EvDhtQryInstResultInd:
 		eno = qryMgr.instResultInd(msg.Body.(*sch.MsgDhtQryInstResultInd))
@@ -513,6 +532,13 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 		}
 	}
 
+	return sch.SchEnoNone
+}
+
+//
+// Instance status indication handler
+//
+func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
@@ -927,11 +953,16 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			seq:		qcb.icbSeq,
 			name:		"qryMgrIcb" + fmt.Sprintf("%d", qcb.icbSeq),
 			ptnInst:	nil,
+			ptnConMgr:	nil,
+			ptnQryMgr:	qryMgr,
+			status:		qisNull,
 			target:		qcb.target,
 			to:			pending.node,
 			qTid:		sch.SchInvalidTid,
 			begTime:	time.Time{},
 			endTime:	time.Time{},
+			conBegTime:	time.Time{},
+			conEndTime:	time.Time{},
 		}
 
 		td := sch.SchTaskDescription{

@@ -307,6 +307,39 @@ const (
 )
 
 //
+// EvDhtConMgrConnectReq
+//
+type MsgDhtConMgrConnectReq struct {
+	Task	interface{}				// pointer to task node
+	Peer	*config.Node			// peer to be connected
+}
+
+//
+// EvDhtConMgrConnectRsp
+//
+type MsgDhtConMgrConnectRsp struct {
+	Peer	*config.Node			// peer to be connected
+	Eno		int						// result code
+}
+
+//
+// EvDhtConMgrSendReq
+//
+type MsgDhtConMgrSendReq struct {
+	Task	interface{}				// pointer to task node
+	Peer	*config.Node			// peer data sent to
+	Data	[]byte					// data to be sent
+}
+
+//
+// EvDhtConMgrCloseReq
+//
+type MsgDhtConMgrCloseReq struct {
+	Task	interface{}				// pointer to task node
+	Peer	*config.Node			// peer to be connected
+}
+
+//
 // DHT connection instance event
 //
 const (
@@ -382,6 +415,8 @@ const (
 	EvDhtQryInstStopReq			= EvDhtQryInstBase + 2
 	EvDhtQryInstStopRsp			= EvDhtQryInstBase + 3
 	EvDhtQryInstResultInd		= EvDhtQryInstBase + 4
+	EvDhtQryInstStatusInd		= EvDhtQryInstBase + 5
+	EvDhtQryInstProtoDatInd		= EvDhtQryInstBase + 6
 )
 
 //
@@ -391,6 +426,15 @@ type MsgDhtQryInstStopReq struct {
 	Target	config.NodeID			// target to be looked up
 	Peer	config.NodeID			// peer to be queried
 	Eno		int						// why stop
+}
+
+//
+// EvDhtQryInstStatusInd
+//
+type MsgDhtQryInstStatusInd struct {
+	Peer		config.NodeID		// peer to be queried
+	Target		config.NodeID		// target node identity
+	Status		int					// status
 }
 
 //
@@ -410,6 +454,14 @@ type MsgDhtQryInstResultInd struct {
 type MsgDhtQryInstStopRsp struct {
 	To			config.Node			// whom is queried by the instance
 	Target		config.NodeID		// target node identity
+}
+
+//
+// EvDhtQryInstProtoDatInd
+//
+type MsgDhtQryInstProtoDatInd struct {
+	From		*config.Node		// where data is sent from
+	Buf			[]byte				// data buffer
 }
 
 //

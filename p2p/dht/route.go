@@ -25,9 +25,9 @@ import (
 	"crypto/rand"
 	"container/list"
 	"crypto/sha256"
-	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	log	"github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
+	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
 //

@@ -100,7 +100,6 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtQryMgrQueryResultInd:
 	case sch.EvDhtPrdMgrGetProviderRsp:
 	case sch.EvDhtPrdMgrAddProviderRsp:
-	case sch.EvDhtConMgrConnectRsp:
 	case sch.EvDhtConMgrSendRsp:
 	case sch.EvDhtConMgrCloseRsp:
 	default:
