@@ -375,13 +375,13 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 
 	if msg.Eno != DhtEnoNone {
 		qryFailed2Sender(DhtErrno(msg.Eno))
-		qryMgr.qryMgrDelQcb(target, sch.EvSchPoweroff)
+		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
 		return sch.SchEnoNone
 	}
 
 	if len(peers) == 0 {
 		qryFailed2Sender(DhtEnoRoute)
-		qryMgr.qryMgrDelQcb(target, sch.EvSchPoweroff)
+		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
 		return sch.SchEnoNone
 	}
 
@@ -394,7 +394,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 
 		if peer.node.ID == target {
 			qryOk2Sender(&peer.node)
-			qryMgr.qryMgrDelQcb(target, sch.EvSchPoweroff)
+			qryMgr.qryMgrDelQcb(delQcb4TargetInLocal, target)
 			return sch.SchEnoNone
 		}
 
@@ -431,7 +431,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	log.LogCallerFileLine("rutNearestRsp: failed, dhtEno: %d", dhtEno)
 
 	qryFailed2Sender(dhtEno)
-	qryMgr.qryMgrDelQcb(target, sch.EvSchPoweroff)
+	qryMgr.qryMgrDelQcb(delQcb4InteralErrors, target)
 
 	return sch.SchEnoUserTask
 }
@@ -450,7 +450,7 @@ func (qryMgr *QryMgr)queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQuery
 		return qryMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	rsp.Eno = int(qryMgr.qryMgrDelQcb(target, sch.EvDhtQryInstStopReq))
+	rsp.Eno = int(qryMgr.qryMgrDelQcb(delQcb4Command, target))
 
 	return rsp2Sender(&rsp)
 }
@@ -507,7 +507,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 			return sch.SchEnoUserTask
 		}
 
-		if dhtEno := qryMgr.qryMgrDelQcb(qcb.target, sch.EvSchPoweroff); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
 			log.LogCallerFileLine("rutNotificationInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -593,7 +593,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	for _, peer := range msg.Peers {
 		if peer.ID == target {
 			qryMgr.qryMgrResultReport(qcb)
-			if dhtEno := qryMgr.qryMgrDelQcb(qcb.target, sch.EvSchPoweroff); dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
 				return sch.SchEnoUserTask
 			}
 			return sch.SchEnoNone
@@ -638,7 +638,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 			return sch.SchEnoUserTask
 		}
 
-		if dhtEno := qryMgr.qryMgrDelQcb(qcb.target, sch.EvSchPoweroff); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
 			log.LogCallerFileLine("instResultInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -697,7 +697,7 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 			return sch.SchEnoUserTask
 		}
 
-		if dhtEno := qryMgr.qryMgrDelQcb(qcb.target, sch.EvSchPoweroff); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
 			log.LogCallerFileLine("instStopRsp: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -734,25 +734,83 @@ func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
 //
 // Delete query control blcok from manager
 //
-func (qryMgr *QryMgr)qryMgrDelQcb(target config.NodeID, event int) DhtErrno {
+const (
+	delQcb4TargetFound	= iota		// target had been found
+	delQcb4NoMoreQueries			// no pendings and no actived instances
+	delQcb4Timeout					// query manager time out for the control block
+	delQcb4Command					// required by other module
+	delQcb4NoSeeds					// no seeds for query
+	delQcb4TargetInLocal			// target found in local
+	delQcb4InteralErrors			// internal errors while tring to query
+)
+
+func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
+
+	event := sch.EvSchPoweroff
+
+	switch why {
+	case delQcb4TargetFound:
+	case delQcb4NoMoreQueries:
+	case delQcb4Timeout:
+	case delQcb4NoSeeds:
+	case delQcb4TargetInLocal:
+	case delQcb4InteralErrors:
+
+	case delQcb4Command:
+		event = sch.EvDhtQryInstStopReq
+
+	default:
+		log.LogCallerFileLine("qryMgrDelQcb: parameters mismatched, why: %d", why)
+		return DhtEnoMismatched
+	}
 
 	qcb, ok := qryMgr.qcbTab[target]
-	if !ok { return DhtEnoNotFound }
+	if !ok {
+		log.LogCallerFileLine("qryMgrDelQcb: target not found: %x", target)
+		return DhtEnoNotFound
+	}
 
 	if qcb.status != qsInited {
 		delete(qryMgr.qcbTab, target)
 		return DhtEnoNone
 	}
 
+	//
+	// when we try to delete the query instance for external module command (why == delQcb4Command),
+	// we send request to each instance to ask them to stop and send response to us, so we do not
+	// release the query control block in this case.
+	//
+
+	if event == sch.EvDhtQryInstStopReq {
+		for _, icb := range qcb.qryActived {
+			req := sch.SchMessage{}
+			body := sch.MsgDhtQryInstStopReq{
+				Target: target,
+				Peer: icb.to.ID,
+				Eno: DhtEnoNone,
+			}
+			icb.sdl.SchMakeMessage(&req, qryMgr.ptnMe, icb.ptnInst, sch.EvDhtQryInstStopReq, &body)
+			icb.sdl.SchSendMessage(&req)
+		}
+		return DhtEnoNone
+	}
+
+	//
+	// other cases than a command, we send power off message to each instance, so they would kill
+	// themself, no responses for us, we free the query control block here.
+	//
+
 	if qcb.qryTid != sch.SchInvalidTid {
 		qryMgr.sdl.SchKillTimer(qryMgr.ptnMe, qcb.qryTid)
 		qcb.qryTid = sch.SchInvalidTid
 	}
 
-	for _, icb := range qcb.qryActived {
-		po := sch.SchMessage{Id: sch.EvSchPoweroff, Body: nil}
-		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, event, &po)
-		icb.sdl.SchSendMessage(&po)
+	if event == sch.EvSchPoweroff {
+		for _, icb := range qcb.qryActived {
+			po := sch.SchMessage{}
+			icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
+			icb.sdl.SchSendMessage(&po)
+		}
 	}
 
 	if qcb.rutNtfFlag == true {
@@ -902,13 +960,13 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		}
 		icb.ptnInst = ptn
 
-		po := sch.SchMessage{
-			Id:		sch.EvSchPoweron,
-			Body:	nil,
-		}
-
-		qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweron, &po)
+		po := sch.SchMessage{}
+		qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweron, nil)
 		qryMgr.sdl.SchSendMessage(&po)
+
+		start := sch.SchMessage{}
+		qryMgr.sdl.SchMakeMessage(&start, qryMgr.ptnMe, icb.ptnInst, sch.EvDhtQryInstStartReq, nil)
+		qryMgr.sdl.SchSendMessage(&start)
 	}
 
 	for _, el := range act {
@@ -955,7 +1013,7 @@ func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
 	}
 
 	qryMgr.qryMgrResultReport(qcb)
-	qryMgr.qryMgrDelQcb(qcb.target, sch.EvSchPoweroff)
+	qryMgr.qryMgrDelQcb(delQcb4Timeout, qcb.target)
 
 	return sch.SchEnoNone
 }

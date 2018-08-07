@@ -21,6 +21,7 @@
 package dht
 
 import (
+	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -61,7 +62,60 @@ func (qryInst *QryInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 // Query instance entry
 //
 func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	var eno = sch.SchEnoUnknown
+
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("qryInstProc: invalid parameters")
+		return sch.SchEnoParameter
+	}
+
+	switch msg.Id {
+
+	case sch.EvSchPoweron:
+		eno = qryInst.poweron(ptn)
+
+	case sch.EvSchPoweroff:
+		eno = qryInst.poweroff(ptn)
+
+	case sch.EvDhtQryInstStartReq:
+		eno = qryInst.startReq()
+
+	case sch.EvDhtQryInstStopReq:
+		eno = qryInst.stopReq(msg.Body.(*sch.MsgDhtQryInstStopReq))
+
+	default:
+		log.LogCallerFileLine("qryInstProc: unknown event: %d", msg.Id)
+		return sch.SchEnoParameter
+	}
+
+	return eno
+}
+
+//
+// Power on handler
+//
+func (qryInst *QryInst)poweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// Power off handler
+//
+func (qryInst *QryInst)poweroff(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
 
+//
+// Start instance handler
+//
+func (qryInst *QryInst)startReq() sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Stop instance handler
+//
+func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
+	return sch.SchEnoNone
+}

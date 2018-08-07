@@ -41,6 +41,7 @@ const (
 	DhtEnoScheduler
 	DhtEnoNotFound
 	DhtEnoDuplicated
+	DhtEnoMismatched
 	DhtEnoResource
 	DhtEnoRoute
 	DhtEnoTimeout

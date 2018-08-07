@@ -378,10 +378,20 @@ type MsgDhtQryMgrQueryResultInd struct {
 //
 const (
 	EvDhtQryInstBase			= 2400
-	EvDhtQryInstStopReq			= EvDhtQryInstBase + 1
-	EvDhtQryInstStopRsp			= EvDhtQryInstBase + 2
-	EvDhtQryInstResultInd		= EvDhtQryInstBase + 3
+	EvDhtQryInstStartReq		= EvDhtQryInstBase + 1
+	EvDhtQryInstStopReq			= EvDhtQryInstBase + 2
+	EvDhtQryInstStopRsp			= EvDhtQryInstBase + 3
+	EvDhtQryInstResultInd		= EvDhtQryInstBase + 4
 )
+
+//
+// EvDhtQryInstStopReq
+//
+type MsgDhtQryInstStopReq struct {
+	Target	config.NodeID			// target to be looked up
+	Peer	config.NodeID			// peer to be queried
+	Eno		int						// why stop
+}
 
 //
 // EvDhtQryInstResultInd
