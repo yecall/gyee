@@ -428,11 +428,11 @@ acceptLoop:
 		// listener, accept would get errors from underlying network.
 		//
 
-		log.LogCallerFileLine("PeerAcceptProc: try Accept()")
+		log.LogCallerFileLine("%s", "PeerAcceptProc: try Accept()")
 
 		conn, err := listener.Accept()
 
-		log.LogCallerFileLine("PeerAcceptProc: get out from Accept()")
+		log.LogCallerFileLine("%s", "PeerAcceptProc: get out from Accept()")
 
 		//
 		// Lock the control block since following statements need to access it

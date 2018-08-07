@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"sync"
 	"math/rand"
-	golog	"log"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
@@ -3420,8 +3419,6 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 //
 func (peMgr *PeerManager)logPeerStat() {
 
-	return
-
 	var obpNumSum = 0
 	var ibpNumSum = 0
 	var wrkNumSum = 0
@@ -3472,8 +3469,7 @@ func (peMgr *PeerManager)logPeerStat() {
 		dbgMsg += strSubnet
 	}
 
-	//log.LogCallerFileLine("%s", dbgMsg)
-	golog.Printf("%s", dbgMsg)
+	fmt.Printf("%s", dbgMsg)
 }
 
 
