@@ -199,13 +199,18 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 	}
 
 	eno, tid = icb.sdl.SchSetTimer(icb.ptnInst, &td)
+
 	if eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
+
 		log.LogCallerFileLine("startReq: SchSetTimer failed, eno: %d", eno)
+
 		ind.Status = qisDone
 		icb.status = qisDone
+
 		icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		icb.sdl.SchSendMessage(&msg)
 		icb.sdl.SchTaskDone(icb.ptnInst, sch.SchEnoInternal)
+
 		return eno
 	}
 
@@ -289,11 +294,11 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	}
 
 	//
-	// if we are wait connection to be established, we request the connection manager
-	// to abandon the connect-procedure. when this request received, the connection
-	// manager should check if the connection had been established and route talbe updated,
-	// if ture, then do not care this request, else it should close the connection and
-	// free all resources had been allocated to the connection instance.
+	// if we are waiting connection to be established, we request the connection manager
+	// to abandon the connect-procedure. when this request received, the connection manager
+	// should check if the connection had been established and route talbe updated, if ture,
+	// then do not care this request, else it should close the connection and free all
+	// resources had been allocated to the connection instance.
 	//
 
 	if icb.status == qisWaitConnect {
@@ -396,11 +401,20 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
 	sdl.SchSendMessage(&schMsg)
 
+	//
+	// update instance status and tell query manager
+	//
+
 	ind.Status = qisWaitResponse
 	icb.status = qisWaitResponse
+	icb.begTime = time.Now()
 
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	sdl.SchSendMessage(&schMsg)
+
+	//
+	// start timer to wait query response from peer
+	//
 
 	td := sch.TimerDescription {
 		Name:	"qiQryTimer" + fmt.Sprintf("%d", icb.seq),
@@ -418,11 +432,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	}
 
 	icb.qTid = tid
-	ind.Status = qisWaitResponse
-	icb.status = qisWaitResponse
-
-	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
-	sdl.SchSendMessage(&schMsg)
 
 	return sch.SchEnoNone
 }
