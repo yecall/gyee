@@ -45,6 +45,7 @@ const (
 	DhtEnoResource
 	DhtEnoRoute
 	DhtEnoTimeout
+	DhtEnoOs
 	DhtEnoUnknown
 )
 

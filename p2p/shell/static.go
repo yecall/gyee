@@ -84,6 +84,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 	}
 
 	log.LogCallerFileLine("P2pCreateStaticTaskTab: invalid type: %d", what)
+
 	return nil
 }
 
@@ -105,11 +106,11 @@ var taskStaticPoweronOrder4Chain = []string {
 //
 var taskStaticPoweronOrder4Dht = [] string {
 	dht.DhtMgrName,
+	dht.ConMgrName,
 	dht.QryMgrName,
 	dht.PrdMgrName,
-	dht.ConMgrName,
-	dht.LsnMgrName,
 	dht.RutMgrName,
+	dht.LsnMgrName,
 }
 
 //

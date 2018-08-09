@@ -178,6 +178,7 @@ type Config struct {
 	// DHT application part
 	//
 
+	DhtLocal			Node					// dht local node config
 	DhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
 	DhtQryCfg			Cfg4DhtQryManager		// for dht query manager
 }
@@ -284,6 +285,15 @@ type Cfg4DhtQryManager struct {
 }
 
 //
+// Configuration about dht listener management
+//
+type Cfg4DhtLsnManager struct {
+	IP				net.IP			// ip address
+	PortTcp			uint16			// port number for tcp
+	PortUdp			uint16			// port number for udp
+}
+
+//
 // Default version string, formated as "M.m0.m1.m2"
 //
 const dftVersion = "0.1.0.0"
@@ -356,6 +366,7 @@ func P2pDefaultConfig() *Config {
 		//
 
 		DhtRutCfg: Cfg4DhtRouteManager {
+			NodeId:			NodeID{0},
 			RandomQryNum:	1,
 			Period:			time.Minute * 1,
 		},
@@ -931,6 +942,17 @@ func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
 //
 func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
 	return &config[name].DhtQryCfg
+}
+
+//
+// Get configuration for dht listener manager
+//
+func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
+	return &Cfg4DhtLsnManager {
+		IP:			config[name].DhtLocal.IP,
+		PortTcp:	config[name].DhtLocal.TCP,
+		PortUdp:	config[name].DhtLocal.UDP,
+	}
 }
 
 //

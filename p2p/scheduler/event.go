@@ -289,8 +289,10 @@ const (
 	EvDhtLsnMgrStartReq		= EvDhtLsnMgrBase + 1
 	EvDhtLsnMgrStopReq		= EvDhtLsnMgrBase + 2
 	EvDhtLsnMgrPauseReq		= EvDhtLsnMgrBase + 3
-	EvDhtLsnMgrAcceptInd	= EvDhtLsnMgrBase + 4
-	EvDhtLsnMgrStatusInd	= EvDhtLsnMgrBase + 5
+	EvDhtLsnMgrResumeReq	= EvDhtLsnMgrBase + 4
+	EvDhtLsnMgrDriveSelf	= EvDhtLsnMgrBase + 5
+	EvDhtLsnMgrAcceptInd	= EvDhtLsnMgrBase + 6
+	EvDhtLsnMgrStatusInd	= EvDhtLsnMgrBase + 7
 )
 
 //

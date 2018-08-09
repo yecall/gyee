@@ -504,7 +504,9 @@ acceptLoop:
 	if accepter.curError != nil && accepter.event != sch.SchEnoNone {
 
 		//
-		// This is the normal case: the loop is broken by manager task killing the accepter
+		// This is the normal case: the loop is broken by manager task killing the accepter,
+		// in this case, the accepter.listener will be closed by manager so we get errors in
+		// accepting, see event sch.EvPeLsnStopReq handler for more pls.
 		//
 
 		log.LogCallerFileLine("PeerAcceptProc: broken for event: %d", accepter.event)
