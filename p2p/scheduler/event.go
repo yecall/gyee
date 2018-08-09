@@ -296,6 +296,20 @@ const (
 )
 
 //
+// EvDhtLsnMgrAcceptInd
+//
+type MsgDhtLsnMgrAcceptInd struct {
+	Con			net.Conn			// connection accepted
+}
+
+//
+// EvDhtLsnMgrStatusInd
+//
+type MsgDhtLsnMgrStatusInd struct {
+	Status		int					// current listener manager status
+}
+
+//
 // DHT connection manager event
 //
 const (

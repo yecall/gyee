@@ -36,17 +36,18 @@ const DhtMgrName = sch.DhtMgrName
 type DhtErrno int
 
 const (
-	DhtEnoNone	= iota
-	DhtEnoParameter
-	DhtEnoScheduler
-	DhtEnoNotFound
-	DhtEnoDuplicated
-	DhtEnoMismatched
-	DhtEnoResource
-	DhtEnoRoute
-	DhtEnoTimeout
-	DhtEnoOs
-	DhtEnoUnknown
+	DhtEnoNone	= iota			// none of errors
+	DhtEnoParameter				// invalid parameters
+	DhtEnoScheduler				// scheduler errors
+	DhtEnoNotFound				// something not found
+	DhtEnoDuplicated			// something duplicated
+	DhtEnoMismatched			// status mismatched
+	DhtEnoResource				// no more resource
+	DhtEnoRoute					// route errors
+	DhtEnoTimeout				// timeout
+	DhtEnoInternal				// internal logical errors
+	DhtEnoOs					// underlying operating system errors
+	DhtEnoUnknown				// unknown
 )
 
 //
