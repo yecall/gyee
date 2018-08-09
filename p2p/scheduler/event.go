@@ -362,9 +362,10 @@ const (
 	EvDhtConInstBase			= 2200
 	EvDhtConInstHandshakeReq	= EvDhtConInstBase + 1
 	EvDhtConInstHandshakeRsp	= EvDhtConInstBase + 2
-	EvDhtConInstStatusInd		= EvDhtConInstBase + 3
-	EvDhtConInstCloseReq		= EvDhtConInstBase + 4
-	EvDhtConInstCloseRsp		= EvDhtConInstBase + 5
+	EvDhtConInstTxDataReq		= EvDhtConInstBase + 3
+	EvDhtConInstStatusInd		= EvDhtConInstBase + 4
+	EvDhtConInstCloseReq		= EvDhtConInstBase + 5
+	EvDhtConInstCloseRsp		= EvDhtConInstBase + 6
 )
 
 //
@@ -381,6 +382,13 @@ type MsgDhtConInstHandshakeRsp struct {
 	Eno		int						// result code
 	Peer	*config.Node			// peer
 	HsInfo	interface{}				// handshake information
+}
+
+//
+// EvDhtConInstTxDataReq
+//
+type MsgDhtConInstTxDataReq struct {
+	Data	[]byte					// data buffer
 }
 
 //
@@ -456,9 +464,9 @@ type MsgDhtQryMgrQueryStopRsp struct {
 // EvDhtQryMgrQueryResultInd
 //
 type MsgDhtQryMgrQueryResultInd struct {
-	Eno		int							// result code. notice: when timeout, closests reported
-	Target	config.NodeID				// target to be looked up
-	Peers	[]*config.Node				// peers list, if target got, it always be the first one
+	Eno		int						// result code. notice: when timeout, closests reported
+	Target	config.NodeID			// target to be looked up
+	Peers	[]*config.Node			// peers list, if target got, it always be the first one
 }
 
 

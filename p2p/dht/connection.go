@@ -44,9 +44,13 @@ const (
 // Connection manager
 //
 type ConMgr struct {
-	name	string				// my name
-	tep		sch.SchUserTaskEp	// task entry
-	ptnMe	interface{}			// pointer to task node of myself
+	sdl			*sch.Scheduler					// pointer to scheduler
+	name		string							// my name
+	tep			sch.SchUserTaskEp				// task entry
+	ptnMe		interface{}						// pointer to task node of myself
+	ptnRutMgr	interface{}						// pointer to route manager task node
+	ptnQryMgr	interface{}						// pointer to query manager task node
+	ciTab		map[conInstIdentity]*ConInst	// connection instance table
 }
 
 //
@@ -55,9 +59,13 @@ type ConMgr struct {
 func NewConMgr() *ConMgr {
 
 	conMgr := ConMgr{
-		name:	ConMgrName,
-		tep:	nil,
-		ptnMe:	nil,
+		sdl:		nil,
+		name:		ConMgrName,
+		tep:		nil,
+		ptnMe:		nil,
+		ptnRutMgr:	nil,
+		ptnQryMgr:	nil,
+		ciTab:		make(map[conInstIdentity]*ConInst, 0),
 	}
 
 	conMgr.tep = conMgr.conMgrProc
@@ -88,7 +96,7 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = conMgr.poweroff(ptn)
 
 	case sch.EvDhtLsnMgrAcceptInd:
-		eno = conMgr.AcceptInd(msg.Body.(*sch.MsgDhtLsnMgrAcceptInd))
+		eno = conMgr.acceptInd(msg.Body.(*sch.MsgDhtLsnMgrAcceptInd))
 
 	case sch.EvDhtConInstHandshakeRsp:
 		eno = conMgr.handshakeRsp(msg.Body.(*sch.MsgDhtConInstHandshakeRsp))
@@ -139,7 +147,7 @@ func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 // Inbound connection accepted indication handler
 //
-func (conMgr *ConMgr)AcceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
+func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
