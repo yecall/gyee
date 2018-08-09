@@ -923,7 +923,9 @@ _done:
 //
 func (rutMgr *RutMgr)rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 	var msg = sch.SchMessage{}
-	var ind = sch.MsgDhtRutPeerRemovedInd{}
+	var ind = sch.MsgDhtRutPeerRemovedInd{
+		Peer:	bn.node.ID,
+	}
 	rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnConMgr, sch.EvDhtRutPeerRemovedInd, &ind)
 	rutMgr.sdl.SchSendMessage(&msg)
 	return DhtEnoNone

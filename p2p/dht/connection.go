@@ -21,6 +21,7 @@
 package dht
 
 import (
+	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -79,21 +80,123 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
+
 	case sch.EvSchPoweron:
+		eno = conMgr.poweron(ptn)
+
 	case sch.EvSchPoweroff:
+		eno = conMgr.poweroff(ptn)
+
 	case sch.EvDhtLsnMgrAcceptInd:
-	case sch.EvDhtConMgrConnectReq:
+		eno = conMgr.AcceptInd(msg.Body.(*sch.MsgDhtLsnMgrAcceptInd))
+
+	case sch.EvDhtConInstHandshakeRsp:
+		eno = conMgr.handshakeRsp(msg.Body.(*sch.MsgDhtConInstHandshakeRsp))
+
 	case sch.EvDhtLsnMgrStatusInd:
-	case sch.EvDhtConMgrSendReq:
+		eno = conMgr.lsnMgrStatusInd(msg.Body.(*sch.MsgDhtLsnMgrStatusInd))
+
+	case sch.EvDhtConMgrConnectReq:
+		eno = conMgr.connctReq(msg.Body.(*sch.MsgDhtConMgrConnectReq))
+
 	case sch.EvDhtConMgrCloseReq:
-	case sch.EvDhtConInstMsgInd:
+		eno = conMgr.closeReq(msg.Body.(*sch.MsgDhtConMgrCloseReq))
+
+	case sch.EvDhtConMgrSendReq:
+		eno = conMgr.sendReq(msg.Body.(*sch.MsgDhtConMgrSendReq))
+
 	case sch.EvDhtConInstStatusInd:
+		eno = conMgr.instStatusInd(msg.Body.(*sch.MsgDhtConInstStatusInd))
+
 	case sch.EvDhtConInstCloseRsp:
+		eno = conMgr.instCloseRsp(msg.Body.(*sch.MsgDhtConInstCloseRsp))
+
 	case sch.EvDhtRutPeerRemovedInd:
+		eno = conMgr.rutPeerRemoveInd(msg.Body.(*sch.MsgDhtRutPeerRemovedInd))
+
 	default:
+		log.LogCallerFileLine("conMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
 	return eno
 }
+
+//
+// Poweron handler
+//
+func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Poweroff handler
+//
+func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Inbound connection accepted indication handler
+//
+func (conMgr *ConMgr)AcceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Handshake response handler
+//
+func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Listener manager status indication handler
+//
+func (conMgr *ConMgr)lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Connect-request handler
+//
+func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Close-instance-request handler
+//
+func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Send-data-request handler
+//
+func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Instance status indication handler
+//
+func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Close-instance-request handler
+//
+func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// Peer removed from route indication handler
+//
+func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
 

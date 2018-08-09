@@ -388,7 +388,7 @@ func (lsnMgr *LsnMgr)driveMore() DhtErrno {
 }
 
 //
-// Froce to get out from accept action
+// Froce to get out from accept call
 //
 func (lsnMgr *LsnMgr) ForceAcceptOut() DhtErrno {
 

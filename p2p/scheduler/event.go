@@ -359,12 +359,52 @@ type MsgDhtConMgrCloseReq struct {
 // DHT connection instance event
 //
 const (
-	EvDhtConInstBase		= 2200
-	EvDhtConInstMsgInd		= EvDhtConInstBase + 1
-	EvDhtConInstStatusInd	= EvDhtConInstBase + 2
-	EvDhtConInstCloseReq	= EvDhtConInstBase + 3
-	EvDhtConInstCloseRsp	= EvDhtConInstBase + 4
+	EvDhtConInstBase			= 2200
+	EvDhtConInstHandshakeReq	= EvDhtConInstBase + 1
+	EvDhtConInstHandshakeRsp	= EvDhtConInstBase + 2
+	EvDhtConInstStatusInd		= EvDhtConInstBase + 3
+	EvDhtConInstCloseReq		= EvDhtConInstBase + 4
+	EvDhtConInstCloseRsp		= EvDhtConInstBase + 5
 )
+
+//
+// EvDhtConInstHandshakeReq
+//
+type MsgDhtConInstHandshakeReq struct {
+	toDur	time.Duration			// timeout duration
+}
+
+//
+// EvDhtConInstHandshakeRsp
+//
+type MsgDhtConInstHandshakeRsp struct {
+	Eno		int						// result code
+	Peer	*config.Node			// peer
+	HsInfo	interface{}				// handshake information
+}
+
+//
+// EvDhtConInstCloseReq
+//
+type MsgDhtConInstCloseReq struct {
+	Peer	*config.NodeID			// peer identity
+	Why		int						// why to close
+}
+
+//
+// EvDhtConInstCloseRsp
+//
+type MsgDhtConInstCloseRsp struct {
+	Peer	*config.NodeID			// peer identity
+}
+
+//
+// EvDhtConInstStatusInd
+//
+type MsgDhtConInstStatusInd struct {
+	Peer	*config.NodeID			// peer identity
+	Status	int						// status
+}
 
 //
 // DHT query manager event
@@ -536,7 +576,7 @@ type MsgDhtRutMgrNotificationInd struct {
 // EvDhtRutPeerRemovedInd
 //
 type MsgDhtRutPeerRemovedInd struct {
-	Target	config.NodeID			// target peer identity
+	Peer	config.NodeID			// target peer identity
 }
 
 //
