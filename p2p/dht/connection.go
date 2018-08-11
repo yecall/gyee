@@ -21,8 +21,11 @@
 package dht
 
 import (
+	"fmt"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	config "github.com/yeeco/gyee/p2p/config"
+	"time"
 )
 
 //
@@ -41,16 +44,26 @@ const (
 )
 
 //
+// Connection manager configuration
+//
+type conMgrCfg struct {
+	maxCon		int								// max number of connection
+	hsTimeout	time.Duration					// handshake timeout duration
+}
+
+//
 // Connection manager
 //
 type ConMgr struct {
 	sdl			*sch.Scheduler					// pointer to scheduler
 	name		string							// my name
+	cfg			conMgrCfg						// configuration
 	tep			sch.SchUserTaskEp				// task entry
 	ptnMe		interface{}						// pointer to task node of myself
 	ptnRutMgr	interface{}						// pointer to route manager task node
 	ptnQryMgr	interface{}						// pointer to query manager task node
 	ciTab		map[conInstIdentity]*ConInst	// connection instance table
+	ciSeq		int64							// connection instance sequence number
 }
 
 //
@@ -66,6 +79,7 @@ func NewConMgr() *ConMgr {
 		ptnRutMgr:	nil,
 		ptnQryMgr:	nil,
 		ciTab:		make(map[conInstIdentity]*ConInst, 0),
+		ciSeq:		0,
 	}
 
 	conMgr.tep = conMgr.conMgrProc
@@ -85,6 +99,13 @@ func (conMgr *ConMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("conMgrProc: " +
+			"invalid parameters, ptn: %p, msg: %p",
+			ptn, msg)
+		return sch.SchEnoParameter
+	}
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -95,6 +116,12 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvSchPoweroff:
 		eno = conMgr.poweroff(ptn)
 
+	case sch.EvDhtConMgrConnectReq:
+		eno = conMgr.connctReq(msg.Body.(*sch.MsgDhtConMgrConnectReq))
+
+	case sch.EvDhtConMgrCloseReq:
+		eno = conMgr.closeReq(msg.Body.(*sch.MsgDhtConMgrCloseReq))
+
 	case sch.EvDhtLsnMgrAcceptInd:
 		eno = conMgr.acceptInd(msg.Body.(*sch.MsgDhtLsnMgrAcceptInd))
 
@@ -103,12 +130,6 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	case sch.EvDhtLsnMgrStatusInd:
 		eno = conMgr.lsnMgrStatusInd(msg.Body.(*sch.MsgDhtLsnMgrStatusInd))
-
-	case sch.EvDhtConMgrConnectReq:
-		eno = conMgr.connctReq(msg.Body.(*sch.MsgDhtConMgrConnectReq))
-
-	case sch.EvDhtConMgrCloseReq:
-		eno = conMgr.closeReq(msg.Body.(*sch.MsgDhtConMgrCloseReq))
 
 	case sch.EvDhtConMgrSendReq:
 		eno = conMgr.sendReq(msg.Body.(*sch.MsgDhtConMgrSendReq))
@@ -134,6 +155,23 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 // Poweron handler
 //
 func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
+
+	sdl := sch.SchGetScheduler(ptn)
+
+	conMgr.ptnMe = ptn
+	_, conMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
+	_, conMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
+
+	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil {
+		log.LogCallerFileLine("poweron: internal errors")
+		return sch.SchEnoInternal
+	}
+
+	if dhtEno := conMgr.getConfig(); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("poweron: getConfig failed, dhtEno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -141,6 +179,17 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
+
+	log.LogCallerFileLine("poweroff: task will be done ...")
+
+	po := sch.SchMessage{}
+	for _, ci := range conMgr.ciTab {
+		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		conMgr.sdl.SchSendMessage(&po)
+	}
+
+	conMgr.sdl.SchTaskDone(conMgr.ptnMe, sch.SchEnoKilled)
+
 	return sch.SchEnoNone
 }
 
@@ -169,7 +218,66 @@ func (conMgr *ConMgr)lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrn
 // Connect-request handler
 //
 func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
-	return sch.SchEnoNone
+
+	var rsp = sch.MsgDhtConMgrConnectRsp {
+		Peer:	msg.Peer,
+		Eno:	DhtEnoNone,
+	}
+
+	var sender = msg.Task
+	var sdl = conMgr.sdl
+
+	var rsp2Sender = func(eno DhtErrno) sch.SchErrno {
+		msg := sch.SchMessage{}
+		rsp.Eno = int(eno)
+		sdl.SchMakeMessage(&msg, conMgr.ptnMe, sender, sch.EvDhtConMgrConnectRsp, &rsp)
+		return sdl.SchSendMessage(&msg)
+	}
+
+	if conMgr.lookupOutboundConInst(&msg.Peer.ID) != nil {
+		log.LogCallerFileLine("connctReq: outbound instance duplicated, id: %x", msg.Peer.ID)
+		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
+	}
+
+	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
+	conMgr.setupOutboundInst(ci, msg.Task, msg.Peer)
+	conMgr.ciSeq++
+
+	td := sch.SchTaskDescription{
+		Name:		ci.name,
+		MbSize:		-1,
+		Ep:			ci,
+		Wd:			&sch.SchWatchDog{HaveDog:false,},
+		Flag:		sch.SchCreatedGo,
+		DieCb:		nil,
+		UserDa:		nil,
+	}
+
+	eno, ptn := conMgr.sdl.SchCreateTask(&td)
+	if eno != sch.SchEnoNone || ptn == nil {
+		log.LogCallerFileLine("")
+		return rsp2Sender(DhtErrno(DhtEnoScheduler))
+	}
+
+	ci.ptnMe = ptn
+	po := sch.SchMessage{}
+	sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweron, nil)
+	sdl.SchSendMessage(&po)
+
+	hs := sch.SchMessage{}
+	hsreq := sch.MsgDhtConInstHandshakeReq {
+		DurHs: conMgr.cfg.hsTimeout,
+	}
+	sdl.SchMakeMessage(&hs, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstHandshakeReq, &hsreq)
+	sdl.SchSendMessage(&hs)
+
+	cid := conInstIdentity{
+		nid: msg.Peer.ID,
+		dir: conInstDirOutbound,
+	}
+	conMgr.ciTab[cid] = ci
+
+	return rsp2Sender(DhtErrno(DhtEnoNone))
 }
 
 //
@@ -207,4 +315,58 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	return sch.SchEnoNone
 }
 
+//
+// Get configuration for connection mananger
+//
+func (conMgr *ConMgr)getConfig() DhtErrno {
+	return DhtEnoNone
+}
 
+//
+// Lookup connection instance by instance identity
+//
+func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) *ConInst {
+	if cid == nil {
+		return nil
+	}
+	return conMgr.ciTab[*cid]
+}
+
+//
+// Lookup outbound connection instance by node identity
+//
+func (conMgr *ConMgr)lookupOutboundConInst(nid *config.NodeID) *ConInst {
+	ci := &conInstIdentity {
+		nid:*nid,
+		dir:conInstDirOutbound,
+	}
+	return conMgr.lookupConInst(ci)
+}
+
+//
+// Lookup outbound connection instance by node identity
+//
+func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
+	ci := &conInstIdentity {
+		nid:*nid,
+		dir:conInstDirInbound,
+	}
+	return conMgr.lookupConInst(ci)
+}
+
+//
+// Setup outbound connection instance
+//
+func (conMgr *ConMgr)setupOutboundInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
+
+	ci.sdl = conMgr.sdl
+	ci.ptnConMgr = conMgr.ptnMe
+	ci.ptnSrcTsk = srcTask
+
+	ci.cid = conInstIdentity{
+		nid: peer.ID,
+		dir: conInstDirInbound,
+	}
+
+	return DhtEnoNone
+}

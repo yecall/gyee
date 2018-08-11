@@ -114,6 +114,13 @@ func (lsnMgr *LsnMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("lsnMgrProc: " +
+			"invalid parameters, ptn: %p, msg: %p",
+			ptn, msg)
+		return sch.SchEnoParameter
+	}
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {

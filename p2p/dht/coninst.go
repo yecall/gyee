@@ -37,7 +37,8 @@ type ConInst struct {
 	name		string					// task name
 	tep			sch.SchUserTaskEp		// task entry
 	ptnMe		interface{}				// pointer to myself task node
-	ptnConMgr	interface {}			// pointer to connection manager task node
+	ptnConMgr	interface{}				// pointer to connection manager task node
+	ptnSrcTsk	interface{}				// for outbound, the source task requests the connection
 	status		conInstStatus			// instance status
 	cid			conInstIdentity			// connection instance identity
 	con			net.Conn				// connection
@@ -100,9 +101,11 @@ type conInstTxPkg struct {
 func newConInst(postFixed string) *ConInst {
 
 	conInst := ConInst {
-		name:	"conInst" + postFixed,
-		tep:	nil,
-		ptnMe:	nil,
+		name:		"conInst" + postFixed,
+		tep:		nil,
+		ptnMe:		nil,
+		ptnConMgr:	nil,
+		ptnSrcTsk:	nil,
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -121,6 +124,13 @@ func (conInst *ConInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 // Connection instance entry
 //
 func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("conInstProc: " +
+			"invalid parameters, ptn: %p, msg: %p",
+			ptn, msg)
+		return sch.SchEnoParameter
+	}
 
 	var eno = sch.SchEnoUnknown
 

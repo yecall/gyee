@@ -72,12 +72,14 @@ func (qryInst *QryInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 //
 func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	var eno = sch.SchEnoUnknown
-
 	if ptn == nil || msg == nil {
-		log.LogCallerFileLine("qryInstProc: invalid parameters")
+		log.LogCallerFileLine("qryInstProc: " +
+			"invalid parameters, ptn: %p, msg: %p",
+			ptn, msg)
 		return sch.SchEnoParameter
 	}
+
+	var eno = sch.SchEnoUnknown
 
 	switch msg.Id {
 

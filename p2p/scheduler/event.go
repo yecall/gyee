@@ -372,7 +372,7 @@ const (
 // EvDhtConInstHandshakeReq
 //
 type MsgDhtConInstHandshakeReq struct {
-	toDur	time.Duration			// timeout duration
+	DurHs	time.Duration			// timeout duration
 }
 
 //
