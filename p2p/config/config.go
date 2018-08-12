@@ -181,6 +181,7 @@ type Config struct {
 	DhtLocal			Node					// dht local node config
 	DhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
 	DhtQryCfg			Cfg4DhtQryManager		// for dht query manager
+	DhtConCfg			Cfg4DhtConManager		// for dht connection manager
 }
 
 //
@@ -294,6 +295,14 @@ type Cfg4DhtLsnManager struct {
 }
 
 //
+// Configuration about dht connection manager
+//
+type Cfg4DhtConManager struct {
+	MaxCon    		int				// max number of connection
+	HsTimeout 		time.Duration	// handshake timeout duration
+}
+
+//
 // Default version string, formated as "M.m0.m1.m2"
 //
 const dftVersion = "0.1.0.0"
@@ -376,6 +385,11 @@ func P2pDefaultConfig() *Config {
 			MaxActInsts:	8,
 			QryExpired:		time.Second * 60,
 			QryInstExpired:	time.Second * 16,
+		},
+
+		DhtConCfg: Cfg4DhtConManager {
+			MaxCon:			512,
+			HsTimeout:		time.Second * 16,
 		},
 	}
 
@@ -953,6 +967,13 @@ func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 		PortTcp:	config[name].DhtLocal.TCP,
 		PortUdp:	config[name].DhtLocal.UDP,
 	}
+}
+
+//
+// Get configuration for dht connection manager
+//
+func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
+	return &config[name].DhtConCfg
 }
 
 //

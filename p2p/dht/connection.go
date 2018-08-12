@@ -672,6 +672,9 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 // Get configuration for connection mananger
 //
 func (conMgr *ConMgr)getConfig() DhtErrno {
+	cfg := config.P2pConfig4DhtConManager(conMgr.sdl.SchGetP2pCfgName())
+	conMgr.cfg.maxCon = cfg.MaxCon
+	conMgr.cfg.hsTimeout = cfg.HsTimeout
 	return DhtEnoNone
 }
 
