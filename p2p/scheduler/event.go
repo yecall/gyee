@@ -391,8 +391,11 @@ type MsgDhtConInstHandshakeReq struct {
 //
 type MsgDhtConInstHandshakeRsp struct {
 	Eno		int						// result code
+	Inst	interface{}				// pointer connection instance
 	Peer	*config.Node			// peer
+	Dir		int						// connection instance direction
 	HsInfo	interface{}				// handshake information
+	Dur		time.Duration			// duration for handshake
 }
 
 //

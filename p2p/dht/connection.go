@@ -22,10 +22,11 @@ package dht
 
 import (
 	"fmt"
+	"time"
+	"container/list"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
-	"time"
 )
 
 //
@@ -62,8 +63,10 @@ type ConMgr struct {
 	ptnMe		interface{}						// pointer to task node of myself
 	ptnRutMgr	interface{}						// pointer to route manager task node
 	ptnQryMgr	interface{}						// pointer to query manager task node
+	ptnLsnMgr	interface{}						// pointer to the listner manager task node
 	ciTab		map[conInstIdentity]*ConInst	// connection instance table
 	ciSeq		int64							// connection instance sequence number
+	txQueTab	map[conInstIdentity]*list.List	// outbound data pending queue
 }
 
 //
@@ -80,6 +83,7 @@ func NewConMgr() *ConMgr {
 		ptnQryMgr:	nil,
 		ciTab:		make(map[conInstIdentity]*ConInst, 0),
 		ciSeq:		0,
+		txQueTab:	make(map[conInstIdentity]*list.List, 0),
 	}
 
 	conMgr.tep = conMgr.conMgrProc
@@ -161,8 +165,9 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 	conMgr.ptnMe = ptn
 	_, conMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
 	_, conMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
+	_, conMgr.ptnLsnMgr = sdl.SchGetTaskNodeByName(LsnMgrName)
 
-	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil {
+	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil || conMgr.ptnLsnMgr == nil {
 		log.LogCallerFileLine("poweron: internal errors")
 		return sch.SchEnoInternal
 	}
@@ -197,6 +202,46 @@ func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 // Inbound connection accepted indication handler
 //
 func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
+
+	//
+	// at this moment, we do not know any peer information, since it just only the
+	// inbound connection accepted. we can check the peer only after the handshake
+	// procedure is completed.
+	//
+
+	sdl := conMgr.sdl
+	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
+	conMgr.setupOutboundInst(ci, conMgr.ptnLsnMgr, nil)
+	conMgr.ciSeq++
+
+	td := sch.SchTaskDescription{
+		Name:		ci.name,
+		MbSize:		-1,
+		Ep:			ci,
+		Wd:			&sch.SchWatchDog{HaveDog:false,},
+		Flag:		sch.SchCreatedGo,
+		DieCb:		nil,
+		UserDa:		nil,
+	}
+
+	eno, ptn := conMgr.sdl.SchCreateTask(&td)
+	if eno != sch.SchEnoNone || ptn == nil {
+		log.LogCallerFileLine("acceptInd: SchCreateTask failed, eno: %d", eno)
+		return eno
+	}
+
+	ci.ptnMe = ptn
+	po := sch.SchMessage{}
+	sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweron, nil)
+	sdl.SchSendMessage(&po)
+
+	hs := sch.SchMessage{}
+	hsreq := sch.MsgDhtConInstHandshakeReq {
+		DurHs: conMgr.cfg.hsTimeout,
+	}
+	sdl.SchMakeMessage(&hs, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstHandshakeReq, &hsreq)
+	sdl.SchSendMessage(&hs)
+
 	return sch.SchEnoNone
 }
 
@@ -204,6 +249,105 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 // Handshake response handler
 //
 func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErrno {
+
+	//
+	// for inbound connection instances, we still not map them into "conMgr.ciTab",
+	// we need to do this if handshake-ok reported, since we can obtain the peer
+	// information in this case here.
+	//
+
+	cid := conInstIdentity {
+		nid:	msg.Peer.ID,
+		dir:	conInstDir(msg.Dir),
+	}
+
+	var ci *ConInst = nil
+
+	if msg.Eno != DhtEnoNone {
+
+		//
+		// notice: if handshake failed, connection instances should have done themself,
+		// so here we need not to request them to be closed, we just remove them from
+		// the map table(for outbounds).
+		//
+
+		if msg.Dir == conInstDirOutbound {
+			delete(conMgr.ciTab, cid)
+		}
+
+		cid := conInstIdentity{
+			nid: msg.Peer.ID,
+			dir: conInstDirOutbound,
+		}
+
+		if li, ok := conMgr.txQueTab[cid]; ok {
+			for li.Len() > 0 {
+				li.Remove(li.Front())
+			}
+			delete(conMgr.txQueTab, cid)
+		}
+
+		return sch.SchEnoNone
+	}
+
+	if msg.Dir == conInstDirInbound {
+
+		ci = msg.Inst.(*ConInst)
+		conMgr.ciTab[cid] = ci
+
+	} else {
+
+		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
+			log.LogCallerFileLine("handshakeRsp: not found, id: %x", msg.Peer.ID)
+			return sch.SchEnoUserTask
+		}
+
+		//
+		// submit the pending package for outbound instance if any
+		//
+
+		cid := conInstIdentity{
+			nid: msg.Peer.ID,
+			dir: conInstDirOutbound,
+		}
+
+		if li, ok := conMgr.txQueTab[cid]; ok {
+
+			for li.Len() > 0 {
+
+				el := li.Front()
+				tx := el.Value.(*sch.MsgDhtConMgrSendReq)
+
+				pkg := conInstTxPkg {
+					task:		tx.Task,
+					submitTime:	time.Now(),
+					payload:	tx.Data,
+				}
+
+				ci.txPutPending(&pkg)
+			}
+
+			delete(conMgr.txQueTab, cid)
+		}
+	}
+
+	//
+	// we need to update the route manager
+	//
+
+	update := sch.MsgDhtRutMgrUpdateReq {
+		Seens:	[]config.Node {
+			*msg.Peer,
+		},
+		Duras:	[]time.Duration {
+			msg.Dur,
+		},
+	}
+
+	schMsg := sch.SchMessage{}
+	conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
+	conMgr.sdl.SchSendMessage(&schMsg)
+
 	return sch.SchEnoNone
 }
 
@@ -211,6 +355,12 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 // Listener manager status indication handler
 //
 func (conMgr *ConMgr)lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrno {
+	log.LogCallerFileLine("lsnMgrStatusInd: listener manager status reported: %d", msg.Status)
+	if msg.Status == lmsNull || msg.Status == lmsStopped {
+		schMsg := sch.SchMessage{}
+		conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrStartReq, nil)
+		return conMgr.sdl.SchSendMessage(&schMsg)
+	}
 	return sch.SchEnoNone
 }
 
@@ -341,6 +491,56 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 // Send-data-request handler
 //
 func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
+
+	//
+	// notice: when requested to send, the connection instance might not be exist,
+	// we need to establesh the connection and backup the data if it is the case;
+	//
+	// notice: it must be a outbound instance to bear the data requested to be sent,
+	// even we have an instance of inbound with the same node identity, we do not
+	// send on it.
+	//
+
+	ci := conMgr.lookupOutboundConInst(&msg.Peer.ID)
+
+	if ci != nil {
+
+		pkg := conInstTxPkg {
+			task:		msg.Task,
+			submitTime:	time.Now(),
+			payload:	msg.Data,
+		}
+
+		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
+			log.LogCallerFileLine("sendReq: txPutPending failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		return sch.SchEnoNone
+	}
+
+	schMsg := sch.SchMessage{}
+	req := sch.MsgDhtConMgrConnectReq {
+		Task:	msg.Task,
+		Peer:	msg.Peer,
+	}
+	conMgr.sdl.SchMakeMessage(&schMsg, msg.Task, conMgr.ptnMe, sch.EvDhtConMgrConnectReq, &req)
+	conMgr.sdl.SchSendMessage(&schMsg)
+
+	cid := conInstIdentity {
+		nid: msg.Peer.ID,
+		dir: conInstDirOutbound,
+	}
+
+	li, ok := conMgr.txQueTab[cid]
+	if ok {
+		li.PushBack(msg)
+	} else {
+		li = list.New()
+		conMgr.txQueTab[cid] = li
+		li.PushBack(msg)
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -348,6 +548,21 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 // Instance status indication handler
 //
 func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+
+	log.LogCallerFileLine("instStatusInd: " +
+		"instance status reported: %d, id: %x",
+		msg.Status, msg.Peer)
+
+	switch msg.Status {
+	case cisNull:
+	case cisConnected:
+	case cisInHandshaking:
+	case cisHandshaked:
+	case cisInService:
+	case cisClosed:
+	default:
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -357,7 +572,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 
 	cid := conInstIdentity {
-		nid:	msg.Peer.ID,
+		nid:	*msg.Peer,
 		dir:	conInstDir(msg.Dir),
 	}
 
@@ -412,7 +627,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	//
 
 	cid := conInstIdentity {
-		nid:	msg.Peer.ID,
+		nid:	msg.Peer,
 		dir:	conInstDirAllbound,
 	}
 
@@ -421,7 +636,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 
 	req2Inst := func(inst *ConInst) sch.SchErrno {
 		req := sch.MsgDhtConInstCloseReq{
-			Peer:	&msg.Peer.ID,
+			Peer:	&msg.Peer,
 			Why:	sch.EvDhtRutPeerRemovedInd,
 		}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
@@ -470,12 +685,16 @@ func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
 	}
 
 	if cid.dir == conInstDirInbound || cid.dir == conInstDirOutbound {
+
 		return []*ConInst{conMgr.ciTab[*cid]}
+
 	} else if cid.dir == conInstDirAllbound {
+
 		inCid := *cid
 		inCid.dir = conInstDirInbound
 		outCid := *cid
 		outCid.dir = conInstDirOutbound
+
 		return []*ConInst {
 			conMgr.ciTab[inCid],
 			conMgr.ciTab[outCid],
@@ -511,13 +730,22 @@ func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 // Setup outbound connection instance
 //
 func (conMgr *ConMgr)setupOutboundInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
+
 	ci.sdl = conMgr.sdl
 	ci.ptnConMgr = conMgr.ptnMe
 	ci.ptnSrcTsk = srcTask
-	ci.hsInfo.peer = *peer
+
+	if peer != nil {
+		ci.hsInfo.peer = *peer
+		ci.dir = conInstDirOutbound
+	} else {
+		ci.dir = conInstDirInbound
+	}
+
 	ci.cid = conInstIdentity{
 		nid: peer.ID,
 		dir: conInstDirInbound,
 	}
+
 	return DhtEnoNone
 }

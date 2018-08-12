@@ -42,6 +42,7 @@ type ConInst struct {
 	status		conInstStatus			// instance status
 	cid			conInstIdentity			// connection instance identity
 	con			net.Conn				// connection
+	dir			conInstDir				// connection instance directory
 	hsInfo		conInstHandshakeInfo	// handshake information
 	txPending	[]*conInstTxPkg			// pending package to be sent
 	txLock		sync.Mutex				// tx lock
@@ -76,6 +77,7 @@ const (
 	conInstDirInbound	= 0			// out from local
 	conInstDirOutbound	= 1			// in from peer
 	conInstDirAllbound	= 2			// in & out
+	conInstDirUnknown	= -1		// not be initialized
 )
 
 type conInstDir int
@@ -92,6 +94,7 @@ type conInstHandshakeInfo struct {
 // Outcoming package
 //
 type conInstTxPkg struct {
+	task		interface{}			// pointer to owner task node
 	submitTime	time.Time			// time the payload submitted
 	payload		[]byte				// payload buffer
 }
@@ -107,6 +110,9 @@ func newConInst(postFixed string) *ConInst {
 		ptnMe:		nil,
 		ptnConMgr:	nil,
 		ptnSrcTsk:	nil,
+		status:		cisNull,
+		dir:		conInstDirUnknown,
+		txPending:	[]*conInstTxPkg{},
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -178,6 +184,12 @@ func (conInst *ConInst)poweroff(ptn interface{}) sch.SchErrno {
 // Handshake-request handler
 //
 func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchErrno {
+
+	//
+	// if handshake failed, the instance task should done itself, and send handshake
+	// response message to connection manager task.
+	//
+
 	return sch.SchEnoNone
 }
 
@@ -198,7 +210,7 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 //
 // Map connection instance status to "peer connection status"
 //
-func ConInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
+func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 	cis2pcs := map[conInstStatus] conMgrPeerConnStat {
 		cisNull:			pcsConnNo,
 		cisConnected:		pcsConnNo,
@@ -208,4 +220,14 @@ func ConInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 		cisClosed:			pcsConnNo,
 	}
 	return cis2pcs[cis]
+}
+
+//
+// Put outbound package into pending queue
+//
+func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
+	conInst.txLock.Lock()
+	defer conInst.txLock.Unlock()
+	conInst.txPending = append(conInst.txPending, pkg)
+	return DhtEnoNone
 }
