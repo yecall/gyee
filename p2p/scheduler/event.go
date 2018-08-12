@@ -353,7 +353,18 @@ type MsgDhtConMgrSendReq struct {
 type MsgDhtConMgrCloseReq struct {
 	Task	interface{}				// pointer to task node
 	Peer	*config.Node			// peer to be connected
+	Dir		int						// instance direction
 }
+
+//
+// EvDhtConMgrCloseRsp
+//
+type MsgDhtConMgrCloseRsp struct {
+	Eno		int						// result code
+	Peer	*config.Node			// peer to be connected
+	Dir		int						// instance direction
+}
+
 
 //
 // DHT connection instance event
@@ -404,6 +415,7 @@ type MsgDhtConInstCloseReq struct {
 //
 type MsgDhtConInstCloseRsp struct {
 	Peer	*config.NodeID			// peer identity
+	Dir		int						// instance direction
 }
 
 //

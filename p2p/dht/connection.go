@@ -40,7 +40,7 @@ type conMgrPeerConnStat int
 
 const (
 	pcsConnNo	= iota			// not connected
-	pcsConnYes					// connected
+	pcsConnYes					// connected in service
 )
 
 //
@@ -272,8 +272,8 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	sdl.SchSendMessage(&hs)
 
 	cid := conInstIdentity{
-		nid: msg.Peer.ID,
-		dir: conInstDirOutbound,
+		nid:	msg.Peer.ID,
+		dir:	conInstDirOutbound,
 	}
 	conMgr.ciTab[cid] = ci
 
@@ -284,6 +284,56 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 // Close-instance-request handler
 //
 func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
+
+	cid := conInstIdentity {
+		nid:	msg.Peer.ID,
+		dir:	conInstDir(msg.Dir),
+	}
+
+	schMsg := sch.SchMessage{}
+	sender := msg.Task
+	sdl := conMgr.sdl
+
+	rsp2Sender := func(eno DhtErrno) sch.SchErrno{
+		rsp := sch.MsgDhtConMgrCloseRsp{
+			Eno:	int(eno),
+			Peer:	msg.Peer,
+			Dir:	msg.Dir,
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, sender, sch.EvDhtConMgrCloseRsp, &rsp)
+		return sdl.SchSendMessage(&schMsg)
+	}
+
+	req2Inst := func(inst *ConInst) sch.SchErrno {
+		req := sch.MsgDhtConInstCloseReq{
+			Peer:	&msg.Peer.ID,
+			Why:	sch.EvDhtConMgrCloseReq,
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
+		return sdl.SchSendMessage(&schMsg)
+	}
+
+	found := false
+	err := false
+
+	cis := conMgr.lookupConInst(&cid)
+	for _, ci := range cis {
+		if ci != nil {
+			found = true
+			if req2Inst(ci) != sch.SchEnoNone {
+				err = true
+			}
+		}
+	}
+
+	if !found {
+		return rsp2Sender(DhtEnoNotFound)
+	}
+
+	if err {
+		return rsp2Sender(DhtEnoScheduler)
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -305,6 +355,49 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 // Close-instance-request handler
 //
 func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
+
+	cid := conInstIdentity {
+		nid:	msg.Peer.ID,
+		dir:	conInstDir(msg.Dir),
+	}
+
+	schMsg := sch.SchMessage{}
+	sdl := conMgr.sdl
+
+	rsp2Sender := func(eno DhtErrno, peer *config.Node, task interface{}) sch.SchErrno{
+		rsp := sch.MsgDhtConMgrCloseRsp{
+			Eno:	int(eno),
+			Peer:	peer,
+			Dir:	msg.Dir,
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, task, sch.EvDhtConMgrCloseRsp, &rsp)
+		return sdl.SchSendMessage(&schMsg)
+	}
+
+	found := false
+	err := false
+
+	cis := conMgr.lookupConInst(&cid)
+	for _, ci := range cis {
+		if ci != nil {
+			found = true
+			if rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk) != sch.SchEnoNone {
+				err = true
+			} else {
+				delete(conMgr.ciTab, cid)
+			}
+		}
+	}
+
+	if !found {
+		log.LogCallerFileLine("instCloseRsp: not found, id: %x", msg.Peer)
+	}
+
+	if err {
+		log.LogCallerFileLine("instCloseRsp: seems some errors")
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -312,6 +405,51 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 // Peer removed from route indication handler
 //
 func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchErrno {
+
+	//
+	// when peer is removed from route table, we close all bound connection
+	// instances if any.
+	//
+
+	cid := conInstIdentity {
+		nid:	msg.Peer.ID,
+		dir:	conInstDirAllbound,
+	}
+
+	schMsg := sch.SchMessage{}
+	sdl := conMgr.sdl
+
+	req2Inst := func(inst *ConInst) sch.SchErrno {
+		req := sch.MsgDhtConInstCloseReq{
+			Peer:	&msg.Peer.ID,
+			Why:	sch.EvDhtRutPeerRemovedInd,
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
+		return sdl.SchSendMessage(&schMsg)
+	}
+
+	found := false
+	err := false
+
+	cis := conMgr.lookupConInst(&cid)
+	for _, ci := range cis {
+		if ci != nil {
+			found = true
+			if req2Inst(ci) != sch.SchEnoNone {
+				err = true
+			}
+		}
+	}
+
+	if !found {
+		log.LogCallerFileLine("rutPeerRemoveInd: not found, id: %x", msg.Peer)
+	}
+
+	if err {
+		log.LogCallerFileLine("rutPeerRemoveInd: seems some errors")
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -325,11 +463,26 @@ func (conMgr *ConMgr)getConfig() DhtErrno {
 //
 // Lookup connection instance by instance identity
 //
-func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) *ConInst {
+func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
+
 	if cid == nil {
-		return nil
+		return []*ConInst{nil}
 	}
-	return conMgr.ciTab[*cid]
+
+	if cid.dir == conInstDirInbound || cid.dir == conInstDirOutbound {
+		return []*ConInst{conMgr.ciTab[*cid]}
+	} else if cid.dir == conInstDirAllbound {
+		inCid := *cid
+		inCid.dir = conInstDirInbound
+		outCid := *cid
+		outCid.dir = conInstDirOutbound
+		return []*ConInst {
+			conMgr.ciTab[inCid],
+			conMgr.ciTab[outCid],
+		}
+	}
+
+	return []*ConInst{nil}
 }
 
 //
@@ -337,10 +490,10 @@ func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) *ConInst {
 //
 func (conMgr *ConMgr)lookupOutboundConInst(nid *config.NodeID) *ConInst {
 	ci := &conInstIdentity {
-		nid:*nid,
-		dir:conInstDirOutbound,
+		nid:	*nid,
+		dir:	conInstDirOutbound,
 	}
-	return conMgr.lookupConInst(ci)
+	return conMgr.lookupConInst(ci)[0]
 }
 
 //
@@ -348,25 +501,23 @@ func (conMgr *ConMgr)lookupOutboundConInst(nid *config.NodeID) *ConInst {
 //
 func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 	ci := &conInstIdentity {
-		nid:*nid,
-		dir:conInstDirInbound,
+		nid:	*nid,
+		dir:	conInstDirInbound,
 	}
-	return conMgr.lookupConInst(ci)
+	return conMgr.lookupConInst(ci)[0]
 }
 
 //
 // Setup outbound connection instance
 //
 func (conMgr *ConMgr)setupOutboundInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
-
 	ci.sdl = conMgr.sdl
 	ci.ptnConMgr = conMgr.ptnMe
 	ci.ptnSrcTsk = srcTask
-
+	ci.hsInfo.peer = *peer
 	ci.cid = conInstIdentity{
 		nid: peer.ID,
 		dir: conInstDirInbound,
 	}
-
 	return DhtEnoNone
 }

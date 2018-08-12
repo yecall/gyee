@@ -75,6 +75,7 @@ type conInstStatus int
 const (
 	conInstDirInbound	= 0			// out from local
 	conInstDirOutbound	= 1			// in from peer
+	conInstDirAllbound	= 2			// in & out
 )
 
 type conInstDir int
@@ -83,7 +84,7 @@ type conInstDir int
 // Handshake information
 //
 type conInstHandshakeInfo struct {
-	peer		config.NodeID		// peer node identity
+	peer		config.Node			// peer node identity
 	extra		interface{}			// extra information
 }
 
@@ -192,4 +193,19 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 //
 func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 	return sch.SchEnoNone
+}
+
+//
+// Map connection instance status to "peer connection status"
+//
+func ConInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
+	cis2pcs := map[conInstStatus] conMgrPeerConnStat {
+		cisNull:			pcsConnNo,
+		cisConnected:		pcsConnNo,
+		cisInHandshaking:	pcsConnNo,
+		cisHandshaked:		pcsConnNo,
+		cisInService:		pcsConnYes,
+		cisClosed:			pcsConnNo,
+	}
+	return cis2pcs[cis]
 }
