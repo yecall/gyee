@@ -315,10 +315,6 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 		}
 	}
 
-	//
-	// response to conntion manager
-	//
-
 	conInst.status = cisHandshaked
 	conInst.statusReport()
 
@@ -326,6 +322,14 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	rsp.Peer = &conInst.hsInfo.peer
 	rsp.HsInfo = &conInst.hsInfo
 	rsp2ConMgr()
+
+
+	//
+	// service startup
+	//
+
+	conInst.txTaskStart()
+	conInst.rxTaskStart()
 
 	conInst.status = cisInService
 	conInst.statusReport()
@@ -449,8 +453,8 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 		conInst.txDone<-why
 		done := <-conInst.txDone
 		close(conInst.txDone)
-
 		conInst.txDone = nil
+
 		return DhtErrno(done)
 	}
 
@@ -467,8 +471,8 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 		conInst.rxDone<-why
 		done := <-conInst.rxDone
 		close(conInst.rxDone)
-
 		conInst.rxDone = nil
+
 		return DhtErrno(done)
 	}
 
