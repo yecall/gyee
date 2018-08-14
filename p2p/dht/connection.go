@@ -592,23 +592,45 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 		return sdl.SchSendMessage(&schMsg)
 	}
 
+	rutUpdate := func(node *config.Node) sch.SchErrno {
+		update := sch.MsgDhtRutMgrUpdateReq {
+			Why:	rutMgrUpdate4Closed,
+			Eno:	DhtEnoNone,
+			Seens:	[]config.Node {
+				*node,
+			},
+			Duras:	nil,
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
+		return sdl.SchSendMessage(&schMsg)
+	}
+
 	found := false
 	err := false
-
 	cis := conMgr.lookupConInst(&cid)
+
 	for _, ci := range cis {
+
 		if ci != nil {
+
 			found = true
-			if rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk) != sch.SchEnoNone {
+
+			if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
+				log.LogCallerFileLine("instCloseRsp: rsp2Sender failed, eno: %d", eno)
 				err = true
-			} else {
-				delete(conMgr.ciTab, cid)
 			}
+
+			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
+				log.LogCallerFileLine("instCloseRsp: rutUpdate failed, eno: %d", eno)
+				err = true
+			}
+
+			delete(conMgr.ciTab, cid)
 		}
 	}
 
 	if !found {
-		log.LogCallerFileLine("instCloseRsp: not found, id: %x", msg.Peer)
+		log.LogCallerFileLine("instCloseRsp: none is found, id: %x", msg.Peer)
 	}
 
 	if err {
