@@ -402,6 +402,7 @@ type MsgDhtConInstHandshakeRsp struct {
 // EvDhtConInstTxDataReq
 //
 type MsgDhtConInstTxDataReq struct {
+	Task	interface{}				// owner task node pointer
 	Data	[]byte					// data buffer
 }
 
@@ -426,6 +427,7 @@ type MsgDhtConInstCloseRsp struct {
 //
 type MsgDhtConInstStatusInd struct {
 	Peer	*config.NodeID			// peer identity
+	Dir		int						// instance direction
 	Status	int						// status
 }
 

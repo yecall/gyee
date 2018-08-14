@@ -24,6 +24,7 @@ import (
 	"net"
 	"time"
 	"sync"
+	"container/list"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
@@ -44,8 +45,10 @@ type ConInst struct {
 	con			net.Conn				// connection
 	dir			conInstDir				// connection instance directory
 	hsInfo		conInstHandshakeInfo	// handshake information
-	txPending	[]*conInstTxPkg			// pending package to be sent
+	txPending	*list.List				// pending package to be sent
 	txLock		sync.Mutex				// tx lock
+	txDone		chan int				// tx-task done signal
+	rxDone		chan int				// rx-task done signal
 }
 
 //
@@ -61,6 +64,7 @@ type conInstIdentity struct {
 //
 const (
 	cisNull			= iota			// null, not inited
+	cisConnecting					// connecting
 	cisConnected					// connected
 	cisInHandshaking				// handshaking
 	cisHandshaked					// handshaked
@@ -100,6 +104,17 @@ type conInstTxPkg struct {
 }
 
 //
+// Max tx-pending queue size
+//
+const txPendingQueueSize = 64
+
+//
+// Connect to peer timeout vale
+//
+const ciConn2PeerTimeout = time.Second * 16
+
+
+//
 // Create connection instance
 //
 func newConInst(postFixed string) *ConInst {
@@ -112,7 +127,9 @@ func newConInst(postFixed string) *ConInst {
 		ptnSrcTsk:	nil,
 		status:		cisNull,
 		dir:		conInstDirUnknown,
-		txPending:	[]*conInstTxPkg{},
+		txPending:	list.New(),
+		txDone:		nil,
+		rxDone:		nil,
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -170,13 +187,49 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 // Poweron handler
 //
 func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
-	return sch.SchEnoNone
+
+	//
+	// initialization for an instance had been done when this task is created,
+	// not so much to do, and here for a inbound instance, it still not be mapped
+	// into connection manager's instance table, so its' status should not be
+	// reported at this moment.
+	//
+
+	if conInst.ptnMe != ptn {
+		log.LogCallerFileLine("poweron: task mismatched")
+		return sch.SchEnoMismatched
+	}
+
+	if conInst.dir == conInstDirInbound {
+		conInst.status = cisConnected
+		return sch.SchEnoNone
+	}
+
+	if conInst.dir == conInstDirOutbound {
+		if conInst.statusReport() != DhtEnoNone {
+			return sch.SchEnoUserTask
+		}
+		return sch.SchEnoNone
+	}
+
+	return sch.SchEnoUserTask
 }
 
 //
 // Poweroff handler
 //
 func (conInst *ConInst)poweroff(ptn interface{}) sch.SchErrno {
+
+	if conInst.ptnMe != ptn {
+		log.LogCallerFileLine("poweroff: task mismatched")
+		return sch.SchEnoMismatched
+	}
+
+	log.LogCallerFileLine("poweroff: task will be done ...")
+
+	conInst.cleanUp(DhtEnoScheduler)
+	conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
+
 	return sch.SchEnoNone
 }
 
@@ -190,6 +243,93 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	// response message to connection manager task.
 	//
 
+	rsp := sch.MsgDhtConInstHandshakeRsp {
+		Eno:	DhtEnoUnknown,
+		Inst:	conInst,
+		Peer:	nil,
+		Dir:	int(conInst.dir),
+		HsInfo:	nil,
+		Dur:	time.Duration(-1),
+	}
+
+	rsp2ConMgr := func() sch.SchErrno {
+		schMsg := sch.SchMessage{}
+		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
+		return conInst.sdl.SchSendMessage(&schMsg)
+	}
+
+	//
+	// connect to peer if it's not
+	//
+
+	if conInst.con == nil && conInst.dir == conInstDirOutbound {
+
+		conInst.status = cisConnecting
+		conInst.statusReport()
+
+		if eno := conInst.connect2Peer(); eno != DhtEnoNone {
+
+			rsp.Eno = int(eno)
+			rsp.Peer = &conInst.hsInfo.peer
+			rsp2ConMgr()
+
+			conInst.cleanUp(int(eno))
+			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+		}
+
+		conInst.status = cisConnected
+		conInst.statusReport()
+	}
+
+	//
+	// handshake
+	//
+
+	conInst.status = cisInHandshaking
+	conInst.statusReport()
+
+	if conInst.dir == conInstDirOutbound {
+
+		if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
+
+			rsp.Eno = int(eno)
+			rsp.Peer = &conInst.hsInfo.peer
+			rsp.HsInfo = &conInst.hsInfo
+			rsp2ConMgr()
+
+			conInst.cleanUp(int(eno))
+			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+		}
+
+	} else {
+
+		if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
+
+			rsp.Eno = int(eno)
+			rsp.Peer = &conInst.hsInfo.peer
+			rsp.HsInfo = &conInst.hsInfo
+			rsp2ConMgr()
+
+			conInst.cleanUp(int(eno))
+			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+		}
+	}
+
+	//
+	// response to conntion manager
+	//
+
+	conInst.status = cisHandshaked
+	conInst.statusReport()
+
+	rsp.Eno = DhtEnoNone
+	rsp.Peer = &conInst.hsInfo.peer
+	rsp.HsInfo = &conInst.hsInfo
+	rsp2ConMgr()
+
+	conInst.status = cisInService
+	conInst.statusReport()
+
 	return sch.SchEnoNone
 }
 
@@ -197,13 +337,56 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 // Instance-close-request handler
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
-	return sch.SchEnoNone
+
+	if conInst.status != cisHandshaked &&
+		conInst.status != cisInService &&
+		conInst.dir != conInstDirOutbound {
+
+		log.LogCallerFileLine("closeReq: " +
+			"status mismatched, dir: %d, status: %d",
+			conInst.dir, conInst.status)
+		return sch.SchEnoMismatched
+	}
+
+	if *msg.Peer != conInst.hsInfo.peer.ID {
+		log.LogCallerFileLine("closeReq: peer node identity mismatched")
+		return sch.SchEnoMismatched
+	}
+
+	log.LogCallerFileLine("closeReq: " +
+		"connection will be closed, why: %d, peer: %x",
+		msg.Why, *msg.Peer)
+
+	conInst.cleanUp(DhtEnoNone)
+	conInst.status = cisClosed
+
+	schMsg := sch.SchMessage{}
+	rsp := sch.MsgDhtConInstCloseRsp{
+		Peer:	&conInst.hsInfo.peer.ID,
+		Dir:	int(conInst.dir),
+	}
+	conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstCloseRsp, &rsp)
+	conInst.sdl.SchSendMessage(&schMsg)
+
+	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
 }
 
 //
 // Send-data-request handler
 //
 func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
+
+	pkg := conInstTxPkg {
+		task:		msg.Task,
+		submitTime:	time.Now(),
+		payload:	msg.Data,
+	}
+
+	if eno := conInst.txPutPending(&pkg); eno != DhtEnoNone {
+		log.LogCallerFileLine("txDataReq: txPutPending failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -226,8 +409,159 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 // Put outbound package into pending queue
 //
 func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
+
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
-	conInst.txPending = append(conInst.txPending, pkg)
+
+	if conInst.txPending.Len() >= txPendingQueueSize {
+		log.LogCallerFileLine("txPutPending: queue full")
+		return DhtEnoResource
+	}
+
+	conInst.txPending.PushBack(pkg)
+
 	return DhtEnoNone
+}
+
+//
+// Start tx-task
+//
+func (conInst *ConInst)txTaskStart() DhtErrno {
+	go conInst.txProc()
+	return DhtEnoNone
+}
+
+//
+// Start rx-task
+//
+func (conInst *ConInst)rxTaskStart() DhtErrno {
+	go conInst.rxProc()
+	return DhtEnoNone
+}
+
+//
+// Stop tx-task
+//
+func (conInst *ConInst)txTaskStop(why int) DhtErrno {
+
+	if conInst.txDone != nil {
+
+		conInst.txDone<-why
+		done := <-conInst.txDone
+		close(conInst.txDone)
+
+		conInst.txDone = nil
+		return DhtErrno(done)
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Stop rx-task
+//
+func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
+
+	if conInst.rxDone != nil {
+
+		conInst.rxDone<-why
+		done := <-conInst.rxDone
+		close(conInst.rxDone)
+
+		conInst.rxDone = nil
+		return DhtErrno(done)
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Cleanup the instance
+//
+func (conInst *ConInst)cleanUp(why int) DhtErrno {
+
+	conInst.txTaskStop(why)
+	conInst.rxTaskStop(why)
+
+	if conInst.con != nil {
+		conInst.con.Close()
+		conInst.con = nil
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Connect to peer
+//
+func (conInst *ConInst)connect2Peer() DhtErrno {
+
+	if conInst.dir != conInstDirOutbound {
+		log.LogCallerFileLine("connect2Peer: mismatched direction: %d", conInst.dir)
+		return DhtEnoInternal
+	}
+
+	peer := conInst.hsInfo.peer
+	dialer := &net.Dialer{Timeout: ciConn2PeerTimeout}
+	addr := &net.TCPAddr{IP: peer.IP, Port: int(peer.TCP)}
+
+	var conn net.Conn
+	var err error
+
+	if conn, err = dialer.Dial("tcp", addr.String()); err != nil {
+		log.LogCallerFileLine("connect2Peer: " +
+			"dial failed, to: %s, err: %s",
+			addr.String(), err.Error())
+		return DhtEnoOs
+	}
+
+	conInst.con = conn
+
+	return DhtEnoNone
+}
+
+//
+// Report instance status to connection manager
+//
+func (conInst *ConInst)statusReport() DhtErrno {
+
+	msg := sch.SchMessage{}
+	ind := sch.MsgDhtConInstStatusInd {
+		Peer:   &conInst.hsInfo.peer.ID,
+		Dir:    int(conInst.dir),
+		Status: int(conInst.status),
+	}
+
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstStatusInd, &ind)
+	if conInst.sdl.SchSendMessage(&msg) != sch.SchEnoNone {
+		return DhtEnoScheduler
+	}
+
+	return DhtEnoNone
+}
+
+//
+// Outbound handshake
+//
+func (conInst *ConInst)outboundHandshake() DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Inbound handshake
+//
+func (conInst *ConInst)inboundHandshake() DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Tx routine entry
+//
+func (conInst *ConInst)txProc() {
+}
+
+//
+// Rx routine entry
+//
+func (conInst *ConInst)rxProc() {
 }

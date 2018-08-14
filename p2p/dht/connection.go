@@ -555,6 +555,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	switch msg.Status {
 	case cisNull:
+	case cisConnecting:
 	case cisConnected:
 	case cisInHandshaking:
 	case cisHandshaked:
@@ -747,7 +748,7 @@ func (conMgr *ConMgr)setupOutboundInst(ci *ConInst, srcTask interface{}, peer *c
 
 	ci.cid = conInstIdentity{
 		nid: peer.ID,
-		dir: conInstDirInbound,
+		dir: ci.dir,
 	}
 
 	return DhtEnoNone
