@@ -41,6 +41,9 @@ const (
 	HashBitLength = HashByteLength * 8	// hash bits
 	rutMgrMaxLatency = time.Second * 60	// max latency in metric
 	rutMgrMaxNofifee = 64				// max notifees could be
+	rutMgrUpdate4Handshake = 0			// update for handshaking
+	rutMgrUpdate4Closed = 1				// update for connection instance closed
+	rutMgrUpdate4Query = 2				// update for query result
 )
 
 //

@@ -336,6 +336,8 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 
 	update := sch.MsgDhtRutMgrUpdateReq {
+		Why:	rutMgrUpdate4Handshake,
+		Eno:	DhtEnoNone,
 		Seens:	[]config.Node {
 			*msg.Peer,
 		},

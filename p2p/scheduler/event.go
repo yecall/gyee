@@ -584,6 +584,8 @@ type MsgDhtRutMgrNearestRsp struct {
 // EvDhtRutMgrUpdateReq
 //
 type MsgDhtRutMgrUpdateReq struct {
+	Why		int						// why to request to upadte
+	Eno		int						// result code
 	Seens	[]config.Node			// nodes seen
 	Duras	[]time.Duration			// durations/latencies about seen nodes
 }

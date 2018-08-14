@@ -113,6 +113,7 @@ type qryInstCtrlBlock struct {
 	ptnInst		interface{}			// pointer to query instance task node
 	ptnConMgr	interface{}			// pointer to connection manager task node
 	ptnQryMgr	interface{}			// pointer to query manager task node
+	ptnRutMgr	interface{}			// pointer to rute manager task node
 	status		int					// instance status
 	target		config.NodeID		// target is looking up
 	to			config.Node			// to whom the query message sent
@@ -573,10 +574,12 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	updateReq2RutMgr := func (peer *config.Node, dur time.Duration) sch.SchErrno {
 		var schMsg = sch.SchMessage{}
 		var updateReq = sch.MsgDhtRutMgrUpdateReq{
-			Seens: []config.Node{
+			Why:	rutMgrUpdate4Query,
+			Eno:	DhtEnoNone,
+			Seens:	[]config.Node{
 				*peer,
 			},
-			Duras: []time.Duration{
+			Duras:	[]time.Duration{
 				dur,
 			},
 		}
@@ -954,6 +957,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			name:		"qryMgrIcb" + fmt.Sprintf("%d", qcb.icbSeq),
 			ptnInst:	nil,
 			ptnConMgr:	nil,
+			ptnRutMgr:	nil,
 			ptnQryMgr:	qryMgr,
 			status:		qisNull,
 			target:		qcb.target,

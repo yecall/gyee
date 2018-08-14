@@ -25,6 +25,7 @@ import (
 	"time"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	config "github.com/yeeco/gyee/p2p/config"
 )
 
 
@@ -119,6 +120,7 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 
 	var sdl = sch.SchGetScheduler(ptn)
 	var ptnConMgr interface{}
+	var ptnRutMgr interface{}
 	var icb *qryInstCtrlBlock
 
 	if sdl == nil {
@@ -136,8 +138,14 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
+	if _, ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName); ptnRutMgr == nil {
+		log.LogCallerFileLine("powerOn: nil route manager")
+		return sch.SchEnoInternal
+	}
+
 	icb.status = qisInited
 	icb.ptnConMgr = ptnConMgr
+	icb.ptnRutMgr = ptnRutMgr
 	qryInst.icb = icb
 
 	ind := sch.MsgDhtQryInstStatusInd {
@@ -311,6 +319,19 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
 		sdl.SchSendMessage(&schMsg)
 	}
+
+	//
+	// update route manager
+	//
+
+	var updateReq = sch.MsgDhtRutMgrUpdateReq{
+		Why:	rutMgrUpdate4Query,
+		Eno:	DhtEnoTimeout,
+		Seens:	[]config.Node{icb.to},
+		Duras:	nil,
+	}
+	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
+	sdl.SchSendMessage(&schMsg)
 
 	//
 	// done this instance task and tell query manager task about instance done,

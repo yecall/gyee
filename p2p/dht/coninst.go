@@ -431,6 +431,11 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 // Start tx-task
 //
 func (conInst *ConInst)txTaskStart() DhtErrno {
+	if conInst.txDone != nil {
+		log.LogCallerFileLine("txTaskStart: non-nil chan for done")
+		return DhtEnoMismatched
+	}
+	conInst.txDone = make(chan int, 1)
 	go conInst.txProc()
 	return DhtEnoNone
 }
@@ -439,6 +444,11 @@ func (conInst *ConInst)txTaskStart() DhtErrno {
 // Start rx-task
 //
 func (conInst *ConInst)rxTaskStart() DhtErrno {
+	if conInst.rxDone != nil {
+		log.LogCallerFileLine("rxTaskStart: non-nil chan for done")
+		return DhtEnoMismatched
+	}
+	conInst.rxDone = make(chan int, 1)
 	go conInst.rxProc()
 	return DhtEnoNone
 }
