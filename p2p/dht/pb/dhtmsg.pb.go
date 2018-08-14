@@ -8,6 +8,7 @@
 		dhtmsg.proto
 
 	It has these top-level messages:
+		DhtPackage
 		DhtMessage
 */
 package dhtmsg_pb
@@ -29,44 +30,81 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
+type ProtocolId int32
+
+const (
+	ProtocolId_PID_DHT ProtocolId = 0
+	ProtocolId_PID_EXT ProtocolId = 255
+)
+
+var ProtocolId_name = map[int32]string{
+	0:   "PID_DHT",
+	255: "PID_EXT",
+}
+var ProtocolId_value = map[string]int32{
+	"PID_DHT": 0,
+	"PID_EXT": 255,
+}
+
+func (x ProtocolId) Enum() *ProtocolId {
+	p := new(ProtocolId)
+	*p = x
+	return p
+}
+func (x ProtocolId) String() string {
+	return proto.EnumName(ProtocolId_name, int32(x))
+}
+func (x *ProtocolId) UnmarshalJSON(data []byte) error {
+	value, err := proto.UnmarshalJSONEnum(ProtocolId_value, data, "ProtocolId")
+	if err != nil {
+		return err
+	}
+	*x = ProtocolId(value)
+	return nil
+}
+func (ProtocolId) EnumDescriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0} }
+
 type DhtMessage_MessageType int32
 
 const (
-	DhtMessage_FINDNODE        DhtMessage_MessageType = 0
-	DhtMessage_NEIGHBORS       DhtMessage_MessageType = 1
-	DhtMessage_PUTVALUE        DhtMessage_MessageType = 2
-	DhtMessage_GETVALUE_REQ    DhtMessage_MessageType = 3
-	DhtMessage_GETVALUE_RSP    DhtMessage_MessageType = 4
-	DhtMessage_PUTPROVIDER     DhtMessage_MessageType = 5
-	DhtMessage_GETPROVIDER_REQ DhtMessage_MessageType = 6
-	DhtMessage_GETPROVIDER_RSP DhtMessage_MessageType = 7
-	DhtMessage_PING            DhtMessage_MessageType = 8
-	DhtMessage_PONG            DhtMessage_MessageType = 9
+	DhtMessage_MID_HANDSHAKE       DhtMessage_MessageType = 0
+	DhtMessage_MID_FINDNODE        DhtMessage_MessageType = 1
+	DhtMessage_MID_NEIGHBORS       DhtMessage_MessageType = 2
+	DhtMessage_MID_PUTVALUE        DhtMessage_MessageType = 3
+	DhtMessage_MID_GETVALUE_REQ    DhtMessage_MessageType = 4
+	DhtMessage_MID_GETVALUE_RSP    DhtMessage_MessageType = 5
+	DhtMessage_MID_PUTPROVIDER     DhtMessage_MessageType = 6
+	DhtMessage_MID_GETPROVIDER_REQ DhtMessage_MessageType = 7
+	DhtMessage_MID_GETPROVIDER_RSP DhtMessage_MessageType = 8
+	DhtMessage_MID_PING            DhtMessage_MessageType = 9
+	DhtMessage_MID_PONG            DhtMessage_MessageType = 10
 )
 
 var DhtMessage_MessageType_name = map[int32]string{
-	0: "FINDNODE",
-	1: "NEIGHBORS",
-	2: "PUTVALUE",
-	3: "GETVALUE_REQ",
-	4: "GETVALUE_RSP",
-	5: "PUTPROVIDER",
-	6: "GETPROVIDER_REQ",
-	7: "GETPROVIDER_RSP",
-	8: "PING",
-	9: "PONG",
+	0:  "MID_HANDSHAKE",
+	1:  "MID_FINDNODE",
+	2:  "MID_NEIGHBORS",
+	3:  "MID_PUTVALUE",
+	4:  "MID_GETVALUE_REQ",
+	5:  "MID_GETVALUE_RSP",
+	6:  "MID_PUTPROVIDER",
+	7:  "MID_GETPROVIDER_REQ",
+	8:  "MID_GETPROVIDER_RSP",
+	9:  "MID_PING",
+	10: "MID_PONG",
 }
 var DhtMessage_MessageType_value = map[string]int32{
-	"FINDNODE":        0,
-	"NEIGHBORS":       1,
-	"PUTVALUE":        2,
-	"GETVALUE_REQ":    3,
-	"GETVALUE_RSP":    4,
-	"PUTPROVIDER":     5,
-	"GETPROVIDER_REQ": 6,
-	"GETPROVIDER_RSP": 7,
-	"PING":            8,
-	"PONG":            9,
+	"MID_HANDSHAKE":       0,
+	"MID_FINDNODE":        1,
+	"MID_NEIGHBORS":       2,
+	"MID_PUTVALUE":        3,
+	"MID_GETVALUE_REQ":    4,
+	"MID_GETVALUE_RSP":    5,
+	"MID_PUTPROVIDER":     6,
+	"MID_GETPROVIDER_REQ": 7,
+	"MID_GETPROVIDER_RSP": 8,
+	"MID_PING":            9,
+	"MID_PONG":            10,
 }
 
 func (x DhtMessage_MessageType) Enum() *DhtMessage_MessageType {
@@ -86,7 +124,7 @@ func (x *DhtMessage_MessageType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 func (DhtMessage_MessageType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptorDhtmsg, []int{0, 0}
+	return fileDescriptorDhtmsg, []int{1, 0}
 }
 
 type DhtMessage_ConnectionType int32
@@ -128,34 +166,75 @@ func (x *DhtMessage_ConnectionType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 func (DhtMessage_ConnectionType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptorDhtmsg, []int{0, 1}
+	return fileDescriptorDhtmsg, []int{1, 1}
+}
+
+type DhtPackage struct {
+	Pid              *ProtocolId `protobuf:"varint,1,req,name=Pid,enum=dhtmsg.pb.ProtocolId" json:"Pid,omitempty"`
+	PayloadLength    *uint32     `protobuf:"varint,2,req,name=PayloadLength" json:"PayloadLength,omitempty"`
+	Payload          []byte      `protobuf:"bytes,3,opt,name=Payload" json:"Payload,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *DhtPackage) Reset()                    { *m = DhtPackage{} }
+func (m *DhtPackage) String() string            { return proto.CompactTextString(m) }
+func (*DhtPackage) ProtoMessage()               {}
+func (*DhtPackage) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0} }
+
+func (m *DhtPackage) GetPid() ProtocolId {
+	if m != nil && m.Pid != nil {
+		return *m.Pid
+	}
+	return ProtocolId_PID_DHT
+}
+
+func (m *DhtPackage) GetPayloadLength() uint32 {
+	if m != nil && m.PayloadLength != nil {
+		return *m.PayloadLength
+	}
+	return 0
+}
+
+func (m *DhtPackage) GetPayload() []byte {
+	if m != nil {
+		return m.Payload
+	}
+	return nil
 }
 
 type DhtMessage struct {
 	MsgType          *DhtMessage_MessageType    `protobuf:"varint,1,req,name=msgType,enum=dhtmsg.pb.DhtMessage_MessageType" json:"msgType,omitempty"`
-	FindNode         *DhtMessage_FindNode       `protobuf:"bytes,2,opt,name=findNode" json:"findNode,omitempty"`
-	Neighbors        *DhtMessage_Neighbors      `protobuf:"bytes,3,opt,name=neighbors" json:"neighbors,omitempty"`
-	PutValue         *DhtMessage_PutValue       `protobuf:"bytes,4,opt,name=putValue" json:"putValue,omitempty"`
-	GetValueReq      *DhtMessage_GetValueReq    `protobuf:"bytes,5,opt,name=getValueReq" json:"getValueReq,omitempty"`
-	GetValueRsp      *DhtMessage_GetValueRsp    `protobuf:"bytes,6,opt,name=getValueRsp" json:"getValueRsp,omitempty"`
-	PutProvider      *DhtMessage_PutProvider    `protobuf:"bytes,7,opt,name=putProvider" json:"putProvider,omitempty"`
-	GutProviderReq   *DhtMessage_GetProviderReq `protobuf:"bytes,8,opt,name=gutProviderReq" json:"gutProviderReq,omitempty"`
-	GutProviderRsp   *DhtMessage_GetProviderRsp `protobuf:"bytes,9,opt,name=gutProviderRsp" json:"gutProviderRsp,omitempty"`
-	Ping             *DhtMessage_Ping           `protobuf:"bytes,10,opt,name=ping" json:"ping,omitempty"`
-	Pong             *DhtMessage_Pong           `protobuf:"bytes,11,opt,name=pong" json:"pong,omitempty"`
+	Handshake        *DhtMessage_Handshake      `protobuf:"bytes,2,opt,name=handshake" json:"handshake,omitempty"`
+	FindNode         *DhtMessage_FindNode       `protobuf:"bytes,3,opt,name=findNode" json:"findNode,omitempty"`
+	Neighbors        *DhtMessage_Neighbors      `protobuf:"bytes,4,opt,name=neighbors" json:"neighbors,omitempty"`
+	PutValue         *DhtMessage_PutValue       `protobuf:"bytes,5,opt,name=putValue" json:"putValue,omitempty"`
+	GetValueReq      *DhtMessage_GetValueReq    `protobuf:"bytes,6,opt,name=getValueReq" json:"getValueReq,omitempty"`
+	GetValueRsp      *DhtMessage_GetValueRsp    `protobuf:"bytes,7,opt,name=getValueRsp" json:"getValueRsp,omitempty"`
+	PutProvider      *DhtMessage_PutProvider    `protobuf:"bytes,8,opt,name=putProvider" json:"putProvider,omitempty"`
+	GutProviderReq   *DhtMessage_GetProviderReq `protobuf:"bytes,9,opt,name=gutProviderReq" json:"gutProviderReq,omitempty"`
+	GutProviderRsp   *DhtMessage_GetProviderRsp `protobuf:"bytes,10,opt,name=gutProviderRsp" json:"gutProviderRsp,omitempty"`
+	Ping             *DhtMessage_Ping           `protobuf:"bytes,11,opt,name=ping" json:"ping,omitempty"`
+	Pong             *DhtMessage_Pong           `protobuf:"bytes,12,opt,name=pong" json:"pong,omitempty"`
 	XXX_unrecognized []byte                     `json:"-"`
 }
 
 func (m *DhtMessage) Reset()                    { *m = DhtMessage{} }
 func (m *DhtMessage) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage) ProtoMessage()               {}
-func (*DhtMessage) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0} }
+func (*DhtMessage) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1} }
 
 func (m *DhtMessage) GetMsgType() DhtMessage_MessageType {
 	if m != nil && m.MsgType != nil {
 		return *m.MsgType
 	}
-	return DhtMessage_FINDNODE
+	return DhtMessage_MID_HANDSHAKE
+}
+
+func (m *DhtMessage) GetHandshake() *DhtMessage_Handshake {
+	if m != nil {
+		return m.Handshake
+	}
+	return nil
 }
 
 func (m *DhtMessage) GetFindNode() *DhtMessage_FindNode {
@@ -240,7 +319,7 @@ type DhtMessage_Node struct {
 func (m *DhtMessage_Node) Reset()                    { *m = DhtMessage_Node{} }
 func (m *DhtMessage_Node) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_Node) ProtoMessage()               {}
-func (*DhtMessage_Node) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 0} }
+func (*DhtMessage_Node) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 0} }
 
 func (m *DhtMessage_Node) GetIP() []byte {
 	if m != nil {
@@ -286,7 +365,7 @@ type DhtMessage_Value struct {
 func (m *DhtMessage_Value) Reset()                    { *m = DhtMessage_Value{} }
 func (m *DhtMessage_Value) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_Value) ProtoMessage()               {}
-func (*DhtMessage_Value) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 1} }
+func (*DhtMessage_Value) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 1} }
 
 func (m *DhtMessage_Value) GetKey() []byte {
 	if m != nil {
@@ -311,7 +390,7 @@ type DhtMessage_Provider struct {
 func (m *DhtMessage_Provider) Reset()                    { *m = DhtMessage_Provider{} }
 func (m *DhtMessage_Provider) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_Provider) ProtoMessage()               {}
-func (*DhtMessage_Provider) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 2} }
+func (*DhtMessage_Provider) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 2} }
 
 func (m *DhtMessage_Provider) GetKey() []byte {
 	if m != nil {
@@ -323,6 +402,104 @@ func (m *DhtMessage_Provider) GetKey() []byte {
 func (m *DhtMessage_Provider) GetNode() *DhtMessage_Node {
 	if m != nil {
 		return m.Node
+	}
+	return nil
+}
+
+type DhtMessage_Protocol struct {
+	Pid              *ProtocolId `protobuf:"varint,1,req,name=Pid,enum=dhtmsg.pb.ProtocolId" json:"Pid,omitempty"`
+	Ver              []byte      `protobuf:"bytes,2,req,name=Ver" json:"Ver,omitempty"`
+	XXX_unrecognized []byte      `json:"-"`
+}
+
+func (m *DhtMessage_Protocol) Reset()                    { *m = DhtMessage_Protocol{} }
+func (m *DhtMessage_Protocol) String() string            { return proto.CompactTextString(m) }
+func (*DhtMessage_Protocol) ProtoMessage()               {}
+func (*DhtMessage_Protocol) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 3} }
+
+func (m *DhtMessage_Protocol) GetPid() ProtocolId {
+	if m != nil && m.Pid != nil {
+		return *m.Pid
+	}
+	return ProtocolId_PID_DHT
+}
+
+func (m *DhtMessage_Protocol) GetVer() []byte {
+	if m != nil {
+		return m.Ver
+	}
+	return nil
+}
+
+type DhtMessage_Handshake struct {
+	SubNetId         []byte                 `protobuf:"bytes,1,req,name=SubNetId" json:"SubNetId,omitempty"`
+	NodeId           []byte                 `protobuf:"bytes,2,req,name=NodeId" json:"NodeId,omitempty"`
+	IP               []byte                 `protobuf:"bytes,3,req,name=IP" json:"IP,omitempty"`
+	UDP              *uint32                `protobuf:"varint,4,req,name=UDP" json:"UDP,omitempty"`
+	TCP              *uint32                `protobuf:"varint,5,req,name=TCP" json:"TCP,omitempty"`
+	ProtoNum         *uint32                `protobuf:"varint,6,req,name=ProtoNum" json:"ProtoNum,omitempty"`
+	Protocols        []*DhtMessage_Protocol `protobuf:"bytes,7,rep,name=Protocols" json:"Protocols,omitempty"`
+	Extra            []byte                 `protobuf:"bytes,8,opt,name=Extra" json:"Extra,omitempty"`
+	XXX_unrecognized []byte                 `json:"-"`
+}
+
+func (m *DhtMessage_Handshake) Reset()                    { *m = DhtMessage_Handshake{} }
+func (m *DhtMessage_Handshake) String() string            { return proto.CompactTextString(m) }
+func (*DhtMessage_Handshake) ProtoMessage()               {}
+func (*DhtMessage_Handshake) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 4} }
+
+func (m *DhtMessage_Handshake) GetSubNetId() []byte {
+	if m != nil {
+		return m.SubNetId
+	}
+	return nil
+}
+
+func (m *DhtMessage_Handshake) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *DhtMessage_Handshake) GetIP() []byte {
+	if m != nil {
+		return m.IP
+	}
+	return nil
+}
+
+func (m *DhtMessage_Handshake) GetUDP() uint32 {
+	if m != nil && m.UDP != nil {
+		return *m.UDP
+	}
+	return 0
+}
+
+func (m *DhtMessage_Handshake) GetTCP() uint32 {
+	if m != nil && m.TCP != nil {
+		return *m.TCP
+	}
+	return 0
+}
+
+func (m *DhtMessage_Handshake) GetProtoNum() uint32 {
+	if m != nil && m.ProtoNum != nil {
+		return *m.ProtoNum
+	}
+	return 0
+}
+
+func (m *DhtMessage_Handshake) GetProtocols() []*DhtMessage_Protocol {
+	if m != nil {
+		return m.Protocols
+	}
+	return nil
+}
+
+func (m *DhtMessage_Handshake) GetExtra() []byte {
+	if m != nil {
+		return m.Extra
 	}
 	return nil
 }
@@ -339,7 +516,7 @@ type DhtMessage_FindNode struct {
 func (m *DhtMessage_FindNode) Reset()                    { *m = DhtMessage_FindNode{} }
 func (m *DhtMessage_FindNode) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_FindNode) ProtoMessage()               {}
-func (*DhtMessage_FindNode) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 3} }
+func (*DhtMessage_FindNode) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 5} }
 
 func (m *DhtMessage_FindNode) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -388,7 +565,7 @@ type DhtMessage_Neighbors struct {
 func (m *DhtMessage_Neighbors) Reset()                    { *m = DhtMessage_Neighbors{} }
 func (m *DhtMessage_Neighbors) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_Neighbors) ProtoMessage()               {}
-func (*DhtMessage_Neighbors) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 4} }
+func (*DhtMessage_Neighbors) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 6} }
 
 func (m *DhtMessage_Neighbors) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -437,7 +614,7 @@ type DhtMessage_PutValue struct {
 func (m *DhtMessage_PutValue) Reset()                    { *m = DhtMessage_PutValue{} }
 func (m *DhtMessage_PutValue) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_PutValue) ProtoMessage()               {}
-func (*DhtMessage_PutValue) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 5} }
+func (*DhtMessage_PutValue) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 7} }
 
 func (m *DhtMessage_PutValue) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -486,7 +663,7 @@ type DhtMessage_GetValueReq struct {
 func (m *DhtMessage_GetValueReq) Reset()                    { *m = DhtMessage_GetValueReq{} }
 func (m *DhtMessage_GetValueReq) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_GetValueReq) ProtoMessage()               {}
-func (*DhtMessage_GetValueReq) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 6} }
+func (*DhtMessage_GetValueReq) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 8} }
 
 func (m *DhtMessage_GetValueReq) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -535,7 +712,7 @@ type DhtMessage_GetValueRsp struct {
 func (m *DhtMessage_GetValueRsp) Reset()                    { *m = DhtMessage_GetValueRsp{} }
 func (m *DhtMessage_GetValueRsp) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_GetValueRsp) ProtoMessage()               {}
-func (*DhtMessage_GetValueRsp) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 7} }
+func (*DhtMessage_GetValueRsp) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 9} }
 
 func (m *DhtMessage_GetValueRsp) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -584,7 +761,7 @@ type DhtMessage_PutProvider struct {
 func (m *DhtMessage_PutProvider) Reset()                    { *m = DhtMessage_PutProvider{} }
 func (m *DhtMessage_PutProvider) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_PutProvider) ProtoMessage()               {}
-func (*DhtMessage_PutProvider) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 8} }
+func (*DhtMessage_PutProvider) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 10} }
 
 func (m *DhtMessage_PutProvider) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -634,7 +811,7 @@ func (m *DhtMessage_GetProviderReq) Reset()         { *m = DhtMessage_GetProvide
 func (m *DhtMessage_GetProviderReq) String() string { return proto.CompactTextString(m) }
 func (*DhtMessage_GetProviderReq) ProtoMessage()    {}
 func (*DhtMessage_GetProviderReq) Descriptor() ([]byte, []int) {
-	return fileDescriptorDhtmsg, []int{0, 9}
+	return fileDescriptorDhtmsg, []int{1, 11}
 }
 
 func (m *DhtMessage_GetProviderReq) GetFrom() *DhtMessage_Node {
@@ -685,7 +862,7 @@ func (m *DhtMessage_GetProviderRsp) Reset()         { *m = DhtMessage_GetProvide
 func (m *DhtMessage_GetProviderRsp) String() string { return proto.CompactTextString(m) }
 func (*DhtMessage_GetProviderRsp) ProtoMessage()    {}
 func (*DhtMessage_GetProviderRsp) Descriptor() ([]byte, []int) {
-	return fileDescriptorDhtmsg, []int{0, 10}
+	return fileDescriptorDhtmsg, []int{1, 12}
 }
 
 func (m *DhtMessage_GetProviderRsp) GetFrom() *DhtMessage_Node {
@@ -726,7 +903,7 @@ func (m *DhtMessage_GetProviderRsp) GetExtra() []byte {
 type DhtMessage_Ping struct {
 	From             *DhtMessage_Node `protobuf:"bytes,1,req,name=From" json:"From,omitempty"`
 	To               *DhtMessage_Node `protobuf:"bytes,2,req,name=To" json:"To,omitempty"`
-	Id               *uint64          `protobuf:"varint,3,req,name=Id" json:"Id,omitempty"`
+	Seq              *uint64          `protobuf:"varint,3,req,name=Seq" json:"Seq,omitempty"`
 	Extra            []byte           `protobuf:"bytes,4,opt,name=Extra" json:"Extra,omitempty"`
 	XXX_unrecognized []byte           `json:"-"`
 }
@@ -734,7 +911,7 @@ type DhtMessage_Ping struct {
 func (m *DhtMessage_Ping) Reset()                    { *m = DhtMessage_Ping{} }
 func (m *DhtMessage_Ping) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_Ping) ProtoMessage()               {}
-func (*DhtMessage_Ping) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 11} }
+func (*DhtMessage_Ping) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 13} }
 
 func (m *DhtMessage_Ping) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -750,9 +927,9 @@ func (m *DhtMessage_Ping) GetTo() *DhtMessage_Node {
 	return nil
 }
 
-func (m *DhtMessage_Ping) GetId() uint64 {
-	if m != nil && m.Id != nil {
-		return *m.Id
+func (m *DhtMessage_Ping) GetSeq() uint64 {
+	if m != nil && m.Seq != nil {
+		return *m.Seq
 	}
 	return 0
 }
@@ -767,7 +944,7 @@ func (m *DhtMessage_Ping) GetExtra() []byte {
 type DhtMessage_Pong struct {
 	From             *DhtMessage_Node `protobuf:"bytes,1,req,name=From" json:"From,omitempty"`
 	To               *DhtMessage_Node `protobuf:"bytes,2,req,name=To" json:"To,omitempty"`
-	Id               *uint64          `protobuf:"varint,3,req,name=Id" json:"Id,omitempty"`
+	Seq              *uint64          `protobuf:"varint,3,req,name=Seq" json:"Seq,omitempty"`
 	Extra            []byte           `protobuf:"bytes,4,opt,name=Extra" json:"Extra,omitempty"`
 	XXX_unrecognized []byte           `json:"-"`
 }
@@ -775,7 +952,7 @@ type DhtMessage_Pong struct {
 func (m *DhtMessage_Pong) Reset()                    { *m = DhtMessage_Pong{} }
 func (m *DhtMessage_Pong) String() string            { return proto.CompactTextString(m) }
 func (*DhtMessage_Pong) ProtoMessage()               {}
-func (*DhtMessage_Pong) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{0, 12} }
+func (*DhtMessage_Pong) Descriptor() ([]byte, []int) { return fileDescriptorDhtmsg, []int{1, 14} }
 
 func (m *DhtMessage_Pong) GetFrom() *DhtMessage_Node {
 	if m != nil {
@@ -791,9 +968,9 @@ func (m *DhtMessage_Pong) GetTo() *DhtMessage_Node {
 	return nil
 }
 
-func (m *DhtMessage_Pong) GetId() uint64 {
-	if m != nil && m.Id != nil {
-		return *m.Id
+func (m *DhtMessage_Pong) GetSeq() uint64 {
+	if m != nil && m.Seq != nil {
+		return *m.Seq
 	}
 	return 0
 }
@@ -806,10 +983,13 @@ func (m *DhtMessage_Pong) GetExtra() []byte {
 }
 
 func init() {
+	proto.RegisterType((*DhtPackage)(nil), "dhtmsg.pb.DhtPackage")
 	proto.RegisterType((*DhtMessage)(nil), "dhtmsg.pb.DhtMessage")
 	proto.RegisterType((*DhtMessage_Node)(nil), "dhtmsg.pb.DhtMessage.Node")
 	proto.RegisterType((*DhtMessage_Value)(nil), "dhtmsg.pb.DhtMessage.Value")
 	proto.RegisterType((*DhtMessage_Provider)(nil), "dhtmsg.pb.DhtMessage.Provider")
+	proto.RegisterType((*DhtMessage_Protocol)(nil), "dhtmsg.pb.DhtMessage.Protocol")
+	proto.RegisterType((*DhtMessage_Handshake)(nil), "dhtmsg.pb.DhtMessage.Handshake")
 	proto.RegisterType((*DhtMessage_FindNode)(nil), "dhtmsg.pb.DhtMessage.FindNode")
 	proto.RegisterType((*DhtMessage_Neighbors)(nil), "dhtmsg.pb.DhtMessage.Neighbors")
 	proto.RegisterType((*DhtMessage_PutValue)(nil), "dhtmsg.pb.DhtMessage.PutValue")
@@ -820,9 +1000,51 @@ func init() {
 	proto.RegisterType((*DhtMessage_GetProviderRsp)(nil), "dhtmsg.pb.DhtMessage.GetProviderRsp")
 	proto.RegisterType((*DhtMessage_Ping)(nil), "dhtmsg.pb.DhtMessage.Ping")
 	proto.RegisterType((*DhtMessage_Pong)(nil), "dhtmsg.pb.DhtMessage.Pong")
+	proto.RegisterEnum("dhtmsg.pb.ProtocolId", ProtocolId_name, ProtocolId_value)
 	proto.RegisterEnum("dhtmsg.pb.DhtMessage_MessageType", DhtMessage_MessageType_name, DhtMessage_MessageType_value)
 	proto.RegisterEnum("dhtmsg.pb.DhtMessage_ConnectionType", DhtMessage_ConnectionType_name, DhtMessage_ConnectionType_value)
 }
+func (m *DhtPackage) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DhtPackage) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Pid == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.Pid))
+	}
+	if m.PayloadLength == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.PayloadLength))
+	}
+	if m.Payload != nil {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(len(m.Payload)))
+		i += copy(dAtA[i:], m.Payload)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
 func (m *DhtMessage) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -845,105 +1067,115 @@ func (m *DhtMessage) MarshalTo(dAtA []byte) (int, error) {
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.MsgType))
 	}
-	if m.FindNode != nil {
+	if m.Handshake != nil {
 		dAtA[i] = 0x12
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.FindNode.Size()))
-		n1, err := m.FindNode.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Handshake.Size()))
+		n1, err := m.Handshake.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n1
 	}
-	if m.Neighbors != nil {
+	if m.FindNode != nil {
 		dAtA[i] = 0x1a
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Neighbors.Size()))
-		n2, err := m.Neighbors.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.FindNode.Size()))
+		n2, err := m.FindNode.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n2
 	}
-	if m.PutValue != nil {
+	if m.Neighbors != nil {
 		dAtA[i] = 0x22
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.PutValue.Size()))
-		n3, err := m.PutValue.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Neighbors.Size()))
+		n3, err := m.Neighbors.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n3
 	}
-	if m.GetValueReq != nil {
+	if m.PutValue != nil {
 		dAtA[i] = 0x2a
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GetValueReq.Size()))
-		n4, err := m.GetValueReq.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.PutValue.Size()))
+		n4, err := m.PutValue.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n4
 	}
-	if m.GetValueRsp != nil {
+	if m.GetValueReq != nil {
 		dAtA[i] = 0x32
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GetValueRsp.Size()))
-		n5, err := m.GetValueRsp.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GetValueReq.Size()))
+		n5, err := m.GetValueReq.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n5
 	}
-	if m.PutProvider != nil {
+	if m.GetValueRsp != nil {
 		dAtA[i] = 0x3a
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.PutProvider.Size()))
-		n6, err := m.PutProvider.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GetValueRsp.Size()))
+		n6, err := m.GetValueRsp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n6
 	}
-	if m.GutProviderReq != nil {
+	if m.PutProvider != nil {
 		dAtA[i] = 0x42
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GutProviderReq.Size()))
-		n7, err := m.GutProviderReq.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.PutProvider.Size()))
+		n7, err := m.PutProvider.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n7
 	}
-	if m.GutProviderRsp != nil {
+	if m.GutProviderReq != nil {
 		dAtA[i] = 0x4a
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GutProviderRsp.Size()))
-		n8, err := m.GutProviderRsp.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GutProviderReq.Size()))
+		n8, err := m.GutProviderReq.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n8
 	}
-	if m.Ping != nil {
+	if m.GutProviderRsp != nil {
 		dAtA[i] = 0x52
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Ping.Size()))
-		n9, err := m.Ping.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.GutProviderRsp.Size()))
+		n9, err := m.GutProviderRsp.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n9
 	}
-	if m.Pong != nil {
+	if m.Ping != nil {
 		dAtA[i] = 0x5a
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Pong.Size()))
-		n10, err := m.Pong.MarshalTo(dAtA[i:])
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Ping.Size()))
+		n10, err := m.Ping.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
 		i += n10
+	}
+	if m.Pong != nil {
+		dAtA[i] = 0x62
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Pong.Size()))
+		n11, err := m.Pong.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n11
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -1075,11 +1307,131 @@ func (m *DhtMessage_Provider) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.Node.Size()))
-		n11, err := m.Node.MarshalTo(dAtA[i:])
+		n12, err := m.Node.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n11
+		i += n12
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *DhtMessage_Protocol) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DhtMessage_Protocol) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Pid == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.Pid))
+	}
+	if m.Ver == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(len(m.Ver)))
+		i += copy(dAtA[i:], m.Ver)
+	}
+	if m.XXX_unrecognized != nil {
+		i += copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	return i, nil
+}
+
+func (m *DhtMessage_Handshake) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DhtMessage_Handshake) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.SubNetId == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(len(m.SubNetId)))
+		i += copy(dAtA[i:], m.SubNetId)
+	}
+	if m.NodeId == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(len(m.NodeId)))
+		i += copy(dAtA[i:], m.NodeId)
+	}
+	if m.IP == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x1a
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(len(m.IP)))
+		i += copy(dAtA[i:], m.IP)
+	}
+	if m.UDP == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.UDP))
+	}
+	if m.TCP == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.TCP))
+	}
+	if m.ProtoNum == nil {
+		return 0, new(proto.RequiredNotSetError)
+	} else {
+		dAtA[i] = 0x30
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.ProtoNum))
+	}
+	if len(m.Protocols) > 0 {
+		for _, msg := range m.Protocols {
+			dAtA[i] = 0x3a
+			i++
+			i = encodeVarintDhtmsg(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	if m.Extra != nil {
+		dAtA[i] = 0x42
+		i++
+		i = encodeVarintDhtmsg(dAtA, i, uint64(len(m.Extra)))
+		i += copy(dAtA[i:], m.Extra)
 	}
 	if m.XXX_unrecognized != nil {
 		i += copy(dAtA[i:], m.XXX_unrecognized)
@@ -1108,11 +1460,11 @@ func (m *DhtMessage_FindNode) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n12, err := m.From.MarshalTo(dAtA[i:])
+		n13, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n12
+		i += n13
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1120,11 +1472,11 @@ func (m *DhtMessage_FindNode) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n13, err := m.To.MarshalTo(dAtA[i:])
+		n14, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n13
+		i += n14
 	}
 	if m.Target == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1174,11 +1526,11 @@ func (m *DhtMessage_Neighbors) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n14, err := m.From.MarshalTo(dAtA[i:])
+		n15, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n14
+		i += n15
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1186,11 +1538,11 @@ func (m *DhtMessage_Neighbors) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n15, err := m.To.MarshalTo(dAtA[i:])
+		n16, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n15
+		i += n16
 	}
 	if len(m.Nodes) > 0 {
 		for _, msg := range m.Nodes {
@@ -1244,11 +1596,11 @@ func (m *DhtMessage_PutValue) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n16, err := m.From.MarshalTo(dAtA[i:])
+		n17, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n16
+		i += n17
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1256,11 +1608,11 @@ func (m *DhtMessage_PutValue) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n17, err := m.To.MarshalTo(dAtA[i:])
+		n18, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n17
+		i += n18
 	}
 	if len(m.Values) > 0 {
 		for _, msg := range m.Values {
@@ -1314,11 +1666,11 @@ func (m *DhtMessage_GetValueReq) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n18, err := m.From.MarshalTo(dAtA[i:])
+		n19, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n18
+		i += n19
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1326,11 +1678,11 @@ func (m *DhtMessage_GetValueReq) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n19, err := m.To.MarshalTo(dAtA[i:])
+		n20, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n19
+		i += n20
 	}
 	if len(m.Keys) > 0 {
 		for _, b := range m.Keys {
@@ -1380,11 +1732,11 @@ func (m *DhtMessage_GetValueRsp) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n20, err := m.From.MarshalTo(dAtA[i:])
+		n21, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n20
+		i += n21
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1392,11 +1744,11 @@ func (m *DhtMessage_GetValueRsp) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n21, err := m.To.MarshalTo(dAtA[i:])
+		n22, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n21
+		i += n22
 	}
 	if len(m.Values) > 0 {
 		for _, msg := range m.Values {
@@ -1450,11 +1802,11 @@ func (m *DhtMessage_PutProvider) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n22, err := m.From.MarshalTo(dAtA[i:])
+		n23, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n22
+		i += n23
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1462,11 +1814,11 @@ func (m *DhtMessage_PutProvider) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n23, err := m.To.MarshalTo(dAtA[i:])
+		n24, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n23
+		i += n24
 	}
 	if len(m.Providers) > 0 {
 		for _, msg := range m.Providers {
@@ -1520,11 +1872,11 @@ func (m *DhtMessage_GetProviderReq) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n24, err := m.From.MarshalTo(dAtA[i:])
+		n25, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n24
+		i += n25
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1532,11 +1884,11 @@ func (m *DhtMessage_GetProviderReq) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n25, err := m.To.MarshalTo(dAtA[i:])
+		n26, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n25
+		i += n26
 	}
 	if len(m.Key) > 0 {
 		for _, b := range m.Key {
@@ -1586,11 +1938,11 @@ func (m *DhtMessage_GetProviderRsp) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n26, err := m.From.MarshalTo(dAtA[i:])
+		n27, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n26
+		i += n27
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1598,11 +1950,11 @@ func (m *DhtMessage_GetProviderRsp) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n27, err := m.To.MarshalTo(dAtA[i:])
+		n28, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n27
+		i += n28
 	}
 	if len(m.Providers) > 0 {
 		for _, msg := range m.Providers {
@@ -1656,11 +2008,11 @@ func (m *DhtMessage_Ping) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n28, err := m.From.MarshalTo(dAtA[i:])
+		n29, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n28
+		i += n29
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1668,18 +2020,18 @@ func (m *DhtMessage_Ping) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n29, err := m.To.MarshalTo(dAtA[i:])
+		n30, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n29
+		i += n30
 	}
-	if m.Id == nil {
+	if m.Seq == nil {
 		return 0, new(proto.RequiredNotSetError)
 	} else {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.Id))
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.Seq))
 	}
 	if m.Extra != nil {
 		dAtA[i] = 0x22
@@ -1714,11 +2066,11 @@ func (m *DhtMessage_Pong) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0xa
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.From.Size()))
-		n30, err := m.From.MarshalTo(dAtA[i:])
+		n31, err := m.From.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n30
+		i += n31
 	}
 	if m.To == nil {
 		return 0, new(proto.RequiredNotSetError)
@@ -1726,18 +2078,18 @@ func (m *DhtMessage_Pong) MarshalTo(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 		i++
 		i = encodeVarintDhtmsg(dAtA, i, uint64(m.To.Size()))
-		n31, err := m.To.MarshalTo(dAtA[i:])
+		n32, err := m.To.MarshalTo(dAtA[i:])
 		if err != nil {
 			return 0, err
 		}
-		i += n31
+		i += n32
 	}
-	if m.Id == nil {
+	if m.Seq == nil {
 		return 0, new(proto.RequiredNotSetError)
 	} else {
 		dAtA[i] = 0x18
 		i++
-		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.Id))
+		i = encodeVarintDhtmsg(dAtA, i, uint64(*m.Seq))
 	}
 	if m.Extra != nil {
 		dAtA[i] = 0x22
@@ -1760,11 +2112,34 @@ func encodeVarintDhtmsg(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *DhtPackage) Size() (n int) {
+	var l int
+	_ = l
+	if m.Pid != nil {
+		n += 1 + sovDhtmsg(uint64(*m.Pid))
+	}
+	if m.PayloadLength != nil {
+		n += 1 + sovDhtmsg(uint64(*m.PayloadLength))
+	}
+	if m.Payload != nil {
+		l = len(m.Payload)
+		n += 1 + l + sovDhtmsg(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
 func (m *DhtMessage) Size() (n int) {
 	var l int
 	_ = l
 	if m.MsgType != nil {
 		n += 1 + sovDhtmsg(uint64(*m.MsgType))
+	}
+	if m.Handshake != nil {
+		l = m.Handshake.Size()
+		n += 1 + l + sovDhtmsg(uint64(l))
 	}
 	if m.FindNode != nil {
 		l = m.FindNode.Size()
@@ -1864,6 +2239,62 @@ func (m *DhtMessage_Provider) Size() (n int) {
 	}
 	if m.Node != nil {
 		l = m.Node.Size()
+		n += 1 + l + sovDhtmsg(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DhtMessage_Protocol) Size() (n int) {
+	var l int
+	_ = l
+	if m.Pid != nil {
+		n += 1 + sovDhtmsg(uint64(*m.Pid))
+	}
+	if m.Ver != nil {
+		l = len(m.Ver)
+		n += 1 + l + sovDhtmsg(uint64(l))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *DhtMessage_Handshake) Size() (n int) {
+	var l int
+	_ = l
+	if m.SubNetId != nil {
+		l = len(m.SubNetId)
+		n += 1 + l + sovDhtmsg(uint64(l))
+	}
+	if m.NodeId != nil {
+		l = len(m.NodeId)
+		n += 1 + l + sovDhtmsg(uint64(l))
+	}
+	if m.IP != nil {
+		l = len(m.IP)
+		n += 1 + l + sovDhtmsg(uint64(l))
+	}
+	if m.UDP != nil {
+		n += 1 + sovDhtmsg(uint64(*m.UDP))
+	}
+	if m.TCP != nil {
+		n += 1 + sovDhtmsg(uint64(*m.TCP))
+	}
+	if m.ProtoNum != nil {
+		n += 1 + sovDhtmsg(uint64(*m.ProtoNum))
+	}
+	if len(m.Protocols) > 0 {
+		for _, e := range m.Protocols {
+			l = e.Size()
+			n += 1 + l + sovDhtmsg(uint64(l))
+		}
+	}
+	if m.Extra != nil {
+		l = len(m.Extra)
 		n += 1 + l + sovDhtmsg(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
@@ -2121,8 +2552,8 @@ func (m *DhtMessage_Ping) Size() (n int) {
 		l = m.To.Size()
 		n += 1 + l + sovDhtmsg(uint64(l))
 	}
-	if m.Id != nil {
-		n += 1 + sovDhtmsg(uint64(*m.Id))
+	if m.Seq != nil {
+		n += 1 + sovDhtmsg(uint64(*m.Seq))
 	}
 	if m.Extra != nil {
 		l = len(m.Extra)
@@ -2145,8 +2576,8 @@ func (m *DhtMessage_Pong) Size() (n int) {
 		l = m.To.Size()
 		n += 1 + l + sovDhtmsg(uint64(l))
 	}
-	if m.Id != nil {
-		n += 1 + sovDhtmsg(uint64(*m.Id))
+	if m.Seq != nil {
+		n += 1 + sovDhtmsg(uint64(*m.Seq))
 	}
 	if m.Extra != nil {
 		l = len(m.Extra)
@@ -2170,6 +2601,137 @@ func sovDhtmsg(x uint64) (n int) {
 }
 func sozDhtmsg(x uint64) (n int) {
 	return sovDhtmsg(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *DhtPackage) Unmarshal(dAtA []byte) error {
+	var hasFields [1]uint64
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDhtmsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DhtPackage: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DhtPackage: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			var v ProtocolId
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (ProtocolId(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Pid = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PayloadLength", wireType)
+			}
+			var v uint32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.PayloadLength = &v
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Payload", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Payload = append(m.Payload[:0], dAtA[iNdEx:postIndex]...)
+			if m.Payload == nil {
+				m.Payload = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDhtmsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 	var hasFields [1]uint64
@@ -2224,6 +2786,39 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 			hasFields[0] |= uint64(0x00000001)
 		case 2:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Handshake", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Handshake == nil {
+				m.Handshake = &DhtMessage_Handshake{}
+			}
+			if err := m.Handshake.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field FindNode", wireType)
 			}
 			var msglen int
@@ -2255,7 +2850,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 3:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Neighbors", wireType)
 			}
@@ -2288,7 +2883,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 4:
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PutValue", wireType)
 			}
@@ -2321,7 +2916,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 5:
+		case 6:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field GetValueReq", wireType)
 			}
@@ -2354,7 +2949,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 6:
+		case 7:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field GetValueRsp", wireType)
 			}
@@ -2387,7 +2982,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 7:
+		case 8:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PutProvider", wireType)
 			}
@@ -2420,7 +3015,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 8:
+		case 9:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field GutProviderReq", wireType)
 			}
@@ -2453,7 +3048,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 9:
+		case 10:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field GutProviderRsp", wireType)
 			}
@@ -2486,7 +3081,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 10:
+		case 11:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Ping", wireType)
 			}
@@ -2519,7 +3114,7 @@ func (m *DhtMessage) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 11:
+		case 12:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Pong", wireType)
 			}
@@ -3009,6 +3604,408 @@ func (m *DhtMessage_Provider) Unmarshal(dAtA []byte) error {
 		return new(proto.RequiredNotSetError)
 	}
 	if hasFields[0]&uint64(0x00000002) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DhtMessage_Protocol) Unmarshal(dAtA []byte) error {
+	var hasFields [1]uint64
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDhtmsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Protocol: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Protocol: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Pid", wireType)
+			}
+			var v ProtocolId
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (ProtocolId(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Pid = &v
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ver", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ver = append(m.Ver[:0], dAtA[iNdEx:postIndex]...)
+			if m.Ver == nil {
+				m.Ver = []byte{}
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDhtmsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DhtMessage_Handshake) Unmarshal(dAtA []byte) error {
+	var hasFields [1]uint64
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowDhtmsg
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Handshake: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Handshake: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubNetId", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SubNetId = append(m.SubNetId[:0], dAtA[iNdEx:postIndex]...)
+			if m.SubNetId == nil {
+				m.SubNetId = []byte{}
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000001)
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeId", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeId = append(m.NodeId[:0], dAtA[iNdEx:postIndex]...)
+			if m.NodeId == nil {
+				m.NodeId = []byte{}
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000002)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IP", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IP = append(m.IP[:0], dAtA[iNdEx:postIndex]...)
+			if m.IP == nil {
+				m.IP = []byte{}
+			}
+			iNdEx = postIndex
+			hasFields[0] |= uint64(0x00000004)
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UDP", wireType)
+			}
+			var v uint32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.UDP = &v
+			hasFields[0] |= uint64(0x00000008)
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TCP", wireType)
+			}
+			var v uint32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.TCP = &v
+			hasFields[0] |= uint64(0x00000010)
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ProtoNum", wireType)
+			}
+			var v uint32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ProtoNum = &v
+			hasFields[0] |= uint64(0x00000020)
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Protocols", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Protocols = append(m.Protocols, &DhtMessage_Protocol{})
+			if err := m.Protocols[len(m.Protocols)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Extra", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowDhtmsg
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Extra = append(m.Extra[:0], dAtA[iNdEx:postIndex]...)
+			if m.Extra == nil {
+				m.Extra = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipDhtmsg(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthDhtmsg
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+	if hasFields[0]&uint64(0x00000001) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000002) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000004) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000008) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000010) == 0 {
+		return new(proto.RequiredNotSetError)
+	}
+	if hasFields[0]&uint64(0x00000020) == 0 {
 		return new(proto.RequiredNotSetError)
 	}
 
@@ -4813,7 +5810,7 @@ func (m *DhtMessage_Ping) Unmarshal(dAtA []byte) error {
 			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Seq", wireType)
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
@@ -4830,7 +5827,7 @@ func (m *DhtMessage_Ping) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-			m.Id = &v
+			m.Seq = &v
 			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
@@ -4994,7 +5991,7 @@ func (m *DhtMessage_Pong) Unmarshal(dAtA []byte) error {
 			hasFields[0] |= uint64(0x00000002)
 		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Seq", wireType)
 			}
 			var v uint64
 			for shift := uint(0); ; shift += 7 {
@@ -5011,7 +6008,7 @@ func (m *DhtMessage_Pong) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-			m.Id = &v
+			m.Seq = &v
 			hasFields[0] |= uint64(0x00000004)
 		case 4:
 			if wireType != 2 {
@@ -5183,56 +6180,69 @@ var (
 func init() { proto.RegisterFile("dhtmsg.proto", fileDescriptorDhtmsg) }
 
 var fileDescriptorDhtmsg = []byte{
-	// 809 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x56, 0xcd, 0x6e, 0xda, 0x58,
-	0x14, 0x8e, 0x7f, 0x00, 0x73, 0xec, 0x90, 0xab, 0x3b, 0xa3, 0x19, 0x8b, 0x91, 0x98, 0x4c, 0x34,
-	0x8b, 0x68, 0x46, 0x42, 0xa3, 0xcc, 0xae, 0x3f, 0x52, 0x13, 0x30, 0xd4, 0x0d, 0x31, 0xee, 0x8d,
-	0x41, 0xca, 0x2a, 0x22, 0xc5, 0x75, 0x50, 0x13, 0xdb, 0xc1, 0x4e, 0x55, 0xde, 0xa0, 0x0f, 0xd0,
-	0x45, 0xf7, 0xcd, 0xae, 0x0f, 0x51, 0x55, 0xea, 0xa2, 0x9b, 0x4a, 0xe9, 0x1b, 0x54, 0xe9, 0x8b,
-	0x54, 0xf7, 0xda, 0x06, 0x03, 0x21, 0xf1, 0x86, 0xaa, 0x5d, 0x71, 0xce, 0xe1, 0xfb, 0xce, 0xfd,
-	0xbe, 0xeb, 0x7b, 0x8f, 0x0d, 0x4a, 0xff, 0x38, 0x3c, 0x0d, 0x9c, 0xaa, 0x3f, 0xf4, 0x42, 0x0f,
-	0x17, 0x93, 0xec, 0x68, 0xe3, 0xf3, 0xef, 0x00, 0xf5, 0xe3, 0x70, 0xcf, 0x0e, 0x82, 0x9e, 0x63,
-	0xe3, 0xbb, 0x50, 0x38, 0x0d, 0x1c, 0x6b, 0xe4, 0xdb, 0x2a, 0xb7, 0xce, 0x6f, 0x96, 0xb6, 0xfe,
-	0xaa, 0x8e, 0xb1, 0xd5, 0x09, 0xae, 0x1a, 0xff, 0x52, 0x20, 0x49, 0x18, 0xf8, 0x0e, 0x48, 0x4f,
-	0x07, 0x6e, 0xdf, 0xf0, 0xfa, 0xb6, 0xca, 0xaf, 0x73, 0x9b, 0xf2, 0x56, 0xe5, 0x7a, 0x76, 0x23,
-	0x46, 0x91, 0x31, 0x1e, 0xdf, 0x87, 0xa2, 0x6b, 0x0f, 0x9c, 0xe3, 0x23, 0x6f, 0x18, 0xa8, 0x02,
-	0x23, 0xff, 0x79, 0x3d, 0xd9, 0x48, 0x60, 0x64, 0xc2, 0xa0, 0x4b, 0xfb, 0xe7, 0x61, 0xb7, 0x77,
-	0x72, 0x6e, 0xab, 0xe2, 0x4d, 0x4b, 0x9b, 0x31, 0x8a, 0x8c, 0xf1, 0xb8, 0x06, 0xb2, 0x63, 0xc7,
-	0x55, 0xfb, 0x4c, 0xcd, 0x31, 0xfa, 0x02, 0xdf, 0xcd, 0x09, 0x90, 0xa4, 0x59, 0x53, 0x4d, 0x02,
-	0x5f, 0xcd, 0x67, 0x6a, 0x12, 0xf8, 0x24, 0xcd, 0xa2, 0x4d, 0xfc, 0xf3, 0xd0, 0x1c, 0x7a, 0xcf,
-	0x07, 0x7d, 0x7b, 0xa8, 0x16, 0x6e, 0x6a, 0x62, 0x4e, 0x80, 0x24, 0xcd, 0xc2, 0x2d, 0x28, 0x39,
-	0xa9, 0xff, 0xec, 0x33, 0x55, 0x62, 0x7d, 0xfe, 0x5e, 0x28, 0x26, 0x85, 0x25, 0x33, 0xdc, 0xd9,
-	0x6e, 0x81, 0xaf, 0x16, 0xb3, 0x76, 0x0b, 0x7c, 0x32, 0xc3, 0xc5, 0x55, 0x10, 0xfd, 0x81, 0xeb,
-	0xa8, 0xc0, 0x7a, 0x94, 0x17, 0x38, 0x1b, 0xb8, 0x0e, 0x61, 0x38, 0x86, 0xf7, 0x5c, 0x47, 0x95,
-	0x6f, 0xc4, 0x7b, 0x0c, 0xef, 0xb9, 0x4e, 0xf9, 0x15, 0x07, 0x22, 0x3b, 0x4e, 0x25, 0xe0, 0x75,
-	0x93, 0x1d, 0x61, 0x85, 0xf0, 0xba, 0x89, 0x11, 0x08, 0x9d, 0xba, 0xa9, 0xf2, 0xeb, 0xfc, 0xe6,
-	0x2a, 0xa1, 0x21, 0xad, 0x58, 0x35, 0x53, 0x15, 0xa2, 0x8a, 0x55, 0x33, 0xf1, 0x6f, 0x90, 0xa7,
-	0x5c, 0xbd, 0xaf, 0x8a, 0x8c, 0x17, 0x67, 0xf8, 0x01, 0x48, 0x35, 0xcf, 0x75, 0xd9, 0xa5, 0xc8,
-	0xb1, 0x4b, 0xb1, 0xc0, 0x3c, 0x45, 0xd9, 0x4f, 0xc2, 0x81, 0xc7, 0xb0, 0x64, 0xcc, 0x2a, 0xff,
-	0x0b, 0xb9, 0xe8, 0xa8, 0x21, 0x10, 0x76, 0xed, 0x51, 0xac, 0x8b, 0x86, 0xb4, 0xd2, 0xed, 0x9d,
-	0x30, 0x61, 0x0a, 0xa1, 0x61, 0xb9, 0x05, 0xd2, 0xf8, 0x59, 0xce, 0xe3, 0xab, 0x91, 0x41, 0x46,
-	0x58, 0xb8, 0x23, 0xec, 0x6e, 0x31, 0x5c, 0xf9, 0x82, 0x03, 0x29, 0xb9, 0x6e, 0x94, 0xdc, 0x18,
-	0x7a, 0xa7, 0xac, 0xdf, 0x2d, 0x64, 0x8a, 0xc3, 0xff, 0x00, 0x6f, 0x79, 0x19, 0x96, 0xe2, 0x2d,
-	0x8f, 0xee, 0x9e, 0xd5, 0x1b, 0x3a, 0x76, 0xc8, 0xb6, 0x54, 0x21, 0x71, 0xc6, 0x9e, 0x44, 0xb4,
-	0xa3, 0x22, 0xe1, 0xf5, 0x3e, 0xfe, 0x15, 0x72, 0xda, 0x8b, 0x70, 0xd8, 0x63, 0xf7, 0x4c, 0x21,
-	0x51, 0x52, 0x7e, 0xc7, 0x41, 0x71, 0x7c, 0xb1, 0x97, 0xaa, 0xf3, 0x3f, 0xc8, 0xd1, 0x98, 0x0e,
-	0x19, 0xe1, 0x16, 0x78, 0x04, 0xcc, 0xe8, 0xe0, 0x3d, 0x07, 0x52, 0x32, 0x5c, 0x96, 0x6a, 0xe0,
-	0x7f, 0xc8, 0xb3, 0x45, 0x12, 0x07, 0x7f, 0x5c, 0x8f, 0x8f, 0x86, 0x4a, 0x0c, 0xcd, 0xe8, 0xe1,
-	0x0d, 0x07, 0x72, 0x6a, 0xc2, 0x2d, 0xd5, 0x06, 0x06, 0x71, 0xd7, 0x1e, 0x45, 0x26, 0x14, 0xc2,
-	0xe2, 0x8c, 0x2a, 0x3f, 0xa4, 0x55, 0x46, 0x43, 0xe5, 0x67, 0xdc, 0xec, 0x4f, 0x1c, 0xc8, 0xa9,
-	0x21, 0xbe, 0x54, 0x1b, 0xf7, 0xa0, 0x98, 0xac, 0x93, 0x38, 0x59, 0xf4, 0x7e, 0x4c, 0xa6, 0xf5,
-	0x84, 0x90, 0xd1, 0xcf, 0x05, 0x07, 0xa5, 0xe9, 0x97, 0xc9, 0x52, 0x2d, 0x21, 0x10, 0x9e, 0xd9,
-	0xa3, 0xf8, 0xf8, 0xd0, 0x30, 0xa3, 0xcc, 0xcb, 0x19, 0x99, 0x4b, 0x3e, 0x40, 0xdf, 0x63, 0xe7,
-	0x5f, 0x72, 0x20, 0x9a, 0xf1, 0xeb, 0x72, 0x69, 0x46, 0x22, 0x29, 0xc2, 0xbc, 0x14, 0x71, 0x4e,
-	0x8a, 0xf7, 0x23, 0x48, 0xd9, 0x78, 0xcb, 0x81, 0x9c, 0xfa, 0x4c, 0xc5, 0x0a, 0x48, 0x0d, 0xdd,
-	0xa8, 0x1b, 0xed, 0xba, 0x86, 0x56, 0xf0, 0x2a, 0x14, 0x0d, 0x4d, 0x6f, 0x3e, 0xdc, 0x69, 0x93,
-	0x7d, 0xc4, 0xd1, 0x3f, 0xcd, 0x8e, 0xd5, 0xdd, 0x6e, 0x75, 0x34, 0xc4, 0x63, 0x04, 0x4a, 0x53,
-	0x8b, 0xb2, 0x43, 0xa2, 0x3d, 0x46, 0xc2, 0x74, 0x65, 0xdf, 0x44, 0x22, 0x5e, 0x03, 0xd9, 0xec,
-	0x58, 0x26, 0x69, 0x77, 0xf5, 0xba, 0x46, 0x50, 0x0e, 0xff, 0x02, 0x6b, 0x4d, 0x6d, 0x5c, 0x60,
-	0xbc, 0xfc, 0x5c, 0x71, 0xdf, 0x44, 0x05, 0x2c, 0x81, 0x68, 0xea, 0x46, 0x13, 0x49, 0x2c, 0x6a,
-	0x1b, 0x4d, 0x54, 0xdc, 0x78, 0x04, 0xa5, 0xe9, 0xcf, 0x07, 0x2c, 0x43, 0xa1, 0xd6, 0x36, 0xac,
-	0x43, 0xa3, 0x8d, 0x56, 0xa8, 0x3e, 0x96, 0x1c, 0x68, 0xb1, 0x5a, 0x96, 0xed, 0x6d, 0x1f, 0x20,
-	0x9e, 0x2a, 0x61, 0x59, 0x63, 0x5b, 0x6f, 0x69, 0x75, 0x24, 0xec, 0xa0, 0x8f, 0x57, 0x15, 0xee,
-	0xf2, 0xaa, 0xc2, 0x7d, 0xb9, 0xaa, 0x70, 0xaf, 0xbf, 0x56, 0x56, 0xbe, 0x05, 0x00, 0x00, 0xff,
-	0xff, 0xff, 0x2c, 0xf1, 0xa4, 0xff, 0x0b, 0x00, 0x00,
+	// 1020 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x57, 0x5d, 0x6f, 0xe3, 0x44,
+	0x17, 0xae, 0x3f, 0xd2, 0x24, 0x27, 0x69, 0x77, 0xde, 0xd9, 0x7d, 0xc1, 0x32, 0x52, 0x09, 0xd5,
+	0x4a, 0x5b, 0x2d, 0x52, 0x84, 0xca, 0x1d, 0x1f, 0x12, 0xd9, 0xd8, 0x4d, 0x4c, 0x53, 0xc7, 0x4c,
+	0xdc, 0x8a, 0xbd, 0xaa, 0xdc, 0x7a, 0x70, 0xa2, 0xb6, 0x76, 0x1a, 0x3b, 0x88, 0xfc, 0x05, 0xae,
+	0xb9, 0xe0, 0x9e, 0xfd, 0x1f, 0x08, 0x89, 0x0b, 0x6e, 0x90, 0xf6, 0x27, 0xa0, 0xae, 0xc4, 0xaf,
+	0x40, 0x02, 0xcd, 0xf8, 0x33, 0x69, 0x13, 0x72, 0x13, 0x04, 0x57, 0x9d, 0x73, 0xf2, 0x3c, 0xe7,
+	0x3c, 0xe7, 0xcc, 0xcc, 0x19, 0x17, 0xea, 0xee, 0x30, 0xba, 0x09, 0xbd, 0xe6, 0x78, 0x12, 0x44,
+	0x01, 0xae, 0xa6, 0xd6, 0xc5, 0xfe, 0x14, 0x40, 0x1b, 0x46, 0x96, 0x73, 0x79, 0xe5, 0x78, 0x14,
+	0x3f, 0x03, 0xc9, 0x1a, 0xb9, 0x8a, 0xd0, 0x10, 0x0f, 0x76, 0x0f, 0xff, 0xdf, 0xcc, 0x60, 0x4d,
+	0x8b, 0xf1, 0x2e, 0x83, 0x6b, 0xc3, 0x25, 0x0c, 0x81, 0x9f, 0xc2, 0x8e, 0xe5, 0xcc, 0xae, 0x03,
+	0xc7, 0xed, 0x51, 0xdf, 0x8b, 0x86, 0x8a, 0xd8, 0x10, 0x0f, 0x76, 0xc8, 0xbc, 0x13, 0x2b, 0x50,
+	0x4e, 0x1c, 0x8a, 0xd4, 0x10, 0x0e, 0xea, 0x24, 0x35, 0xf7, 0xff, 0x50, 0x79, 0xde, 0x13, 0x1a,
+	0x86, 0x2c, 0xef, 0xc7, 0x50, 0xbe, 0x09, 0x3d, 0x7b, 0x36, 0xa6, 0x49, 0xee, 0xf7, 0x0a, 0xb9,
+	0x73, 0x5c, 0x33, 0xf9, 0xcb, 0x80, 0x24, 0x65, 0xe0, 0x4f, 0xa1, 0x3a, 0x74, 0x7c, 0x37, 0x1c,
+	0x3a, 0x57, 0x54, 0x11, 0x1b, 0xc2, 0x41, 0xed, 0xf0, 0xdd, 0x87, 0xe9, 0xdd, 0x14, 0x46, 0x72,
+	0x06, 0xfe, 0x08, 0x2a, 0x5f, 0x8d, 0x7c, 0xd7, 0x0c, 0x5c, 0xca, 0x55, 0xd6, 0x0e, 0xf7, 0x1e,
+	0x66, 0x1f, 0x25, 0x28, 0x92, 0xe1, 0x59, 0x6a, 0x9f, 0x8e, 0xbc, 0xe1, 0x45, 0x30, 0x09, 0x15,
+	0x79, 0x55, 0x6a, 0x33, 0x85, 0x91, 0x9c, 0xc1, 0x52, 0x8f, 0xa7, 0xd1, 0x99, 0x73, 0x3d, 0xa5,
+	0x4a, 0x69, 0x55, 0x6a, 0x2b, 0x41, 0x91, 0x0c, 0x8f, 0xdb, 0x50, 0xf3, 0x68, 0xe2, 0xa5, 0xb7,
+	0xca, 0x36, 0xa7, 0x2f, 0x69, 0x5b, 0x27, 0x07, 0x92, 0x22, 0x6b, 0x2e, 0x48, 0x38, 0x56, 0xca,
+	0x6b, 0x05, 0x09, 0xc7, 0xa4, 0xc8, 0x62, 0x41, 0xc6, 0xd3, 0xc8, 0x9a, 0x04, 0x5f, 0x8f, 0x5c,
+	0x3a, 0x51, 0x2a, 0xab, 0x82, 0x58, 0x39, 0x90, 0x14, 0x59, 0xb8, 0x07, 0xbb, 0x5e, 0xe1, 0x37,
+	0x7a, 0xab, 0x54, 0x79, 0x9c, 0xa7, 0x4b, 0xc5, 0x14, 0xb0, 0x64, 0x81, 0xbb, 0x18, 0x2d, 0x1c,
+	0x2b, 0xb0, 0x6e, 0xb4, 0x70, 0x4c, 0x16, 0xb8, 0xb8, 0x09, 0xf2, 0x78, 0xe4, 0x7b, 0x4a, 0x8d,
+	0xc7, 0x50, 0x97, 0x54, 0x36, 0xf2, 0x3d, 0xc2, 0x71, 0x1c, 0x1f, 0xf8, 0x9e, 0x52, 0x5f, 0x89,
+	0x0f, 0x38, 0x3e, 0xf0, 0x3d, 0xf5, 0x3b, 0x01, 0x64, 0x7e, 0x9c, 0x76, 0x41, 0x34, 0x2c, 0x7e,
+	0x03, 0xea, 0x44, 0x34, 0x2c, 0x8c, 0x40, 0x3a, 0xd5, 0xac, 0xe4, 0x6e, 0xb1, 0x25, 0xf3, 0xd8,
+	0x6d, 0x4b, 0x91, 0x62, 0x8f, 0xdd, 0xb6, 0xf0, 0x5b, 0xb0, 0xcd, 0xb8, 0x86, 0xab, 0xc8, 0x9c,
+	0x97, 0x58, 0xf8, 0x33, 0xa8, 0xb4, 0x03, 0xdf, 0xe7, 0x77, 0xaa, 0xc4, 0xef, 0xd4, 0x92, 0xe2,
+	0x19, 0x8a, 0x5e, 0x46, 0xa3, 0x80, 0x63, 0x49, 0xc6, 0x52, 0xdf, 0x87, 0x52, 0x7c, 0xd4, 0x10,
+	0x48, 0xc7, 0x74, 0x96, 0xe8, 0x62, 0x4b, 0xe6, 0x39, 0x73, 0xae, 0xb9, 0xb0, 0x3a, 0x61, 0x4b,
+	0xb5, 0x07, 0x95, 0x6c, 0x2f, 0xef, 0xe3, 0x9b, 0x71, 0x81, 0x9c, 0xb0, 0xb4, 0x23, 0xfc, 0x6e,
+	0x71, 0x9c, 0xaa, 0xf3, 0x68, 0x7c, 0xe2, 0xac, 0x3f, 0x93, 0x98, 0x28, 0x3a, 0xc9, 0x44, 0xd1,
+	0x89, 0xfa, 0x46, 0x80, 0x6a, 0x76, 0xe7, 0xb1, 0x0a, 0x95, 0xc1, 0xf4, 0xc2, 0xa4, 0x91, 0xe1,
+	0x26, 0xda, 0x32, 0xbb, 0xd0, 0x45, 0x71, 0xae, 0x8b, 0xf1, 0x8e, 0x48, 0x8b, 0x3b, 0x22, 0xdf,
+	0xdb, 0x91, 0x52, 0xbe, 0x23, 0x6a, 0x22, 0xde, 0x9c, 0xde, 0x28, 0xdb, 0xdc, 0x9d, 0xd9, 0xf8,
+	0x13, 0xa8, 0xa6, 0xb2, 0x43, 0xa5, 0xdc, 0x90, 0x56, 0x5c, 0xf9, 0x04, 0x46, 0x72, 0x02, 0x7e,
+	0x02, 0x25, 0xfd, 0x9b, 0x68, 0xe2, 0xf0, 0x3b, 0x56, 0x27, 0xb1, 0xa1, 0xbe, 0x12, 0xa0, 0x92,
+	0xce, 0x26, 0xd6, 0xe9, 0xa3, 0x49, 0x70, 0xc3, 0x0b, 0xfc, 0x9b, 0x4e, 0x33, 0x1c, 0x7e, 0x0e,
+	0xa2, 0x1d, 0xac, 0xb1, 0x2f, 0xa2, 0x1d, 0xb0, 0x26, 0xd9, 0xce, 0xc4, 0xa3, 0x51, 0xd2, 0x90,
+	0xc4, 0xe2, 0x4d, 0x8a, 0x8f, 0x9f, 0x4c, 0x44, 0xc3, 0xcd, 0x65, 0x96, 0x8a, 0x32, 0x7f, 0x14,
+	0xa0, 0x9a, 0x4d, 0xc1, 0x8d, 0xea, 0xfc, 0x00, 0x4a, 0x6c, 0x1d, 0x2a, 0x12, 0x6f, 0xf0, 0x2a,
+	0x78, 0x0c, 0x5c, 0xb3, 0x82, 0x9f, 0x04, 0xa8, 0xa4, 0x93, 0x78, 0xa3, 0x05, 0x7c, 0x08, 0xdb,
+	0x3c, 0x49, 0x5a, 0xc1, 0x3b, 0x0f, 0xe3, 0xe3, 0x09, 0x9c, 0x40, 0xd7, 0xac, 0xe1, 0x07, 0x01,
+	0x6a, 0x85, 0xe7, 0x60, 0xa3, 0x65, 0x60, 0x90, 0x8f, 0xe9, 0x2c, 0x2e, 0xa2, 0x4e, 0xf8, 0x7a,
+	0x4d, 0x95, 0x3f, 0x17, 0x55, 0xc6, 0x13, 0xf8, 0xbf, 0xd8, 0xec, 0x5f, 0x05, 0xa8, 0x15, 0x5e,
+	0xbc, 0x8d, 0x96, 0x11, 0x4f, 0x16, 0x9e, 0x27, 0xad, 0x64, 0xf9, 0x64, 0x89, 0x9f, 0xb6, 0x9c,
+	0xb0, 0x66, 0x3d, 0xaf, 0x04, 0xd8, 0x9d, 0x7f, 0x79, 0x37, 0x5a, 0x12, 0x02, 0xe9, 0x8a, 0xce,
+	0x92, 0xe3, 0xc3, 0x96, 0x6b, 0xca, 0x7c, 0xbd, 0x20, 0x73, 0xc3, 0x07, 0xe8, 0x9f, 0xe8, 0xfc,
+	0xb7, 0x02, 0xc8, 0x56, 0xf2, 0x6d, 0xb1, 0xc9, 0x7e, 0x0f, 0xe8, 0x2d, 0x1f, 0xee, 0x32, 0x61,
+	0xcb, 0x5c, 0x8c, 0x7c, 0x4f, 0x4c, 0xf0, 0xef, 0x10, 0xb3, 0xff, 0xbb, 0x00, 0xb5, 0xc2, 0xbf,
+	0x05, 0xf8, 0x7f, 0xb0, 0x73, 0x62, 0x68, 0xe7, 0xdd, 0x96, 0xa9, 0x0d, 0xba, 0xad, 0x63, 0x1d,
+	0x6d, 0x61, 0x04, 0x75, 0xe6, 0x3a, 0x32, 0x4c, 0xcd, 0xec, 0x6b, 0x3a, 0x12, 0x52, 0x90, 0xa9,
+	0x1b, 0x9d, 0xee, 0x8b, 0x3e, 0x19, 0x20, 0x31, 0x05, 0x59, 0xa7, 0xf6, 0x59, 0xab, 0x77, 0xaa,
+	0x23, 0x09, 0x3f, 0x01, 0xc4, 0x3c, 0x1d, 0x3d, 0xf6, 0x9c, 0x13, 0xfd, 0x0b, 0x24, 0xdf, 0xf7,
+	0x0e, 0x2c, 0x54, 0xc2, 0x8f, 0xe1, 0x51, 0xc2, 0xb6, 0x48, 0xff, 0xcc, 0xd0, 0x74, 0x82, 0xb6,
+	0xf1, 0xdb, 0xf0, 0x38, 0x81, 0xa6, 0x4e, 0x1e, 0xa3, 0xfc, 0xe0, 0x0f, 0x03, 0x0b, 0x55, 0x70,
+	0x1d, 0x2a, 0x3c, 0x8c, 0x61, 0x76, 0x50, 0x35, 0xb3, 0xfa, 0x66, 0x07, 0xc1, 0xfe, 0xe7, 0xb0,
+	0x3b, 0xff, 0xa9, 0x86, 0x6b, 0x50, 0x6e, 0xf7, 0x4d, 0xfb, 0xdc, 0xec, 0xa3, 0x2d, 0x06, 0xe6,
+	0xc6, 0x4b, 0x7d, 0x80, 0x84, 0xcc, 0x3a, 0x69, 0xbd, 0x44, 0x22, 0x7e, 0x04, 0x35, 0x6e, 0x1d,
+	0xb5, 0x8c, 0x9e, 0xae, 0x21, 0xe9, 0xf9, 0x33, 0x80, 0xfc, 0xeb, 0x89, 0xc5, 0xb1, 0x0c, 0xed,
+	0x5c, 0xeb, 0xda, 0x3c, 0x0e, 0x37, 0xf4, 0x2f, 0x6d, 0xf4, 0xa7, 0xf0, 0x02, 0xfd, 0x72, 0xb7,
+	0x27, 0xbc, 0xbe, 0xdb, 0x13, 0x7e, 0xbb, 0xdb, 0x13, 0xbe, 0x7f, 0xb3, 0xb7, 0xf5, 0x57, 0x00,
+	0x00, 0x00, 0xff, 0xff, 0x05, 0x41, 0xe0, 0x7a, 0x4a, 0x0e, 0x00, 0x00,
 }

@@ -25,6 +25,7 @@ import (
 	"time"
 	"sync"
 	"container/list"
+	ggio "github.com/gogo/protobuf/io"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
@@ -43,6 +44,8 @@ type ConInst struct {
 	status		conInstStatus			// instance status
 	cid			conInstIdentity			// connection instance identity
 	con			net.Conn				// connection
+	iow			ggio.WriteCloser		// IO writer
+	ior			ggio.ReadCloser			// IO reader
 	dir			conInstDir				// connection instance directory
 	hsInfo		conInstHandshakeInfo	// handshake information
 	txPending	*list.List				// pending package to be sent
@@ -125,6 +128,9 @@ func newConInst(postFixed string) *ConInst {
 		ptnMe:		nil,
 		ptnConMgr:	nil,
 		ptnSrcTsk:	nil,
+		con:		nil,
+		ior:		nil,
+		iow:		nil,
 		status:		cisNull,
 		dir:		conInstDirUnknown,
 		txPending:	list.New(),

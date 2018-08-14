@@ -27,132 +27,186 @@
 syntax = "proto2";
 package dhtmsg.pb;
 
+
+//
+// Protocol identities
+//
+
+enum ProtocolId {
+    PID_DHT = 0;        // dht internal
+    PID_EXT = 0xff;     // external, for dht users
+}
+
+//
+// The package for all messages
+//
+
+message DhtPackage {
+
+    //
+    // a pb package would be, the payload is determined how to be handled
+    // by protocol identity "Pid".
+    //
+
+    required ProtocolId Pid         = 1;    // protocol identity
+    required uint32 PayloadLength   = 2;    // payload length
+    optional bytes Payload          = 3;    // payload buffer
+}
+
+//
+// DHT message
+//
+
 message DhtMessage {
+
     enum MessageType {
-        FINDNODE            = 0;
-        NEIGHBORS           = 1;
-        PUTVALUE            = 2;
-        GETVALUE_REQ        = 3;
-        GETVALUE_RSP        = 4;
-        PUTPROVIDER         = 5;
-        GETPROVIDER_REQ     = 6;
-        GETPROVIDER_RSP     = 7;
-        PING                = 8;
-        PONG                = 9;
+        MID_HANDSHAKE           = 0;
+        MID_FINDNODE            = 1;
+        MID_NEIGHBORS           = 2;
+        MID_PUTVALUE            = 3;
+        MID_GETVALUE_REQ        = 4;
+        MID_GETVALUE_RSP        = 5;
+        MID_PUTPROVIDER         = 6;
+        MID_GETPROVIDER_REQ     = 7;
+        MID_GETPROVIDER_RSP     = 8;
+        MID_PING                = 9;
+        MID_PONG                = 10;
     }
 
     enum ConnectionType {
-        CONT_NO             = 0;
-        CONT_YES            = 1;
-        CONT_MAY            = 2;
-        CONT_FAILED         = 3;
+        CONT_NO                 = 0;
+        CONT_YES                = 1;
+        CONT_MAY                = 2;
+        CONT_FAILED         =    3;
     }
 
     message Node {
-        required bytes          IP              = 1;
-        required uint32         UDP             = 2;
-        required uint32         TCP             = 3;
-        required bytes          NodeId          = 4;
-        required ConnectionType ConnType        = 5;
+        required bytes          IP              = 1;    // ip address
+        required uint32         UDP             = 2;    // udp port number
+        required uint32         TCP             = 3;    // tcp port number
+        required bytes          NodeId          = 4;    // node identity
+        required ConnectionType ConnType        = 5;    // connection type
     }
 
     message Value {
-        required bytes          Key             = 1;
-        required bytes          Val             = 2;
+        required bytes          Key             = 1;    // key
+        required bytes          Val             = 2;    // val
     }
 
     message Provider {
-        required bytes          Key             = 1;
-        required Node           Node            = 2;
+        required bytes          Key             = 1;    // key
+        required Node           Node            = 2;    // peer node
     }
 
+    message Protocol {
+        required ProtocolId     Pid             = 1;    // protocol identity
+        required bytes          Ver             = 2;    // protocol version: M.m0.m1.m2
+    }
+
+    message Handshake {
+        required bytes          SubNetId        = 1;    // sub network identity
+        required bytes          NodeId          = 2;    // node identity
+        required bytes          IP              = 3;    // ip address
+        required uint32         UDP             = 4;    // udp port number
+        required uint32         TCP             = 5;    // tcp port number
+        required uint32         ProtoNum        = 6;    // number of protocols
+        repeated Protocol       Protocols       = 7;    // protocol table
+        optional bytes          Extra           = 8;    // extra info, reserved
+    }
     message FindNode {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        required bytes          Target          = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        required bytes          Target          = 3;    // target
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message Neighbors {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated Node           Nodes           = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated Node           Nodes           = 3;    // neighbors
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message PutValue {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated Value          Values          = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated Value          Values          = 3;    // values to be put
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message GetValueReq {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated bytes          Keys            = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated bytes          Keys            = 3;    // keys for values wanted to get
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message GetValueRsp {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated Value          Values          = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated Value          Values          = 3;    // values to responsed
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message PutProvider {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated Provider       Providers       = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated Provider       Providers       = 3;    // providers to be put
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message GetProviderReq {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated bytes          key             = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated bytes          key             = 3;    // key for value be requested
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message GetProviderRsp {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        repeated Provider       Providers       = 3;
-        required uint64         Id              = 4;
-        optional bytes          Extra           = 5;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        repeated Provider       Providers       = 3;    // providers found
+        required uint64         Id              = 4;    // message identity
+        optional bytes          Extra           = 5;    // extra info
     }
 
     message Ping {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        required uint64         Id              = 3;
-        optional bytes          Extra           = 4;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        required uint64         Seq             = 3;    // sequence number
+        optional bytes          Extra           = 4;    // extra info
     }
 
     message Pong {
-        required Node           From            = 1;
-        required Node           To              = 2;
-        required uint64         Id              = 3;
-        optional bytes          Extra           = 4;
+        required Node           From            = 1;    // from whom
+        required Node           To              = 2;    // to whom
+        required uint64         Seq             = 3;    // sequence number
+        optional bytes          Extra           = 4;    // extra info
     }
 
+    //
+    // a pb message would be, the optional message body is determined by the
+    // message type "msgType".
+    //
+
     required MessageType        msgType         = 1;
-    optional FindNode           findNode        = 2;
-    optional Neighbors          neighbors       = 3;
-    optional PutValue           putValue        = 4;
-    optional GetValueReq        getValueReq     = 5;
-    optional GetValueRsp        getValueRsp     = 6;
-    optional PutProvider        putProvider     = 7;
-    optional GetProviderReq     gutProviderReq  = 8;
-    optional GetProviderRsp     gutProviderRsp  = 9;
-    optional Ping               ping            = 10;
-    optional Pong               pong            = 11;
+
+    optional Handshake          handshake       = 2;
+    optional FindNode           findNode        = 3;
+    optional Neighbors          neighbors       = 4;
+    optional PutValue           putValue        = 5;
+    optional GetValueReq        getValueReq     = 6;
+    optional GetValueRsp        getValueRsp     = 7;
+    optional PutProvider        putProvider     = 8;
+    optional GetProviderReq     gutProviderReq  = 9;
+    optional GetProviderRsp     gutProviderRsp  = 10;
+    optional Ping               ping            = 11;
+    optional Pong               pong            = 12;
 }
