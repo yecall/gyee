@@ -108,6 +108,7 @@ type RutMgr struct {
 	ptnConMgr		interface{}								// pointer to connection manager task node
 	bpCfg			bootstrapPolicy							// bootstrap policy configuration
 	bpTid			int										// bootstrap timer identity
+	bpTargets		map[config.NodeID] interface{}			// targets in bootstrapping
 	distLookupTab	[]int									// log2 distance lookup table for a xor byte
 	localNodeId		config.NodeID							// local node identity
 	rutTab			rutMgrRouteTable						// route table
@@ -141,6 +142,7 @@ func NewRutMgr() *RutMgr {
 		ptnConMgr:		nil,
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
+		bpTargets:		map[config.NodeID] interface{}{},
 		distLookupTab:	[]int{},
 		localNodeId:	config.NodeID{},
 		rutTab:			rutMgrRouteTable{},
@@ -271,6 +273,11 @@ func (rutMgr *RutMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 
+	if len(rutMgr.bpTargets) != 0 {
+		log.LogCallerFileLine("bootstarpTimerHandler: the previous is not completed")
+		return sch.SchEnoNone
+	}
+
 	sdl := rutMgr.sdl
 
 	for loop := 0; loop < rutMgr.bpCfg.randomQryNum; loop++ {
@@ -279,6 +286,8 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 		var req = sch.MsgDhtQryMgrQueryStartReq {
 			Target: rutMgrRandomPeerId(),
 		}
+
+		rutMgr.bpTargets[req.Target] = &req.Target
 
 		sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		sdl.SchSendMessage(&msg)
@@ -317,6 +326,25 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	log.LogCallerFileLine("queryResultInd: " +
 		"bootstrap result indication, eno: %d, target: %x",
 		msg.Eno, msg.Target)
+
+	if _, ok := rutMgr.bpTargets[msg.Target]; !ok {
+		log.LogCallerFileLine("queryResultInd: not a bootstrap target: %x", msg.Target)
+		return sch.SchEnoMismatched
+	}
+
+	//
+	// when a bootstrap round is completed, we publish ourself to outside world to
+	// let others know us.
+	//
+
+	if delete(rutMgr.bpTargets, msg.Target); len(rutMgr.bpTargets) == 0 {
+		var msg = sch.SchMessage{}
+		var req = sch.MsgDhtQryMgrQueryStartReq {
+			Target: rutMgr.localNodeId,
+		}
+		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
+		rutMgr.sdl.SchSendMessage(&msg)
+	}
 
 	return sch.SchEnoNone
 }
