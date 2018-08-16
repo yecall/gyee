@@ -49,6 +49,7 @@ const (
 // Connection manager configuration
 //
 type conMgrCfg struct {
+	local		*config.Node					// pointer to local node specification
 	maxCon		int								// max number of connection
 	hsTimeout	time.Duration					// handshake timeout duration
 }
@@ -699,6 +700,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 //
 func (conMgr *ConMgr)getConfig() DhtErrno {
 	cfg := config.P2pConfig4DhtConManager(conMgr.sdl.SchGetP2pCfgName())
+	conMgr.cfg.local = cfg.Local
 	conMgr.cfg.maxCon = cfg.MaxCon
 	conMgr.cfg.hsTimeout = cfg.HsTimeout
 	return DhtEnoNone
@@ -761,6 +763,7 @@ func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
 
 	ci.sdl = conMgr.sdl
+	ci.local = conMgr.cfg.local
 	ci.ptnConMgr = conMgr.ptnMe
 	ci.ptnSrcTsk = srcTask
 

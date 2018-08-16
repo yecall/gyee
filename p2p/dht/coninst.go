@@ -29,6 +29,7 @@ import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
+	pb "github.com/yeeco/gyee/p2p/dht/pb"
 )
 
 //
@@ -38,10 +39,12 @@ type ConInst struct {
 	sdl			*sch.Scheduler			// pointer to scheduler
 	name		string					// task name
 	tep			sch.SchUserTaskEp		// task entry
+	local		*config.Node			// pointer to local node specification
 	ptnMe		interface{}				// pointer to myself task node
 	ptnConMgr	interface{}				// pointer to connection manager task node
 	ptnSrcTsk	interface{}				// for outbound, the source task requests the connection
 	status		conInstStatus			// instance status
+	hsTimeout	time.Duration			// handshake timeout value
 	cid			conInstIdentity			// connection instance identity
 	con			net.Conn				// connection
 	iow			ggio.WriteCloser		// IO writer
@@ -103,7 +106,7 @@ type conInstHandshakeInfo struct {
 type conInstTxPkg struct {
 	task		interface{}			// pointer to owner task node
 	submitTime	time.Time			// time the payload submitted
-	payload		[]byte				// payload buffer
+	payload		interface{}			// payload buffer
 }
 
 //
@@ -290,6 +293,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	//
 
 	conInst.status = cisInHandshaking
+	conInst.hsTimeout = msg.DurHs
 	conInst.statusReport()
 
 	if conInst.dir == conInstDirOutbound {
@@ -571,6 +575,93 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 // Inbound handshake
 //
 func (conInst *ConInst)inboundHandshake() DhtErrno {
+
+	pkg := new(pb.DhtPackage)
+	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
+	if err := conInst.ior.ReadMsg(pkg); err != nil {
+		log.LogCallerFileLine("inboundHandshake: ReadMsg failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	if *pkg.Pid != PID_DHT {
+		log.LogCallerFileLine("inboundHandshake: invalid pid: %d", pkg.Pid)
+		return DhtEnoProtocol
+	}
+
+	if *pkg.PayloadLength <= 0 {
+		log.LogCallerFileLine("inboundHandshake: " +
+			"invalid payload length: %d",
+			*pkg.PayloadLength)
+		return DhtEnoProtocol
+	}
+
+	if len(pkg.Payload) != int(*pkg.PayloadLength) {
+		log.LogCallerFileLine("inboundHandshake: " +
+			"payload length mismatched, PlLen: %d, real: %d",
+			*pkg.PayloadLength, len(pkg.Payload))
+		return DhtEnoProtocol
+	}
+
+	dhtPkg := new(DhtPackage)
+	dhtPkg.Pid = uint32(*pkg.Pid)
+	dhtPkg.PayloadLength = *pkg.PayloadLength
+	dhtPkg.Payload = pkg.Payload
+
+	dhtMsg := new(DhtMessage)
+	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
+		log.LogCallerFileLine("inboundHandshake: GetMessage failed, eno: %d", eno)
+		return eno
+	}
+
+
+	if dhtMsg.Mid != MID_HANDSHAKE {
+		log.LogCallerFileLine("inboundHandshake: " +
+			"invalid MID: %d", dhtMsg.Mid)
+		return DhtEnoProtocol
+	}
+
+	hs := dhtMsg.Handshake
+	if hs.Dir != conInstDirOutbound {
+		log.LogCallerFileLine("inboundHandshake: " +
+			"mismatched direction: %d", hs.Dir)
+		return DhtEnoProtocol
+	}
+
+	conInst.hsInfo.peer = config.Node{
+		IP:		hs.IP,
+		TCP:	uint16(hs.TCP & 0xffff),
+		UDP:	uint16(hs.UDP & 0xffff),
+		ID:		hs.NodeId,
+	}
+
+	*dhtMsg = DhtMessage{}
+	dhtMsg.Mid = MID_HANDSHAKE
+	dhtMsg.Handshake = &Handshake{
+		Dir:		conInstDirInbound,
+		NodeId:		conInst.local.ID,
+		IP:			conInst.local.IP,
+		UDP:		uint32(conInst.local.UDP),
+		TCP:		uint32(conInst.local.TCP),
+		ProtoNum:	1,
+		Protocols:	[]DhtProtocol {
+			{
+				Pid:	uint32(PID_DHT),
+				Ver:	DhtVersion,
+			},
+		},
+	}
+
+	pbPkg := dhtMsg.GetPbPackage()
+	if pbPkg == nil {
+		log.LogCallerFileLine("inboundHandshake: GetPbPackage failed")
+		return DhtEnoSerialization
+	}
+
+	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
+		log.LogCallerFileLine("inboundHandshake: WriteMsg failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
 	return DhtEnoNone
 }
 

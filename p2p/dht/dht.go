@@ -47,6 +47,9 @@ const (
 	DhtEnoTimeout				// timeout
 	DhtEnoInternal				// internal logical errors
 	DhtEnoOs					// underlying operating system errors
+	DhtEnoSerialization			// serialization errors
+	DhtEnoProtocol				// protocol errors
+	DhtEnoNotSup				// not supported
 	DhtEnoUnknown				// unknown
 )
 

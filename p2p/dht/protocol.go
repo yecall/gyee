@@ -23,6 +23,7 @@ package dht
 import (
 	"net"
 	config "github.com/yeeco/gyee/p2p/config"
+	pb "github.com/yeeco/gyee/p2p/dht/pb"
 )
 
 //
@@ -34,12 +35,14 @@ type DhtProtocol struct {
 	Ver				[DhtProtoBytes]byte		// protocol version: M.m0.m1.m2
 }
 
+var DhtVersion = [DhtProtoBytes]byte {1, 0, 0, 0}
+
 //
 // Protocol identity
 //
 const (
-	PID_DHT = 0				// dht internal
-	PID_EXT = 0xff			// external, for dht users
+	PID_DHT = pb.ProtocolId_PID_DHT			// dht internal
+	PID_EXT = pb.ProtocolId_PID_EXT			// external, for dht users
 )
 
 //
@@ -227,5 +230,23 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 //
 func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
 	return DhtEnoNone
+}
+
+//
+// Setup protobuf package from message
+//
+func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
+
+	dhtPkg := DhtPackage{}
+	dhtMsg.GetPackage(&dhtPkg)
+
+	pbPkg := new(pb.DhtPackage)
+	pbPkg.Pid = new(pb.ProtocolId)
+	*pbPkg.Pid = pb.ProtocolId(dhtPkg.Pid)
+	pbPkg.PayloadLength = new(uint32)
+	*pbPkg.PayloadLength = dhtPkg.PayloadLength
+	pbPkg.Payload = dhtPkg.Payload
+
+	return pbPkg
 }
 

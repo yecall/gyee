@@ -344,7 +344,7 @@ type MsgDhtConMgrConnectRsp struct {
 type MsgDhtConMgrSendReq struct {
 	Task	interface{}				// pointer to task node
 	Peer	*config.Node			// peer data sent to
-	Data	[]byte					// data to be sent
+	Data	interface{}				// data to be sent
 }
 
 //

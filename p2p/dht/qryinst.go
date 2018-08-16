@@ -508,7 +508,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 //
 // Setup the package for query by protobuf schema
 //
-func (qryInst *QryInst)setupQryPkg() (DhtErrno, []byte) {
+func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 
 	fn := FindNode {
 		From:	*qryInst.icb.local,
@@ -528,5 +528,5 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, []byte) {
 		return eno, nil
 	}
 
-	return DhtEnoNone, fnPkg.Bytes()
+	return DhtEnoNone, &fnPkg
 }

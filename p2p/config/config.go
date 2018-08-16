@@ -299,6 +299,7 @@ type Cfg4DhtLsnManager struct {
 // Configuration about dht connection manager
 //
 type Cfg4DhtConManager struct {
+	Local			*Node			// pointer to local node specification
 	MaxCon    		int				// max number of connection
 	HsTimeout 		time.Duration	// handshake timeout duration
 }
@@ -976,6 +977,7 @@ func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 // Get configuration for dht connection manager
 //
 func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
+	config[name].DhtConCfg.Local = &config[name].Local
 	return &config[name].DhtConCfg
 }
 
