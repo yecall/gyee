@@ -102,8 +102,8 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 	case sch.EvDhtConMgrConnectRsp:
 		eno = qryInst.connectRsp(msg.Body.(*sch.MsgDhtConMgrConnectRsp))
 
-	case sch.EvDhtQryInstProtoDatInd:
-		eno = qryInst.protoDatInd(msg.Body.(*sch.MsgDhtQryInstProtoDatInd))
+	case sch.EvDhtQryInstProtoMsgInd:
+		eno = qryInst.protoMsgInd(msg.Body.(*sch.MsgDhtQryInstProtoMsgInd))
 
 	default:
 		log.LogCallerFileLine("qryInstProc: unknown event: %d", msg.Id)
@@ -401,9 +401,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	// send query to peer since connection is ok here now
 	//
 
-	var pkg = []byte{}
-
-	if eno := qryInst.setupQryPkg(pkg); eno != DhtEnoNone {
+	if eno, pkg := qryInst.setupQryPkg(); eno != DhtEnoNone {
 
 		log.LogCallerFileLine("connectRsp: setupQryPkg failed, eno: %d", eno)
 
@@ -415,14 +413,16 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
 
 		return sch.SchEnoUserTask
+
+	} else {
+
+		sendReq.Data = pkg
+		sendReq.Task = icb.ptnInst
+		sendReq.Peer = &icb.to
+
+		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
+		sdl.SchSendMessage(&schMsg)
 	}
-
-	sendReq.Data = pkg
-	sendReq.Task = icb.ptnInst
-	sendReq.Peer = &icb.to
-
-	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
-	sdl.SchSendMessage(&schMsg)
 
 	//
 	// update instance status and tell query manager
@@ -462,13 +462,71 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 //
 // Incoming DHT messages handler
 //
-func (qryInst *QryInst)protoDatInd(msg *sch.MsgDhtQryInstProtoDatInd) sch.SchErrno {
-	return sch.SchEnoNone
+func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErrno {
+
+	//
+	// notice: only "Neighbors" message should be dispatched here, a query instance
+	// is just for "query" than anything else.
+	//
+
+	dhtMsg, ok := msg.Msg.(*DhtMessage)
+	if !ok {
+		log.LogCallerFileLine("protoMsgInd: mismatched type")
+		return sch.SchEnoMismatched
+	}
+
+	switch dhtMsg.Mid {
+
+	case MID_NEIGHBORS:
+		if dhtMsg.Neighbors == nil {
+			log.LogCallerFileLine("protoMsgInd: nil body")
+			return sch.SchEnoParameter
+		}
+
+	default:
+		log.LogCallerFileLine("protoMsgInd: mismatched, mid: %d", dhtMsg.Mid)
+		return sch.SchEnoMismatched
+	}
+
+	icb := qryInst.icb
+	icb.endTime = time.Now()
+	nbs := dhtMsg.Neighbors
+
+	ind := sch.MsgDhtQryInstResultInd {
+		From:		nbs.From,
+		Target:		icb.target,
+		Latency:	icb.endTime.Sub(icb.begTime),
+		Peers:		nbs.Nodes,
+		Pcs:		nbs.Pcs,
+	}
+
+	schMsg := sch.SchMessage{}
+	icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+	return icb.sdl.SchSendMessage(&schMsg)
 }
 
 //
 // Setup the package for query by protobuf schema
 //
-func (qryInst *QryInst)setupQryPkg(pkg []byte) DhtErrno {
-	return DhtEnoNone
+func (qryInst *QryInst)setupQryPkg() (DhtErrno, []byte) {
+
+	fn := FindNode {
+		From:	*qryInst.icb.local,
+		To:		qryInst.icb.to,
+		Target:	qryInst.icb.target,
+		Id:		uint64(time.Now().UnixNano()),
+		Extra:	nil,
+	}
+
+	fnMsg := DhtMessage{
+		Mid:		MID_FINDNODE,
+		FindNode:	&fn,
+	}
+
+	fnPkg := DhtPackage{}
+	if eno := fnMsg.GetPackage(&fnPkg); eno != DhtEnoNone {
+		return eno, nil
+	}
+
+	return DhtEnoNone, fnPkg.Bytes()
 }

@@ -497,7 +497,7 @@ const (
 	EvDhtQryInstStopRsp			= EvDhtQryInstBase + 3
 	EvDhtQryInstResultInd		= EvDhtQryInstBase + 4
 	EvDhtQryInstStatusInd		= EvDhtQryInstBase + 5
-	EvDhtQryInstProtoDatInd		= EvDhtQryInstBase + 6
+	EvDhtQryInstProtoMsgInd		= EvDhtQryInstBase + 6
 )
 
 //
@@ -538,11 +538,11 @@ type MsgDhtQryInstStopRsp struct {
 }
 
 //
-// EvDhtQryInstProtoDatInd
+// EvDhtQryInstProtoMsgInd
 //
-type MsgDhtQryInstProtoDatInd struct {
+type MsgDhtQryInstProtoMsgInd struct {
 	From		*config.Node		// where data is sent from
-	Buf			[]byte				// data buffer
+	Msg			interface{}			// dht message pointer
 }
 
 //

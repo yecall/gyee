@@ -961,3 +961,4 @@ func (rutMgr *RutMgr)rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 	rutMgr.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
+

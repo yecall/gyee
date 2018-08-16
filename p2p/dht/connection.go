@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 	"container/list"
+	ggio "github.com/gogo/protobuf/io"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
@@ -211,7 +212,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	sdl := conMgr.sdl
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
-	conMgr.setupOutboundInst(ci, conMgr.ptnLsnMgr, nil)
+	conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil)
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -392,7 +393,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
-	conMgr.setupOutboundInst(ci, msg.Task, msg.Peer)
+	conMgr.setupConInst(ci, msg.Task, msg.Peer)
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -757,7 +758,7 @@ func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 //
 // Setup outbound connection instance
 //
-func (conMgr *ConMgr)setupOutboundInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
+func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
 
 	ci.sdl = conMgr.sdl
 	ci.ptnConMgr = conMgr.ptnMe
@@ -768,6 +769,8 @@ func (conMgr *ConMgr)setupOutboundInst(ci *ConInst, srcTask interface{}, peer *c
 		ci.dir = conInstDirOutbound
 	} else {
 		ci.dir = conInstDirInbound
+		ci.ior = ggio.NewDelimitedReader(ci.con, ciMaxPackageSize)
+		ci.iow = ggio.NewDelimitedWriter(ci.con)
 	}
 
 	ci.cid = conInstIdentity{

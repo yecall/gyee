@@ -107,15 +107,13 @@ type conInstTxPkg struct {
 }
 
 //
-// Max tx-pending queue size
+// Constants related to performance
 //
-const txPendingQueueSize = 64
-
-//
-// Connect to peer timeout vale
-//
-const ciConn2PeerTimeout = time.Second * 16
-
+const (
+	ciTxPendingQueueSize = 64				// Max tx-pending queue size
+	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
+	ciMaxPackageSize = 1024 * 1024			// bytes
+)
 
 //
 // Create connection instance
@@ -423,7 +421,7 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
 
-	if conInst.txPending.Len() >= txPendingQueueSize {
+	if conInst.txPending.Len() >= ciTxPendingQueueSize {
 		log.LogCallerFileLine("txPutPending: queue full")
 		return DhtEnoResource
 	}
@@ -536,6 +534,8 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 	}
 
 	conInst.con = conn
+	conInst.ior = ggio.NewDelimitedReader(conn, ciMaxPackageSize)
+	conInst.iow = ggio.NewDelimitedWriter(conn)
 
 	return DhtEnoNone
 }

@@ -279,6 +279,7 @@ type Cfg4DhtRouteManager struct {
 // Configuration about dht query manager
 //
 type Cfg4DhtQryManager struct {
+	Local			*Node			// pointer to local node specification
 	MaxPendings		int				// max pendings can be held in the list
 	MaxActInsts		int           	// max concurrent actived instances for one query
 	QryExpired		time.Duration 	// duration to get expired for a query
@@ -381,6 +382,7 @@ func P2pDefaultConfig() *Config {
 		},
 
 		DhtQryCfg: Cfg4DhtQryManager {
+			Local:			&dftLocal,
 			MaxPendings:	32,
 			MaxActInsts:	8,
 			QryExpired:		time.Second * 60,
@@ -955,6 +957,7 @@ func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
 // Get configuration for dht query manager
 //
 func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
+	config[name].DhtQryCfg.Local = &config[name].Local
 	return &config[name].DhtQryCfg
 }
 

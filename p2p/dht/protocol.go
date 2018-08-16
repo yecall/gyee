@@ -35,6 +35,31 @@ type DhtProtocol struct {
 }
 
 //
+// Protocol identity
+//
+const (
+	PID_DHT = 0				// dht internal
+	PID_EXT = 0xff			// external, for dht users
+)
+
+//
+// Message type identity
+//
+const (
+	MID_HANDSHAKE           = 0
+	MID_FINDNODE            = 1
+	MID_NEIGHBORS           = 2
+	MID_PUTVALUE            = 3
+	MID_GETVALUE_REQ        = 4
+	MID_GETVALUE_RSP        = 5
+	MID_PUTPROVIDER         = 6
+	MID_GETPROVIDER_REQ     = 7
+	MID_GETPROVIDER_RSP     = 8
+	MID_PING                = 9
+	MID_PONG                = 10
+)
+
+//
 // Value
 //
 type DhtKey []byte
@@ -101,6 +126,7 @@ type Neighbors struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Nodes			[]*config.Node			// neighbor nodes
+	Pcs				[]int					// peer connection status
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -166,3 +192,40 @@ type Pong struct {
 	Seq				uint64					// sequence
 	Extra			[]byte					// extra info
 }
+
+
+//
+// Send package
+//
+func (dhtPkg *DhtPackage)SendPackage(ci *ConInst) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Reveived package
+//
+func (dhtpkg *DhtPackage)RecvPackage(ci *ConInst) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Enocode package to bytes
+//
+func (dhtPkg *DhtPackage)Bytes() []byte {
+	return []byte{}
+}
+
+//
+// Extract message from package
+//
+func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup package from message
+//
+func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+

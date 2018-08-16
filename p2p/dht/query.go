@@ -44,6 +44,7 @@ const (
 // Query manager configuration
 //
 type qryMgrCfg struct {
+	local			*config.Node		// pointer to local node specification
 	maxPendings		int					// max pendings can be held in the list
 	maxActInsts		int					// max concurrent actived instances for one query
 	qryExpired		time.Duration		// duration to get expired for a query
@@ -115,6 +116,7 @@ type qryInstCtrlBlock struct {
 	ptnQryMgr	interface{}			// pointer to query manager task node
 	ptnRutMgr	interface{}			// pointer to rute manager task node
 	status		int					// instance status
+	local		*config.Node		// pointer to local node specification
 	target		config.NodeID		// target is looking up
 	to			config.Node			// to whom the query message sent
 	qTid		int					// query timer identity
@@ -753,6 +755,7 @@ func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
 	cfg := config.P2pConfig4DhtQryManager(qryMgr.sdl.SchGetP2pCfgName())
 
 	qmCfg := &qryMgr.qmCfg
+	qmCfg.local = cfg.Local
 	qmCfg.maxActInsts = cfg.MaxActInsts
 	qmCfg.qryExpired = cfg.QryExpired
 	qmCfg.qryInstExpired = cfg.QryInstExpired
@@ -959,6 +962,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			ptnConMgr:	nil,
 			ptnRutMgr:	nil,
 			ptnQryMgr:	qryMgr,
+			local:		qryMgr.qmCfg.local,
 			status:		qisNull,
 			target:		qcb.target,
 			to:			pending.node,
