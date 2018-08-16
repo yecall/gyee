@@ -41,6 +41,10 @@ type ConInst struct {
 	tep			sch.SchUserTaskEp		// task entry
 	local		*config.Node			// pointer to local node specification
 	ptnMe		interface{}				// pointer to myself task node
+	ptnDhtMgr	interface{}				// pointer to dht manager task node
+	ptnRutMgr	interface{}				// pointer to route manager task node
+	ptnDsMgr	interface{}				// pointer to data store manager task node
+	ptnPrdMgr	interface{}				// pointer to provider manager task node
 	ptnConMgr	interface{}				// pointer to connection manager task node
 	ptnSrcTsk	interface{}				// for outbound, the source task requests the connection
 	status		conInstStatus			// instance status
@@ -181,6 +185,9 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 
 	case sch.EvDhtConInstTxDataReq:
 		eno = conInst.txDataReq(msg.Body.(*sch.MsgDhtConInstTxDataReq))
+
+	case sch.EvDhtRutMgrNearestRsp:
+		eno = conInst.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
 	default:
 		log.LogCallerFileLine("conInstProc: unknown event: %d", msg.Id)
@@ -396,6 +403,45 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 
 	if eno := conInst.txPutPending(&pkg); eno != DhtEnoNone {
 		log.LogCallerFileLine("txDataReq: txPutPending failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
+	return sch.SchEnoNone
+}
+
+//
+// Nearest response handler
+//
+func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
+
+	nbs := Neighbors {
+		From:	*conInst.local,
+		To:		conInst.hsInfo.peer,
+		Nodes:	msg.Peers.([]*config.Node),
+		Pcs:	msg.Pcs.([]int),
+		Id:		uint64(time.Now().UnixNano()),
+		Extra:	nil,
+	}
+
+	dhtMsg := DhtMessage {
+		Mid:	MID_NEIGHBORS,
+		Neighbors:	&nbs,
+	}
+
+	dhtPkg := DhtPackage{}
+	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
+		log.LogCallerFileLine("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
+	txPkg := conInstTxPkg {
+		task:		conInst.ptnMe,
+		submitTime:	time.Now(),
+		payload:	dhtPkg,
+	}
+
+	if eno := conInst.txPutPending(&txPkg); eno != DhtEnoNone {
+		log.LogCallerFileLine("rutMgrNearestRsp: txPutPending failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -947,7 +993,7 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
-		eno = conInst.neighbors(msg.Neighbors)
+		eno = conInst.neighbors(msg)
 
 	case MID_PUTVALUE:
 		eno = conInst.putValue(msg.PutValue)
@@ -987,13 +1033,29 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 // Handler for "MID_FINDNODE" from peer
 //
 func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
+	msg := sch.SchMessage{}
+	req := sch.MsgDhtRutMgrNearestReq {
+		Target:	fn.Target,
+		Max:	rutMgrMaxNearest,
+		NtfReq:	false,
+		Task:	conInst.ptnMe,
+	}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &req)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
 //
 // Handler for "MID_NEIGHBORS" from peer
 //
-func (conInst *ConInst)neighbors(nb *Neighbors) DhtErrno {
+func (conInst *ConInst)neighbors(nb *DhtMessage) DhtErrno {
+	msg := sch.SchMessage{}
+	ind := sch.MsgDhtQryInstProtoMsgInd {
+		From:	&nb.Neighbors.From,
+		Msg:	nb,
+	}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
@@ -1001,6 +1063,13 @@ func (conInst *ConInst)neighbors(nb *Neighbors) DhtErrno {
 // Handler for "MID_PUTVALUE" from peer
 //
 func (conInst *ConInst)putValue(pv *PutValue) DhtErrno {
+	req := sch.MsgDhtDsMgrAddValReq {
+		ConInst:	conInst,
+		Msg:		pv,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsMgrAddValReq, &req)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
@@ -1008,6 +1077,13 @@ func (conInst *ConInst)putValue(pv *PutValue) DhtErrno {
 // Handler for "MID_GETVALUE_REQ" from peer
 //
 func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
+	req := sch.MsgDhtDsMgrGetValReq {
+		ConInst:	conInst,
+		Msg:		gvr,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsMgrGetValReq, &req)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
@@ -1015,6 +1091,13 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 // Handler for "MID_GETVALUE_RSP" from peer
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
+	rsp := sch.MsgDhtDsMgrGetValRsp {
+		ConInst:	conInst,
+		Msg:		gvr,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsMgrGetValRsp, &rsp)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
@@ -1022,6 +1105,13 @@ func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 // Handler for "MID_PUTPROVIDER" from peer
 //
 func (conInst *ConInst)putProvider(pp *PutProvider) DhtErrno {
+	req := sch.MsgDhtPrdMgrAddProviderReq {
+		ConInst:	conInst,
+		Msg:		pp,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrAddProviderReq, &req)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
@@ -1029,6 +1119,13 @@ func (conInst *ConInst)putProvider(pp *PutProvider) DhtErrno {
 // Handler for "MID_GETPROVIDER_REQ" from peer
 //
 func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
+	req := sch.MsgDhtPrdMgrGetProviderReq {
+		ConInst:	conInst,
+		Msg:		gpr,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrGetProviderReq, &req)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
 
@@ -1036,5 +1133,12 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 // Handler for "MID_GETPROVIDER_RSP" from peer
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
+	rsp := sch.MsgDhtPrdMgrGetProviderRsp {
+		ConInst:	conInst,
+		Msg:		gpr,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrGetProviderRsp, &rsp)
+	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }

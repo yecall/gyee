@@ -74,12 +74,13 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 	} else if what == P2P_TYPE_DHT {
 
 		return []sch.TaskStaticDescription{
-			{Name: dht.DhtMgrName,	Tep: dht.NewDhtMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.LsnMgrName,	Tep: dht.NewLsnMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.PrdMgrName,	Tep: dht.NewPrdMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.QryMgrName,	Tep: dht.NewQryMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.RutMgrName,	Tep: dht.NewRutMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.ConMgrName,	Tep: dht.NewConMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DhtMgrName,	Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DsMgrName,	Tep: dht.NewDsMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.LsnMgrName,	Tep: dht.NewLsnMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.PrdMgrName,	Tep: dht.NewPrdMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.QryMgrName,	Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.RutMgrName,	Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.ConMgrName,	Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 	}
 
@@ -106,6 +107,7 @@ var taskStaticPoweronOrder4Chain = []string {
 //
 var taskStaticPoweronOrder4Dht = [] string {
 	dht.DhtMgrName,
+	dht.DsMgrName,
 	dht.ConMgrName,
 	dht.QryMgrName,
 	dht.PrdMgrName,

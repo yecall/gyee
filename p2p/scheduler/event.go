@@ -578,6 +578,7 @@ type MsgDhtRutMgrNearestRsp struct {
 	Target	config.NodeID			// target peer identity
 	Peers	interface{}				// nearest nodes table
 	Dists	interface{}				// distances of nearest nodes
+	Pcs		interface{}				// peer connection status table
 }
 
 //
@@ -625,3 +626,61 @@ const (
 	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 4
 	EvDhtPrdMgrUpdateReq		= EvDhtPrdMgrBase + 5
 )
+
+//
+// EvDhtPrdMgrAddProviderReq
+//
+type MsgDhtPrdMgrAddProviderReq struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtPrdMgrGetProviderRsp
+//
+type MsgDhtPrdMgrGetProviderReq struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtPrdMgrGetProviderRsp
+//
+type MsgDhtPrdMgrGetProviderRsp struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// DHT data store manager event
+//
+const (
+	EvDhtDsMgrBase				= 2700
+	EvDhtDsMgrAddValReq			= EvDhtDsMgrBase + 1
+	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 2
+	EvDhtDsMgrGetValRsp			= EvDhtDsMgrBase + 3
+)
+
+//
+// EvDhtDsMgrGetValReq
+//
+type MsgDhtDsMgrAddValReq struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtDsMgrGetValReq
+//
+type MsgDhtDsMgrGetValReq struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtDsMgrGetValRsp
+//
+type MsgDhtDsMgrGetValRsp struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}

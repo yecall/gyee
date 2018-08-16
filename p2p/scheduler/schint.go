@@ -181,4 +181,5 @@ const (
 	DhtQryMgrName		= "DhtQryMgr"		// dht query manager
 	DhtRutMgrName		= "DhtRutMgr"		// dht route manager
 	DhtConMgrName		= "DhtConMgr"		// dht connection manager
+	DhtDsMgrName		= "DhtDsMgr"		// dht data store manager
 )

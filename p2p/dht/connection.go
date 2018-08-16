@@ -769,6 +769,10 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 	ci.local = conMgr.cfg.local
 	ci.ptnConMgr = conMgr.ptnMe
 	ci.ptnSrcTsk = srcTask
+	_, ci.ptnDhtMgr = conMgr.sdl.SchGetTaskNodeByName(DhtMgrName)
+	_, ci.ptnRutMgr = conMgr.sdl.SchGetTaskNodeByName(RutMgrName)
+	_, ci.ptnDsMgr = conMgr.sdl.SchGetTaskNodeByName(DsMgrName)
+	_, ci.ptnPrdMgr = conMgr.sdl.SchGetTaskNodeByName(PrdMgrName)
 
 	if peer != nil {
 		ci.hsInfo.peer = *peer

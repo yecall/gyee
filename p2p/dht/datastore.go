@@ -19,3 +19,59 @@
  */
 
 package dht
+
+import (
+	sch	"github.com/yeeco/gyee/p2p/scheduler"
+)
+
+//
+// Data store manager name registered in scheduler
+//
+const DsMgrName = sch.DhtDsMgrName
+
+//
+// Data store manager
+//
+type DsMgr struct {
+	name	string				// my name
+	tep		sch.SchUserTaskEp	// task entry
+	ptnMe	interface{}			// pointer to task node of myself
+}
+
+//
+// Create data store manager
+//
+func NewDsMgr() *DsMgr {
+
+	dsMgr := DsMgr{
+		name:	DsMgrName,
+		tep:	nil,
+		ptnMe:	nil,
+	}
+
+	dsMgr.tep = dsMgr.dsMgrProc
+
+	return &dsMgr
+}
+
+//
+// Entry point exported to shceduler
+//
+func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return dsMgr.tep(ptn, msg)
+}
+
+//
+// Provider manager entry
+//
+func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	eno := sch.SchEnoUnknown
+
+	switch msg.Id {
+	default:
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
+}

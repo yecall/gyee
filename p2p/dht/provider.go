@@ -25,8 +25,14 @@ import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
+//
+// Provider manager name registered in scheduler
+//
 const PrdMgrName = sch.DhtPrdMgrName
 
+//
+// Provider manager
+//
 type PrdMgr struct {
 	name	string				// my name
 	tep		sch.SchUserTaskEp	// task entry
