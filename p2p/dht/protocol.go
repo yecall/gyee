@@ -196,28 +196,6 @@ type Pong struct {
 	Extra			[]byte					// extra info
 }
 
-
-//
-// Send package
-//
-func (dhtPkg *DhtPackage)SendPackage(ci *ConInst) DhtErrno {
-	return DhtEnoNone
-}
-
-//
-// Reveived package
-//
-func (dhtpkg *DhtPackage)RecvPackage(ci *ConInst) DhtErrno {
-	return DhtEnoNone
-}
-
-//
-// Enocode package to bytes
-//
-func (dhtPkg *DhtPackage)Bytes() []byte {
-	return []byte{}
-}
-
 //
 // Extract message from package
 //
@@ -255,10 +233,13 @@ func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
 	dhtMsg.GetPackage(&dhtPkg)
 
 	pbPkg := new(pb.DhtPackage)
+
 	pbPkg.Pid = new(pb.ProtocolId)
 	*pbPkg.Pid = pb.ProtocolId(dhtPkg.Pid)
+
 	pbPkg.PayloadLength = new(uint32)
 	*pbPkg.PayloadLength = dhtPkg.PayloadLength
+
 	pbPkg.Payload = dhtPkg.Payload
 
 	return pbPkg
