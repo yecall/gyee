@@ -558,13 +558,16 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		msg.Status, msg.Peer)
 
 	switch msg.Status {
+
+	case cisClosed:
+		return conMgr.instClosedInd(msg)
+
 	case cisNull:
 	case cisConnecting:
 	case cisConnected:
 	case cisInHandshaking:
 	case cisHandshaked:
 	case cisInService:
-	case cisClosed:
 	default:
 	}
 
@@ -782,4 +785,61 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 	}
 
 	return DhtEnoNone
+}
+
+//
+// Instance closed status indication handler
+//
+func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+
+	cid := conInstIdentity {
+		nid:	*msg.Peer,
+		dir:	conInstDir(msg.Dir),
+	}
+
+	sdl := conMgr.sdl
+
+	rutUpdate := func(node *config.Node) sch.SchErrno {
+		schMsg := sch.SchMessage{}
+		update := sch.MsgDhtRutMgrUpdateReq {
+			Why:	rutMgrUpdate4Closed,
+			Eno:	DhtEnoNone,
+			Seens:	[]config.Node {
+				*node,
+			},
+			Duras:	nil,
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
+		return sdl.SchSendMessage(&schMsg)
+	}
+
+	found := false
+	err := false
+	cis := conMgr.lookupConInst(&cid)
+
+	for _, ci := range cis {
+
+		if ci != nil {
+
+			found = true
+
+			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
+				log.LogCallerFileLine("instClosedInd: rutUpdate failed, eno: %d", eno)
+				err = true
+			}
+
+			delete(conMgr.ciTab, cid)
+		}
+	}
+
+	if !found {
+		log.LogCallerFileLine("instClosedInd: none is found, id: %x", msg.Peer)
+	}
+
+	if err {
+		log.LogCallerFileLine("instClosedInd: seems some errors")
+		return sch.SchEnoUserTask
+	}
+
+	return sch.SchEnoNone
 }

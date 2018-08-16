@@ -568,6 +568,93 @@ func (conInst *ConInst)statusReport() DhtErrno {
 // Outbound handshake
 //
 func (conInst *ConInst)outboundHandshake() DhtErrno {
+
+	dhtMsg := new(DhtMessage)
+	dhtMsg.Mid = MID_HANDSHAKE
+	dhtMsg.Handshake = &Handshake{
+		Dir:		conInstDirOutbound,
+		NodeId:		conInst.local.ID,
+		IP:			conInst.local.IP,
+		UDP:		uint32(conInst.local.UDP),
+		TCP:		uint32(conInst.local.TCP),
+		ProtoNum:	1,
+		Protocols:	[]DhtProtocol {
+			{
+				Pid:	uint32(PID_DHT),
+				Ver:	DhtVersion,
+			},
+		},
+	}
+
+	pbPkg := dhtMsg.GetPbPackage()
+	if pbPkg == nil {
+		log.LogCallerFileLine("outboundHandshake: GetPbPackage failed")
+		return DhtEnoSerialization
+	}
+
+	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
+	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
+		log.LogCallerFileLine("outboundHandshake: WriteMsg failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	*pbPkg = pb.DhtPackage{}
+	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
+	if err := conInst.ior.ReadMsg(pbPkg); err != nil {
+		log.LogCallerFileLine("outboundHandshake: ReadMsg failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	if *pbPkg.Pid != PID_DHT {
+		log.LogCallerFileLine("outboundHandshake: invalid pid: %d", pbPkg.Pid)
+		return DhtEnoProtocol
+	}
+
+	if *pbPkg.PayloadLength <= 0 {
+		log.LogCallerFileLine("outboundHandshake: " +
+			"invalid payload length: %d",
+			*pbPkg.PayloadLength)
+		return DhtEnoProtocol
+	}
+
+	if len(pbPkg.Payload) != int(*pbPkg.PayloadLength) {
+		log.LogCallerFileLine("outboundHandshake: " +
+			"payload length mismatched, PlLen: %d, real: %d",
+			*pbPkg.PayloadLength, len(pbPkg.Payload))
+		return DhtEnoProtocol
+	}
+
+	dhtPkg := new(DhtPackage)
+	dhtPkg.Pid = uint32(*pbPkg.Pid)
+	dhtPkg.PayloadLength = *pbPkg.PayloadLength
+	dhtPkg.Payload = pbPkg.Payload
+
+	*dhtMsg = DhtMessage{}
+	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
+		log.LogCallerFileLine("outboundHandshake: GetMessage failed, eno: %d", eno)
+		return eno
+	}
+
+	if dhtMsg.Mid != MID_HANDSHAKE {
+		log.LogCallerFileLine("outboundHandshake: " +
+			"invalid MID: %d", dhtMsg.Mid)
+		return DhtEnoProtocol
+	}
+
+	hs := dhtMsg.Handshake
+	if hs.Dir != conInstDirOutbound {
+		log.LogCallerFileLine("outboundHandshake: " +
+			"mismatched direction: %d", hs.Dir)
+		return DhtEnoProtocol
+	}
+
+	conInst.hsInfo.peer = config.Node{
+		IP:		hs.IP,
+		TCP:	uint16(hs.TCP & 0xffff),
+		UDP:	uint16(hs.UDP & 0xffff),
+		ID:		hs.NodeId,
+	}
+
 	return DhtEnoNone
 }
 
@@ -613,7 +700,6 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 		return eno
 	}
 
-
 	if dhtMsg.Mid != MID_HANDSHAKE {
 		log.LogCallerFileLine("inboundHandshake: " +
 			"invalid MID: %d", dhtMsg.Mid)
@@ -657,6 +743,7 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 		return DhtEnoSerialization
 	}
 
+	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 		log.LogCallerFileLine("inboundHandshake: WriteMsg failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -669,10 +756,285 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 // Tx routine entry
 //
 func (conInst *ConInst)txProc() {
+
+	//
+	// longlong loop in a blocked mode
+	//
+
+	conInst.con.SetDeadline(time.Time{})
+	errUnderlying := false
+	isDone := false
+
+_txLoop:
+
+	for {
+
+		var txPkg *conInstTxPkg = nil
+		var dhtPkg *DhtPackage = nil
+		var pbPkg *pb.DhtPackage = nil
+		var ok bool
+
+		conInst.txLock.Lock()
+		el := conInst.txPending.Front()
+		conInst.txPending.Remove(el)
+		conInst.txLock.Unlock()
+
+		if el == nil {
+			time.Sleep(time.Microsecond * 10)
+			goto _checkDone
+		}
+
+		if txPkg, ok = el.Value.(*conInstTxPkg); !ok {
+			log.LogCallerFileLine("txProc: mismatched type")
+			goto _checkDone
+		}
+
+		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
+			log.LogCallerFileLine("txProc: mismatched type")
+			goto _checkDone
+		}
+
+		pbPkg = new(pb.DhtPackage)
+		dhtPkg.ToPbPackage(pbPkg)
+
+		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
+			log.LogCallerFileLine("txProc: WriteMsg failed, err: %s", err.Error())
+			errUnderlying = true
+			break _txLoop
+		}
+
+_checkDone:
+
+		select {
+		case done := <-conInst.rxDone:
+			log.LogCallerFileLine("txProc: done by: %d", done)
+			isDone = true
+			break _txLoop
+		default:
+		}
+	}
+
+	//
+	// here we get out, it might be:
+	// 1) errors fired by underlying network;
+	// 2) task done for some reasons;
+	//
+
+	if errUnderlying == true {
+
+		//
+		// the 1) case
+		//
+
+		conInst.status = cisClosed
+		conInst.statusReport()
+		conInst.cleanUp(DhtEnoOs)
+		return
+	}
+
+	if isDone == true {
+
+		//
+		// the 2) case
+		//
+
+		conInst.txDone <- DhtEnoNone
+		return
+	}
+
+	log.LogCallerFileLine("txProc: wOw! impossible errors")
 }
 
 //
 // Rx routine entry
 //
 func (conInst *ConInst)rxProc() {
+
+	//
+	// longlong loop in a blocked mode
+	//
+
+	conInst.con.SetDeadline(time.Time{})
+	errUnderlying := false
+	isDone := false
+
+_rxLoop:
+
+	for {
+
+		var msg *DhtMessage = nil
+
+		pbPkg := new(pb.DhtPackage)
+		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
+			log.LogCallerFileLine("rxProc: ReadMsg failed, err: %s", err.Error())
+			errUnderlying = true
+			break _rxLoop
+		}
+
+		pkg := new(DhtPackage)
+		pkg.FromPbPackage(pbPkg)
+		if pb.ProtocolId(pkg.Pid) == PID_EXT {
+			log.LogCallerFileLine("rxProc: PID_EXT is not supported now")
+			goto _checkDone
+		}
+
+		msg = new(DhtMessage)
+		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
+			log.LogCallerFileLine("rxProc: GetMessage failed, eno: %d", eno)
+			goto _checkDone
+		}
+
+		if eno := conInst.dispatch(msg); eno != DhtEnoNone {
+			log.LogCallerFileLine("rxProc: dispatch failed, eno: %d", eno)
+		}
+
+_checkDone:
+
+		select {
+		case done := <-conInst.txDone:
+			isDone = true
+			log.LogCallerFileLine("rxProc: done by: %d", done)
+			break _rxLoop
+		default:
+		}
+	}
+
+	//
+	// here we get out, it might be:
+	// 1) errors fired by underlying network;
+	// 2) task done for some reasons;
+	//
+
+	if errUnderlying == true {
+
+		//
+		// the 1) case
+		//
+
+		conInst.status = cisClosed
+		conInst.statusReport()
+		conInst.cleanUp(DhtEnoOs)
+		return
+	}
+
+	if isDone == true {
+
+		//
+		// the 2) case
+		//
+
+		conInst.txDone <- DhtEnoNone
+		return
+	}
+
+	log.LogCallerFileLine("rxProc: wOw! impossible errors")
+}
+
+//
+// messages dispatching
+//
+func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
+
+	var eno DhtErrno = DhtEnoUnknown
+
+	switch msg.Mid {
+
+	case MID_HANDSHAKE:
+		log.LogCallerFileLine("dispatch: re-handshake is not supported now")
+		eno = DhtEnoProtocol
+
+	case MID_FINDNODE:
+		eno = conInst.findNode(msg.FindNode)
+
+	case MID_NEIGHBORS:
+		eno = conInst.neighbors(msg.Neighbors)
+
+	case MID_PUTVALUE:
+		eno = conInst.putValue(msg.PutValue)
+
+	case MID_GETVALUE_REQ:
+		eno = conInst.getValueReq(msg.GetValueReq)
+
+	case MID_GETVALUE_RSP:
+		eno = conInst.getValueRsp(msg.GetValueRsp)
+
+	case MID_PUTPROVIDER:
+		eno = conInst.putProvider(msg.PutProvider)
+
+	case MID_GETPROVIDER_REQ:
+		eno = conInst.getProviderReq(msg.GetProviderReq)
+
+	case MID_GETPROVIDER_RSP:
+		eno = conInst.getProviderRsp(msg.GetProviderRsp)
+
+	case MID_PING:
+		log.LogCallerFileLine("dispatch: MID_PING is not supported now")
+		eno = DhtEnoNotSup
+
+	case MID_PONG:
+		log.LogCallerFileLine("dispatch: MID_PONG is not supported now")
+		eno = DhtEnoNotSup
+
+	default:
+		log.LogCallerFileLine("dispatch: invalid message identity: %d", msg.Mid)
+		eno = DhtEnoProtocol
+	}
+
+	return eno
+}
+
+//
+// Handler for "MID_FINDNODE" from peer
+//
+func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_NEIGHBORS" from peer
+//
+func (conInst *ConInst)neighbors(nb *Neighbors) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_PUTVALUE" from peer
+//
+func (conInst *ConInst)putValue(pv *PutValue) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_GETVALUE_REQ" from peer
+//
+func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_GETVALUE_RSP" from peer
+//
+func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_PUTPROVIDER" from peer
+//
+func (conInst *ConInst)putProvider(pp *PutProvider) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_GETPROVIDER_REQ" from peer
+//
+func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_GETPROVIDER_RSP" from peer
+//
+func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
+	return DhtEnoNone
 }

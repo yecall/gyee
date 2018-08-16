@@ -226,6 +226,20 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 }
 
 //
+// Setup dht package from protobuf package
+//
+func (dhtPkg *DhtPackage)FromPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup protobuf package from dht package
+//
+func (dhtPkg *DhtPackage)ToPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
 // Setup package from message
 //
 func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
