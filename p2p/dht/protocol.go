@@ -22,8 +22,9 @@ package dht
 
 import (
 	"net"
-	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
+	config "github.com/yeeco/gyee/p2p/config"
+	log "github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -200,13 +201,83 @@ type Pong struct {
 // Extract message from package
 //
 func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
-	return DhtEnoNone
+
+	if dhtMsg == nil {
+		return DhtEnoParameter
+	}
+
+	if dhtPkg.Pid != uint32(PID_DHT) {
+		return DhtEnoMismatched
+	}
+
+	if dhtPkg.PayloadLength == 0 || int(dhtPkg.PayloadLength) != len(dhtPkg.Payload) {
+		return DhtEnoSerialization
+	}
+
+	pbMsg := new(pb.DhtMessage)
+	if err := pbMsg.Unmarshal(dhtPkg.Payload); err != nil {
+		log.LogCallerFileLine("GetMessage: Unmarshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	eno := DhtErrno(DhtEnoUnknown)
+	mid := *pbMsg.MsgType
+
+	switch mid {
+
+	case pb.DhtMessage_MID_HANDSHAKE:
+		eno = dhtMsg.GetHandshakeMessage(pbMsg)
+
+	case pb.DhtMessage_MID_FINDNODE:
+		eno = dhtMsg.GetFindNodeMessage(pbMsg)
+
+	case pb.DhtMessage_MID_NEIGHBORS:
+		eno = dhtMsg.GetNeighborsMessage(pbMsg)
+
+	case pb.DhtMessage_MID_PUTVALUE:
+		eno = dhtMsg.GetPutValueMessage(pbMsg)
+
+	case pb.DhtMessage_MID_GETVALUE_REQ:
+		eno = dhtMsg.GetGetValueReqMessage(pbMsg)
+
+	case pb.DhtMessage_MID_GETVALUE_RSP:
+		eno = dhtMsg.GetGetValueRspMessage(pbMsg)
+
+	case pb.DhtMessage_MID_PUTPROVIDER:
+		eno = dhtMsg.GetPutProviderMessage(pbMsg)
+
+	case pb.DhtMessage_MID_GETPROVIDER_REQ:
+		eno = dhtMsg.GetGutProviderReqMessage(pbMsg)
+
+	case pb.DhtMessage_MID_GETPROVIDER_RSP:
+		eno = dhtMsg.GetGutProviderRspMessage(pbMsg)
+
+	case pb.DhtMessage_MID_PING:
+		eno = dhtMsg.GetPingMessage(pbMsg)
+		return DhtEnoNotSup
+
+	case pb.DhtMessage_MID_PONG:
+		eno = dhtMsg.GetPongMessage(pbMsg)
+		return DhtEnoNotSup
+
+	default:
+		log.LogCallerFileLine("GetMessage: invalid pb message type: %d", mid)
+		return DhtEnoSerialization
+	}
+
+	return eno
 }
 
 //
 // Setup dht package from protobuf package
 //
 func (dhtPkg *DhtPackage)FromPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
+	if pbPkg == nil {
+		return DhtEnoParameter
+	}
+	dhtPkg.Pid = uint32(*pbPkg.Pid)
+	dhtPkg.PayloadLength = *pbPkg.PayloadLength
+	dhtPkg.Payload = pbPkg.Payload
 	return DhtEnoNone
 }
 
@@ -214,6 +285,18 @@ func (dhtPkg *DhtPackage)FromPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
 // Setup protobuf package from dht package
 //
 func (dhtPkg *DhtPackage)ToPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
+	if pbPkg == nil {
+		return DhtEnoParameter
+	}
+	if pbPkg.Pid == nil {
+		pbPkg.Pid = new(pb.ProtocolId)
+	}
+	if pbPkg.Payload == nil {
+		pbPkg.PayloadLength = new(uint32)
+	}
+	*pbPkg.Pid = pb.ProtocolId(dhtPkg.Pid)
+	*pbPkg.PayloadLength = dhtPkg.PayloadLength
+	pbPkg.Payload = dhtPkg.Payload
 	return DhtEnoNone
 }
 
@@ -221,27 +304,224 @@ func (dhtPkg *DhtPackage)ToPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
 // Setup package from message
 //
 func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
-	return DhtEnoNone
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
+	eno := DhtErrno(DhtEnoUnknown)
+	mid := dhtMsg.Mid
+
+	switch mid {
+
+	case MID_HANDSHAKE:
+		eno = dhtMsg.GetHandshakePackage(dhtPkg)
+
+	case MID_FINDNODE:
+		eno = dhtMsg.GetFindNodePackage(dhtPkg)
+
+	case MID_NEIGHBORS:
+		eno = dhtMsg.GetNeighborsPackage(dhtPkg)
+
+	case MID_PUTVALUE:
+		eno = dhtMsg.GetPutValuePackage(dhtPkg)
+
+	case MID_GETVALUE_REQ:
+		eno = dhtMsg.GetGetValueReqPackage(dhtPkg)
+
+	case MID_GETVALUE_RSP:
+		eno = dhtMsg.GetGetValueRspPackage(dhtPkg)
+
+	case MID_PUTPROVIDER:
+		eno = dhtMsg.GetPutProviderPackage(dhtPkg)
+
+	case MID_GETPROVIDER_REQ:
+		eno = dhtMsg.GetGetProviderReqPackage(dhtPkg)
+
+	case MID_GETPROVIDER_RSP:
+		eno = dhtMsg.GetGetProviderRspPackage(dhtPkg)
+
+	case MID_PING:
+		eno = dhtMsg.GetPingPackage(dhtPkg)
+
+	case MID_PONG:
+		eno = dhtMsg.GetPongPackage(dhtPkg)
+
+	default:
+		log.LogCallerFileLine("")
+		return DhtEnoSerialization
+	}
+
+	return eno
 }
 
 //
 // Setup protobuf package from message
 //
 func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
-
 	dhtPkg := DhtPackage{}
 	dhtMsg.GetPackage(&dhtPkg)
 
 	pbPkg := new(pb.DhtPackage)
-
 	pbPkg.Pid = new(pb.ProtocolId)
-	*pbPkg.Pid = pb.ProtocolId(dhtPkg.Pid)
-
 	pbPkg.PayloadLength = new(uint32)
-	*pbPkg.PayloadLength = dhtPkg.PayloadLength
 
+	*pbPkg.Pid = pb.ProtocolId(dhtPkg.Pid)
+	*pbPkg.PayloadLength = dhtPkg.PayloadLength
 	pbPkg.Payload = dhtPkg.Payload
 
 	return pbPkg
 }
 
+//
+// Setup dht handshake message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht find-node message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht neighbors message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht put-value message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-value-req message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-value-rsp message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht put-provider message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-provider-req message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetGutProviderReqMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-provider-rsp message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetGutProviderRspMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht ping message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht pong message from protobuf message
+//
+func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht handshake package from dht message
+//
+func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht find-node package from dht message
+//
+func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht neighbors package from dht message
+//
+func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht put-value package from dht message
+//
+func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-value-req package from dht message
+//
+func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-value-rsp package from dht message
+//
+func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht put-provider package from dht message
+//
+func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-provider-req package from dht message
+//
+func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht get-provider-rsp package from dht message
+//
+func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht ping package from dht message
+//
+func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Setup dht pong package from dht message
+//
+func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
+	return DhtEnoNone
+}

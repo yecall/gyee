@@ -767,12 +767,22 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 
 	ci.sdl = conMgr.sdl
 	ci.local = conMgr.cfg.local
-	ci.ptnConMgr = conMgr.ptnMe
 	ci.ptnSrcTsk = srcTask
+	ci.ptnConMgr = conMgr.ptnMe
 	_, ci.ptnDhtMgr = conMgr.sdl.SchGetTaskNodeByName(DhtMgrName)
 	_, ci.ptnRutMgr = conMgr.sdl.SchGetTaskNodeByName(RutMgrName)
 	_, ci.ptnDsMgr = conMgr.sdl.SchGetTaskNodeByName(DsMgrName)
 	_, ci.ptnPrdMgr = conMgr.sdl.SchGetTaskNodeByName(PrdMgrName)
+
+	if ci.ptnSrcTsk == nil ||
+		ci.ptnConMgr == nil ||
+		ci.ptnDhtMgr == nil ||
+		ci.ptnRutMgr == nil ||
+		ci.ptnDsMgr == nil ||
+		ci.ptnPrdMgr == nil {
+		log.LogCallerFileLine("setupConInst: internal errors")
+		return DhtEnoInternal
+	}
 
 	if peer != nil {
 		ci.hsInfo.peer = *peer
