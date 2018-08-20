@@ -22,6 +22,7 @@ package dht
 
 import (
 	"net"
+	"time"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
 	config "github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
@@ -260,7 +261,7 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 		eno = dhtMsg.GetPongMessage(pbMsg.Pong)
 
 	default:
-		log.LogCallerFileLine("GetMessage: invalid pb message type: %d", mid)
+		log.LogCallerFileLine("GetMessage: invalid mid: %d", mid)
 		return DhtEnoSerialization
 	}
 
@@ -346,7 +347,7 @@ func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
 		eno = dhtMsg.GetPongPackage(dhtPkg)
 
 	default:
-		log.LogCallerFileLine("")
+		log.LogCallerFileLine("GetPackage: invalid mid: %d", mid)
 		return DhtEnoSerialization
 	}
 
@@ -378,6 +379,25 @@ func (dhtMsg *DhtMessage)getNode(n *pb.DhtMessage_Node) *config.Node {
 }
 
 //
+// Set protobuf node from dht node specification
+//
+func (dhtMsg *DhtMessage)setNode(n *config.Node, ct pb.DhtMessage_ConnectionType) *pb.DhtMessage_Node {
+	if n == nil {
+		return nil
+	}
+	pbn := new(pb.DhtMessage_Node)
+	pbn.IP = n.IP
+	pbn.TCP = new(uint32)
+	*pbn.TCP = uint32(n.TCP)
+	pbn.UDP = new(uint32)
+	*pbn.UDP = uint32(n.UDP)
+	pbn.NodeId = n.ID[0:]
+	pbn.ConnType = new(pb.DhtMessage_ConnectionType)
+	*pbn.ConnType = ct
+	return pbn
+}
+
+//
 // Setup protobuf package from message
 //
 func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
@@ -399,6 +419,10 @@ func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
 // Setup dht handshake message from protobuf message
 //
 func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) DhtErrno {
+
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
 
 	hs := new(Handshake)
 
@@ -448,6 +472,10 @@ func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) Dht
 //
 func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtErrno {
 
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
+
 	fn := new(FindNode)
 
 	fn.From = *dhtMsg.getNode(pbMsg.From)
@@ -467,6 +495,10 @@ func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtEr
 // Setup dht neighbors message from protobuf message
 //
 func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) DhtErrno {
+
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
 
 	nbs := new(Neighbors)
 
@@ -490,6 +522,10 @@ func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) Dht
 // Setup dht put-value message from protobuf message
 //
 func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtErrno {
+
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
 
 	pv := new(PutValue)
 
@@ -519,6 +555,10 @@ func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtEr
 //
 func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq) DhtErrno {
 
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
+
 	gvr := new(GetValueReq)
 
 	gvr.From = *dhtMsg.getNode(pbMsg.From)
@@ -543,6 +583,10 @@ func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq)
 // Setup dht get-value-rsp message from protobuf message
 //
 func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp) DhtErrno {
+
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
 
 	gvr := new(GetValueRsp)
 
@@ -573,6 +617,10 @@ func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp)
 //
 func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider) DhtErrno {
 
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
+
 	pp := new(PutProvider)
 
 	pp.From = *dhtMsg.getNode(pbMsg.From)
@@ -601,6 +649,10 @@ func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider)
 //
 func (dhtMsg *DhtMessage)GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProviderReq) DhtErrno {
 
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
+
 	gpr := new(GetProviderReq)
 
 	gpr.From = *dhtMsg.getNode(pbMsg.From)
@@ -622,6 +674,10 @@ func (dhtMsg *DhtMessage)GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProvid
 // Setup dht get-provider-rsp message from protobuf message
 //
 func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProviderRsp) DhtErrno {
+
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
 
 	gpr := new(GetProviderRsp)
 
@@ -651,6 +707,10 @@ func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProvid
 //
 func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
+
 	ping := new(Ping)
 
 	ping.From = *dhtMsg.getNode(pbMsg.From)
@@ -670,6 +730,10 @@ func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 //
 func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 
+	if pbMsg == nil {
+		return DhtEnoParameter
+	}
+
 	pong := new(Pong)
 
 	pong.From = *dhtMsg.getNode(pbMsg.From)
@@ -688,6 +752,54 @@ func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 // Setup dht handshake package from dht message
 //
 func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
+	pbHs := new(pb.DhtMessage_Handshake)
+	pbMsg := pb.DhtMessage{
+		MsgType:	new(pb.DhtMessage_MessageType),
+		Handshake:	pbHs,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_HANDSHAKE
+	hs := dhtMsg.Handshake
+
+	pbHs.Dir = new(int32)
+	*pbHs.Dir = int32(hs.Dir)
+
+	pbHs.NodeId = hs.NodeId[0:]
+	pbHs.IP = hs.IP
+	pbHs.UDP = new(uint32)
+	*pbHs.UDP = hs.UDP
+	pbHs.TCP = new(uint32)
+	*pbHs.TCP = hs.TCP
+	pbHs.ProtoNum = new(uint32)
+	*pbHs.ProtoNum = hs.ProtoNum
+
+	for _, p := range hs.Protocols {
+		pbp := &pb.DhtMessage_Protocol {
+			Pid:	new(pb.ProtocolId),
+			Ver:	p.Ver[0:],
+		}
+		*pbp.Pid = pb.ProtocolId(p.Pid)
+		pbHs.Protocols = append(pbHs.Protocols, pbp)
+	}
+
+	pbHs.Id = new(uint64)
+	*pbHs.Id = uint64(time.Now().UnixNano())
+	pbHs.Extra = nil
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetHandshakePackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -695,6 +807,36 @@ func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht find-node package from dht message
 //
 func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
+	pbFn := new(pb.DhtMessage_FindNode)
+	pbMsg := pb.DhtMessage {
+		MsgType:	new(pb.DhtMessage_MessageType),
+		FindNode:	pbFn,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_FINDNODE
+	fn := dhtMsg.FindNode
+
+	pbFn.From = dhtMsg.setNode(&fn.From, pb.DhtMessage_CONT_YES)
+	pbFn.To = dhtMsg.setNode(&fn.To, pb.DhtMessage_CONT_YES)
+	pbFn.Target = fn.Target[0:]
+	pbFn.Id = new(uint64)
+	*pbFn.Id = uint64(time.Now().UnixNano())
+	pbFn.Extra = fn.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetFindNodePackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -702,6 +844,40 @@ func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht neighbors package from dht message
 //
 func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
+	pbNbs := new(pb.DhtMessage_Neighbors)
+	pbMsg := pb.DhtMessage {
+		MsgType:	new(pb.DhtMessage_MessageType),
+		Neighbors:	pbNbs,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_NEIGHBORS
+	nbs := dhtMsg.Neighbors
+
+	for idx, nb := range nbs.Nodes {
+		pbn := dhtMsg.setNode(nb, pb.DhtMessage_ConnectionType(nbs.Pcs[idx]))
+		pbNbs.Nodes = append(pbNbs.Nodes, pbn)
+	}
+
+	pbNbs.From = dhtMsg.setNode(&nbs.From, pb.DhtMessage_CONT_YES)
+	pbNbs.To = dhtMsg.setNode(&nbs.To, pb.DhtMessage_CONT_YES)
+	pbNbs.Id = new(uint64)
+	*pbNbs.Id = uint64(time.Now().UnixNano())
+	pbNbs.Extra = nbs.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetNeighborsPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -709,6 +885,44 @@ func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht put-value package from dht message
 //
 func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
+	pbPv := new(pb.DhtMessage_PutValue)
+	pbMsg := pb.DhtMessage {
+		MsgType:	new(pb.DhtMessage_MessageType),
+		PutValue:	pbPv,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_PUTVALUE
+	pv := dhtMsg.PutValue
+
+	pbPv.From = dhtMsg.setNode(&pv.From, pb.DhtMessage_CONT_YES)
+	pbPv.To = dhtMsg.setNode(&pv.To, pb.DhtMessage_CONT_YES)
+
+	for _, v := range pv.Values {
+		pbV := &pb.DhtMessage_Value {
+			Key:	v.Key,
+			Val:	v.Val,
+		}
+		pbPv.Values = append(pbPv.Values, pbV)
+	}
+
+	pbPv.Id = new(uint64)
+	*pbPv.Id = pv.id
+	pbPv.Extra = pv.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetPutValuePackage: Marshal failed")
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -716,6 +930,11 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht get-value-req package from dht message
 //
 func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
 
@@ -723,6 +942,11 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht get-value-rsp package from dht message
 //
 func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
 
@@ -730,6 +954,11 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht put-provider package from dht message
 //
 func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
 
@@ -737,6 +966,11 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht get-provider-req package from dht message
 //
 func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
 
@@ -744,6 +978,11 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht get-provider-rsp package from dht message
 //
 func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
 
@@ -751,6 +990,11 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht ping package from dht message
 //
 func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
 
@@ -758,5 +1002,10 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 // Setup dht pong package from dht message
 //
 func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
+
+	if dhtPkg == nil {
+		return DhtEnoParameter
+	}
+
 	return DhtEnoNone
 }
