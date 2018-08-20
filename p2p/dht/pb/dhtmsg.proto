@@ -77,7 +77,7 @@ message DhtMessage {
         CONT_NO                 = 0;
         CONT_YES                = 1;
         CONT_MAY                = 2;
-        CONT_FAILED         =    3;
+        CONT_FAILED             = 3;
     }
 
     message Node {
@@ -104,14 +104,15 @@ message DhtMessage {
     }
 
     message Handshake {
-        required bytes          SubNetId        = 1;    // sub network identity
+        required int32          Dir             = 1;    // direction
         required bytes          NodeId          = 2;    // node identity
         required bytes          IP              = 3;    // ip address
         required uint32         UDP             = 4;    // udp port number
         required uint32         TCP             = 5;    // tcp port number
         required uint32         ProtoNum        = 6;    // number of protocols
         repeated Protocol       Protocols       = 7;    // protocol table
-        optional bytes          Extra           = 8;    // extra info, reserved
+        required uint64         Id              = 8;    // message identity
+        optional bytes          Extra           = 9;    // extra info, reserved
     }
     message FindNode {
         required Node           From            = 1;    // from whom
@@ -205,8 +206,8 @@ message DhtMessage {
     optional GetValueReq        getValueReq     = 6;
     optional GetValueRsp        getValueRsp     = 7;
     optional PutProvider        putProvider     = 8;
-    optional GetProviderReq     gutProviderReq  = 9;
-    optional GetProviderRsp     gutProviderRsp  = 10;
+    optional GetProviderReq     getProviderReq  = 9;
+    optional GetProviderRsp     getProviderRsp  = 10;
     optional Ping               ping            = 11;
     optional Pong               pong            = 12;
 }
