@@ -165,7 +165,7 @@ message DhtMessage {
     message GetProviderReq {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        repeated bytes          key             = 3;    // key for value be requested
+        repeated bytes          Keys            = 3;    // key for value be requested
         required uint64         Id              = 4;    // message identity
         optional bytes          Extra           = 5;    // extra info
     }

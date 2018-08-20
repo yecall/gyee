@@ -61,6 +61,7 @@ const (
 	MID_GETPROVIDER_RSP     = 8
 	MID_PING                = 9
 	MID_PONG                = 10
+	MID_UNKNOWN				= -1
 )
 
 //
@@ -170,7 +171,7 @@ type PutProvider struct {
 type GetProviderReq struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Key				DhtKey					// key wanted
+	Keys			[]DhtKey					// key wanted
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -226,39 +227,37 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 	switch mid {
 
 	case pb.DhtMessage_MID_HANDSHAKE:
-		eno = dhtMsg.GetHandshakeMessage(pbMsg)
+		eno = dhtMsg.GetHandshakeMessage(pbMsg.Handshake)
 
 	case pb.DhtMessage_MID_FINDNODE:
-		eno = dhtMsg.GetFindNodeMessage(pbMsg)
+		eno = dhtMsg.GetFindNodeMessage(pbMsg.FindNode)
 
 	case pb.DhtMessage_MID_NEIGHBORS:
-		eno = dhtMsg.GetNeighborsMessage(pbMsg)
+		eno = dhtMsg.GetNeighborsMessage(pbMsg.Neighbors)
 
 	case pb.DhtMessage_MID_PUTVALUE:
-		eno = dhtMsg.GetPutValueMessage(pbMsg)
+		eno = dhtMsg.GetPutValueMessage(pbMsg.PutValue)
 
 	case pb.DhtMessage_MID_GETVALUE_REQ:
-		eno = dhtMsg.GetGetValueReqMessage(pbMsg)
+		eno = dhtMsg.GetGetValueReqMessage(pbMsg.GetValueReq)
 
 	case pb.DhtMessage_MID_GETVALUE_RSP:
-		eno = dhtMsg.GetGetValueRspMessage(pbMsg)
+		eno = dhtMsg.GetGetValueRspMessage(pbMsg.GetValueRsp)
 
 	case pb.DhtMessage_MID_PUTPROVIDER:
-		eno = dhtMsg.GetPutProviderMessage(pbMsg)
+		eno = dhtMsg.GetPutProviderMessage(pbMsg.PutProvider)
 
 	case pb.DhtMessage_MID_GETPROVIDER_REQ:
-		eno = dhtMsg.GetGutProviderReqMessage(pbMsg)
+		eno = dhtMsg.GetGetProviderReqMessage(pbMsg.GetProviderReq)
 
 	case pb.DhtMessage_MID_GETPROVIDER_RSP:
-		eno = dhtMsg.GetGutProviderRspMessage(pbMsg)
+		eno = dhtMsg.GetGetProviderRspMessage(pbMsg.GetProviderRsp)
 
 	case pb.DhtMessage_MID_PING:
-		eno = dhtMsg.GetPingMessage(pbMsg)
-		return DhtEnoNotSup
+		eno = dhtMsg.GetPingMessage(pbMsg.Ping)
 
 	case pb.DhtMessage_MID_PONG:
-		eno = dhtMsg.GetPongMessage(pbMsg)
-		return DhtEnoNotSup
+		eno = dhtMsg.GetPongMessage(pbMsg.Pong)
 
 	default:
 		log.LogCallerFileLine("GetMessage: invalid pb message type: %d", mid)
@@ -355,6 +354,30 @@ func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
 }
 
 //
+// Reset dht message
+//
+func (dhtMsg *DhtMessage)reset() {
+	*dhtMsg = DhtMessage{}
+	dhtMsg.Mid = MID_UNKNOWN
+}
+
+//
+// Get dht node specification from protobuf node
+//
+func (dhtMsg *DhtMessage)getNode(n *pb.DhtMessage_Node) *config.Node {
+	if n == nil {
+		return nil
+	}
+	dn := config.Node{
+		IP:		n.IP,
+		TCP:	uint16(*n.TCP & 0xffff),
+		UDP:	uint16(*n.UDP & 0xffff),
+	}
+	copy(dn.ID[0:], n.NodeId)
+	return &dn
+}
+
+//
 // Setup protobuf package from message
 //
 func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
@@ -375,77 +398,289 @@ func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
 //
 // Setup dht handshake message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) DhtErrno {
+
+	hs := new(Handshake)
+
+	hs.Dir = int(*pbMsg.Dir)
+
+	if len(pbMsg.NodeId) != cap(hs.NodeId) {
+		return DhtEnoSerialization
+	}
+	copy(hs.NodeId[0:], pbMsg.NodeId)
+
+	hs.IP = pbMsg.IP
+	hs.TCP = *pbMsg.TCP
+	hs.UDP = *pbMsg.UDP
+
+	hs.ProtoNum = *pbMsg.ProtoNum
+	if hs.ProtoNum != uint32(len(pbMsg.Protocols)) {
+		return DhtEnoSerialization
+	}
+
+	dhtSup := false
+
+	hs.Protocols = make([]DhtProtocol, hs.ProtoNum)
+	for idx, p := range pbMsg.Protocols {
+		if hs.Protocols[idx].Pid = uint32(*p.Pid); *p.Pid == PID_DHT {
+			dhtSup = true
+		}
+		if len(p.Ver) != DhtProtoBytes {
+			return DhtEnoSerialization
+		}
+		copy(hs.Protocols[idx].Ver[0:], p.Ver)
+	}
+
+	if !dhtSup {
+		log.LogCallerFileLine("GetHandshakeMessage: DHT not supported")
+		return DhtEnoNotSup
+	}
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_HANDSHAKE
+	dhtMsg.Handshake = hs
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht find-node message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtErrno {
+
+	fn := new(FindNode)
+
+	fn.From = *dhtMsg.getNode(pbMsg.From)
+	fn.To = *dhtMsg.getNode(pbMsg.To)
+	copy(fn.Target[0:], pbMsg.Target)
+	fn.Id = *pbMsg.Id
+	fn.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_FINDNODE
+	dhtMsg.FindNode = fn
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht neighbors message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) DhtErrno {
+
+	nbs := new(Neighbors)
+
+	nbs.From = *dhtMsg.getNode(pbMsg.From)
+	nbs.To = *dhtMsg.getNode(pbMsg.To)
+	for _, n := range pbMsg.Nodes {
+		nbs.Nodes = append(nbs.Nodes, dhtMsg.getNode(n))
+		nbs.Pcs = append(nbs.Pcs, int(*n.ConnType))
+	}
+	nbs.Id = *pbMsg.Id
+	nbs.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_NEIGHBORS
+	dhtMsg.Neighbors = nbs
+	
 	return DhtEnoNone
 }
 
 //
 // Setup dht put-value message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtErrno {
+
+	pv := new(PutValue)
+
+	pv.From = *dhtMsg.getNode(pbMsg.From)
+	pv.To = *dhtMsg.getNode(pbMsg.To)
+
+	for _, v := range(pbMsg.Values) {
+		val := DhtValue {
+			Key: v.Key,
+			Val: v.Val,
+		}
+		pv.Values = append(pv.Values, val)
+	}
+
+	pv.Id = *pbMsg.Id
+	pv.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_PUTVALUE
+	dhtMsg.PutValue = pv
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht get-value-req message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq) DhtErrno {
+
+	gvr := new(GetValueReq)
+
+	gvr.From = *dhtMsg.getNode(pbMsg.From)
+	gvr.To = *dhtMsg.getNode(pbMsg.To)
+
+	for  _, k := range pbMsg.Keys {
+		dhtK := DhtKey(k)
+		gvr.Keys = append(gvr.Keys, dhtK)
+	}
+
+	gvr.Id = *pbMsg.Id
+	gvr.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_GETVALUE_REQ
+	dhtMsg.GetValueReq = gvr
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht get-value-rsp message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp) DhtErrno {
+
+	gvr := new(GetValueRsp)
+
+	gvr.From = *dhtMsg.getNode(pbMsg.From)
+	gvr.To = *dhtMsg.getNode(pbMsg.To)
+
+	for _, v := range pbMsg.Values {
+		dhtValue := DhtValue{
+			Key: DhtKey(v.Key),
+			Val: DhtVal(v.Val),
+		}
+		gvr.Values = append(gvr.Values, dhtValue)
+
+	}
+
+	gvr.Id = *pbMsg.Id
+	gvr.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_GETVALUE_RSP
+	dhtMsg.GetValueRsp = gvr
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht put-provider message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider) DhtErrno {
+
+	pp := new(PutProvider)
+
+	pp.From = *dhtMsg.getNode(pbMsg.From)
+	pp.To = *dhtMsg.getNode(pbMsg.To)
+
+	for _, p := range pbMsg.Providers {
+		dhtP := DhtProvider{
+			Key: 	DhtKey(p.Key),
+			Node:	*dhtMsg.getNode(p.Node),
+		}
+		pp.Providers = append(pp.Providers, dhtP)
+	}
+
+	pp.Id = *pbMsg.Id
+	pp.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_PUTPROVIDER
+	dhtMsg.PutProvider = pp
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht get-provider-req message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGutProviderReqMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProviderReq) DhtErrno {
+
+	gpr := new(GetProviderReq)
+
+	gpr.From = *dhtMsg.getNode(pbMsg.From)
+	gpr.To = *dhtMsg.getNode(pbMsg.To)
+
+	for _, k := range pbMsg.Keys {
+		dhtK := DhtKey(k)
+		gpr.Keys = append(gpr.Keys, dhtK)
+	}
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_GETPROVIDER_REQ
+	dhtMsg.GetProviderReq = gpr
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht get-provider-rsp message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGutProviderRspMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProviderRsp) DhtErrno {
+
+	gpr := new(GetProviderRsp)
+
+	gpr.From = *dhtMsg.getNode(pbMsg.From)
+	gpr.To = *dhtMsg.getNode(pbMsg.To)
+
+	for _, p := range pbMsg.Providers {
+		dhtP := DhtProvider{
+			Key:	DhtKey(p.Key),
+			Node:	*dhtMsg.getNode(p.Node),
+		}
+		gpr.Providers = append(gpr.Providers, dhtP)
+	}
+
+	gpr.Id = *pbMsg.Id
+	gpr.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_GETPROVIDER_RSP
+	dhtMsg.GetProviderRsp = gpr
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht ping message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
+
+	ping := new(Ping)
+
+	ping.From = *dhtMsg.getNode(pbMsg.From)
+	ping.To = *dhtMsg.getNode(pbMsg.To)
+	ping.Seq = *pbMsg.Seq
+	ping.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_PING
+	dhtMsg.Ping = ping
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht pong message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage) DhtErrno {
+func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
+
+	pong := new(Pong)
+
+	pong.From = *dhtMsg.getNode(pbMsg.From)
+	pong.To = *dhtMsg.getNode(pbMsg.To)
+	pong.Seq = *pbMsg.Seq
+	pong.Extra = pbMsg.Extra
+
+	dhtMsg.reset()
+	dhtMsg.Mid = MID_PONG
+	dhtMsg.Pong = pong
+
 	return DhtEnoNone
 }
 
