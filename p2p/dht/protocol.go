@@ -910,7 +910,7 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbPv.Id = new(uint64)
-	*pbPv.Id = pv.id
+	*pbPv.Id = pv.Id
 	pbPv.Extra = pv.Extra
 
 	pl, err := pbMsg.Marshal()
