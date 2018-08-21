@@ -165,6 +165,7 @@ type PutProvider struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Providers		[]DhtProvider			// providers
+	Pcs				[]int					// prividers connection status
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -181,6 +182,7 @@ type GetProviderRsp struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Providers		[]DhtProvider			// providers
+	Pcs				[]int					// prividers connection status
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -915,7 +917,7 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
-		log.LogCallerFileLine("GetPutValuePackage: Marshal failed")
+		log.LogCallerFileLine("GetPutValuePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -935,6 +937,34 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 		return DhtEnoParameter
 	}
 
+	pbGvr := new(pb.DhtMessage_GetValueReq)
+	pbMsg := pb.DhtMessage{
+		MsgType:		new(pb.DhtMessage_MessageType),
+		GetValueReq:	pbGvr,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_GETVALUE_REQ
+
+	pbGvr.From = dhtMsg.setNode(&dhtMsg.GetProviderReq.From, pb.DhtMessage_CONT_YES)
+	pbGvr.To = dhtMsg.setNode(&dhtMsg.GetValueReq.To, pb.DhtMessage_CONT_YES)
+
+	for _, k := range dhtMsg.GetValueReq.Keys {
+		pbGvr.Keys = append(pbGvr.Keys, k)
+	}
+
+	pbGvr.Id = new(uint64)
+	*pbGvr.Id = dhtMsg.GetValueReq.Id
+	pbGvr.Extra = dhtMsg.GetProviderReq.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetGetValueReqPackage: failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -946,6 +976,38 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	if dhtPkg == nil {
 		return DhtEnoParameter
 	}
+
+	pbGvr := new(pb.DhtMessage_GetValueRsp)
+	pbMsg := pb.DhtMessage {
+		MsgType:		new(pb.DhtMessage_MessageType),
+		GetValueRsp:	pbGvr,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_GETVALUE_RSP
+
+	pbGvr.From = dhtMsg.setNode(&dhtMsg.GetValueRsp.From, pb.DhtMessage_CONT_YES)
+	pbGvr.To = dhtMsg.setNode(&dhtMsg.GetValueRsp.To, pb.DhtMessage_CONT_YES)
+
+	for _, v := range dhtMsg.GetValueRsp.Values {
+		pbV := &pb.DhtMessage_Value {
+			Key:	v.Key,
+			Val:	v.Val,
+		}
+		pbGvr.Values = append(pbGvr.Values, pbV)
+	}
+
+	pbGvr.Id = new(uint64)
+	*pbGvr.Id = dhtMsg.GetValueRsp.Id
+	pbGvr.Extra = dhtMsg.GetValueRsp.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetGetValueRspPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
 
 	return DhtEnoNone
 }
@@ -959,6 +1021,39 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 		return DhtEnoParameter
 	}
 
+	pbPP := new(pb.DhtMessage_PutProvider)
+	pbMsg := pb.DhtMessage{
+		MsgType:		new(pb.DhtMessage_MessageType),
+		PutProvider:	pbPP,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_PUTPROVIDER
+
+	pbPP.From = dhtMsg.setNode(&dhtMsg.PutProvider.From, pb.DhtMessage_CONT_YES)
+	pbPP.To = dhtMsg.setNode(&dhtMsg.PutProvider.To, pb.DhtMessage_CONT_YES)
+
+	for idx, p := range dhtMsg.PutProvider.Providers {
+		ct := dhtMsg.PutProvider.Pcs[idx]
+		pbp := &pb.DhtMessage_Provider {
+			Key:	p.Key,
+			Node:	dhtMsg.setNode(&p.Node, pb.DhtMessage_ConnectionType(ct)),
+		}
+		pbPP.Providers = append(pbPP.Providers, pbp)
+	}
+
+	pbPP.Id = new(uint64)
+	*pbPP.Id = dhtMsg.PutProvider.Id
+	pbPP.Extra = dhtMsg.PutProvider.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetPutProviderPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -970,6 +1065,34 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 	if dhtPkg == nil {
 		return DhtEnoParameter
 	}
+
+	pbGpr := new(pb.DhtMessage_GetProviderReq)
+	pbMsg := pb.DhtMessage{
+		MsgType:		new(pb.DhtMessage_MessageType),
+		GetProviderReq:	pbGpr,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_GETPROVIDER_REQ
+
+	pbGpr.From = dhtMsg.setNode(&dhtMsg.GetProviderReq.From, pb.DhtMessage_CONT_YES)
+	pbGpr.To = dhtMsg.setNode(&dhtMsg.GetProviderReq.To, pb.DhtMessage_CONT_YES)
+
+	for _, k := range dhtMsg.GetProviderReq.Keys {
+		pbGpr.Keys = append(pbGpr.Keys, k)
+	}
+
+	pbGpr.Id = new(uint64)
+	*pbGpr.Id = dhtMsg.GetProviderReq.Id
+	pbGpr.Extra = dhtMsg.GetProviderReq.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetGetProviderReqPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
 
 	return DhtEnoNone
 }
@@ -983,6 +1106,39 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 		return DhtEnoParameter
 	}
 
+	pbGpr := new(pb.DhtMessage_GetProviderRsp)
+	pbMsg := pb.DhtMessage{
+		MsgType:		new(pb.DhtMessage_MessageType),
+		GetProviderRsp:	pbGpr,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_GETPROVIDER_RSP
+
+	pbGpr.From = dhtMsg.setNode(&dhtMsg.GetProviderRsp.From, pb.DhtMessage_CONT_YES)
+	pbGpr.To = dhtMsg.setNode(&dhtMsg.GetProviderRsp.To, pb.DhtMessage_CONT_YES)
+
+	for idx, p := range dhtMsg.GetProviderRsp.Providers {
+		ct := dhtMsg.GetProviderRsp.Pcs[idx]
+		pbp := &pb.DhtMessage_Provider{
+			Key:	p.Key,
+			Node:	dhtMsg.setNode(&p.Node, pb.DhtMessage_ConnectionType(ct)),
+		}
+		pbGpr.Providers = append(pbGpr.Providers, pbp)
+	}
+
+	pbGpr.Id = new(uint64)
+	*pbGpr.Id = dhtMsg.GetProviderRsp.Id
+	pbGpr.Extra = dhtMsg.GetProviderRsp.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetGetProviderRspPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -995,6 +1151,29 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 		return DhtEnoParameter
 	}
 
+	pbPing := new(pb.DhtMessage_Ping)
+	pbMsg := pb.DhtMessage{
+		MsgType:	new(pb.DhtMessage_MessageType),
+		Ping:		pbPing,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_PING
+
+	pbPing.From = dhtMsg.setNode(&dhtMsg.Ping.From, pb.DhtMessage_CONT_YES)
+	pbPing.To = dhtMsg.setNode(&dhtMsg.Ping.To, pb.DhtMessage_CONT_YES)
+	pbPing.Seq = new(uint64)
+	*pbPing.Seq = dhtMsg.Ping.Seq
+	pbPing.Extra = dhtMsg.Ping.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetPingPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
+
 	return DhtEnoNone
 }
 
@@ -1006,6 +1185,29 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 	if dhtPkg == nil {
 		return DhtEnoParameter
 	}
+
+	pbPong := new(pb.DhtMessage_Pong)
+	pbMsg := pb.DhtMessage{
+		MsgType:	new(pb.DhtMessage_MessageType),
+		Pong:		pbPong,
+	}
+	*pbMsg.MsgType = pb.DhtMessage_MID_PONG
+
+	pbPong.From = dhtMsg.setNode(&dhtMsg.Pong.From, pb.DhtMessage_CONT_YES)
+	pbPong.To = dhtMsg.setNode(&dhtMsg.Pong.To, pb.DhtMessage_CONT_YES)
+	pbPong.Seq = new(uint64)
+	*pbPong.Seq = dhtMsg.Pong.Seq
+	pbPong.Extra = dhtMsg.Pong.Extra
+
+	pl, err := pbMsg.Marshal()
+	if err != nil {
+		log.LogCallerFileLine("GetPongPackage: Marshal failed, err: %s", err.Error())
+		return DhtEnoSerialization
+	}
+
+	dhtPkg.Pid = uint32(PID_DHT)
+	dhtPkg.PayloadLength = uint32(len(pl))
+	dhtPkg.Payload = pl
 
 	return DhtEnoNone
 }
