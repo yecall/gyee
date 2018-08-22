@@ -888,7 +888,7 @@ _checkDone:
 		return
 	}
 
-	log.LogCallerFileLine("txProc: wOw! impossible errors")
+	log.LogCallerFileLine("txProc: wOw! impossible errors.")
 }
 
 //
@@ -973,7 +973,7 @@ _checkDone:
 		return
 	}
 
-	log.LogCallerFileLine("rxProc: wOw! impossible errors")
+	log.LogCallerFileLine("rxProc: wOw! impossible errors.")
 }
 
 //
@@ -1014,12 +1014,10 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
-		log.LogCallerFileLine("dispatch: MID_PING is not supported now")
-		eno = DhtEnoNotSup
+		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
-		log.LogCallerFileLine("dispatch: MID_PONG is not supported now")
-		eno = DhtEnoNotSup
+		eno = conInst.getPong(msg.Pong)
 
 	default:
 		log.LogCallerFileLine("dispatch: invalid message identity: %d", msg.Mid)
@@ -1139,6 +1137,34 @@ func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 	}
 	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrGetProviderRsp, &rsp)
+	conInst.sdl.SchSendMessage(&msg)
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_PING" from peer
+//
+func (conInst *ConInst)getPing(ping *Ping) DhtErrno {
+	pingInd := sch.MsgDhtRutPingInd {
+		ConInst:	conInst,
+		Msg:		ping,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutPingInd, &pingInd)
+	conInst.sdl.SchSendMessage(&msg)
+	return DhtEnoNone
+}
+
+//
+// Handler for "MID_PONG" from peer
+//
+func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
+	pongInd := sch.MsgDhtRutPingInd {
+		ConInst:	conInst,
+		Msg:		pong,
+	}
+	msg := sch.SchMessage{}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutPongInd, &pongInd)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }

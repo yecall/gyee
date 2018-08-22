@@ -204,6 +204,14 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtRutMgrStopNotifyReq:
 		eno = rutMgr.stopNotifyReq(msg.Body.(*sch.MsgDhtRutMgrStopNofiyReq))
 
+	case sch.EvDhtRutPingInd:
+		log.LogCallerFileLine("rutMgrProc: ping is not supported")
+		eno = sch.SchEnoNotImpl
+
+	case sch.EvDhtRutPongInd:
+		log.LogCallerFileLine("rutMgrProc: pong is not supported")
+		eno = sch.SchEnoNotImpl
+
 	default:
 		log.LogCallerFileLine("rutMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter

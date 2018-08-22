@@ -558,6 +558,8 @@ const (
 	EvDhtRutMgrNotificationInd	= EvDhtRutMgrBase + 4
 	EvDhtRutPeerRemovedInd		= EvDhtRutMgrBase + 5
 	EvDhtRutMgrStopNotifyReq	= EvDhtRutMgrBase + 6
+	EvDhtRutPingInd				= EvDhtRutMgrBase + 7
+	EvDhtRutPongInd				= EvDhtRutMgrBase + 8
 )
 
 //
@@ -613,6 +615,22 @@ type MsgDhtRutPeerRemovedInd struct {
 type MsgDhtRutMgrStopNofiyReq struct {
 	Task	interface{}				// owner task of the notifee registered
 	Target	config.NodeID			// target peer identity
+}
+
+//
+// EvDhtRutPingInd
+//
+type MsgDhtRutPingInd struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtRutPongInd
+//
+type MsgDhtRutPongInd struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
 }
 
 //
