@@ -74,6 +74,7 @@ func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvSchPoweroff:
 	case sch.EvDhtPrdMgrAddProviderReq:
 	case sch.EvDhtPrdMgrGetProviderReq:
+	case sch.EvDhtPrdMgrGetProviderRsp:
 	case sch.EvDhtPrdMgrUpdateReq:
 	default:
 		eno = sch.SchEnoParameter

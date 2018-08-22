@@ -69,6 +69,11 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	case sch.EvDhtDsMgrAddValReq:
+	case sch.EvDhtDsMgrGetValReq:
+	case sch.EvDhtDsMgrGetValRsp:
 	default:
 		eno = sch.SchEnoParameter
 	}
