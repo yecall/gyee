@@ -44,6 +44,7 @@ const (
 	rutMgrUpdate4Handshake = 0			// update for handshaking
 	rutMgrUpdate4Closed = 1				// update for connection instance closed
 	rutMgrUpdate4Query = 2				// update for query result
+	rutMgrMaxFails2Del = 3				// max fails to be deleted
 )
 
 //
@@ -67,6 +68,7 @@ type rutMgrBucketNode struct {
 	node	config.Node					// common node
 	hash	Hash						// hash from node.ID
 	dist	int							// distance between this node and local
+	fails	int							// counter for peer fail to response our query
 }
 
 //
@@ -399,28 +401,72 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
-	rt := &rutMgr.rutTab
+	why := req.Why
+	eno := req.Eno
 
-	for idx, n := range req.Seens {
+	log.LogCallerFileLine("updateReq: why: %d, eno: %d", why, eno)
 
-		hash := rutMgrNodeId2Hash(n.ID)
-		dist := rutMgr.rutMgrLog2Dist(&rt.shaLocal, hash)
-		dur := req.Duras[idx]
+	//
+	// check "why" and "eno"
+	//
 
-		rutMgr.rutMgrMetricSample(n.ID, dur)
+	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone {
 
-		bn := rutMgrBucketNode {
-			node:	n,
-			hash:	*hash,
-			dist:	dist,
+		//
+		// new peer picked ok
+		//
+
+		rt := &rutMgr.rutTab
+
+		for idx, n := range req.Seens {
+
+			hash := rutMgrNodeId2Hash(n.ID)
+			dist := rutMgr.rutMgrLog2Dist(&rt.shaLocal, hash)
+			dur := req.Duras[idx]
+
+			rutMgr.rutMgrMetricSample(n.ID, dur)
+
+			bn := rutMgrBucketNode{
+				node: n,
+				hash: *hash,
+				dist: dist,
+			}
+
+			rutMgr.update(&bn, dist)
 		}
 
-		rutMgr.update(&bn, dist)
-	}
+		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("updateReq: rutMgrNotify failed, eno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
 
-	if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("updateReq: rutMgrNotify failed, eno: %d", dhtEno)
-		return sch.SchEnoUserTask
+	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout {
+
+		//
+		// query peer time out, check fail counter
+		//
+
+		p := req.Seens[0].ID
+		h := rutMgrNodeId2Hash(p)
+		d := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, h)
+
+		eno, el := rutMgr.find(p, d)
+		if eno != DhtEnoNone {
+			log.LogCallerFileLine("updateReq: not found, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		bn := el.Value.(*rutMgrBucketNode)
+		if bn.fails++; bn.fails >= rutMgrMaxFails2Del {
+
+			if eno := rutMgr.delete(p); eno != DhtEnoNone {
+
+				log.LogCallerFileLine("updateReq: delete failed, eno: %d, id: %x", eno, p)
+				return sch.SchEnoUserTask
+			}
+
+			rutMgr.rutMgrRmvNotify(bn)
+		}
 	}
 
 	return sch.SchEnoNone
@@ -674,6 +720,25 @@ func (rutMgr *RutMgr)find(id config.NodeID, dist int) (DhtErrno, *list.Element) 
 	}
 
 	return DhtEnoNotFound, nil
+}
+
+//
+// Delete peer from route table
+//
+func (rutMgr *RutMgr)delete(id config.NodeID) DhtErrno {
+
+	hash := rutMgrNodeId2Hash(id)
+	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
+	li := rutMgr.rutTab.bucketTab[dist]
+
+	for el := li.Front(); el != nil; el.Next() {
+		if el.Value.(*rutMgrBucketNode).node.ID == id {
+			li.Remove(el)
+			return DhtEnoNone
+		}
+	}
+
+	return DhtEnoNotFound
 }
 
 //

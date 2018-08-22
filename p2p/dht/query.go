@@ -542,6 +542,34 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 // Instance status indication handler
 //
 func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno {
+
+	switch msg.Status {
+	case qisNull:
+		log.LogCallerFileLine("instStatusInd: qisNull")
+	case qisInited:
+		log.LogCallerFileLine("instStatusInd: qisInited")
+	case qisWaitConnect:
+		log.LogCallerFileLine("instStatusInd: qisWaitConnect")
+	case qisWaitResponse:
+		log.LogCallerFileLine("instStatusInd: qisWaitResponse")
+
+	case qisDone:
+
+		//
+		// done reported, we delete the instance from manager
+		//
+
+		log.LogCallerFileLine("instStatusInd: qisDone")
+
+		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4QryInstDoneInd, msg.Target); dhtEno != DhtEnoNone {
+			return sch.SchEnoUserTask
+		}
+
+	default:
+		log.LogCallerFileLine("instStatusInd: invalid instance status: %d", msg.Status)
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -567,33 +595,46 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	}
 
 	//
-	// update route manager in any cases
+	// update route manager in any cases.
+	//
+	// Notice: since we had update the route manager in handshake procedure in connection
+	// manager module, we need not to update again for the peer which we must have connected
+	// to. we keep the statements temply.
 	//
 
-	from := msg.From
-	latency	:= msg.Latency
+	if false {
 
-	updateReq2RutMgr := func (peer *config.Node, dur time.Duration) sch.SchErrno {
-		var schMsg = sch.SchMessage{}
-		var updateReq = sch.MsgDhtRutMgrUpdateReq{
-			Why:	rutMgrUpdate4Query,
-			Eno:	DhtEnoNone,
-			Seens:	[]config.Node{
-				*peer,
-			},
-			Duras:	[]time.Duration{
-				dur,
-			},
+		from := msg.From
+		latency := msg.Latency
+
+		updateReq2RutMgr := func(peer *config.Node, dur time.Duration) sch.SchErrno {
+			var schMsg= sch.SchMessage{}
+			var updateReq = sch.MsgDhtRutMgrUpdateReq{
+				Why: rutMgrUpdate4Query,
+				Eno: DhtEnoNone,
+				Seens: []config.Node{
+					*peer,
+				},
+				Duras: []time.Duration{
+					dur,
+				},
+			}
+			qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
+			return qryMgr.sdl.SchSendMessage(&schMsg)
 		}
-		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
-		return qryMgr.sdl.SchSendMessage(&schMsg)
-	}
 
-	updateReq2RutMgr(&from, latency)
+		updateReq2RutMgr(&from, latency)
+	}
 
 	//
 	// update query result
 	//
+
+	target := msg.Target
+	if qcb = qryMgr.qcbTab[target]; qcb == nil {
+		log.LogCallerFileLine("instResultInd: not found, target: %x", target)
+		return sch.SchEnoUserTask
+	}
 
 	for idx, peer := range msg.Peers {
 
@@ -614,12 +655,6 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	//
 	// check if target found: if true, query should be ended, report the result
 	//
-
-	target := msg.Target
-	if qcb = qryMgr.qcbTab[target]; qcb == nil {
-		log.LogCallerFileLine("instResultInd: not found, target: %x", target)
-		return sch.SchEnoUserTask
-	}
 
 	for _, peer := range msg.Peers {
 		if peer.ID == target {
@@ -773,6 +808,7 @@ const (
 	delQcb4Command					// required by other module
 	delQcb4NoSeeds					// no seeds for query
 	delQcb4TargetInLocal			// target found in local
+	delQcb4QryInstDoneInd			// query instance done is indicated
 	delQcb4InteralErrors			// internal errors while tring to query
 )
 
@@ -781,12 +817,18 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
 	event := sch.EvSchPoweroff
 
 	switch why {
+
 	case delQcb4TargetFound:
 	case delQcb4NoMoreQueries:
 	case delQcb4Timeout:
 	case delQcb4NoSeeds:
 	case delQcb4TargetInLocal:
+	case delQcb4QryInstDoneInd:
 	case delQcb4InteralErrors:
+
+		//
+		// nothing for aboved cases, see bellow outside of this "switch".
+		//
 
 	case delQcb4Command:
 		event = sch.EvDhtQryInstStopReq
