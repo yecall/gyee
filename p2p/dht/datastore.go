@@ -24,6 +24,94 @@ import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
+
+//
+// Datastore key
+//
+type DsKey struct {
+	name	string			// name space
+	extra	interface{}		// extra info
+}
+
+//
+// Datastore value
+//
+type DsValue []byte
+
+//
+// Common datastore interface
+//
+type Datastore interface {
+
+	//
+	// Put (key, value) to data store
+	//
+
+	Put(key *DsKey, value *DsValue) DhtErrno
+
+	//
+	// Get (key, value) from data store
+	//
+
+	Get(key *DsKey) (DhtErrno, value *DsValue)
+
+	//
+	// Delete (key, value) from data store
+	//
+
+	Delete(key *DsKey) DhtErrno
+
+	//
+	// Query (key, value) pairs in data store
+	//
+
+	Query(query interface{}) (DhtErrno, result interface{})
+}
+
+//
+// Data store based on "map" in memory, for test only
+//
+type MapDatastore struct {
+	mds map[DsKey]DsValue		// (key, value) map
+}
+
+//
+// New map datastore
+//
+func NewMapDatastore() *MapDatastore {
+	return &MapDatastore{
+		mds: make(map[DsKey]DsValue, 0),
+	}
+}
+
+//
+// Put
+//
+func (mds *MapDatastore)Put(k *DsKey, v *DsValue) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Get
+//
+func (mds *MapDatastore)Get(k *DsKey) (eno DhtErrno, value *DsValue) {
+	return DhtEnoUnknown, nil
+}
+
+//
+// Delete
+//
+func (mds *MapDatastore)Delete(k *DsKey) DhtErrno {
+	return DhtEnoNone
+}
+
+//
+// Query
+//
+func (mds *MapDatastore)Query(q interface{}) (DhtErrno, result interface{}) {
+	return DhtEnoUnknown, nil
+}
+
 //
 // Data store manager name registered in scheduler
 //
@@ -33,9 +121,9 @@ const DsMgrName = sch.DhtDsMgrName
 // Data store manager
 //
 type DsMgr struct {
-	name	string				// my name
-	tep		sch.SchUserTaskEp	// task entry
-	ptnMe	interface{}			// pointer to task node of myself
+	name	string					// my name
+	tep		sch.SchUserTaskEp		// task entry
+	ptnMe	interface{}				// pointer to task node of myself
 }
 
 //
@@ -55,7 +143,7 @@ func NewDsMgr() *DsMgr {
 }
 
 //
-// Entry point exported to shceduler
+// Entry point exported to scheduler
 //
 func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return dsMgr.tep(ptn, msg)
