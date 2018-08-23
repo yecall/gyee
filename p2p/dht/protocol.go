@@ -70,17 +70,20 @@ const (
 //
 type DhtKey []byte
 type DhtVal	[]byte
+
 type DhtValue struct {
 	Key				DhtKey					// key of value
 	Val				DhtVal					// value
+	Extra			interface{}				// extra inforamtion
 }
 
 //
 // Provider
 //
 type DhtProvider struct {
-	Key				DhtKey					// key for provider
+	Key				DhtKey					// key for what provided
 	Node			config.Node				// node of provider
+	Extra			interface{}				// extra inforamtion
 }
 
 //

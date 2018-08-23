@@ -22,16 +22,14 @@ package dht
 
 import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	config "github.com/yeeco/gyee/p2p/config"
 )
 
 
 //
 // Datastore key
 //
-type DsKey struct {
-	name	string			// name space
-	extra	interface{}		// extra info
-}
+type DsKey = config.NodeID
 
 //
 // Datastore value

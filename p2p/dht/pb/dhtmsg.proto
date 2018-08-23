@@ -91,11 +91,13 @@ message DhtMessage {
     message Value {
         required bytes          Key             = 1;    // key
         required bytes          Val             = 2;    // val
+        optional bytes          Extra           = 3;    // extra information, like access control ...
     }
 
     message Provider {
         required bytes          Key             = 1;    // key
-        required Node           Node            = 2;    // peer node
+        required Node           Node            = 2;    // provider node
+        optional bytes          Extra           = 3;    // extra information, like access control ...
     }
 
     message Protocol {
