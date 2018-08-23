@@ -34,9 +34,12 @@ const PrdMgrName = sch.DhtPrdMgrName
 // Provider manager
 //
 type PrdMgr struct {
-	name	string				// my name
-	tep		sch.SchUserTaskEp	// task entry
-	ptnMe	interface{}			// pointer to task node of myself
+	name		string					// my name
+	tep			sch.SchUserTaskEp		// task entry
+	ptnMe		interface{}				// pointer to task node of myself
+	ptnDhtMgr	interface{}				// pointer to dht manager task node
+	ptnQryMgr	interface{}				// pointer to query manager task node
+	ds			Datastore				// data store
 }
 
 //
@@ -45,9 +48,12 @@ type PrdMgr struct {
 func NewPrdMgr() *PrdMgr {
 
 	prdMgr := PrdMgr{
-		name:	PrdMgrName,
-		tep:	nil,
-		ptnMe:	nil,
+		name:		PrdMgrName,
+		tep:		nil,
+		ptnMe:		nil,
+		ptnDhtMgr:	nil,
+		ptnQryMgr:	nil,
+		ds:			nil,
 	}
 
 	prdMgr.tep = prdMgr.prdMgrProc
@@ -73,9 +79,10 @@ func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvSchPoweron:
 	case sch.EvSchPoweroff:
 	case sch.EvDhtPrdMgrAddProviderReq:
+	case sch.EvDhtPrdMgrCleanupTimer:
+	case sch.EvDhtQryMgrQueryResultInd:
 	case sch.EvDhtPrdMgrGetProviderReq:
 	case sch.EvDhtPrdMgrGetProviderRsp:
-	case sch.EvDhtPrdMgrUpdateReq:
 	default:
 		eno = sch.SchEnoParameter
 	}

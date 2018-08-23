@@ -51,7 +51,7 @@ type Datastore interface {
 	// Get (key, value) from data store
 	//
 
-	Get(key *DsKey) (DhtErrno, value *DsValue)
+	Get(key *DsKey) (eno DhtErrno, value *DsValue)
 
 	//
 	// Delete (key, value) from data store
@@ -63,14 +63,14 @@ type Datastore interface {
 	// Query (key, value) pairs in data store
 	//
 
-	Query(query interface{}) (DhtErrno, result interface{})
+	Query(query interface{}) (eno DhtErrno, result interface{})
 }
 
 //
 // Data store based on "map" in memory, for test only
 //
 type MapDatastore struct {
-	mds map[DsKey]DsValue		// (key, value) map
+	ds map[DsKey]DsValue		// (key, value) map
 }
 
 //
@@ -86,6 +86,7 @@ func NewMapDatastore() *MapDatastore {
 // Put
 //
 func (mds *MapDatastore)Put(k *DsKey, v *DsValue) DhtErrno {
+	mds.ds[*k] = *v
 	return DhtEnoNone
 }
 
@@ -93,21 +94,30 @@ func (mds *MapDatastore)Put(k *DsKey, v *DsValue) DhtErrno {
 // Get
 //
 func (mds *MapDatastore)Get(k *DsKey) (eno DhtErrno, value *DsValue) {
-	return DhtEnoUnknown, nil
+	v, ok := mds.ds[*k]
+	if !ok {
+		return DhtEnoNotFound, nil
+	}
+	return DhtEnoNone, &v
 }
 
 //
 // Delete
 //
 func (mds *MapDatastore)Delete(k *DsKey) DhtErrno {
+	delete(mds.ds, *k)
 	return DhtEnoNone
 }
 
 //
 // Query
 //
-func (mds *MapDatastore)Query(q interface{}) (DhtErrno, result interface{}) {
-	return DhtEnoUnknown, nil
+func (mds *MapDatastore)Query(q interface{}) (eno DhtErrno, result interface{}) {
+	k, ok := q.(*DsKey)
+	if !ok {
+		return DhtEnoMismatched, nil
+	}
+	return mds.Get(k)
 }
 
 //
@@ -119,9 +129,12 @@ const DsMgrName = sch.DhtDsMgrName
 // Data store manager
 //
 type DsMgr struct {
-	name	string					// my name
-	tep		sch.SchUserTaskEp		// task entry
-	ptnMe	interface{}				// pointer to task node of myself
+	name		string					// my name
+	tep			sch.SchUserTaskEp		// task entry
+	ptnMe		interface{}				// pointer to task node of myself
+	ptnDhtMgr	interface{}				// pointer to dht manager task node
+	ptnQryMgr	interface{}				// pointer to query manager task node
+	ds			Datastore				// data store
 }
 
 //
@@ -130,9 +143,12 @@ type DsMgr struct {
 func NewDsMgr() *DsMgr {
 
 	dsMgr := DsMgr{
-		name:	DsMgrName,
-		tep:	nil,
-		ptnMe:	nil,
+		name:		DsMgrName,
+		tep:		nil,
+		ptnMe:		nil,
+		ptnDhtMgr:	nil,
+		ptnQryMgr:	nil,
+		ds:			NewMapDatastore(),
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -158,6 +174,7 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 	case sch.EvSchPoweron:
 	case sch.EvSchPoweroff:
 	case sch.EvDhtDsMgrAddValReq:
+	case sch.EvDhtQryMgrQueryResultInd:
 	case sch.EvDhtDsMgrGetValReq:
 	case sch.EvDhtDsMgrGetValRsp:
 	default:

@@ -636,13 +636,14 @@ type MsgDhtRutPongInd struct {
 //
 // DHT provider manager event
 //
+const DhtPrdMgrCleanupTimerId	= 0
 const (
 	EvDhtPrdMgrBase				= 2600
+	EvDhtPrdMgrCleanupTimer		= EvDhtRutMgrBase + DhtPrdMgrCleanupTimerId
 	EvDhtPrdMgrAddProviderReq	= EvDhtPrdMgrBase + 1
 	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
 	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 3
 	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 4
-	EvDhtPrdMgrUpdateReq		= EvDhtPrdMgrBase + 5
 )
 
 //
