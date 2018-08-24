@@ -134,20 +134,29 @@ func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 }
 
 //
-//
+// add provider request handler
 //
 func (prdMgr *PrdMgr)addProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// qryMgr query result indication handler
+//
 func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// get provider handler
+//
 func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// get provder response handler
+//
 func (prdMgr *PrdMgr)getProviderRsp(msg *sch.MsgDhtPrdMgrGetProviderRsp) sch.SchErrno {
 	return sch.SchEnoNone
 }
