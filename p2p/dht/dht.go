@@ -21,6 +21,7 @@
 package dht
 
 import (
+	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -90,26 +91,169 @@ func (dhtMgr *DhtMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("dhtMgrProc: invalid parameters")
+		return DhtEnoParameter
+	}
+
 	var eno = sch.SchEnoUnknown
 
 	switch msg.Id {
+
 	case sch.EvSchPoweron:
+		eno = dhtMgr.poweron(ptn)
+
 	case sch.EvSchPoweroff:
+		eno = dhtMgr.poweroff(ptn)
+
 	case sch.EvDhtMgrFindPeerReq:
-	case sch.EvDhtMgrPutProviderReq:
-	case sch.EvDhtMgrGetProviderReq:
-	case sch.EvDhtMgrPutValueReq:
-	case sch.EvDhtMgrGetValueReq:
+		eno = dhtMgr.findPeerReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
+
 	case sch.EvDhtQryMgrQueryStartRsp:
+		eno = dhtMgr.qryMgrQueryStartRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStartRsp))
+
 	case sch.EvDhtQryMgrQueryStopRsp:
+		eno = dhtMgr.qryMgrQueryStopRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStopRsp))
+
 	case sch.EvDhtQryMgrQueryResultInd:
-	case sch.EvDhtPrdMgrGetProviderRsp:
-	case sch.EvDhtPrdMgrAddProviderRsp:
-	case sch.EvDhtConMgrSendRsp:
+		eno = dhtMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
+
+	case sch.EvDhtMgrPutProviderReq:
+		eno = dhtMgr.putProviderReq(msg.Body.(*sch.MsgDhtPrdMgrAddProviderReq))
+
+	case sch.EvDhtMgrPutProviderRsp:
+		eno = dhtMgr.putProviderRsp(msg.Body.(*sch.MsgDhtPrdMgrAddProviderRsp))
+
+	case sch.EvDhtMgrGetProviderReq:
+		eno = dhtMgr.getProviderReq(msg.Body.(*sch.MsgDhtMgrGetProviderReq))
+
+	case sch.EvDhtMgrGetProviderRsp:
+		eno = dhtMgr.getProviderRsp(msg.Body.(*sch.MsgDhtMgrPutProviderRsp))
+
+	case sch.EvDhtMgrPutValueReq:
+		eno = dhtMgr.putValueReq(msg.Body.(*sch.MsgDhtMgrPutValueReq))
+
+	case sch.EvDhtMgrPutValueRsp:
+		eno = dhtMgr.putValueRsp(msg.Body.(*sch.MsgDhtMgrPutValueRsp))
+
+	case sch.EvDhtMgrGetValueReq:
+		eno = dhtMgr.getValueReq(msg.Body.(*sch.MsgDhtMgrGetValueReq))
+
+	case sch.EvDhtMgrGetValueRsp:
+		eno = dhtMgr.getValueRsp(msg.Body.(*sch.MsgDhtMgrGetValueRsp))
+
 	case sch.EvDhtConMgrCloseRsp:
+		eno = dhtMgr.conMgrCloseRsp(msg.Body.(*sch.MsgDhtConMgrCloseRsp))
+
 	default:
 		eno = sch.SchEnoParameter
+		log.LogCallerFileLine("")
 	}
 
 	return eno
+}
+
+//
+// power on handler
+//
+func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// power off handler
+//
+func (dhtMgr *DhtMgr)poweroff(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// find peer request handler
+//
+func (dhtMgr *DhtMgr)findPeerReq(msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// qryMgr query start response handler
+//
+func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// qryMgr query stop response handler
+//
+func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// qryMgr query result indication handler
+//
+func (dhtMgr *DhtMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// put provider request handler
+//
+func (dhtMgr *DhtMgr)putProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// put provider response handler
+//
+func (dhtMgr *DhtMgr)putProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// get provider request handler
+//
+func (dhtMgr *DhtMgr)getProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// get provider response handler
+//
+func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrPutProviderRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// put value request handler
+//
+func (dhtMgr *DhtMgr)putValueReq(msg *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// put value response handler
+//
+func (dhtMgr *DhtMgr)putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// get value request handler
+//
+func (dhtMgr *DhtMgr)getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// get value response handler
+//
+func (dhtMgr *DhtMgr)getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// conMgr connection close response handler
+//
+func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+	return sch.SchEnoNone
 }

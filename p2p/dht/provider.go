@@ -22,6 +22,7 @@ package dht
 
 
 import (
+	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -73,19 +74,80 @@ func (prdMgr *PrdMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("prdMgrProc: invalid parameters")
+		return DhtEnoParameter
+	}
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
+
 	case sch.EvSchPoweron:
+		eno = prdMgr.poweron(ptn)
+
 	case sch.EvSchPoweroff:
-	case sch.EvDhtPrdMgrAddProviderReq:
+		eno = prdMgr.poweroff(ptn)
+
 	case sch.EvDhtPrdMgrCleanupTimer:
+		eno = prdMgr.cleanupTimer()
+
+	case sch.EvDhtPrdMgrAddProviderReq:
+		eno = prdMgr.addProviderReq(msg.Body.(*sch.MsgDhtPrdMgrAddProviderReq))
+
 	case sch.EvDhtQryMgrQueryResultInd:
+		eno = prdMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
+
 	case sch.EvDhtPrdMgrGetProviderReq:
+		eno = prdMgr.getProviderReq(msg.Body.(*sch.MsgDhtPrdMgrGetProviderReq))
+
 	case sch.EvDhtPrdMgrGetProviderRsp:
+		eno = prdMgr.getProviderRsp(msg.Body.(*sch.MsgDhtPrdMgrGetProviderRsp))
+
 	default:
 		eno = sch.SchEnoParameter
+		log.LogCallerFileLine("prdMgrProc: unknown message: %d", msg.Id)
 	}
 
 	return eno
+}
+
+//
+// power on handler
+//
+func (prdMgr *PrdMgr)poweron(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// power off handler
+//
+func (prdMgr *PrdMgr)poweroff(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// cleanup timer handler
+//
+func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+//
+//
+func (prdMgr *PrdMgr)addProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (prdMgr *PrdMgr)getProviderRsp(msg *sch.MsgDhtPrdMgrGetProviderRsp) sch.SchErrno {
+	return sch.SchEnoNone
 }

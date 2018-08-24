@@ -1061,12 +1061,12 @@ func (conInst *ConInst)neighbors(nb *DhtMessage) DhtErrno {
 // Handler for "MID_PUTVALUE" from peer
 //
 func (conInst *ConInst)putValue(pv *PutValue) DhtErrno {
-	req := sch.MsgDhtDsMgrAddValReq {
+	req := sch.MsgDhtDsMgrPutValReq {
 		ConInst:	conInst,
 		Msg:		pv,
 	}
 	msg := sch.SchMessage{}
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsMgrAddValReq, &req)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsMgrPutValReq, &req)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }

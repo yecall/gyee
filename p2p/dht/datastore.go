@@ -23,6 +23,7 @@ package dht
 import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
+	log "github.com/yeeco/gyee/p2p/logger"
 )
 
 
@@ -168,18 +169,90 @@ func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.
 //
 func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	if ptn == nil || msg == nil {
+		log.LogCallerFileLine("dsMgrProc: invalid parameters")
+		return sch.SchEnoParameter
+	}
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
+
 	case sch.EvSchPoweron:
+		eno = dsMgr.poweron(ptn)
+
 	case sch.EvSchPoweroff:
+		eno = dsMgr.poweroff(ptn)
+
 	case sch.EvDhtDsMgrAddValReq:
+		eno = dsMgr.addValReq(msg.Body.(*sch.MsgDhtDsMgrAddValReq))
+
+	case sch.EvDhtDsMgrPutValReq:
+		eno = dsMgr.putValReq(msg.Body.(*sch.MsgDhtDsMgrPutValReq))
+
 	case sch.EvDhtQryMgrQueryResultInd:
+		eno = dsMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
+
 	case sch.EvDhtDsMgrGetValReq:
+		eno = dsMgr.getValReq(msg.Body.(*sch.MsgDhtDsMgrGetValReq))
+
 	case sch.EvDhtDsMgrGetValRsp:
+		eno = dsMgr.getValRsp(msg.Body.(*sch.MsgDhtDsMgrGetValRsp))
+
 	default:
 		eno = sch.SchEnoParameter
+		log.LogCallerFileLine("dsMgrProc: unknown message: %d", msg.Id)
 	}
 
 	return eno
 }
+
+//
+// poweron handler
+//
+func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// poweroff handler
+//
+func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// add value request handler
+//
+func (dsMgr *DsMgr)addValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// qryMgr query result indication handler
+//
+func (dsMgr *DsMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// put value request handler
+//
+func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// get value request handler
+//
+func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// get value response handler
+//
+func (dsMgr *DsMgr)getValRsp(msg *sch.MsgDhtDsMgrGetValRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+

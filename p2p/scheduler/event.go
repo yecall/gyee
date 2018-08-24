@@ -282,6 +282,55 @@ const (
 )
 
 //
+// EvDhtMgrGetProviderReq
+//
+type MsgDhtMgrGetProviderReq struct {
+	Key			[]byte				// key wanted
+}
+
+//
+// EvDhtMgrPutProviderRsp
+//
+type MsgDhtMgrPutProviderRsp struct {
+	Eno			int					// result code
+	Key			[]byte				// key wanted
+	Prds		[]*config.Node		// providers
+}
+
+//
+// EvDhtMgrPutValueReq
+//
+type MsgDhtMgrPutValueReq struct {
+	Key			[]byte				// key wanted
+	Val			[]byte				// value
+}
+
+//
+// EvDhtMgrPutValueRsp
+//
+type MsgDhtMgrPutValueRsp struct {
+	Eno			int					// result code
+	Key			[]byte				// key wanted
+	Peers		[]config.Node		// extren peers where the value put beside local
+}
+
+//
+// EvDhtMgrGetValueReq
+//
+type MsgDhtMgrGetValueReq struct {
+	Key			[]byte				// key wanted
+}
+
+//
+// EvDhtMgrGetValueRsp
+//
+type MsgDhtMgrGetValueRsp struct {
+	Eno			int					// result code
+	Key			[]byte				// key wanted
+	Val			[]byte				// value
+}
+
+//
 // DHT listener manager event
 //
 const (
@@ -650,8 +699,16 @@ const (
 // EvDhtPrdMgrAddProviderReq
 //
 type MsgDhtPrdMgrAddProviderReq struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
+	key			[]byte			// key of what is provided
+	prd			config.Node		// provider node
+}
+
+//
+// EvDhtPrdMgrAddProviderRsp
+//
+type MsgDhtPrdMgrAddProviderRsp struct {
+	key			[]byte			// key of what is provided
+	eno			int				// result code
 }
 
 //
@@ -676,14 +733,23 @@ type MsgDhtPrdMgrGetProviderRsp struct {
 const (
 	EvDhtDsMgrBase				= 2700
 	EvDhtDsMgrAddValReq			= EvDhtDsMgrBase + 1
-	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 2
-	EvDhtDsMgrGetValRsp			= EvDhtDsMgrBase + 3
+	EvDhtDsMgrPutValReq			= EvDhtDsMgrBase + 2
+	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 3
+	EvDhtDsMgrGetValRsp			= EvDhtDsMgrBase + 4
 )
 
 //
 // EvDhtDsMgrGetValReq
 //
 type MsgDhtDsMgrAddValReq struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtDsMgrPutValReq
+//
+type MsgDhtDsMgrPutValReq struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
 }
