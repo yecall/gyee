@@ -1103,12 +1103,12 @@ func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 // Handler for "MID_PUTPROVIDER" from peer
 //
 func (conInst *ConInst)putProvider(pp *PutProvider) DhtErrno {
-	req := sch.MsgDhtPrdMgrAddProviderReq {
+	req := sch.MsgDhtPrdMgrPutProviderReq {
 		ConInst:	conInst,
 		Msg:		pp,
 	}
 	msg := sch.SchMessage{}
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrAddProviderReq, &req)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrPutProviderReq, &req)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }

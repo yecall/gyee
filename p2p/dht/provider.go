@@ -98,6 +98,9 @@ func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtQryMgrQueryResultInd:
 		eno = prdMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
 
+	case sch.EvDhtPrdMgrPutProviderReq:
+		eno = prdMgr.putProviderReq(msg.Body.(*sch.MsgDhtPrdMgrPutProviderReq))
+
 	case sch.EvDhtPrdMgrGetProviderReq:
 		eno = prdMgr.getProviderReq(msg.Body.(*sch.MsgDhtPrdMgrGetProviderReq))
 
@@ -144,6 +147,13 @@ func (prdMgr *PrdMgr)addProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.Sch
 // qryMgr query result indication handler
 //
 func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// put provider request handler
+//
+func (prdMgr *PrdMgr)putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.SchErrno {
 	return sch.SchEnoNone
 }
 

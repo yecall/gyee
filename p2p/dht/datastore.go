@@ -79,7 +79,7 @@ type MapDatastore struct {
 //
 func NewMapDatastore() *MapDatastore {
 	return &MapDatastore{
-		mds: make(map[DsKey]DsValue, 0),
+		ds: make(map[DsKey]DsValue, 0),
 	}
 }
 

@@ -690,9 +690,9 @@ const (
 	EvDhtPrdMgrBase				= 2600
 	EvDhtPrdMgrCleanupTimer		= EvDhtRutMgrBase + DhtPrdMgrCleanupTimerId
 	EvDhtPrdMgrAddProviderReq	= EvDhtPrdMgrBase + 1
-	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
-	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 3
-	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 4
+	EvDhtPrdMgrPutProviderReq	= EvDhtPrdMgrBase + 3
+	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 5
+	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 6
 )
 
 //
@@ -709,6 +709,22 @@ type MsgDhtPrdMgrAddProviderReq struct {
 type MsgDhtPrdMgrAddProviderRsp struct {
 	key			[]byte			// key of what is provided
 	eno			int				// result code
+}
+
+//
+// EvDhtPrdMgrPutProviderReq
+//
+type MsgDhtPrdMgrPutProviderReq struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
+}
+
+//
+// EvDhtPrdMgrPutProviderRsp
+//
+type MsgDhtPrdMgrPutProviderRsp struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
 }
 
 //
