@@ -30,12 +30,23 @@ import (
 //
 // Datastore key
 //
-type DsKey = config.NodeID
+const DsKeyLength = config.NodeIDBytes
+type DsKey =  [DsKeyLength]byte
 
 //
 // Datastore value
 //
-type DsValue []byte
+type DsValue = interface{}
+
+//
+// Datastore query
+//
+type DsQuery = interface{}
+
+//
+// Datastore query result
+//
+type DsQueryResult = interface {}
 
 //
 // Common datastore interface
@@ -46,13 +57,13 @@ type Datastore interface {
 	// Put (key, value) to data store
 	//
 
-	Put(key *DsKey, value *DsValue) DhtErrno
+	Put(key *DsKey, value DsValue) DhtErrno
 
 	//
 	// Get (key, value) from data store
 	//
 
-	Get(key *DsKey) (eno DhtErrno, value *DsValue)
+	Get(key *DsKey) (eno DhtErrno, value DsValue)
 
 	//
 	// Delete (key, value) from data store
@@ -64,7 +75,7 @@ type Datastore interface {
 	// Query (key, value) pairs in data store
 	//
 
-	Query(query interface{}) (eno DhtErrno, result interface{})
+	Query(query DsQuery) (eno DhtErrno, result DsQueryResult)
 }
 
 //
@@ -86,15 +97,15 @@ func NewMapDatastore() *MapDatastore {
 //
 // Put
 //
-func (mds *MapDatastore)Put(k *DsKey, v *DsValue) DhtErrno {
-	mds.ds[*k] = *v
+func (mds *MapDatastore)Put(k *DsKey, v DsValue) DhtErrno {
+	mds.ds[*k] = v
 	return DhtEnoNone
 }
 
 //
 // Get
 //
-func (mds *MapDatastore)Get(k *DsKey) (eno DhtErrno, value *DsValue) {
+func (mds *MapDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
 	v, ok := mds.ds[*k]
 	if !ok {
 		return DhtEnoNotFound, nil
@@ -113,7 +124,7 @@ func (mds *MapDatastore)Delete(k *DsKey) DhtErrno {
 //
 // Query
 //
-func (mds *MapDatastore)Query(q interface{}) (eno DhtErrno, result interface{}) {
+func (mds *MapDatastore)Query(q DsQuery) (eno DhtErrno, result DsQueryResult) {
 	k, ok := q.(*DsKey)
 	if !ok {
 		return DhtEnoMismatched, nil

@@ -128,7 +128,7 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = dhtMgr.getProviderReq(msg.Body.(*sch.MsgDhtMgrGetProviderReq))
 
 	case sch.EvDhtMgrGetProviderRsp:
-		eno = dhtMgr.getProviderRsp(msg.Body.(*sch.MsgDhtMgrPutProviderRsp))
+		eno = dhtMgr.getProviderRsp(msg.Body.(*sch.MsgDhtMgrGetProviderRsp))
 
 	case sch.EvDhtMgrPutValueReq:
 		eno = dhtMgr.putValueReq(msg.Body.(*sch.MsgDhtMgrPutValueReq))
@@ -219,7 +219,7 @@ func (dhtMgr *DhtMgr)getProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErr
 //
 // get provider response handler
 //
-func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrPutProviderRsp) sch.SchErrno {
+func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
 	return sch.SchEnoNone
 }
 

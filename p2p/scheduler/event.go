@@ -291,10 +291,10 @@ type MsgDhtMgrGetProviderReq struct {
 //
 // EvDhtMgrPutProviderRsp
 //
-type MsgDhtMgrPutProviderRsp struct {
+type MsgDhtMgrGetProviderRsp struct {
 	Eno			int					// result code
 	Key			[]byte				// key wanted
-	Prds		[]*config.Node		// providers
+	Prds		[]*config.NodeID		// providers
 }
 
 //
@@ -500,7 +500,9 @@ const (
 // EvDhtQryMgrQueryStartReq
 //
 type MsgDhtQryMgrQueryStartReq struct {
-	Target	config.NodeID			// target node identity
+	Target	config.NodeID			// target node identity or key
+	Value	interface{}				// value for put-value
+	ForWhat	int						// find-node; get-provider; get-value; put-value; ...
 }
 
 //
@@ -531,8 +533,11 @@ type MsgDhtQryMgrQueryStopRsp struct {
 //
 type MsgDhtQryMgrQueryResultInd struct {
 	Eno		int						// result code. notice: when timeout, closests reported
-	Target	config.NodeID			// target to be looked up
+	ForWhat	int						// what's the original query for: find-node; get-value; get-provider; put-value; put provider; ...
+	Target	config.NodeID			// target or key to be looked up
 	Peers	[]*config.Node			// peers list, if target got, it always be the first one
+	Val		[]byte					// value
+	Prds	[]*config.NodeID		// providers
 }
 
 
@@ -690,6 +695,7 @@ const (
 	EvDhtPrdMgrBase				= 2600
 	EvDhtPrdMgrCleanupTimer		= EvDhtRutMgrBase + DhtPrdMgrCleanupTimerId
 	EvDhtPrdMgrAddProviderReq	= EvDhtPrdMgrBase + 1
+	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
 	EvDhtPrdMgrPutProviderReq	= EvDhtPrdMgrBase + 3
 	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 5
 	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 6
@@ -699,16 +705,16 @@ const (
 // EvDhtPrdMgrAddProviderReq
 //
 type MsgDhtPrdMgrAddProviderReq struct {
-	key			[]byte			// key of what is provided
-	prd			config.Node		// provider node
+	Key			[]byte			// key of what is provided
+	Prd			config.Node		// provider node
 }
 
 //
 // EvDhtPrdMgrAddProviderRsp
 //
 type MsgDhtPrdMgrAddProviderRsp struct {
-	key			[]byte			// key of what is provided
-	eno			int				// result code
+	Key			[]byte			// key of what is provided
+	Eno			int				// result code
 }
 
 //

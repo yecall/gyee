@@ -213,3 +213,27 @@ message DhtMessage {
     optional Ping               ping            = 11;
     optional Pong               pong            = 12;
 }
+
+//
+// DHT common(key, value) record. It's a key-value pair, and DHT module would
+// never try to interprete this pair, it's the duty of the application, means
+// that, the "key" and "value" might have some "structs" in application's view
+// but which not cared by DHT.
+//
+
+message DhtRecord {
+    required bytes              key             = 1;    // key
+    required bytes              value           = 2;    // value
+}
+
+//
+// DHT provider record
+//
+
+message DhtProviderRecord {
+    message Provider {
+        required bytes          provider        = 1;    // one provider
+    }
+    required bytes              key             = 1;    // key for what provided
+    repeated Provider           providers       = 2;    // providers
+}
