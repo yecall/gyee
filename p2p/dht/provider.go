@@ -282,19 +282,62 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 //
 func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
 
+	if len(msg.Key) != DsKeyLength {
+		return sch.SchEnoParameter
+	}
+
+	var dsk DsKey
+	copy(dsk[0:], msg.Key)
+
+	var prds = []*config.NodeID{}
+	var eno = DhtErrno(DhtEnoUnknown)
+	var qry = sch.MsgDhtQryMgrQueryStartReq{}
+	var schMsg = sch.SchMessage{}
+
 	//
 	// lookup cache
 	//
+
+	if prdSet := prdMgr.prdFromCache(&dsk); prdSet != nil {
+		for _, id := range prdSet.set {
+			prds = append(prds, &id)
+		}
+		if len(prds) >0 {
+			eno = DhtEnoNone
+			goto _rsp2DhtMgr
+		}
+	}
 
 	//
 	// lookup local data store
 	//
 
+	if prdSet := prdMgr.prdFromStore(&dsk); prdSet != nil {
+		for _, id := range prdSet.set {
+			prds = append(prds, &id)
+		}
+		if len(prds) >0 {
+			eno = DhtEnoNone
+			goto _rsp2DhtMgr
+		}
+	}
+
 	//
 	// lookup our neighbors
 	//
 
-	return sch.SchEnoNone
+	qry = sch.MsgDhtQryMgrQueryStartReq {
+		Target:		config.NodeID(dsk),
+		Value:		nil,
+		ForWhat:	MID_GETPROVIDER_REQ,
+	}
+
+	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
+	return prdMgr.sdl.SchSendMessage(&schMsg)
+
+_rsp2DhtMgr:
+
+	return prdMgr.localGetProviderRsp(msg.Key, prds, eno)
 }
 
 //
@@ -379,6 +422,13 @@ func (prdMgr *PrdMgr)getProviderRsp(msg *sch.MsgDhtPrdMgrGetProviderRsp) sch.Sch
 // try get provider from cache
 //
 func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
+	return nil
+}
+
+//
+// try get provider form data store
+//
+func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
 	return nil
 }
 
