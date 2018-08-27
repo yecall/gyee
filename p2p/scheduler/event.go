@@ -426,6 +426,8 @@ const (
 	EvDhtConInstStatusInd		= EvDhtConInstBase + 4
 	EvDhtConInstCloseReq		= EvDhtConInstBase + 5
 	EvDhtConInstCloseRsp		= EvDhtConInstBase + 6
+	EvDhtConInstGetProviderRsp	= EvDhtConInstBase + 7
+	EvDhtDsConInstGetValRsp		= EvDhtConInstBase + 8
 )
 
 //
@@ -478,6 +480,22 @@ type MsgDhtConInstStatusInd struct {
 	Peer	*config.NodeID			// peer identity
 	Dir		int						// instance direction
 	Status	int						// status
+}
+
+//
+// EvDhtConInstGetProviderRsp
+//
+type MsgDhtConInstGetProviderRsp struct {
+	ConInst		interface{}			// connection instance who sent this meeage
+	Msg			interface{}			// the message pointer
+}
+
+//
+// EvDhtDsConInstGetValRsp
+//
+type MsgDhtConInstGetValRsp struct {
+	ConInst		interface{}		// connection instance who sent this meeage
+	Msg			interface{}		// the message pointer
 }
 
 //
@@ -698,7 +716,6 @@ const (
 	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
 	EvDhtPrdMgrPutProviderReq	= EvDhtPrdMgrBase + 3
 	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 5
-	EvDhtPrdMgrGetProviderRsp	= EvDhtPrdMgrBase + 6
 )
 
 //
@@ -734,17 +751,9 @@ type MsgDhtPrdMgrPutProviderRsp struct {
 }
 
 //
-// EvDhtPrdMgrGetProviderRsp
+// EvDhtPrdMgrGetProviderReq
 //
 type MsgDhtPrdMgrGetProviderReq struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
-}
-
-//
-// EvDhtPrdMgrGetProviderRsp
-//
-type MsgDhtPrdMgrGetProviderRsp struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
 }
@@ -757,7 +766,6 @@ const (
 	EvDhtDsMgrAddValReq			= EvDhtDsMgrBase + 1
 	EvDhtDsMgrPutValReq			= EvDhtDsMgrBase + 2
 	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 3
-	EvDhtDsMgrGetValRsp			= EvDhtDsMgrBase + 4
 )
 
 //
@@ -784,10 +792,3 @@ type MsgDhtDsMgrGetValReq struct {
 	Msg			interface{}		// the message pointer
 }
 
-//
-// EvDhtDsMgrGetValRsp
-//
-type MsgDhtDsMgrGetValRsp struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
-}

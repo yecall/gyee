@@ -207,9 +207,6 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 	case sch.EvDhtDsMgrGetValReq:
 		eno = dsMgr.getValReq(msg.Body.(*sch.MsgDhtDsMgrGetValReq))
 
-	case sch.EvDhtDsMgrGetValRsp:
-		eno = dsMgr.getValRsp(msg.Body.(*sch.MsgDhtDsMgrGetValRsp))
-
 	default:
 		eno = sch.SchEnoParameter
 		log.LogCallerFileLine("dsMgrProc: unknown message: %d", msg.Id)
@@ -260,10 +257,4 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-//
-// get value response handler
-//
-func (dsMgr *DsMgr)getValRsp(msg *sch.MsgDhtDsMgrGetValRsp) sch.SchErrno {
-	return sch.SchEnoNone
-}
 

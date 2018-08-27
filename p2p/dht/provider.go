@@ -132,9 +132,6 @@ func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtPrdMgrGetProviderReq:
 		eno = prdMgr.getProviderReq(msg.Body.(*sch.MsgDhtPrdMgrGetProviderReq))
 
-	case sch.EvDhtPrdMgrGetProviderRsp:
-		eno = prdMgr.getProviderRsp(msg.Body.(*sch.MsgDhtPrdMgrGetProviderRsp))
-
 	default:
 		eno = sch.SchEnoParameter
 		log.LogCallerFileLine("prdMgrProc: unknown message: %d", msg.Id)
@@ -401,18 +398,6 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 
 	//
 	// we are required to get-provider by remote peer
-	//
-
-	return sch.SchEnoNone
-}
-
-//
-// get provder response handler
-//
-func (prdMgr *PrdMgr)getProviderRsp(msg *sch.MsgDhtPrdMgrGetProviderRsp) sch.SchErrno {
-
-	//
-	// we get peer response for "get-provider" sent by local
 	//
 
 	return sch.SchEnoNone

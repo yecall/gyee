@@ -208,6 +208,9 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = qryMgr.rutNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
+	case sch.EvDhtConInstGetProviderRsp:
+	case sch.EvDhtDsConInstGetValRsp:
+
 	case sch.EvDhtQryMgrQcbTimer:
 		qcb := msg.Body.(*qryCtrlBlock)
 		eno = qryMgr.qcbTimerHandler(qcb)

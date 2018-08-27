@@ -1089,12 +1089,12 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 // Handler for "MID_GETVALUE_RSP" from peer
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
-	rsp := sch.MsgDhtDsMgrGetValRsp {
+	rsp := sch.MsgDhtConInstGetValRsp {
 		ConInst:	conInst,
 		Msg:		gvr,
 	}
 	msg := sch.SchMessage{}
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsMgrGetValRsp, &rsp)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsConInstGetValRsp, &rsp)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
@@ -1131,12 +1131,12 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 // Handler for "MID_GETPROVIDER_RSP" from peer
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
-	rsp := sch.MsgDhtPrdMgrGetProviderRsp {
+	rsp := sch.MsgDhtConInstGetProviderRsp {
 		ConInst:	conInst,
 		Msg:		gpr,
 	}
 	msg := sch.SchMessage{}
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtPrdMgrGetProviderRsp, &rsp)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtConInstGetProviderRsp, &rsp)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
