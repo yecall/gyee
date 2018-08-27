@@ -23,6 +23,7 @@ package dht
 import (
 	"fmt"
 	"time"
+	"bytes"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
@@ -416,9 +417,27 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	} else {
 
-		sendReq.Data = pkg
 		sendReq.Task = icb.ptnInst
 		sendReq.Peer = &icb.to
+		sendReq.Data = pkg
+
+		var waitMid = map[int]int {
+			MID_FINDNODE: MID_NEIGHBORS,
+			MID_GETPROVIDER_REQ: MID_GETPROVIDER_RSP,
+			MID_GETVALUE_REQ: MID_GETVALUE_RSP,
+		}
+
+		if icb.qryReq.ForWhat == MID_FINDNODE ||
+			icb.qryReq.ForWhat == MID_GETPROVIDER_REQ ||
+			icb.qryReq.ForWhat == MID_GETVALUE_REQ {
+			sendReq.WaitRsp = true
+			sendReq.WaitMid = waitMid[icb.qryReq.ForWhat]
+			sendReq.WaitSeq = icb.qryReq.Seq
+		} else {
+			sendReq.WaitRsp = false
+			sendReq.WaitMid = -1
+			sendReq.WaitSeq = -1
+		}
 
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
 		sdl.SchSendMessage(&schMsg)
@@ -475,12 +494,126 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		return sch.SchEnoMismatched
 	}
 
+	icb := qryInst.icb
+	icb.endTime = time.Now()
+	schMsg := sch.SchMessage{}
+
 	switch dhtMsg.Mid {
 
 	case MID_NEIGHBORS:
+
 		if dhtMsg.Neighbors == nil {
 			log.LogCallerFileLine("protoMsgInd: nil body")
 			return sch.SchEnoParameter
+		}
+
+		nbs := dhtMsg.Neighbors
+		ind := sch.MsgDhtQryInstResultInd {
+			From:		nbs.From,
+			Target:		icb.target,
+			ForWhat:	MID_FINDNODE,
+			Latency:	icb.endTime.Sub(icb.begTime),
+			Peers:		nbs.Nodes,
+			Providers:	nil,
+			Value:		nil,
+			Pcs:		nbs.Pcs,
+		}
+
+		icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+
+	case MID_GETVALUE_RSP:
+
+		if dhtMsg.GetValueRsp == nil {
+			log.LogCallerFileLine("protoMsgInd: nil body")
+			return sch.SchEnoParameter
+		}
+
+		gvr := dhtMsg.GetValueRsp
+
+		if len(gvr.Values) > 0 {
+
+			if bytes.Equal(gvr.Values[0].Key, icb.target[0:]) == false {
+				log.LogCallerFileLine("protoMsgInd: key mismatched")
+				return sch.SchEnoMismatched
+			}
+
+			ind := sch.MsgDhtQryInstResultInd{
+				From:      gvr.From,
+				Target:    icb.target,
+				ForWhat:   MID_FINDNODE,
+				Latency:   icb.endTime.Sub(icb.begTime),
+				Peers:     nil,
+				Providers: nil,
+				Value:     gvr.Values[0].Val,
+				Pcs:       gvr.Pcs,
+			}
+
+			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+
+		} else {
+
+			ind := sch.MsgDhtQryInstResultInd{
+				From:      gvr.From,
+				Target:    icb.target,
+				ForWhat:   MID_FINDNODE,
+				Latency:   icb.endTime.Sub(icb.begTime),
+				Peers:     gvr.Nodes,
+				Providers: nil,
+				Value:     nil,
+				Pcs:       gvr.Pcs,
+			}
+
+			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+		}
+
+
+	case MID_GETPROVIDER_RSP:
+
+		if dhtMsg.GetProviderRsp == nil {
+			log.LogCallerFileLine("protoMsgInd: nil body")
+			return sch.SchEnoParameter
+		}
+
+		gpr := dhtMsg.GetProviderRsp
+
+		if len(gpr.Providers) > 0 {
+
+			ind := sch.MsgDhtQryInstResultInd{
+				From:      gpr.From,
+				Target:    icb.target,
+				ForWhat:   MID_FINDNODE,
+				Latency:   icb.endTime.Sub(icb.begTime),
+				Peers:     nil,
+				Providers: nil,
+				Value:     nil,
+				Pcs:       gpr.Pcs,
+			}
+
+			for _, prd := range gpr.Providers {
+				p := &sch.Provider{
+					Key:	prd.Key,
+					Node:	prd.Node,
+					Extra:	prd.Extra,
+				}
+				ind.Providers = append(ind.Providers, p)
+			}
+
+			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+
+		} else {
+
+			ind := sch.MsgDhtQryInstResultInd{
+				From:      gpr.From,
+				Target:    icb.target,
+				ForWhat:   MID_FINDNODE,
+				Latency:   icb.endTime.Sub(icb.begTime),
+				Peers:     gpr.Nodes,
+				Providers: nil,
+				Value:     nil,
+				Pcs:       gpr.Pcs,
+			}
+
+			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 		}
 
 	default:
@@ -488,20 +621,6 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		return sch.SchEnoMismatched
 	}
 
-	icb := qryInst.icb
-	icb.endTime = time.Now()
-	nbs := dhtMsg.Neighbors
-
-	ind := sch.MsgDhtQryInstResultInd {
-		From:		nbs.From,
-		Target:		icb.target,
-		Latency:	icb.endTime.Sub(icb.begTime),
-		Peers:		nbs.Nodes,
-		Pcs:		nbs.Pcs,
-	}
-
-	schMsg := sch.SchMessage{}
-	icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 	return icb.sdl.SchSendMessage(&schMsg)
 }
 
@@ -517,22 +636,70 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 
 	if forWhat == MID_PUTPROVIDER {
 
+		msg := icb.qryReq.Msg.(*sch.MsgDhtPrdMgrAddProviderReq)
+		pp := PutProvider {
+			From:   *icb.local,
+			To:     icb.to,
+			Providers: []DhtProvider{{Key:msg.Key, Node:msg.Prd, Extra:nil}},
+			Id:     icb.qryReq.Seq,
+			Extra:  nil,
+		}
+
+		dhtMsg.Mid = MID_PUTPROVIDER
+		dhtMsg.PutProvider = &pp
+
 	} else if forWhat == MID_PUTVALUE {
+
+		msg := icb.qryReq.Msg.(*sch.MsgDhtDsMgrAddValReq)
+		pv := PutValue {
+			From:   *icb.local,
+			To:     icb.to,
+			Values:	[]DhtValue{{Key:msg.Key, Val:msg.Val, Extra:nil}},
+			Id:     icb.qryReq.Seq,
+			Extra:  nil,
+		}
+
+		dhtMsg.Mid = MID_PUTVALUE
+		dhtMsg.PutValue = &pv
 
 	} else if forWhat == MID_FINDNODE {
 
-		fn := FindNode{
-			From:   *qryInst.icb.local,
-			To:     qryInst.icb.to,
-			Target: qryInst.icb.target,
-			Id:     uint64(time.Now().UnixNano()),
+		fn := FindNode {
+			From:   *icb.local,
+			To:     icb.to,
+			Target: icb.target,
+			Id:     icb.qryReq.Seq,
 			Extra:  nil,
 		}
+
 		dhtMsg.Mid = MID_FINDNODE
 		dhtMsg.FindNode = &fn
+
 	} else if forWhat == MID_GETVALUE_REQ {
 
+		gvr := GetValueReq {
+			From:   *qryInst.icb.local,
+			To:     qryInst.icb.to,
+			Keys:	[]DhtKey{icb.target[0:]},
+			Id:     icb.qryReq.Seq,
+			Extra:  nil,
+		}
+
+		dhtMsg.Mid = MID_GETVALUE_REQ
+		dhtMsg.GetValueReq = &gvr
+
 	} else if forWhat == MID_GETPROVIDER_REQ {
+
+		gpr := GetProviderReq {
+			From:   *qryInst.icb.local,
+			To:     qryInst.icb.to,
+			Keys:	[]DhtKey{icb.target[0:]},
+			Id:     icb.qryReq.Seq,
+			Extra:  nil,
+		}
+
+		dhtMsg.Mid = MID_GETPROVIDER_REQ
+		dhtMsg.GetProviderReq = &gpr
 
 	} else {
 		log.LogCallerFileLine("setupQryPkg: unknown what's for")
@@ -540,6 +707,7 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 	}
 
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
+		log.LogCallerFileLine("setupQryPkg: GetPackage failed, eno: %d", eno)
 		return eno, nil
 	}
 

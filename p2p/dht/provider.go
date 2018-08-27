@@ -258,8 +258,9 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 
 	qry := sch.MsgDhtQryMgrQueryStartReq {
 		Target:		config.NodeID(k),
-		Value:		msg,
+		Msg:		msg,
 		ForWhat:	MID_PUTPROVIDER,
+		Seq:		uint64(time.Now().UnixNano()),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -318,8 +319,9 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 
 	qry = sch.MsgDhtQryMgrQueryStartReq {
 		Target:		config.NodeID(dsk),
-		Value:		nil,
+		Msg:		nil,
 		ForWhat:	MID_GETPROVIDER_REQ,
+		Seq:		uint64(time.Now().UnixNano()),
 	}
 
 	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)

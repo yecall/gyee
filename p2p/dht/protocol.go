@@ -68,8 +68,8 @@ const (
 //
 // Value
 //
-type DhtKey []byte
-type DhtVal	[]byte
+type DhtKey = []byte
+type DhtVal	= []byte
 
 type DhtValue struct {
 	Key				DhtKey					// key of value
@@ -186,7 +186,7 @@ type GetProviderReq struct {
 type GetProviderRsp struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Providers		[]DhtProvider			// providers
+	Providers		[]*DhtProvider			// providers
 	Nodes			[]*config.Node			// neighbor nodes
 	Pcs				[]int					// peer connection status
 	Id				uint64					// message identity
@@ -697,7 +697,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProvid
 			Key:	DhtKey(p.Key),
 			Node:	*dhtMsg.getNode(p.Node),
 		}
-		gpr.Providers = append(gpr.Providers, dhtP)
+		gpr.Providers = append(gpr.Providers, &dhtP)
 	}
 
 	gpr.Id = *pbMsg.Id

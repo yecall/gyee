@@ -24,6 +24,7 @@ import (
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
+	"time"
 )
 
 
@@ -259,8 +260,9 @@ func (dsMgr *DsMgr)addValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	qry := sch.MsgDhtQryMgrQueryStartReq {
 		Target:		config.NodeID(k),
-		Value:		msg,
+		Msg:		msg,
 		ForWhat:	MID_PUTVALUE,
+		Seq:		uint64(time.Now().UnixNano()),
 	}
 
 	schMsg := sch.SchMessage{}

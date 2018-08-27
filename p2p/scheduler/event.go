@@ -526,8 +526,9 @@ const (
 //
 type MsgDhtQryMgrQueryStartReq struct {
 	Target	config.NodeID			// target node identity or key
-	Value	interface{}				// value for put-value
+	Msg		interface{}				// original request which results this query
 	ForWhat	int						// find-node; get-provider; get-value; put-value; ...
+	Seq		uint64					// sequence number
 }
 
 //
@@ -600,13 +601,19 @@ type MsgDhtQryInstStatusInd struct {
 //
 // EvDhtQryInstResultInd
 //
+type Provider struct {
+	Key			[]byte				// key
+	Node		config.Node			// node
+	Extra		interface{}			// extra
+}
+
 type MsgDhtQryInstResultInd struct {
 	From		config.Node			// the peer who tells us
 	Target		config.NodeID		// target node identity
 	Latency		time.Duration		// latency about response to request
 	ForWhat		int					// what this indication for
 	Peers		[]*config.Node		// neighbors of target for find-node
-	Providers	[]*config.Node		// providers for get-provider
+	Providers	[]*Provider			// providers for get-provider
 	Value		[]byte				// value for get-value
 	Pcs			[]int				// peer connection status, see dht.conMgrPeerConnStat pls
 

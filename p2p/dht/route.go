@@ -295,8 +295,9 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 		var msg = sch.SchMessage{}
 		var req = sch.MsgDhtQryMgrQueryStartReq {
 			Target:		rutMgrRandomPeerId(),
-			Value:		nil,
+			Msg:		nil,
 			ForWhat:	MID_FINDNODE,
+			Seq:		uint64(time.Now().UnixNano()),
 		}
 
 		rutMgr.bpTargets[req.Target] = &req.Target
@@ -353,8 +354,9 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 		var msg = sch.SchMessage{}
 		var req = sch.MsgDhtQryMgrQueryStartReq {
 			Target:		rutMgr.localNodeId,
-			Value:		nil,
+			Msg:		nil,
 			ForWhat:	MID_FINDNODE,
+			Seq:		uint64(time.Now().UnixNano()),
 		}
 		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		rutMgr.sdl.SchSendMessage(&msg)
