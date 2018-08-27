@@ -160,6 +160,8 @@ type GetValueRsp struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Values			[]DhtValue				// values
+	Nodes			[]*config.Node			// neighbor nodes
+	Pcs				[]int					// peer connection status
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -185,7 +187,8 @@ type GetProviderRsp struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Providers		[]DhtProvider			// providers
-	Pcs				[]int					// prividers connection status
+	Nodes			[]*config.Node			// neighbor nodes
+	Pcs				[]int					// peer connection status
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }

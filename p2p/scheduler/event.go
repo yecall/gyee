@@ -392,6 +392,9 @@ type MsgDhtConMgrConnectRsp struct {
 //
 type MsgDhtConMgrSendReq struct {
 	Task	interface{}				// pointer to task node
+	WaitRsp	bool					// wait response from peer
+	WaitMid	int						// wait message identity
+	WaitSeq uint64					// wait message sequence number
 	Peer	*config.Node			// peer data sent to
 	Data	interface{}				// data to be sent
 }
@@ -455,6 +458,9 @@ type MsgDhtConInstHandshakeRsp struct {
 //
 type MsgDhtConInstTxDataReq struct {
 	Task	interface{}				// owner task node pointer
+	WaitRsp	bool					// wait response from peer
+	WaitMid	int						// wait message identity
+	WaitSeq uint64					// wait message sequence number
 	Data	[]byte					// data buffer
 }
 
@@ -648,6 +654,7 @@ type MsgDhtRutMgrNearestReq struct {
 	Max			int					// max items returned could be
 	NtfReq		bool				// ask for notification when route updated
 	Task		interface{}			// task who loves the notification
+	ForWhat		int					// what the request for
 }
 
 //
@@ -655,6 +662,7 @@ type MsgDhtRutMgrNearestReq struct {
 //
 type MsgDhtRutMgrNearestRsp struct {
 	Eno		int						// result code
+	ForWhat	int						// what for
 	Target	config.NodeID			// target peer identity
 	Peers	interface{}				// nearest nodes table
 	Dists	interface{}				// distances of nearest nodes
@@ -778,8 +786,8 @@ const (
 // EvDhtDsMgrGetValReq
 //
 type MsgDhtDsMgrAddValReq struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
+	Key			[]byte			// key
+	Val			[]byte			// value
 }
 
 //

@@ -81,8 +81,9 @@ type qryPendingInfo = rutMgrBucketNode
 //
 type qryCtrlBlock struct {
 	ptnOwner	interface{}								// owner task node pointer
+	qryReq		*sch.MsgDhtQryMgrQueryStartReq			// original query request message
 	seq			int										// sequence number
-	target		config.NodeID							// target is looking up
+	target		config.NodeID							// target for looking up
 	status		QryStatus								// query status
 	qryHistory	map[config.NodeID]*qryPendingInfo		// history peers had been queried
 	qryPending	*list.List								// pending peers to be queried, with type qryPendingInfo
@@ -108,22 +109,23 @@ const (
 // Query instance control block
 //
 type qryInstCtrlBlock struct {
-	sdl			*sch.Scheduler		// pointer to scheduler
-	seq			int					// sequence number
-	name		string				// instance name
-	ptnInst		interface{}			// pointer to query instance task node
-	ptnConMgr	interface{}			// pointer to connection manager task node
-	ptnQryMgr	interface{}			// pointer to query manager task node
-	ptnRutMgr	interface{}			// pointer to rute manager task node
-	status		int					// instance status
-	local		*config.Node		// pointer to local node specification
-	target		config.NodeID		// target is looking up
-	to			config.Node			// to whom the query message sent
-	qTid		int					// query timer identity
-	begTime		time.Time			// query begin time
-	endTime		time.Time			// query end time
-	conBegTime	time.Time			// time to start connection
-	conEndTime	time.Time			// time connection established
+	sdl			*sch.Scheduler					// pointer to scheduler
+	seq			int								// sequence number
+	qryReq		*sch.MsgDhtQryMgrQueryStartReq	// original query request message
+	name		string							// instance name
+	ptnInst		interface{}						// pointer to query instance task node
+	ptnConMgr	interface{}						// pointer to connection manager task node
+	ptnQryMgr	interface{}						// pointer to query manager task node
+	ptnRutMgr	interface{}						// pointer to rute manager task node
+	status		int								// instance status
+	local		*config.Node					// pointer to local node specification
+	target		config.NodeID					// target is looking up
+	to			config.Node						// to whom the query message sent
+	qTid		int								// query timer identity
+	begTime		time.Time						// query begin time
+	endTime		time.Time						// query end time
+	conBegTime	time.Time						// time to start connection
+	conEndTime	time.Time						// time connection established
 }
 
 //
@@ -293,7 +295,17 @@ func (qryMgr *QryMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
 
+	if msg.ForWhat != MID_PUTVALUE &&
+		msg.ForWhat != MID_PUTPROVIDER &&
+		msg.ForWhat != MID_FINDNODE &&
+		msg.ForWhat != MID_GETPROVIDER_REQ &&
+		msg.ForWhat != MID_GETVALUE_REQ {
+		log.LogCallerFileLine("queryStartReq: unknown what's for")
+		return sch.SchEnoMismatched
+	}
+
 	var target = msg.Target
+	var forWhat = msg.ForWhat
 	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target:target, Eno:DhtEnoUnknown}
 	var qcb *qryCtrlBlock = nil
 	var schMsg = sch.SchMessage{}
@@ -304,10 +316,11 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	//
 
 	var nearestReq = sch.MsgDhtRutMgrNearestReq{
-		Target:	target,
-		Max:	rutMgrMaxNearest,
-		NtfReq:	true,
-		Task:	qryMgr.ptnMe,
+		Target:		target,
+		Max:		rutMgrMaxNearest,
+		NtfReq:		true,
+		Task:		qryMgr.ptnMe,
+		ForWhat:	forWhat,
 	}
 
 	if _, dup := qryMgr.qcbTab[target]; dup {
@@ -317,6 +330,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 
 	qcb = new(qryCtrlBlock)
 	qcb.ptnOwner = sender
+	qcb.qryReq = msg
 	qcb.seq = qryMgr.qcbSeq
 	qryMgr.qcbSeq++
 	qcb.icbSeq = 0
@@ -351,10 +365,21 @@ _rsp2Sender:
 //
 func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
+	if msg.ForWhat != MID_PUTVALUE &&
+		msg.ForWhat != MID_PUTPROVIDER &&
+		msg.ForWhat != MID_FINDNODE &&
+		msg.ForWhat != MID_GETPROVIDER_REQ &&
+		msg.ForWhat != MID_GETVALUE_REQ {
+		log.LogCallerFileLine("rutNearestRsp: unknown what's for")
+		return sch.SchEnoMismatched
+	}
+
 	var dhtEno = DhtErrno(DhtEnoNone)
 
+	forWhat := msg.ForWhat
 	target := msg.Target
 	peers := msg.Peers.([]*rutMgrBucketNode)
+	pcs := msg.Pcs.([]conMgrPeerConnStat)
 	dists := msg.Dists.([]int)
 	qcb, ok := qryMgr.qcbTab[target]
 
@@ -412,17 +437,24 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	// nearests reported.
 	//
 
+	qcb.qryResult = list.New()
+
 	for idx, peer := range peers {
 
-		if peer.node.ID == target {
-			qryOk2Sender(&peer.node)
-			qryMgr.qryMgrDelQcb(delQcb4TargetInLocal, target)
-			return sch.SchEnoNone
+		if forWhat == MID_FINDNODE ||
+			forWhat == MID_GETPROVIDER_REQ ||
+			forWhat == MID_GETVALUE_REQ {
+
+			if peer.node.ID == target {
+				qryOk2Sender(&peer.node)
+				qryMgr.qryMgrDelQcb(delQcb4TargetInLocal, target)
+				return sch.SchEnoNone
+			}
 		}
 
 		qri := qryResultInfo {
 			node:	peer.node,
-			pcs:	pcsConnYes,
+			pcs:	pcs[idx],
 			dist:	dists[idx],
 		}
 
@@ -435,7 +467,6 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	//
 
 	qcb.qryPending = list.New()
-	qcb.qryResult = list.New()
 
 	if dhtEno = qcb.qryMgrQcbPutPending(peers, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
 
@@ -680,7 +711,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	//
 	// put peers reported in the message into query control block pending queue,
-	// and try to active more query instance after that.
+	// and try to active more query instances after that.
 	//
 
 	for idx, peer := range msg.Peers {
@@ -1011,6 +1042,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		icb := qryInstCtrlBlock {
 			sdl:		qryMgr.sdl,
 			seq:		qcb.icbSeq,
+			qryReq:		qcb.qryReq,
 			name:		"qryMgrIcb" + fmt.Sprintf("%d", qcb.icbSeq),
 			ptnInst:	nil,
 			ptnConMgr:	nil,

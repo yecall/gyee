@@ -510,23 +510,38 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 //
 func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 
-	fn := FindNode {
-		From:	*qryInst.icb.local,
-		To:		qryInst.icb.to,
-		Target:	qryInst.icb.target,
-		Id:		uint64(time.Now().UnixNano()),
-		Extra:	nil,
+	icb := qryInst.icb
+	forWhat := icb.qryReq.ForWhat
+	dhtMsg := DhtMessage{Mid:MID_UNKNOWN}
+	dhtPkg := DhtPackage{}
+
+	if forWhat == MID_PUTPROVIDER {
+
+	} else if forWhat == MID_PUTVALUE {
+
+	} else if forWhat == MID_FINDNODE {
+
+		fn := FindNode{
+			From:   *qryInst.icb.local,
+			To:     qryInst.icb.to,
+			Target: qryInst.icb.target,
+			Id:     uint64(time.Now().UnixNano()),
+			Extra:  nil,
+		}
+		dhtMsg.Mid = MID_FINDNODE
+		dhtMsg.FindNode = &fn
+	} else if forWhat == MID_GETVALUE_REQ {
+
+	} else if forWhat == MID_GETPROVIDER_REQ {
+
+	} else {
+		log.LogCallerFileLine("setupQryPkg: unknown what's for")
+		return DhtEnoMismatched, nil
 	}
 
-	fnMsg := DhtMessage{
-		Mid:		MID_FINDNODE,
-		FindNode:	&fn,
-	}
-
-	fnPkg := DhtPackage{}
-	if eno := fnMsg.GetPackage(&fnPkg); eno != DhtEnoNone {
+	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
 		return eno, nil
 	}
 
-	return DhtEnoNone, &fnPkg
+	return DhtEnoNone, &dhtPkg
 }

@@ -152,8 +152,9 @@ message DhtMessage {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
         repeated Value          Values          = 3;    // values to responsed
-        required uint64         Id              = 4;    // message identity
-        optional bytes          Extra           = 5;    // extra info
+        repeated Node           Nodes           = 4;    // neighbors
+        required uint64         Id              = 5;    // message identity
+        optional bytes          Extra           = 6;    // extra info
     }
 
     message PutProvider {
@@ -176,8 +177,9 @@ message DhtMessage {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
         repeated Provider       Providers       = 3;    // providers found
-        required uint64         Id              = 4;    // message identity
-        optional bytes          Extra           = 5;    // extra info
+        repeated Node           Nodes           = 4;    // neighbors
+        required uint64         Id              = 5;    // message identity
+        optional bytes          Extra           = 6;    // extra info
     }
 
     message Ping {

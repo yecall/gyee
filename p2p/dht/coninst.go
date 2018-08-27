@@ -56,6 +56,7 @@ type ConInst struct {
 	dir			conInstDir				// connection instance directory
 	hsInfo		conInstHandshakeInfo	// handshake information
 	txPending	*list.List				// pending package to be sent
+	txCurPkg	*conInstTxPkg			// current pending for response
 	txLock		sync.Mutex				// tx lock
 	txDone		chan int				// tx-task done signal
 	rxDone		chan int				// rx-task done signal
@@ -109,6 +110,9 @@ type conInstHandshakeInfo struct {
 //
 type conInstTxPkg struct {
 	task		interface{}			// pointer to owner task node
+	responsed	chan bool			// wait response from peer signal
+	waitMid		int					// wait message identity
+	waitSeq		uint64				// wait message sequence number
 	submitTime	time.Time			// time the payload submitted
 	payload		interface{}			// payload buffer
 }
@@ -397,8 +401,17 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 
 	pkg := conInstTxPkg {
 		task:		msg.Task,
+		responsed:	nil,
+		waitMid:	-1,
+		waitSeq:	-1,
 		submitTime:	time.Now(),
 		payload:	msg.Data,
+	}
+
+	if msg.WaitRsp == true {
+		pkg.responsed = make(chan bool, 1)
+		pkg.waitMid = msg.WaitMid
+		pkg.waitSeq = msg.WaitSeq
 	}
 
 	if eno := conInst.txPutPending(&pkg); eno != DhtEnoNone {
@@ -414,18 +427,63 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 //
 func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
-	nbs := Neighbors {
-		From:	*conInst.local,
-		To:		conInst.hsInfo.peer,
-		Nodes:	msg.Peers.([]*config.Node),
-		Pcs:	msg.Pcs.([]int),
-		Id:		uint64(time.Now().UnixNano()),
-		Extra:	nil,
+	var dhtMsg = DhtMessage {
+		Mid: MID_UNKNOWN,
 	}
 
-	dhtMsg := DhtMessage {
-		Mid:	MID_NEIGHBORS,
-		Neighbors:	&nbs,
+	if msg.ForWhat == MID_FINDNODE {
+
+		nbs := Neighbors {
+			From:		*conInst.local,
+			To:    		conInst.hsInfo.peer,
+			Nodes:		msg.Peers.([]*config.Node),
+			Pcs:		msg.Pcs.([]int),
+			Id:			uint64(time.Now().UnixNano()),
+			Extra:		nil,
+		}
+
+		dhtMsg = DhtMessage{
+			Mid:       MID_NEIGHBORS,
+			Neighbors: &nbs,
+		}
+
+	} else if msg.ForWhat == MID_GETPROVIDER_REQ {
+
+		gpr := GetProviderRsp {
+			From:  		*conInst.local,
+			To:    		conInst.hsInfo.peer,
+			Providers:	nil,
+			Nodes:		msg.Peers.([]*config.Node),
+			Pcs:   		msg.Pcs.([]int),
+			Id:    		uint64(time.Now().UnixNano()),
+			Extra: 		nil,
+		}
+
+		dhtMsg = DhtMessage{
+			Mid:       		MID_GETPROVIDER_RSP,
+			GetProviderRsp:	&gpr,
+		}
+
+	} else if msg.ForWhat == MID_GETVALUE_REQ {
+
+		gvr := GetValueRsp {
+			From:  		*conInst.local,
+			To:    		conInst.hsInfo.peer,
+			Values:		nil,
+			Nodes:		msg.Peers.([]*config.Node),
+			Pcs:   		msg.Pcs.([]int),
+			Id:    		uint64(time.Now().UnixNano()),
+			Extra: 		nil,
+		}
+
+		dhtMsg = DhtMessage{
+			Mid:       		MID_GETVALUE_RSP,
+			GetValueRsp:	&gvr,
+		}
+
+	} else {
+		log.LogCallerFileLine("rutMgrNearestRsp: unknown what's for")
+		return sch.SchEnoMismatched
 	}
 
 	dhtPkg := DhtPackage{}
@@ -436,6 +494,9 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 
 	txPkg := conInstTxPkg {
 		task:		conInst.ptnMe,
+		responsed:	nil,
+		waitMid:	-1,
+		waitSeq:	-1,
 		submitTime:	time.Now(),
 		payload:	dhtPkg,
 	}
@@ -478,6 +539,17 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	conInst.txPending.PushBack(pkg)
 
+	return DhtEnoNone
+}
+
+//
+// Set current Tx pending
+//
+func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) DhtErrno {
+	conInst.txLock.Lock()
+	defer conInst.txLock.Unlock()
+	conInst.ptnSrcTsk = txPkg.task
+	conInst.txCurPkg = txPkg
 	return DhtEnoNone
 }
 
@@ -849,6 +921,14 @@ _txLoop:
 			break _txLoop
 		}
 
+		if txPkg.responsed != nil {
+			conInst.txSetPending(txPkg)
+			<-txPkg.responsed
+			close(txPkg.responsed)
+		}
+
+		conInst.txSetPending(nil)
+
 _checkDone:
 
 		select {
@@ -1033,10 +1113,11 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 	msg := sch.SchMessage{}
 	req := sch.MsgDhtRutMgrNearestReq {
-		Target:	fn.Target,
-		Max:	rutMgrMaxNearest,
-		NtfReq:	false,
-		Task:	conInst.ptnMe,
+		Target:		fn.Target,
+		Max:		rutMgrMaxNearest,
+		NtfReq:		false,
+		Task:		conInst.ptnMe,
+		ForWhat:	MID_FINDNODE,
 	}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &req)
 	conInst.sdl.SchSendMessage(&msg)
@@ -1047,6 +1128,9 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 // Handler for "MID_NEIGHBORS" from peer
 //
 func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
+
+	conInst.checkTxCurPending(MID_NEIGHBORS, nbs.Id)
+
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
 		From:		&nbs.From,
@@ -1090,6 +1174,9 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 // Handler for "MID_GETVALUE_RSP" from peer
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
+
+	conInst.checkTxCurPending(MID_GETVALUE_RSP, gvr.Id)
+
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
 		From:		&gvr.From,
@@ -1133,6 +1220,9 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 // Handler for "MID_GETPROVIDER_RSP" from peer
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
+
+	conInst.checkTxCurPending(MID_GETPROVIDER_RSP, gpr.Id)
+
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
 		From:		&gpr.From,
@@ -1169,5 +1259,17 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutPongInd, &pongInd)
 	conInst.sdl.SchSendMessage(&msg)
+	return DhtEnoNone
+}
+
+//
+// Check if current Tx pending package is responsed by peeer
+//
+func (conInst *ConInst)checkTxCurPending(mid int, seq uint64) DhtErrno {
+	if conInst.txCurPkg != nil {
+		if conInst.txCurPkg.waitMid == mid && conInst.txCurPkg.waitSeq == seq {
+			conInst.txCurPkg.responsed<-true
+		}
+	}
 	return DhtEnoNone
 }

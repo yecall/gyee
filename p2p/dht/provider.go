@@ -256,16 +256,9 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 	// publish it to our neighbors
 	//
 
-	eno, prdVal := prdMgr.encodeProvider(&k, &msg.Prd.ID)
-	if eno != DhtEnoNone {
-		log.LogCallerFileLine("localAddProviderReq: encodeProvider failed, eno: %d", eno)
-		prdMgr.localAddProviderRsp(msg.Key, eno)
-		return sch.SchEnoUserTask
-	}
-
 	qry := sch.MsgDhtQryMgrQueryStartReq {
 		Target:		config.NodeID(k),
-		Value:		prdVal,
+		Value:		msg,
 		ForWhat:	MID_PUTPROVIDER,
 	}
 
@@ -385,8 +378,21 @@ func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) s
 func (prdMgr *PrdMgr)putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.SchErrno {
 
 	//
-	// we are required to put-provider by remote peer
+	// we are required to put-provider by remote peer, we just put it into the
+	// cache and data store.
 	//
+
+	dsk := DsKey{}
+	pp := msg.Msg.(*PutProvider)
+	for _, prd := range pp.Providers {
+		copy(dsk[0:], prd.Key)
+		if prdMgr.cache(&dsk, &prd.Node.ID) != DhtEnoNone {
+			log.LogCallerFileLine("putProviderReq: cache failed")
+		}
+		if prdMgr.store(&dsk, &prd.Node.ID) != DhtEnoNone {
+			log.LogCallerFileLine("putProviderReq: store failed")
+		}
+	}
 
 	return sch.SchEnoNone
 }

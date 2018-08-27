@@ -26,8 +26,8 @@ import (
 	"container/list"
 	ggio "github.com/gogo/protobuf/io"
 	log "github.com/yeeco/gyee/p2p/logger"
-	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
+	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
 //
@@ -322,8 +322,17 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 				pkg := conInstTxPkg {
 					task:		tx.Task,
+					responsed:	nil,
+					waitMid:	-1,
+					waitSeq:	-1,
 					submitTime:	time.Now(),
 					payload:	tx.Data,
+				}
+
+				if tx.WaitRsp == true {
+					pkg.responsed = make(chan bool, 1)
+					pkg.waitMid = tx.WaitMid
+					pkg.waitSeq = tx.WaitSeq
 				}
 
 				ci.txPutPending(&pkg)
@@ -393,8 +402,13 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
 	}
 
+	if conMgr.lookupInboundConInst(&msg.Peer.ID) != nil {
+		log.LogCallerFileLine("connctReq: inbound instance duplicated, id: %x", msg.Peer.ID)
+		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
+	}
+
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
-	conMgr.setupConInst(ci, msg.Task, msg.Peer)
+	conMgr.setupConInst(ci, sender, msg.Peer)
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -507,12 +521,23 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 	ci := conMgr.lookupOutboundConInst(&msg.Peer.ID)
 
+	if ci == nil {
+		ci = conMgr.lookupInboundConInst(&msg.Peer.ID)
+	}
+
 	if ci != nil {
 
 		pkg := conInstTxPkg {
 			task:		msg.Task,
+			responsed:	nil,
 			submitTime:	time.Now(),
 			payload:	msg.Data,
+		}
+
+		if msg.WaitRsp == true {
+			pkg.responsed = make(chan bool, 1)
+			pkg.waitMid = msg.WaitMid
+			pkg.waitSeq = msg.WaitSeq
 		}
 
 		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {

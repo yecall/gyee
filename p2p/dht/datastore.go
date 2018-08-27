@@ -141,6 +141,7 @@ const DsMgrName = sch.DhtDsMgrName
 // Data store manager
 //
 type DsMgr struct {
+	sdl			*sch.Scheduler			// pointer to scheduler
 	name		string					// my name
 	tep			sch.SchUserTaskEp		// task entry
 	ptnMe		interface{}				// pointer to task node of myself
@@ -233,7 +234,38 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 // add value request handler
 //
 func (dsMgr *DsMgr)addValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
-	return sch.SchEnoNone
+
+	if len(msg.Key) != DsKeyLength {
+		log.LogCallerFileLine("addValReq: invalid key length")
+		return sch.SchEnoParameter
+	}
+
+	var k DsKey
+	copy(k[0:], msg.Key)
+
+	//
+	// store it
+	//
+
+	if eno := dsMgr.store(&k, msg.Val); eno != DhtEnoNone {
+		log.LogCallerFileLine("addValReq: store failed, eno: %d", eno)
+		dsMgr.localAddValRsp(&k, eno)
+		return sch.SchEnoUserTask
+	}
+
+	//
+	// publish it to our neighbors
+	//
+
+	qry := sch.MsgDhtQryMgrQueryStartReq {
+		Target:		config.NodeID(k),
+		Value:		msg,
+		ForWhat:	MID_PUTVALUE,
+	}
+
+	schMsg := sch.SchMessage{}
+	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
+	return dsMgr.sdl.SchSendMessage(&schMsg)
 }
 
 //
@@ -257,4 +289,16 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+//
+// store (key, value) pair to data store
+//
+func (dsMgr *DsMgr)store(k *DsKey, v DsValue) DhtErrno {
+	return DhtEnoNone
+}
 
+//
+// response the add-value request sender task
+//
+func (dsMgr *DsMgr)localAddValRsp(k *DsKey, eno DhtErrno) DhtErrno {
+	return DhtEnoNone
+}

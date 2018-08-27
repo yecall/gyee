@@ -294,7 +294,9 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 
 		var msg = sch.SchMessage{}
 		var req = sch.MsgDhtQryMgrQueryStartReq {
-			Target: rutMgrRandomPeerId(),
+			Target:		rutMgrRandomPeerId(),
+			Value:		nil,
+			ForWhat:	MID_FINDNODE,
 		}
 
 		rutMgr.bpTargets[req.Target] = &req.Target
@@ -350,7 +352,9 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	if delete(rutMgr.bpTargets, msg.Target); len(rutMgr.bpTargets) == 0 {
 		var msg = sch.SchMessage{}
 		var req = sch.MsgDhtQryMgrQueryStartReq {
-			Target: rutMgr.localNodeId,
+			Target:		rutMgr.localNodeId,
+			Value:		nil,
+			ForWhat:	MID_FINDNODE,
 		}
 		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		rutMgr.sdl.SchSendMessage(&msg)
@@ -377,10 +381,11 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 	}
 
 	var rsp = sch.MsgDhtRutMgrNearestRsp {
-		Eno:	int(dhtEno),
-		Target:	req.Target,
-		Peers:	nil,
-		Dists:	nil,
+		Eno:		int(dhtEno),
+		ForWhat:	req.ForWhat,
+		Target:		req.Target,
+		Peers:		nil,
+		Dists:		nil,
 	}
 	var schMsg sch.SchMessage
 
