@@ -208,9 +208,6 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = qryMgr.rutNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
-	case sch.EvDhtConInstGetProviderRsp:
-	case sch.EvDhtDsConInstGetValRsp:
-
 	case sch.EvDhtQryMgrQcbTimer:
 		qcb := msg.Body.(*qryCtrlBlock)
 		eno = qryMgr.qcbTimerHandler(qcb)
@@ -580,6 +577,18 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 // Instance query result indication handler
 //
 func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
+
+	//
+	// notice: DHT messages "neighbors", "get provider response", "get value response" would be
+	// indicated here in the "msg", see connection instance (conInst) module for details pls.
+	//
+
+	if msg.ForWhat != sch.EvDhtConInstNeighbors &&
+		msg.ForWhat != sch.EvDhtConInstGetProviderRsp &&
+		msg.ForWhat != sch.EvDhtConInstGetValRsp {
+		log.LogCallerFileLine("instResultInd: mismatched, it's %d", msg.ForWhat)
+		return sch.SchEnoMismatched
+	}
 
 	var qcb *qryCtrlBlock= nil
 	var qpiList = []*qryPendingInfo{}

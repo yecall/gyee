@@ -993,7 +993,7 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
-		eno = conInst.neighbors(msg)
+		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
 		eno = conInst.putValue(msg.PutValue)
@@ -1046,11 +1046,12 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 //
 // Handler for "MID_NEIGHBORS" from peer
 //
-func (conInst *ConInst)neighbors(nb *DhtMessage) DhtErrno {
+func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
-		From:	&nb.Neighbors.From,
-		Msg:	nb,
+		From:		&nbs.From,
+		Msg:		nbs,
+		ForWhat:	sch.EvDhtConInstNeighbors,
 	}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
@@ -1089,12 +1090,13 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 // Handler for "MID_GETVALUE_RSP" from peer
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
-	rsp := sch.MsgDhtConInstGetValRsp {
-		ConInst:	conInst,
-		Msg:		gvr,
-	}
 	msg := sch.SchMessage{}
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnDsMgr, sch.EvDhtDsConInstGetValRsp, &rsp)
+	ind := sch.MsgDhtQryInstProtoMsgInd {
+		From:		&gvr.From,
+		Msg:		gvr,
+		ForWhat:	sch.EvDhtConInstGetValRsp,
+	}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }
@@ -1131,12 +1133,13 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 // Handler for "MID_GETPROVIDER_RSP" from peer
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
-	rsp := sch.MsgDhtConInstGetProviderRsp {
-		ConInst:	conInst,
-		Msg:		gpr,
-	}
 	msg := sch.SchMessage{}
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnPrdMgr, sch.EvDhtConInstGetProviderRsp, &rsp)
+	ind := sch.MsgDhtQryInstProtoMsgInd {
+		From:		&gpr.From,
+		Msg:		gpr,
+		ForWhat:	sch.EvDhtConInstGetProviderRsp,
+	}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
 }

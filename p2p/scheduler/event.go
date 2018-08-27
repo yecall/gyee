@@ -427,7 +427,8 @@ const (
 	EvDhtConInstCloseReq		= EvDhtConInstBase + 5
 	EvDhtConInstCloseRsp		= EvDhtConInstBase + 6
 	EvDhtConInstGetProviderRsp	= EvDhtConInstBase + 7
-	EvDhtDsConInstGetValRsp		= EvDhtConInstBase + 8
+	EvDhtConInstGetValRsp		= EvDhtConInstBase + 8
+	EvDhtConInstNeighbors		= EvDhtConInstBase + 9
 )
 
 //
@@ -491,7 +492,7 @@ type MsgDhtConInstGetProviderRsp struct {
 }
 
 //
-// EvDhtDsConInstGetValRsp
+// EvDhtConInstGetValRsp
 //
 type MsgDhtConInstGetValRsp struct {
 	ConInst		interface{}		// connection instance who sent this meeage
@@ -597,8 +598,12 @@ type MsgDhtQryInstResultInd struct {
 	From		config.Node			// the peer who tells us
 	Target		config.NodeID		// target node identity
 	Latency		time.Duration		// latency about response to request
-	Peers		[]*config.Node		// neighbors of target
+	ForWhat		int					// what this indication for
+	Peers		[]*config.Node		// neighbors of target for find-node
+	Providers	[]*config.Node		// providers for get-provider
+	Value		[]byte				// value for get-value
 	Pcs			[]int				// peer connection status, see dht.conMgrPeerConnStat pls
+
 }
 
 //
@@ -615,6 +620,7 @@ type MsgDhtQryInstStopRsp struct {
 type MsgDhtQryInstProtoMsgInd struct {
 	From		*config.Node		// where data is sent from
 	Msg			interface{}			// dht message pointer
+	ForWhat		int					// what this message for
 }
 
 //
