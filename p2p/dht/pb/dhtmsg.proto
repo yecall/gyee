@@ -96,7 +96,7 @@ message DhtMessage {
 
     message Provider {
         required bytes          Key             = 1;    // key
-        required Node           Node            = 2;    // provider node
+        repeated Node           Nodes           = 2;    // provider node
         optional bytes          Extra           = 3;    // extra information, like access control ...
     }
 
@@ -160,7 +160,7 @@ message DhtMessage {
     message PutProvider {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        repeated Provider       Providers       = 3;    // providers to be put
+        required Provider       Provider        = 3;    // providers to be put
         required uint64         Id              = 4;    // message identity
         optional bytes          Extra           = 5;    // extra info
     }
@@ -168,7 +168,7 @@ message DhtMessage {
     message GetProviderReq {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        repeated bytes          Keys            = 3;    // key for value be requested
+        required bytes          Key             = 3;    // key for value be requested
         required uint64         Id              = 4;    // message identity
         optional bytes          Extra           = 5;    // extra info
     }
@@ -176,10 +176,11 @@ message DhtMessage {
     message GetProviderRsp {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        repeated Provider       Providers       = 3;    // providers found
-        repeated Node           Nodes           = 4;    // neighbors
-        required uint64         Id              = 5;    // message identity
-        optional bytes          Extra           = 6;    // extra info
+        required Provider       Provider        = 3;    // providers found
+        required bytes          Key             = 4;
+        repeated Node           Nodes           = 5;    // neighbors
+        required uint64         Id              = 6;    // message identity
+        optional bytes          Extra           = 7;    // extra info
     }
 
     message Ping {

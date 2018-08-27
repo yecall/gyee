@@ -82,7 +82,7 @@ type DhtValue struct {
 //
 type DhtProvider struct {
 	Key				DhtKey					// key for what provided
-	Node			config.Node				// node of provider
+	Nodes			[]*config.Node			// node of provider
 	Extra			interface{}				// extra inforamtion
 }
 
@@ -169,7 +169,7 @@ type GetValueRsp struct {
 type PutProvider struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Providers		[]DhtProvider			// providers
+	Provider		*DhtProvider			// providers
 	Pcs				[]int					// prividers connection status
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
@@ -178,7 +178,7 @@ type PutProvider struct {
 type GetProviderReq struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Keys			[]DhtKey					// key wanted
+	Key				DhtKey					// key wanted
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -186,7 +186,8 @@ type GetProviderReq struct {
 type GetProviderRsp struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Providers		[]*DhtProvider			// providers
+	Provider		*DhtProvider			// providers
+	Key				DhtKey					// key
 	Nodes			[]*config.Node			// neighbor nodes
 	Pcs				[]int					// peer connection status
 	Id				uint64					// message identity

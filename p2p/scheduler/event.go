@@ -294,7 +294,7 @@ type MsgDhtMgrGetProviderReq struct {
 type MsgDhtMgrGetProviderRsp struct {
 	Eno			int					// result code
 	Key			[]byte				// key wanted
-	Prds		[]*config.NodeID		// providers
+	Prds		[]*config.Node		// providers
 }
 
 //
@@ -461,7 +461,7 @@ type MsgDhtConInstTxDataReq struct {
 	WaitRsp	bool					// wait response from peer
 	WaitMid	int						// wait message identity
 	WaitSeq uint64					// wait message sequence number
-	Data	[]byte					// data buffer
+	Payload	interface{}				// payload
 }
 
 //
@@ -563,7 +563,7 @@ type MsgDhtQryMgrQueryResultInd struct {
 	Target	config.NodeID			// target or key to be looked up
 	Peers	[]*config.Node			// peers list, if target got, it always be the first one
 	Val		[]byte					// value
-	Prds	[]*config.NodeID		// providers
+	Prds	[]*config.Node			// providers
 }
 
 
@@ -603,7 +603,7 @@ type MsgDhtQryInstStatusInd struct {
 //
 type Provider struct {
 	Key			[]byte				// key
-	Node		config.Node			// node
+	Nodes		[]*config.Node		// node
 	Extra		interface{}			// extra
 }
 
@@ -662,6 +662,7 @@ type MsgDhtRutMgrNearestReq struct {
 	NtfReq		bool				// ask for notification when route updated
 	Task		interface{}			// task who loves the notification
 	ForWhat		int					// what the request for
+	Msg			interface{}			// backup for original message
 }
 
 //
@@ -674,6 +675,7 @@ type MsgDhtRutMgrNearestRsp struct {
 	Peers	interface{}				// nearest nodes table
 	Dists	interface{}				// distances of nearest nodes
 	Pcs		interface{}				// peer connection status table
+	Msg		interface{}				// backup for original request
 }
 
 //

@@ -592,7 +592,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			for _, prd := range gpr.Providers {
 				p := &sch.Provider{
 					Key:	prd.Key,
-					Node:	prd.Node,
+					Nodes:	prd.Nodes,
 					Extra:	prd.Extra,
 				}
 				ind.Providers = append(ind.Providers, p)
@@ -640,7 +640,7 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 		pp := PutProvider {
 			From:   *icb.local,
 			To:     icb.to,
-			Providers: []DhtProvider{{Key:msg.Key, Node:msg.Prd, Extra:nil}},
+			Providers: []DhtProvider{{Key:msg.Key, Nodes:[]*config.Node{&msg.Prd}, Extra:nil}},
 			Id:     icb.qryReq.Seq,
 			Extra:  nil,
 		}
@@ -693,7 +693,7 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 		gpr := GetProviderReq {
 			From:   *qryInst.icb.local,
 			To:     qryInst.icb.to,
-			Keys:	[]DhtKey{icb.target[0:]},
+			Key:	icb.target[0:],
 			Id:     icb.qryReq.Seq,
 			Extra:  nil,
 		}

@@ -405,7 +405,7 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 		waitMid:	-1,
 		waitSeq:	-1,
 		submitTime:	time.Now(),
-		payload:	msg.Data,
+		payload:	msg.Payload,
 	}
 
 	if msg.WaitRsp == true {
