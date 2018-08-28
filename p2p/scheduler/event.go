@@ -613,7 +613,7 @@ type MsgDhtQryInstResultInd struct {
 	Latency		time.Duration		// latency about response to request
 	ForWhat		int					// what this indication for
 	Peers		[]*config.Node		// neighbors of target for find-node
-	Providers	[]*Provider			// providers for get-provider
+	Provider	*Provider			// providers for get-provider
 	Value		[]byte				// value for get-value
 	Pcs			[]int				// peer connection status, see dht.conMgrPeerConnStat pls
 

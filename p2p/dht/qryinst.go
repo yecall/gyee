@@ -25,8 +25,8 @@ import (
 	"time"
 	"bytes"
 	log "github.com/yeeco/gyee/p2p/logger"
-	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
+	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
 
@@ -514,7 +514,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			ForWhat:	MID_FINDNODE,
 			Latency:	icb.endTime.Sub(icb.begTime),
 			Peers:		nbs.Nodes,
-			Providers:	nil,
+			Provider:	nil,
 			Value:		nil,
 			Pcs:		nbs.Pcs,
 		}
@@ -530,22 +530,22 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		gvr := dhtMsg.GetValueRsp
 
-		if len(gvr.Values) > 0 {
+		if gvr.Value != nil {
 
-			if bytes.Equal(gvr.Values[0].Key, icb.target[0:]) == false {
+			if bytes.Equal(gvr.Value.Key, icb.target[0:]) == false {
 				log.LogCallerFileLine("protoMsgInd: key mismatched")
 				return sch.SchEnoMismatched
 			}
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:      gvr.From,
-				Target:    icb.target,
-				ForWhat:   MID_FINDNODE,
-				Latency:   icb.endTime.Sub(icb.begTime),
-				Peers:     nil,
-				Providers: nil,
-				Value:     gvr.Values[0].Val,
-				Pcs:       gvr.Pcs,
+				From:		gvr.From,
+				Target:		icb.target,
+				ForWhat:	MID_FINDNODE,
+				Latency:	icb.endTime.Sub(icb.begTime),
+				Peers:		nil,
+				Provider:	nil,
+				Value:		gvr.Value.Val,
+				Pcs:		gvr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -553,14 +553,14 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		} else {
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:      gvr.From,
-				Target:    icb.target,
-				ForWhat:   MID_FINDNODE,
-				Latency:   icb.endTime.Sub(icb.begTime),
-				Peers:     gvr.Nodes,
-				Providers: nil,
-				Value:     nil,
-				Pcs:       gvr.Pcs,
+				From:		gvr.From,
+				Target:		icb.target,
+				ForWhat:	MID_FINDNODE,
+				Latency:	icb.endTime.Sub(icb.begTime),
+				Peers:		gvr.Nodes,
+				Provider:	nil,
+				Value:		nil,
+				Pcs:		gvr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -576,26 +576,17 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		gpr := dhtMsg.GetProviderRsp
 
-		if len(gpr.Providers) > 0 {
+		if gpr.Provider != nil {
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:      gpr.From,
-				Target:    icb.target,
-				ForWhat:   MID_FINDNODE,
-				Latency:   icb.endTime.Sub(icb.begTime),
-				Peers:     nil,
-				Providers: nil,
-				Value:     nil,
-				Pcs:       gpr.Pcs,
-			}
-
-			for _, prd := range gpr.Providers {
-				p := &sch.Provider{
-					Key:	prd.Key,
-					Nodes:	prd.Nodes,
-					Extra:	prd.Extra,
-				}
-				ind.Providers = append(ind.Providers, p)
+				From:		gpr.From,
+				Target:		icb.target,
+				ForWhat:	MID_FINDNODE,
+				Latency:	icb.endTime.Sub(icb.begTime),
+				Peers:		nil,
+				Provider:	(*sch.Provider)(gpr.Provider),
+				Value:		nil,
+				Pcs:		gpr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -603,14 +594,14 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		} else {
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:      gpr.From,
-				Target:    icb.target,
-				ForWhat:   MID_FINDNODE,
-				Latency:   icb.endTime.Sub(icb.begTime),
-				Peers:     gpr.Nodes,
-				Providers: nil,
-				Value:     nil,
-				Pcs:       gpr.Pcs,
+				From:		gpr.From,
+				Target:		icb.target,
+				ForWhat:	MID_FINDNODE,
+				Latency:	icb.endTime.Sub(icb.begTime),
+				Peers:		gpr.Nodes,
+				Provider:	nil,
+				Value:		nil,
+				Pcs:		gpr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -640,7 +631,7 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 		pp := PutProvider {
 			From:   *icb.local,
 			To:     icb.to,
-			Providers: []DhtProvider{{Key:msg.Key, Nodes:[]*config.Node{&msg.Prd}, Extra:nil}},
+			Provider: &DhtProvider{Key:msg.Key, Nodes:[]*config.Node{&msg.Prd}, Extra:nil},
 			Id:     icb.qryReq.Seq,
 			Extra:  nil,
 		}
@@ -680,7 +671,7 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 		gvr := GetValueReq {
 			From:   *qryInst.icb.local,
 			To:     qryInst.icb.to,
-			Keys:	[]DhtKey{icb.target[0:]},
+			Key:	icb.target[0:],
 			Id:     icb.qryReq.Seq,
 			Extra:  nil,
 		}

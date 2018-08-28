@@ -396,20 +396,15 @@ func (prdMgr *PrdMgr)putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.Sch
 
 	dsk := DsKey{}
 	pp := msg.Msg.(*PutProvider)
+	prd := pp.Provider
 
-	for _, prd := range pp.Providers {
-
-		copy(dsk[0:], prd.Key)
-
-		for _, n := range prd.Nodes {
-
-			if prdMgr.cache(&dsk, n) != DhtEnoNone {
-				log.LogCallerFileLine("putProviderReq: cache failed")
-			}
-
-			if prdMgr.store(&dsk, n) != DhtEnoNone {
-				log.LogCallerFileLine("putProviderReq: store failed")
-			}
+	copy(dsk[0:], prd.Key)
+	for _, n := range prd.Nodes {
+		if prdMgr.cache(&dsk, n) != DhtEnoNone {
+			log.LogCallerFileLine("putProviderReq: cache failed")
+		}
+		if prdMgr.store(&dsk, n) != DhtEnoNone {
+			log.LogCallerFileLine("putProviderReq: store failed")
 		}
 	}
 
@@ -431,7 +426,7 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 	rsp := GetProviderRsp{
 		From:		*ci.local,
 		To:			ci.hsInfo.peer,
-		Providers:	nil,
+		Provider:	nil,
 		Key:		nil,
 		Nodes:		nil,
 		Pcs:		nil,
@@ -467,15 +462,13 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 		dhtPrd = makeDhtPrd(&dsk, prdSet)
 	}
 
-	if dhtPrd != nil {
-		rsp.Providers = append(rsp.Providers, dhtPrd)
-	}
+	rsp.Provider = dhtPrd
 
 	//
 	// if providers got, we then response peer
 	//
 
-	if len(rsp.Providers) > 0 {
+	if rsp.Provider != nil  {
 
 		dhtMsg := DhtMessage {
 			Mid:	MID_GETPROVIDER_RSP,
@@ -535,7 +528,7 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 	rsp := GetProviderRsp{
 		From:		*ci.local,
 		To:			ci.hsInfo.peer,
-		Providers:	nil,
+		Provider:	nil,
 		Key:		req.Key,
 		Nodes:		msg.Peers.([]*config.Node),
 		Pcs:		msg.Pcs.([]int),

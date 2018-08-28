@@ -452,7 +452,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 		gpr := GetProviderRsp {
 			From:  		*conInst.local,
 			To:    		conInst.hsInfo.peer,
-			Providers:	nil,
+			Provider:	nil,
 			Nodes:		msg.Peers.([]*config.Node),
 			Pcs:   		msg.Pcs.([]int),
 			Id:    		uint64(time.Now().UnixNano()),
@@ -469,7 +469,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 		gvr := GetValueRsp {
 			From:  		*conInst.local,
 			To:    		conInst.hsInfo.peer,
-			Values:		nil,
+			Value:		nil,
 			Nodes:		msg.Peers.([]*config.Node),
 			Pcs:   		msg.Pcs.([]int),
 			Id:    		uint64(time.Now().UnixNano()),

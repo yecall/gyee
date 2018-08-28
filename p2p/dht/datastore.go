@@ -163,7 +163,7 @@ func NewDsMgr() *DsMgr {
 		ptnMe:		nil,
 		ptnDhtMgr:	nil,
 		ptnQryMgr:	nil,
-		ds:			NewMapDatastore(),
+		ds:			nil,
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -228,6 +228,37 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 // poweron handler
 //
 func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
+
+	if ptn == nil {
+		log.LogCallerFileLine("poweron: invalid ptn")
+		return sch.SchEnoInternal
+	}
+
+	sdl := sch.SchGetScheduler(ptn)
+	dsMgr.sdl = sdl
+	if sdl == nil {
+		log.LogCallerFileLine("poweron: invalid sdl")
+		return sch.SchEnoInternal
+	}
+
+	dsMgr.ptnMe = ptn
+	_, dsMgr.ptnDhtMgr = sdl.SchGetTaskNodeByName(DsMgrName)
+	_, dsMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
+	_, dsMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
+
+	if dsMgr.ptnDhtMgr == nil ||
+		dsMgr.ptnQryMgr == nil ||
+		dsMgr.ptnRutMgr == nil {
+		log.LogCallerFileLine("poweron: invalid ptn")
+		return sch.SchEnoInternal
+	}
+
+	dsMgr.ds = NewMapDatastore()
+	if dsMgr.ds == nil {
+		log.LogCallerFileLine("poweron: invalid ds")
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -235,7 +266,8 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 // poweroff handler
 //
 func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
-	return sch.SchEnoNone
+	log.LogCallerFileLine("poweroff: task will be done ...")
+	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
 }
 
 //
@@ -383,7 +415,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	//
 
 	if val := dsMgr.fromStore(&dsk); len(val) > 0 {
-		gvRsp.Value = DhtValue {
+		gvRsp.Value = &DhtValue {
 			Key:	dsk[0:],
 			Val:	val,
 		}
