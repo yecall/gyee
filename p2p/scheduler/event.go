@@ -311,7 +311,7 @@ type MsgDhtMgrPutValueReq struct {
 type MsgDhtMgrPutValueRsp struct {
 	Eno			int					// result code
 	Key			[]byte				// key wanted
-	Peers		[]config.Node		// extren peers where the value put beside local
+	Peers		[]*config.Node		// extren peers where the value put beside local
 }
 
 //
@@ -755,6 +755,7 @@ type MsgDhtPrdMgrAddProviderReq struct {
 type MsgDhtPrdMgrAddProviderRsp struct {
 	Key			[]byte			// key of what is provided
 	Eno			int				// result code
+	Peers		[]*config.Node	// peers list, if target got, it always be the first one
 }
 
 //

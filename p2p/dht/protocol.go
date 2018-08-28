@@ -151,7 +151,7 @@ type PutValue struct {
 type GetValueReq struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Keys			[]DhtKey				// keys requested
+	Key				DhtKey					// keys requested
 	Id				uint64					// message identity
 	Extra			[]byte					// extra info
 }
@@ -159,7 +159,8 @@ type GetValueReq struct {
 type GetValueRsp struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Values			[]DhtValue				// values
+	Value			DhtValue				// values
+	Key				DhtKey					// keys requested
 	Nodes			[]*config.Node			// neighbor nodes
 	Pcs				[]int					// peer connection status
 	Id				uint64					// message identity

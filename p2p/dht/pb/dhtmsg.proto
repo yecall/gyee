@@ -143,7 +143,7 @@ message DhtMessage {
     message GetValueReq {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        repeated bytes          Keys            = 3;    // keys for values wanted to get
+        required bytes          Key             = 3;    // keys for values wanted to get
         required uint64         Id              = 4;    // message identity
         optional bytes          Extra           = 5;    // extra info
     }
@@ -151,7 +151,7 @@ message DhtMessage {
     message GetValueRsp {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        repeated Value          Values          = 3;    // values to responsed
+        required Value          Value           = 3;    // values to responsed
         repeated Node           Nodes           = 4;    // neighbors
         required uint64         Id              = 5;    // message identity
         optional bytes          Extra           = 6;    // extra info

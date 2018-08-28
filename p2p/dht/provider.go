@@ -27,6 +27,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	"github.com/anacrolix/sync"
 )
 
 //
@@ -56,7 +57,9 @@ type PrdMgr struct {
 	ptnRutMgr	interface{}				// pointer to route manager task node
 	clrTid		int						// cleanup timer identity
 	ds			Datastore				// data store
+	lockStore	sync.Mutex				// sync with store
 	prdCache	*lru.Cache				// providers cache
+	lockCache	sync.Mutex				// sync with cache operations
 }
 
 //
@@ -188,6 +191,9 @@ func (prdMgr *PrdMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 
+	prdMgr.lockCache.Lock()
+	defer prdMgr.lockCache.Unlock()
+
 	c := prdMgr.prdCache
 	now := time.Now()
 	keys := prdMgr.prdCache.Keys()
@@ -242,7 +248,7 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 
 	if eno := prdMgr.cache(&k, &msg.Prd); eno != DhtEnoNone {
 		log.LogCallerFileLine("localAddProviderReq: cache failed, eno: %d", eno)
-		prdMgr.localAddProviderRsp(msg.Key, eno)
+		prdMgr.localAddProviderRsp(msg.Key, nil, eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -252,7 +258,7 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 
 	if eno := prdMgr.store(&k, &msg.Prd); eno != DhtEnoNone {
 		log.LogCallerFileLine("localAddProviderReq: store failed, eno: %d", eno)
-		prdMgr.localAddProviderRsp(msg.Key, eno)
+		prdMgr.localAddProviderRsp(msg.Key, nil, eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -344,7 +350,7 @@ func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) s
 	if msg.ForWhat == MID_PUTPROVIDER {
 
 		key := msg.Target[0:]
-		return prdMgr.localAddProviderRsp(key, DhtErrno(msg.Eno))
+		return prdMgr.localAddProviderRsp(key, msg.Peers, DhtErrno(msg.Eno))
 
 	} else if msg.ForWhat == MID_GETPROVIDER_REQ {
 
@@ -453,8 +459,11 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 	copy(dsk[0:], req.Key)
 
 	if prdSet := prdMgr.prdFromCache(&dsk); prdSet != nil {
+
 		dhtPrd = makeDhtPrd(&dsk, prdSet)
+
 	} else if prdSet = prdMgr.prdFromStore(&dsk); prdSet != nil {
+
 		dhtPrd = makeDhtPrd(&dsk, prdSet)
 	}
 
@@ -474,7 +483,12 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 		}
 
 		dhtPkg := DhtPackage{}
-		dhtMsg.GetPackage(&dhtPkg)
+		if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
+			log.LogCallerFileLine("getProviderReq: GetPackage failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+
 		txReq := sch.MsgDhtConInstTxDataReq {
 			Task:		prdMgr.ptnMe,
 			WaitRsp:	false,
@@ -530,12 +544,16 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 	}
 
 	dhtMsg := DhtMessage {
-		Mid:	MID_GETPROVIDER_RSP,
-		GetProviderRsp: &rsp,
+		Mid:			MID_GETPROVIDER_RSP,
+		GetProviderRsp:	&rsp,
 	}
 
 	dhtPkg := DhtPackage{}
-	dhtMsg.GetPackage(&dhtPkg)
+	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
+		log.LogCallerFileLine("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
 	txReq := sch.MsgDhtConInstTxDataReq {
 		Task:		prdMgr.ptnMe,
 		WaitRsp:	false,
@@ -553,6 +571,8 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 // try get provider from cache
 //
 func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
+	prdMgr.lockCache.Lock()
+	defer prdMgr.lockCache.Unlock()
 	return nil
 }
 
@@ -560,6 +580,8 @@ func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
 // try get provider form data store
 //
 func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
+	prdMgr.lockStore.Lock()
+	defer prdMgr.lockStore.Unlock()
 	return nil
 }
 
@@ -567,16 +589,19 @@ func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
 // store a provider
 //
 func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
+	prdMgr.lockStore.Lock()
+	defer prdMgr.lockStore.Unlock()
 	return DhtEnoNone
 }
 
 //
 // response to local dhtMgr for "add-provider"
 //
-func (prdMgr *PrdMgr)localAddProviderRsp(key []byte, eno DhtErrno) sch.SchErrno {
+func (prdMgr *PrdMgr)localAddProviderRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
 	rsp := sch.MsgDhtPrdMgrAddProviderRsp {
-		Key: key,
-		Eno: int(eno),
+		Eno: 	int(eno),
+		Key: 	key,
+		Peers:	peers,
 	}
 	msg := sch.SchMessage{}
 	prdMgr.sdl.SchMakeMessage(&msg, prdMgr.ptnMe, prdMgr.ptnDhtMgr, sch.EvDhtMgrPutProviderRsp, &rsp)
@@ -604,6 +629,9 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 
 	if prdSet := prdMgr.prdFromCache(k); prdSet != nil {
 
+		prdMgr.lockCache.Lock()
+		defer prdMgr.lockCache.Unlock()
+
 		prdSet.append(prd, time.Now())
 
 	} else {
@@ -612,6 +640,9 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 			set:     []config.Node{*prd},
 			addTime: map[config.Node]time.Time{*prd: time.Now()},
 		}
+
+		prdMgr.lockCache.Lock()
+		defer prdMgr.lockCache.Unlock()
 
 		prdMgr.prdCache.Add(&k, &newPrd)
 	}

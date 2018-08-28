@@ -21,10 +21,10 @@
 package dht
 
 import (
+	"time"
+	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
-	log "github.com/yeeco/gyee/p2p/logger"
-	"time"
 )
 
 
@@ -148,6 +148,7 @@ type DsMgr struct {
 	ptnMe		interface{}				// pointer to task node of myself
 	ptnDhtMgr	interface{}				// pointer to dht manager task node
 	ptnQryMgr	interface{}				// pointer to query manager task node
+	ptnRutMgr	interface{}				// pointer to route manager task node
 	ds			Datastore				// data store
 }
 
@@ -198,16 +199,22 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 		eno = dsMgr.poweroff(ptn)
 
 	case sch.EvDhtDsMgrAddValReq:
-		eno = dsMgr.addValReq(msg.Body.(*sch.MsgDhtDsMgrAddValReq))
+		eno = dsMgr.localAddValReq(msg.Body.(*sch.MsgDhtDsMgrAddValReq))
 
-	case sch.EvDhtDsMgrPutValReq:
-		eno = dsMgr.putValReq(msg.Body.(*sch.MsgDhtDsMgrPutValReq))
+	case sch.EvDhtMgrGetValueReq:
+		eno = dsMgr.localGetValueReq(msg.Body.(*sch.MsgDhtMgrGetValueReq))
 
 	case sch.EvDhtQryMgrQueryResultInd:
 		eno = dsMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
 
+	case sch.EvDhtDsMgrPutValReq:
+		eno = dsMgr.putValReq(msg.Body.(*sch.MsgDhtDsMgrPutValReq))
+
 	case sch.EvDhtDsMgrGetValReq:
 		eno = dsMgr.getValReq(msg.Body.(*sch.MsgDhtDsMgrGetValReq))
+
+	case sch.EvDhtRutMgrNearestRsp:
+		eno = dsMgr.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
 	default:
 		eno = sch.SchEnoParameter
@@ -234,10 +241,10 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 // add value request handler
 //
-func (dsMgr *DsMgr)addValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
+func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		log.LogCallerFileLine("addValReq: invalid key length")
+		log.LogCallerFileLine("localAddValReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -249,8 +256,8 @@ func (dsMgr *DsMgr)addValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	//
 
 	if eno := dsMgr.store(&k, msg.Val); eno != DhtEnoNone {
-		log.LogCallerFileLine("addValReq: store failed, eno: %d", eno)
-		dsMgr.localAddValRsp(&k, eno)
+		log.LogCallerFileLine("localAddValReq: store failed, eno: %d", eno)
+		dsMgr.localAddValRsp(k[0:], nil, eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -271,16 +278,53 @@ func (dsMgr *DsMgr)addValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 }
 
 //
+// local node get-value request handler
+//
+func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
 // qryMgr query result indication handler
 //
 func (dsMgr *DsMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
-	return sch.SchEnoNone
+
+	if msg.ForWhat == MID_PUTVALUE {
+
+		return dsMgr.localAddValRsp(msg.Target[0:], msg.Peers, DhtErrno(msg.Eno))
+
+	} else if msg.ForWhat == MID_GETVALUE_REQ {
+
+		return dsMgr.localGetValRsp(msg.Target[0:], msg.Val, DhtErrno(msg.Eno))
+
+	} else {
+		log.LogCallerFileLine("qryMgrQueryResultInd: unknown what's for")
+	}
+
+	return sch.SchEnoMismatched
 }
 
 //
 // put value request handler
 //
 func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
+
+	//
+	// we are requested to put value from remote peer
+	//
+
+	pv := msg.Msg.(PutValue)
+	dsk := DsKey{}
+
+	for _, v := range pv.Values {
+
+		copy(dsk[0:], v.Key)
+
+		if eno := dsMgr.ds.Put(&dsk, v.Val); eno != DhtEnoNone {
+			log.LogCallerFileLine("putValReq: put failed, eno: %d", eno)
+		}
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -288,19 +332,187 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 // get value request handler
 //
 func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
-	return sch.SchEnoNone
+
+	//
+	// we are requested to get value for remote peer
+	//
+
+	gvReq := msg.Msg.(GetValueReq)
+	conInst := msg.ConInst.(*ConInst)
+	gvRsp := GetValueRsp {
+		From:		*conInst.local,
+		To:			conInst.hsInfo.peer,
+		Value:		nil,
+		Nodes:		nil,
+		Pcs:		nil,
+		Id:			gvReq.Id,
+		Extra:		nil,
+	}
+
+	dsk := DsKey{}
+	copy(dsk[0:], gvReq.Key)
+
+	rsp2Peer := func() sch.SchErrno {
+
+		dhtMsg := DhtMessage {
+			Mid:			MID_GETVALUE_RSP,
+			GetValueRsp:	&gvRsp,
+		}
+
+		dhtPkg := DhtPackage{}
+		if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
+			log.LogCallerFileLine("getValReq: GetPackage failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		txReq := sch.MsgDhtConInstTxDataReq {
+			Task:		dsMgr.ptnMe,
+			WaitRsp:	false,
+			WaitMid:	-1,
+			WaitSeq:	-1,
+			Payload:	&dhtPkg,
+		}
+
+		schMsg := sch.SchMessage{}
+		dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, conInst.ptnMe, sch.EvDhtConInstTxDataReq, &txReq)
+		return dsMgr.sdl.SchSendMessage(&schMsg)
+	}
+
+
+	//
+	// check local data store
+	//
+
+	if val := dsMgr.fromStore(&dsk); len(val) > 0 {
+		gvRsp.Value = DhtValue {
+			Key:	dsk[0:],
+			Val:	val,
+		}
+		return rsp2Peer()
+	}
+
+	//
+	// check provier manager
+	//
+
+	prdMgr, ok := dsMgr.sdl.SchGetUserTaskIF(PrdMgrName).(*PrdMgr)
+	if !ok || prdMgr == nil {
+		log.LogCallerFileLine("getValReq: get provider manager failed")
+		return sch.SchEnoInternal
+	}
+
+	if prdSet := prdMgr.prdFromCache(&dsk); prdSet != nil {
+		for _, p := range prdSet.set {
+			n := p
+			gvRsp.Nodes = append(gvRsp.Nodes, &n)
+		}
+		return rsp2Peer()
+	}
+
+	//
+	// we have to ask route manager for nearest for key requested
+	//
+
+	schMsg := sch.SchMessage{}
+	fnReq := sch.MsgDhtRutMgrNearestReq{
+		Target:		config.NodeID(dsk),
+		Max:		rutMgrMaxNearest,
+		NtfReq:		false,
+		Task:		dsMgr.ptnMe,
+		ForWhat:	MID_FINDNODE,
+		Msg:		msg,
+	}
+
+	conInst.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &fnReq)
+	return conInst.sdl.SchSendMessage(&schMsg)
+}
+
+//
+// nearest response handler
+//
+func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
+
+	//
+	// see dsMgr.getValReq for more please. we assume that no more "get-value"
+	// would be sent from the same connection instance until this function called.
+	//
+
+	ci := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).ConInst.(*ConInst)
+	req := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).Msg.(*GetValueReq)
+	rsp := GetValueRsp{
+		From:		*ci.local,
+		To:			ci.hsInfo.peer,
+		Key:		req.Key,
+		Value:		nil,
+		Nodes:		msg.Peers.([]*config.Node),
+		Pcs:		msg.Pcs.([]int),
+		Id:			req.Id,
+		Extra:		nil,
+	}
+
+	dhtMsg := DhtMessage {
+		Mid:			MID_GETPROVIDER_RSP,
+		GetValueRsp:	&rsp,
+	}
+
+	dhtPkg := DhtPackage{}
+	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
+		log.LogCallerFileLine("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
+	txReq := sch.MsgDhtConInstTxDataReq {
+		Task:		dsMgr.ptnMe,
+		WaitRsp:	false,
+		WaitMid:	-1,
+		WaitSeq:	-1,
+		Payload:	&dhtPkg,
+	}
+
+	schMsg := sch.SchMessage{}
+	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstTxDataReq, &txReq)
+	return dsMgr.sdl.SchSendMessage(&schMsg)
+}
+
+//
+// get value from store by key
+//
+func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
+	return nil
 }
 
 //
 // store (key, value) pair to data store
 //
 func (dsMgr *DsMgr)store(k *DsKey, v DsValue) DhtErrno {
-	return DhtEnoNone
+	return dsMgr.ds.Put(k, v)
 }
 
 //
 // response the add-value request sender task
 //
-func (dsMgr *DsMgr)localAddValRsp(k *DsKey, eno DhtErrno) DhtErrno {
-	return DhtEnoNone
+func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
+	rsp := sch.MsgDhtMgrPutValueRsp {
+		Eno:	int(eno),
+		Key:	key,
+		Peers:	peers,
+	}
+	msg := sch.SchMessage{}
+	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrPutValueRsp, &rsp)
+	return dsMgr.sdl.SchSendMessage(&msg)
 }
+
+//
+// response the get-value request sender task
+//
+func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
+	rsp := sch.MsgDhtMgrGetValueRsp {
+		Eno:	int(eno),
+		Key:	key,
+		Val:	val,
+	}
+	msg := sch.SchMessage{}
+	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrGetValueRsp, &rsp)
+	return dsMgr.sdl.SchSendMessage(&msg)
+}
+
