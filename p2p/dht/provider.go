@@ -23,11 +23,11 @@ package dht
 
 import (
 	"time"
+	"sync"
 	config "github.com/yeeco/gyee/p2p/config"
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/anacrolix/sync"
 )
 
 //

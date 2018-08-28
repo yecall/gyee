@@ -378,7 +378,6 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 		return dsMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-
 	//
 	// check local data store
 	//
@@ -478,7 +477,11 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 // get value from store by key
 //
 func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
-	return nil
+	eno, val := dsMgr.ds.Get(k)
+	if eno != DhtEnoNone {
+		return  nil
+	}
+	return  val.([]byte)
 }
 
 //
