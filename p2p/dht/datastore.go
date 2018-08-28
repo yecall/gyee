@@ -301,7 +301,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 		Target:		config.NodeID(k),
 		Msg:		msg,
 		ForWhat:	MID_PUTVALUE,
-		Seq:		uint64(time.Now().UnixNano()),
+		Seq:		time.Now().UnixNano(),
 	}
 
 	schMsg := sch.SchMessage{}

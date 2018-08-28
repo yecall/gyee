@@ -66,8 +66,8 @@ type PrdMgr struct {
 // Provider set
 //
 type PrdSet struct {
-	set 	[]config.Node				// provider set
-	addTime	map[config.Node]time.Time	// time for providers added
+	set 	map[config.NodeID]config.Node	// provider set
+	addTime	map[config.NodeID]time.Time		// time for providers added
 }
 
 //
@@ -202,7 +202,7 @@ func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 
 		if i, ok := c.Get(k); ok {
 
-			del := []config.Node{}
+			del := []config.NodeID{}
 			ps := i.(*PrdSet)
 
 			for id, t := range ps.addTime {
@@ -213,11 +213,11 @@ func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 
 			for _, id := range del {
 				delete(ps.addTime, id)
+				delete(ps.set, id)
 			}
 
-			ps.set = nil
-			for id := range ps.addTime {
-				ps.set = append(ps.set, id)
+			if len(ps.set) == 0 || len(ps.addTime) == 0 {
+				prdMgr.prdCache.Remove(i)
 			}
 		}
 	}
@@ -270,7 +270,7 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 		Target:		config.NodeID(k),
 		Msg:		msg,
 		ForWhat:	MID_PUTPROVIDER,
-		Seq:		uint64(time.Now().UnixNano()),
+		Seq:		time.Now().UnixNano(),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -331,7 +331,7 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 		Target:		config.NodeID(dsk),
 		Msg:		nil,
 		ForWhat:	MID_GETPROVIDER_REQ,
-		Seq:		uint64(time.Now().UnixNano()),
+		Seq:		time.Now().UnixNano(),
 	}
 
 	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
@@ -630,8 +630,8 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 	} else {
 
 		newPrd := PrdSet{
-			set:     []config.Node{*prd},
-			addTime: map[config.Node]time.Time{*prd: time.Now()},
+			set:     map[config.NodeID]config.Node{prd.ID: *prd},
+			addTime: map[config.NodeID]time.Time{prd.ID: time.Now()},
 		}
 
 		prdMgr.lockCache.Lock()
@@ -647,9 +647,9 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 // add new provider to set
 //
 func (prdSet *PrdSet)append(peerId *config.Node, addTime time.Time) {
-	if _, exist := prdSet.addTime[*peerId]; !exist {
-		prdSet.set = append(prdSet.set, *peerId)
+	if _, exist := prdSet.addTime[peerId.ID]; !exist {
+		prdSet.set[peerId.ID] = *peerId
 	}
-	prdSet.addTime[*peerId] = addTime
+	prdSet.addTime[peerId.ID] = addTime
 }
 

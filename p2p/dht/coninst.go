@@ -112,7 +112,7 @@ type conInstTxPkg struct {
 	task		interface{}			// pointer to owner task node
 	responsed	chan bool			// wait response from peer signal
 	waitMid		int					// wait message identity
-	waitSeq		uint64				// wait message sequence number
+	waitSeq		int64				// wait message sequence number
 	submitTime	time.Time			// time the payload submitted
 	payload		interface{}			// payload buffer
 }
@@ -438,7 +438,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 			To:    		conInst.hsInfo.peer,
 			Nodes:		msg.Peers.([]*config.Node),
 			Pcs:		msg.Pcs.([]int),
-			Id:			uint64(time.Now().UnixNano()),
+			Id:			time.Now().UnixNano(),
 			Extra:		nil,
 		}
 
@@ -455,7 +455,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 			Provider:	nil,
 			Nodes:		msg.Peers.([]*config.Node),
 			Pcs:   		msg.Pcs.([]int),
-			Id:    		uint64(time.Now().UnixNano()),
+			Id:    		time.Now().UnixNano(),
 			Extra: 		nil,
 		}
 
@@ -472,7 +472,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 			Value:		nil,
 			Nodes:		msg.Peers.([]*config.Node),
 			Pcs:   		msg.Pcs.([]int),
-			Id:    		uint64(time.Now().UnixNano()),
+			Id:    		time.Now().UnixNano(),
 			Extra: 		nil,
 		}
 
@@ -1129,7 +1129,7 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 //
 func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 
-	conInst.checkTxCurPending(MID_NEIGHBORS, nbs.Id)
+	conInst.checkTxCurPending(MID_NEIGHBORS, int64(nbs.Id))
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
@@ -1175,7 +1175,7 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 
-	conInst.checkTxCurPending(MID_GETVALUE_RSP, gvr.Id)
+	conInst.checkTxCurPending(MID_GETVALUE_RSP, int64(gvr.Id))
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
@@ -1221,7 +1221,7 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 
-	conInst.checkTxCurPending(MID_GETPROVIDER_RSP, gpr.Id)
+	conInst.checkTxCurPending(MID_GETPROVIDER_RSP, int64(gpr.Id))
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
@@ -1265,7 +1265,7 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 //
 // Check if current Tx pending package is responsed by peeer
 //
-func (conInst *ConInst)checkTxCurPending(mid int, seq uint64) DhtErrno {
+func (conInst *ConInst)checkTxCurPending(mid int, seq int64) DhtErrno {
 	if conInst.txCurPkg != nil {
 		if conInst.txCurPkg.waitMid == mid && conInst.txCurPkg.waitSeq == seq {
 			conInst.txCurPkg.responsed<-true

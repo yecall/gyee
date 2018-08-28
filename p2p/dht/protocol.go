@@ -62,7 +62,7 @@ const (
 	MID_GETPROVIDER_RSP     = 8
 	MID_PING                = 9
 	MID_PONG                = 10
-	MID_UNKNOWN				= -1
+	MID_UNKNOWN				= 0xffffffff
 )
 
 //
@@ -127,7 +127,7 @@ type FindNode struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Target			config.NodeID			// target node identity
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -136,7 +136,7 @@ type Neighbors struct {
 	To				config.Node				// destination node
 	Nodes			[]*config.Node			// neighbor nodes
 	Pcs				[]int					// peer connection status
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -144,7 +144,7 @@ type PutValue struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Values			[]DhtValue				// values
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -152,7 +152,7 @@ type GetValueReq struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Key				DhtKey					// keys requested
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -163,7 +163,7 @@ type GetValueRsp struct {
 	Key				DhtKey					// keys requested
 	Nodes			[]*config.Node			// neighbor nodes
 	Pcs				[]int					// peer connection status
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -172,7 +172,7 @@ type PutProvider struct {
 	To				config.Node				// destination node
 	Provider		*DhtProvider			// providers
 	Pcs				[]int					// prividers connection status
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -180,7 +180,7 @@ type GetProviderReq struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
 	Key				DhtKey					// key wanted
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
@@ -191,21 +191,21 @@ type GetProviderRsp struct {
 	Key				DhtKey					// key
 	Nodes			[]*config.Node			// neighbor nodes
 	Pcs				[]int					// peer connection status
-	Id				uint64					// message identity
+	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }
 
 type Ping struct {
 	From			config.Node				// from whom
 	To				config.Node				// to whom
-	Seq				uint64					// sequence
+	Seq				int64					// sequence
 	Extra			[]byte					// extra info
 }
 
 type Pong struct {
 	From			config.Node				// from whom
 	To				config.Node				// to whom
-	Seq				uint64					// sequence
+	Seq				int64					// sequence
 	Extra			[]byte					// extra info
 }
 
@@ -491,7 +491,7 @@ func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtEr
 	fn.From = *dhtMsg.getNode(pbMsg.From)
 	fn.To = *dhtMsg.getNode(pbMsg.To)
 	copy(fn.Target[0:], pbMsg.Target)
-	fn.Id = *pbMsg.Id
+	fn.Id = int64(*pbMsg.Id)
 	fn.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -518,7 +518,7 @@ func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) Dht
 		nbs.Nodes = append(nbs.Nodes, dhtMsg.getNode(n))
 		nbs.Pcs = append(nbs.Pcs, int(*n.ConnType))
 	}
-	nbs.Id = *pbMsg.Id
+	nbs.Id = int64(*pbMsg.Id)
 	nbs.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -550,7 +550,7 @@ func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtEr
 		pv.Values = append(pv.Values, val)
 	}
 
-	pv.Id = *pbMsg.Id
+	pv.Id = int64(*pbMsg.Id)
 	pv.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -578,7 +578,7 @@ func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq)
 	dhtK := DhtKey(k)
 	gvr.Key = dhtK
 
-	gvr.Id = *pbMsg.Id
+	gvr.Id = int64(*pbMsg.Id)
 	gvr.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -609,7 +609,7 @@ func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp)
 	}
 	gvr.Value = &dhtValue
 
-	gvr.Id = *pbMsg.Id
+	gvr.Id = int64(*pbMsg.Id)
 	gvr.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -642,7 +642,7 @@ func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider)
 	}
 	pp.Provider = &dhtP
 
-	pp.Id = *pbMsg.Id
+	pp.Id = int64(*pbMsg.Id)
 	pp.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -699,7 +699,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProvid
 		gpr.Provider.Nodes = append(gpr.Provider.Nodes, dhtMsg.getNode(n))
 	}
 
-	gpr.Id = *pbMsg.Id
+	gpr.Id = int64(*pbMsg.Id)
 	gpr.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -722,7 +722,7 @@ func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 
 	ping.From = *dhtMsg.getNode(pbMsg.From)
 	ping.To = *dhtMsg.getNode(pbMsg.To)
-	ping.Seq = *pbMsg.Seq
+	ping.Seq = int64(*pbMsg.Seq)
 	ping.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -745,7 +745,7 @@ func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 
 	pong.From = *dhtMsg.getNode(pbMsg.From)
 	pong.To = *dhtMsg.getNode(pbMsg.To)
-	pong.Seq = *pbMsg.Seq
+	pong.Seq = int64(*pbMsg.Seq)
 	pong.Extra = pbMsg.Extra
 
 	dhtMsg.reset()
@@ -917,7 +917,7 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbPv.Id = new(uint64)
-	*pbPv.Id = pv.Id
+	*pbPv.Id = uint64(pv.Id)
 	pbPv.Extra = pv.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -954,7 +954,7 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbGvr.Key = dhtMsg.GetValueReq.Key
 
 	pbGvr.Id = new(uint64)
-	*pbGvr.Id = dhtMsg.GetValueReq.Id
+	*pbGvr.Id = uint64(dhtMsg.GetValueReq.Id)
 	pbGvr.Extra = dhtMsg.GetProviderReq.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -997,7 +997,7 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbGvr.Value = pbV
 
 	pbGvr.Id = new(uint64)
-	*pbGvr.Id = dhtMsg.GetValueRsp.Id
+	*pbGvr.Id = uint64(dhtMsg.GetValueRsp.Id)
 	pbGvr.Extra = dhtMsg.GetValueRsp.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -1041,7 +1041,7 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbPP.Id = new(uint64)
-	*pbPP.Id = dhtMsg.PutProvider.Id
+	*pbPP.Id = uint64(dhtMsg.PutProvider.Id)
 	pbPP.Extra = dhtMsg.PutProvider.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -1077,7 +1077,7 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbGpr.To = dhtMsg.setNode(&dhtMsg.GetProviderReq.To, pb.DhtMessage_CONT_YES)
 	pbGpr.Key = dhtMsg.GetProviderReq.Key
 	pbGpr.Id = new(uint64)
-	*pbGpr.Id = dhtMsg.GetProviderReq.Id
+	*pbGpr.Id = uint64(dhtMsg.GetProviderReq.Id)
 	pbGpr.Extra = dhtMsg.GetProviderReq.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -1121,7 +1121,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbGpr.Id = new(uint64)
-	*pbGpr.Id = dhtMsg.GetProviderRsp.Id
+	*pbGpr.Id = uint64(dhtMsg.GetProviderRsp.Id)
 	pbGpr.Extra = dhtMsg.GetProviderRsp.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -1156,7 +1156,7 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbPing.From = dhtMsg.setNode(&dhtMsg.Ping.From, pb.DhtMessage_CONT_YES)
 	pbPing.To = dhtMsg.setNode(&dhtMsg.Ping.To, pb.DhtMessage_CONT_YES)
 	pbPing.Seq = new(uint64)
-	*pbPing.Seq = dhtMsg.Ping.Seq
+	*pbPing.Seq = uint64(dhtMsg.Ping.Seq)
 	pbPing.Extra = dhtMsg.Ping.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -1191,7 +1191,7 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbPong.From = dhtMsg.setNode(&dhtMsg.Pong.From, pb.DhtMessage_CONT_YES)
 	pbPong.To = dhtMsg.setNode(&dhtMsg.Pong.To, pb.DhtMessage_CONT_YES)
 	pbPong.Seq = new(uint64)
-	*pbPong.Seq = dhtMsg.Pong.Seq
+	*pbPong.Seq = uint64(dhtMsg.Pong.Seq)
 	pbPong.Extra = dhtMsg.Pong.Extra
 
 	pl, err := pbMsg.Marshal()

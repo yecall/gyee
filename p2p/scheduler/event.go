@@ -394,7 +394,7 @@ type MsgDhtConMgrSendReq struct {
 	Task	interface{}				// pointer to task node
 	WaitRsp	bool					// wait response from peer
 	WaitMid	int						// wait message identity
-	WaitSeq uint64					// wait message sequence number
+	WaitSeq int64					// wait message sequence number
 	Peer	*config.Node			// peer data sent to
 	Data	interface{}				// data to be sent
 }
@@ -460,7 +460,7 @@ type MsgDhtConInstTxDataReq struct {
 	Task	interface{}				// owner task node pointer
 	WaitRsp	bool					// wait response from peer
 	WaitMid	int						// wait message identity
-	WaitSeq uint64					// wait message sequence number
+	WaitSeq int64					// wait message sequence number
 	Payload	interface{}				// payload
 }
 
@@ -528,7 +528,7 @@ type MsgDhtQryMgrQueryStartReq struct {
 	Target	config.NodeID			// target node identity or key
 	Msg		interface{}				// original request which results this query
 	ForWhat	int						// find-node; get-provider; get-value; put-value; ...
-	Seq		uint64					// sequence number
+	Seq		int64					// sequence number
 }
 
 //

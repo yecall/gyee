@@ -332,7 +332,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				if tx.WaitRsp == true {
 					pkg.responsed = make(chan bool, 1)
 					pkg.waitMid = tx.WaitMid
-					pkg.waitSeq = tx.WaitSeq
+					pkg.waitSeq = int64(tx.WaitSeq)
 				}
 
 				ci.txPutPending(&pkg)
@@ -537,7 +537,7 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		if msg.WaitRsp == true {
 			pkg.responsed = make(chan bool, 1)
 			pkg.waitMid = msg.WaitMid
-			pkg.waitSeq = msg.WaitSeq
+			pkg.waitSeq = int64(msg.WaitSeq)
 		}
 
 		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
