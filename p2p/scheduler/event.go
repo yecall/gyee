@@ -279,6 +279,7 @@ const (
 	EvDhtMgrPutValueRsp		= EvDhtMgrBase + 8
 	EvDhtMgrGetValueReq		= EvDhtMgrBase + 9
 	EvDhtMgrGetValueRsp		= EvDhtMgrBase + 10
+	EvDhtMgrQueryStopReq	= EvDhtMgrBase + 11
 )
 
 //
@@ -366,7 +367,7 @@ const (
 	EvDhtConMgrConnectReq	= EvDhtConMgrBase + 1
 	EvDhtConMgrConnectRsp	= EvDhtConMgrBase + 2
 	EvDhtConMgrSendReq		= EvDhtConMgrBase + 3
-	EvDhtConMgrSendRsp		= EvDhtConMgrBase + 4
+	EvDhtConMgrSendCfm		= EvDhtConMgrBase + 4
 	EvDhtConMgrCloseReq		= EvDhtConMgrBase + 5
 	EvDhtConMgrCloseRsp		= EvDhtConMgrBase + 6
 )
@@ -395,7 +396,7 @@ type MsgDhtConMgrSendReq struct {
 	WaitRsp	bool					// wait response from peer
 	WaitMid	int						// wait message identity
 	WaitSeq int64					// wait message sequence number
-	Peer	*config.Node			// peer data sent to
+	Peer	*config.Node			// peer where data sent to
 	Data	interface{}				// data to be sent
 }
 
@@ -715,16 +716,16 @@ type MsgDhtRutMgrStopNofiyReq struct {
 // EvDhtRutPingInd
 //
 type MsgDhtRutPingInd struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
+	ConInst		interface{}			// connection instance who sent this meeage
+	Msg			interface{}			// the message pointer
 }
 
 //
 // EvDhtRutPongInd
 //
 type MsgDhtRutPongInd struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
+	ConInst		interface{}			// connection instance who sent this meeage
+	Msg			interface{}			// the message pointer
 }
 
 //
@@ -737,7 +738,7 @@ const (
 	EvDhtPrdMgrAddProviderReq	= EvDhtPrdMgrBase + 1
 	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
 	EvDhtPrdMgrPutProviderReq	= EvDhtPrdMgrBase + 3
-	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 5
+	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 4
 )
 
 //

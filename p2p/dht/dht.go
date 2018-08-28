@@ -109,14 +109,8 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtMgrFindPeerReq:
 		eno = dhtMgr.findPeerReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
 
-	case sch.EvDhtQryMgrQueryStartRsp:
-		eno = dhtMgr.qryMgrQueryStartRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStartRsp))
-
-	case sch.EvDhtQryMgrQueryStopRsp:
-		eno = dhtMgr.qryMgrQueryStopRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStopRsp))
-
-	case sch.EvDhtQryMgrQueryResultInd:
-		eno = dhtMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
+	case sch.EvDhtMgrFindPeerRsp:
+		eno = dhtMgr.findPeerRsp(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
 
 	case sch.EvDhtMgrPutProviderReq:
 		eno = dhtMgr.putProviderReq(msg.Body.(*sch.MsgDhtPrdMgrAddProviderReq))
@@ -141,6 +135,23 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	case sch.EvDhtMgrGetValueRsp:
 		eno = dhtMgr.getValueRsp(msg.Body.(*sch.MsgDhtMgrGetValueRsp))
+
+	case sch.EvDhtQryMgrQueryStartRsp:
+		eno = dhtMgr.qryMgrQueryStartRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStartRsp))
+
+	case sch.EvDhtMgrQueryStopReq:
+		eno = dhtMgr.qryMgrqueryStopReq(msg.Body.(*sch.MsgDhtQryMgrQueryStopReq))
+
+	case sch.EvDhtQryMgrQueryStopRsp:
+		eno = dhtMgr.qryMgrQueryStopRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStopRsp))
+
+	case sch.EvDhtConMgrSendReq:
+		eno = dhtMgr.conMgrSendReq(msg.Body.(*sch.MsgDhtConMgrSendReq))
+
+	case sch.EvDhtConMgrSendCfm:
+
+	case sch.EvDhtConMgrCloseReq:
+		eno = dhtMgr.conMgrCloseReq(msg.Body.(*sch.MsgDhtConMgrCloseReq))
 
 	case sch.EvDhtConMgrCloseRsp:
 		eno = dhtMgr.conMgrCloseRsp(msg.Body.(*sch.MsgDhtConMgrCloseRsp))
@@ -185,13 +196,6 @@ func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch
 // qryMgr query stop response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
-	return sch.SchEnoNone
-}
-
-//
-// qryMgr query result indication handler
-//
-func (dhtMgr *DhtMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
