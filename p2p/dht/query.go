@@ -592,8 +592,48 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 
 		log.LogCallerFileLine("instStatusInd: qisDone")
 
-		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4QryInstDoneInd, msg.Target); dhtEno != DhtEnoNone {
+		qcb, exist := qryMgr.qcbTab[msg.Target]
+		if !exist {
+			log.LogCallerFileLine("instStatusInd: qcb not found")
+			return sch.SchEnoNotFound
+		}
+
+		if dhtEno := qryMgr.qryMgrDelIcb(delQcb4QryInstDoneInd, &msg.Target, &msg.Peer); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instStatusInd: qryMgrDelIcb failed, eno: %d", dhtEno)
 			return sch.SchEnoUserTask
+		}
+
+		//
+		// try to activate more
+		//
+
+		qryMgr.qryMgrQcbPutActived(qcb)
+
+		//
+		// check against abnormal cases
+		//
+
+		if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
+			log.LogCallerFileLine("instStatusInd: internal errors")
+			return sch.SchEnoUserTask
+		}
+
+		//
+		// if pending queue and actived queue all are empty, we just report query
+		// result and end the query.
+		//
+
+		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+
+			if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+				log.LogCallerFileLine("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+				return sch.SchEnoUserTask
+			}
+
+			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
+				log.LogCallerFileLine("instStatusInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+				return sch.SchEnoUserTask
+			}
 		}
 
 	default:
@@ -609,12 +649,9 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 //
 func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
 
-	//
-	// notice: DHT messages "neighbors", "get provider response", "get value response" would be
-	// indicated here in the "msg", see connection instance (conInst) module for details pls.
-	//
-
-	if msg.ForWhat != sch.EvDhtConInstNeighbors &&
+	if msg.ForWhat != sch.EvDhtMgrPutValueRsp &&
+		msg.ForWhat == sch.EvDhtMgrPutProviderReq &&
+		msg.ForWhat != sch.EvDhtConInstNeighbors &&
 		msg.ForWhat != sch.EvDhtConInstGetProviderRsp &&
 		msg.ForWhat != sch.EvDhtConInstGetValRsp {
 		log.LogCallerFileLine("instResultInd: mismatched, it's %d", msg.ForWhat)
@@ -699,13 +736,17 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	// check if target found: if true, query should be ended, report the result
 	//
 
-	for _, peer := range msg.Peers {
-		if peer.ID == target {
-			qryMgr.qryMgrResultReport(qcb)
-			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
-				return sch.SchEnoUserTask
+	if msg.ForWhat == sch.EvDhtConInstNeighbors &&
+		msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
+		msg.ForWhat == sch.EvDhtConInstGetValRsp {
+		for _, peer := range msg.Peers {
+			if peer.ID == target {
+				qryMgr.qryMgrResultReport(qcb)
+				if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
+					return sch.SchEnoUserTask
+				}
+				return sch.SchEnoNone
 			}
-			return sch.SchEnoNone
 		}
 	}
 
@@ -713,6 +754,11 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	// put peers reported in the message into query control block pending queue,
 	// and try to active more query instances after that.
 	//
+
+	if eno := qryMgr.qryMgrDelIcb(delQcb4QryInstResultInd, &msg.Target, &msg.From.ID); eno != DhtEnoNone {
+		log.LogCallerFileLine("instResultInd: qryMgrDelIcb failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
 
 	for idx, peer := range msg.Peers {
 		var qpi = qryPendingInfo {
@@ -852,6 +898,7 @@ const (
 	delQcb4NoSeeds					// no seeds for query
 	delQcb4TargetInLocal			// target found in local
 	delQcb4QryInstDoneInd			// query instance done is indicated
+	delQcb4QryInstResultInd			// query instance result indicated
 	delQcb4InteralErrors			// internal errors while tring to query
 )
 
@@ -941,6 +988,38 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
 	}
 
 	delete(qryMgr.qcbTab, target)
+
+	return DhtEnoNone
+}
+
+//
+// Delete query instance control block
+//
+func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.NodeID, peer *config.NodeID) DhtErrno {
+
+	if why != delQcb4QryInstDoneInd && why != delQcb4QryInstResultInd {
+		log.LogCallerFileLine("qryMgrDelIcb: why delete?! why: %d", why)
+		return DhtEnoMismatched
+	}
+
+	qcb, ok := qryMgr.qcbTab[*target]
+	if !ok {
+		log.LogCallerFileLine("qryMgrDelIcb: target not found: %x", target)
+		return DhtEnoNotFound
+	}
+
+	icb, ok := qcb.qryActived[*peer]
+	if !ok {
+		log.LogCallerFileLine("qryMgrDelIcb: target not found: %x", target)
+		return DhtEnoNotFound
+	}
+
+	if why == delQcb4QryInstResultInd {
+		po := sch.SchMessage{}
+		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
+		icb.sdl.SchSendMessage(&po)
+	}
+	delete(qcb.qryActived, *peer)
 
 	return DhtEnoNone
 }

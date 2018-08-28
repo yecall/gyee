@@ -402,7 +402,9 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	// send query to peer since connection is ok here now
 	//
 
-	if eno, pkg := qryInst.setupQryPkg(); eno != DhtEnoNone {
+	eno, pkg := qryInst.setupQryPkg()
+
+	if eno != DhtEnoNone {
 
 		log.LogCallerFileLine("connectRsp: setupQryPkg failed, eno: %d", eno)
 
@@ -415,32 +417,66 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 		return sch.SchEnoUserTask
 
+	}
+
+	sendReq.Task = icb.ptnInst
+	sendReq.Peer = &icb.to
+	sendReq.Data = pkg
+
+	var waitMid = map[int]int {
+		MID_FINDNODE:			MID_NEIGHBORS,
+		MID_GETPROVIDER_REQ:	MID_GETPROVIDER_RSP,
+		MID_GETVALUE_REQ:		MID_GETVALUE_RSP,
+	}
+
+	if icb.qryReq.ForWhat == MID_FINDNODE ||
+		icb.qryReq.ForWhat == MID_GETPROVIDER_REQ ||
+		icb.qryReq.ForWhat == MID_GETVALUE_REQ {
+		sendReq.WaitRsp = true
+		sendReq.WaitMid = waitMid[icb.qryReq.ForWhat]
+		sendReq.WaitSeq = icb.qryReq.Seq
 	} else {
+		sendReq.WaitRsp = false
+		sendReq.WaitMid = -1
+		sendReq.WaitSeq = -1
+	}
 
-		sendReq.Task = icb.ptnInst
-		sendReq.Peer = &icb.to
-		sendReq.Data = pkg
+	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
+	sdl.SchSendMessage(&schMsg)
 
-		var waitMid = map[int]int {
-			MID_FINDNODE: MID_NEIGHBORS,
-			MID_GETPROVIDER_REQ: MID_GETPROVIDER_RSP,
-			MID_GETVALUE_REQ: MID_GETVALUE_RSP,
+	//
+	// for "put-value" or "put-provider", we should send indication to query manager
+	// as following, since no responses is expected from peer in this cases.
+	// notice: the dht package might still not be sent at this moment, firstly it will
+	// be put into pending queue of a connection instance.
+	//
+
+	if icb.qryReq.ForWhat == MID_PUTVALUE || icb.qryReq.ForWhat == MID_PUTPROVIDER {
+
+		//
+		// tell result
+		//
+
+		fwMap := map[int] int {
+			MID_PUTVALUE:		sch.EvDhtMgrPutValueReq,
+			MID_PUTPROVIDER:	sch.EvDhtMgrPutProviderReq,
+		}
+		fw := fwMap[icb.qryReq.ForWhat]
+
+		indResult := sch.MsgDhtQryInstResultInd{
+			From:		icb.to,
+			Target:		icb.target,
+			Latency:	icb.conEndTime.Sub(icb.conBegTime),
+			ForWhat:	fw,
+			Peers:		[]*config.Node{&icb.to},
+			Provider:	nil,
+			Value:		nil,
+			Pcs:		[]int{pcsConnYes},
 		}
 
-		if icb.qryReq.ForWhat == MID_FINDNODE ||
-			icb.qryReq.ForWhat == MID_GETPROVIDER_REQ ||
-			icb.qryReq.ForWhat == MID_GETVALUE_REQ {
-			sendReq.WaitRsp = true
-			sendReq.WaitMid = waitMid[icb.qryReq.ForWhat]
-			sendReq.WaitSeq = icb.qryReq.Seq
-		} else {
-			sendReq.WaitRsp = false
-			sendReq.WaitMid = -1
-			sendReq.WaitSeq = -1
-		}
-
-		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
-		sdl.SchSendMessage(&schMsg)
+		schMsg := sch.SchMessage{}
+		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
+		return sdl.SchSendMessage(&schMsg)
 	}
 
 	//
@@ -466,11 +502,10 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		Extra:	qryInst,
 	}
 
-	eno, tid := sdl.SchSetTimer(icb.ptnInst, &td)
-
-	if eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
+	schEno, tid := sdl.SchSetTimer(icb.ptnInst, &td)
+	if schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 		log.LogCallerFileLine("connectRsp: SchSetTimer failed, eno: %d, tid: %d", eno, tid)
-		return eno
+		return schEno
 	}
 
 	icb.qTid = tid

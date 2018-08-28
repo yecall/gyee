@@ -383,8 +383,8 @@ type MsgDhtConMgrConnectReq struct {
 // EvDhtConMgrConnectRsp
 //
 type MsgDhtConMgrConnectRsp struct {
-	Peer	*config.Node			// peer to be connected
 	Eno		int						// result code
+	Peer	*config.Node			// peer to be connected
 }
 
 //
@@ -616,7 +616,6 @@ type MsgDhtQryInstResultInd struct {
 	Provider	*Provider			// providers for get-provider
 	Value		[]byte				// value for get-value
 	Pcs			[]int				// peer connection status, see dht.conMgrPeerConnStat pls
-
 }
 
 //
