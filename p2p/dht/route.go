@@ -690,7 +690,7 @@ func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
 			if d < ds[el.Value.(int)] {
 				li.InsertBefore(i, el)
 				inserted = true
-				break;
+				break
 			}
 		}
 		if !inserted {

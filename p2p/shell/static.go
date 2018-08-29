@@ -242,7 +242,7 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 
 		if tasks == 0 {
 			log.LogCallerFileLine("P2pStop: p2pInst: %s, all tasks are done", p2pInstName)
-			break;
+			break
 		}
 
 		log.LogCallerFileLine("P2pStop: " +

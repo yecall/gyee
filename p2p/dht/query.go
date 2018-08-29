@@ -1167,7 +1167,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 				eno, ptn)
 
 			dhtEno = DhtEnoScheduler
-			break;
+			break
 		}
 		icb.ptnInst = ptn
 
