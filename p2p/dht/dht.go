@@ -21,6 +21,7 @@
 package dht
 
 import (
+	"sync"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
@@ -58,10 +59,24 @@ const (
 // Dht manager control block
 //
 type DhtMgr struct {
-	name	string				// my name
-	tep		sch.SchUserTaskEp	// task entry
-	ptnMe	interface{}			// pointer to task node of myself
+	sdl			*sch.Scheduler		// pointer to scheduler
+	name		string				// my name
+	tep			sch.SchUserTaskEp	// task entry
+	ptnMe		interface{}			// pointer to task node of myself
+	ptnQryMgr	interface{}			// pointer to task node of query manager
+	ptnConMgr	interface{}			// pointer to task node of connection manager
+	ptnRutMgr	interface{}			// pointer to task node of route manager
+	ptnPrdMgr	interface{}			// pointer to task node of provider manager
+	ptnDsMgr	interface{}			// pointer to task node of data store manager
+	cbLock		sync.Mutex			// lock for callback to be installed/removed
+	cbf			DhtCallback			// callback entry
+
 }
+
+//
+// Callback type
+//
+type DhtCallback func(mid int, msg interface{})int
 
 //
 // Create DHT manager
@@ -69,9 +84,16 @@ type DhtMgr struct {
 func NewDhtMgr() *DhtMgr {
 
 	dhtMgr := DhtMgr{
-		name:	DhtMgrName,
-		tep:	nil,
-		ptnMe:	nil,
+		sdl:		nil,
+		name:		DhtMgrName,
+		tep:		nil,
+		ptnMe:		nil,
+		ptnQryMgr:	nil,
+		ptnConMgr:	nil,
+		ptnRutMgr:	nil,
+		ptnPrdMgr:	nil,
+		ptnDsMgr:	nil,
+		cbf:		nil,
 	}
 
 	dhtMgr.tep = dhtMgr.dhtMgrProc
@@ -169,6 +191,26 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 // power on handler
 //
 func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
+
+	sdl := sch.SchGetScheduler(ptn)
+	dhtMgr.sdl = sdl
+
+	dhtMgr.ptnMe = ptn
+	_, dhtMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
+	_, dhtMgr.ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName)
+	_, dhtMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
+	_, dhtMgr.ptnPrdMgr = sdl.SchGetTaskNodeByName(PrdMgrName)
+	_, dhtMgr.ptnDsMgr = sdl.SchGetTaskNodeByName(DsMgrName)
+
+	if dhtMgr.ptnQryMgr == nil ||
+		dhtMgr.ptnConMgr == nil ||
+		dhtMgr.ptnRutMgr == nil ||
+		dhtMgr.ptnPrdMgr == nil ||
+		dhtMgr.ptnDsMgr == nil {
+		log.LogCallerFileLine("poweron: nil task pointers")
+		return sch.SchEnoInternal
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -176,20 +218,29 @@ func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
 // power off handler
 //
 func (dhtMgr *DhtMgr)poweroff(ptn interface{}) sch.SchErrno {
-	return sch.SchEnoNone
+	log.LogCallerFileLine("poweroff: task will be done ...")
+	return dhtMgr.sdl.SchTaskDone(dhtMgr.ptnMe, sch.SchEnoKilled)
 }
 
 //
 // find peer request handler
 //
 func (dhtMgr *DhtMgr)findPeerReq(msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
-	return sch.SchEnoNone
+	if msg.ForWhat != MID_FINDNODE {
+		log.LogCallerFileLine("findPeerReq: unknown what's for: %d", msg.ForWhat)
+		return sch.SchEnoParameter
+	}
+	return dhtMgr.dispMsg(dhtMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, msg)
 }
 
 //
 // find peer response handler
 //
 func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtMgrFindPeerRsp, msg)
+		log.LogCallerFileLine("qryMgrQueryStartRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -197,6 +248,10 @@ func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErr
 // qryMgr query start response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtQryMgrQueryStartRsp, msg)
+		log.LogCallerFileLine("qryMgrQueryStartRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -204,13 +259,17 @@ func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch
 // qryMgr query stop request handler
 //
 func (dhtMgr *DhtMgr)qryMgrqueryStopReq(msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStopReq, msg)
 }
 
 //
 // qryMgr query stop response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtQryMgrQueryStopRsp, msg)
+		log.LogCallerFileLine("qryMgrQueryStopRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -218,13 +277,17 @@ func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.S
 // conMgr send request handler
 //
 func (dhtMgr *DhtMgr)conMgrSendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnConMgr, sch.EvDhtConMgrSendReq, msg)
 }
 
 //
 // conMgr send confirm handler
 //
 func (dhtMgr *DhtMgr)conMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtConMgrSendCfm, msg)
+		log.LogCallerFileLine("conMgrSendCfm: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -232,13 +295,17 @@ func (dhtMgr *DhtMgr)conMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
 // put provider request handler
 //
 func (dhtMgr *DhtMgr)putProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnPrdMgr, sch.EvDhtPrdMgrAddProviderReq, msg)
 }
 
 //
 // put provider response handler
 //
 func (dhtMgr *DhtMgr)putProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtMgrPutProviderRsp, msg)
+		log.LogCallerFileLine("putProviderRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -246,13 +313,17 @@ func (dhtMgr *DhtMgr)putProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.Sch
 // get provider request handler
 //
 func (dhtMgr *DhtMgr)getProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnPrdMgr, sch.EvDhtMgrGetProviderReq, msg)
 }
 
 //
 // get provider response handler
 //
 func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtMgrGetProviderRsp, msg)
+		log.LogCallerFileLine("getProviderRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -260,13 +331,17 @@ func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErr
 // put value request handler
 //
 func (dhtMgr *DhtMgr)putValueReq(msg *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrPutValueReq, msg)
 }
 
 //
 // put value response handler
 //
 func (dhtMgr *DhtMgr)putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtMgrPutValueRsp, msg)
+		log.LogCallerFileLine("putValueRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -274,13 +349,17 @@ func (dhtMgr *DhtMgr)putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 // get value request handler
 //
 func (dhtMgr *DhtMgr)getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueReq, msg)
 }
 
 //
 // get value response handler
 //
 func (dhtMgr *DhtMgr)getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtMgrGetValueRsp, msg)
+		log.LogCallerFileLine("getValueRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
 }
 
@@ -288,12 +367,48 @@ func (dhtMgr *DhtMgr)getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 // conMgr connection close request handler
 //
 func (dhtMgr *DhtMgr)conMgrCloseReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
-	return sch.SchEnoNone
+	return dhtMgr.dispMsg(dhtMgr.ptnConMgr, sch.EvDhtConMgrCloseReq, msg)
 }
 
 //
 // conMgr connection close response handler
 //
 func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtConMgrCloseRsp, msg)
+		log.LogCallerFileLine("conMgrCloseRsp: callback return: %d", rc)
+	}
 	return sch.SchEnoNone
+}
+
+//
+// install callback
+//
+func (dhtMgr *DhtMgr)InstallCallback(cbf DhtCallback) DhtErrno {
+
+	dhtMgr.cbLock.Lock()
+	defer dhtMgr.cbLock.Unlock()
+
+	if dhtMgr.cbf != nil {
+		log.LogCallerFileLine("DhtInstallCallback: " +
+			"callback is not nil: %p, it will be overlapped",
+			dhtMgr.cbf)
+	}
+
+	dhtMgr.cbf = cbf
+
+	if dhtMgr.cbf == nil {
+		log.LogCallerFileLine("DhtInstallCallback: it's a nil callback, old is removed")
+	}
+
+	return DhtEnoNone
+}
+
+//
+// dispatch message to specific task
+//
+func (dhtMgr *DhtMgr)dispMsg(dstTask interface{}, event int, msg interface{}) sch.SchErrno {
+	schMsg := sch.SchMessage{}
+	dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dstTask, event, msg)
+	return dhtMgr.sdl.SchSendMessage(&schMsg)
 }

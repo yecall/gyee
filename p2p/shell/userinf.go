@@ -92,9 +92,9 @@ const (
 func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno {
 
 	if what != P2pIndCb && what != P2pPkgCb {
+		log.LogCallerFileLine("P2pRegisterCallback: unknown what is: %d", what)
 		return P2pEnoParameter
 	}
-
 
 	if what == P2pIndCb {
 
@@ -180,6 +180,11 @@ func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) 
 // Turn off specific p2p instance
 //
 func P2pPoweroff(p2pInst *sch.Scheduler) P2pErrno {
-	log.LogCallerFileLine("P2pPoweroff: not supported yet")
-	return P2pEnoNotImpl
+
+	if eno := P2pStop(p2pInst); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("P2pPoweroff: P2pStop failed, eno: %d", eno)
+		return P2pEnoScheduler
+	}
+
+	return P2pEnoNone
 }

@@ -49,6 +49,7 @@ type P2pType int
 const (
 	P2P_TYPE_CHAIN	P2pType = 0
 	P2P_TYPE_DHT	P2pType = 1
+	P2P_TYPE_ALL	P2pType = 2
 )
 
 func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {

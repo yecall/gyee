@@ -578,7 +578,6 @@ type MsgDhtQryMgrQueryResultInd struct {
 	Prds	[]*config.Node			// providers
 }
 
-
 //
 // DHT query instance event
 //

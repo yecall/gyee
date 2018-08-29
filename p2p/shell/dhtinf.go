@@ -21,118 +21,45 @@
 
 package shell
 
-
-//
-// DHT errno constants
-//
-const (
-	DHTINF_ENO_NONE		= iota
-	DHTINF_ENO_PARA
-	DHTINF_ENO_UNKNOWN
-	DHTINF_ENO_MAX
+import (
+	log "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+	dht "github.com/yeeco/gyee/p2p/dht"
 )
 
 //
-// DHT errno type
+// get dht manager hosted in a scheduler
 //
-type DhtErrno int
+func DhtGetManager(sdl *sch.Scheduler) *dht.DhtMgr {
+	if sdl == nil {
+		log.LogCallerFileLine("DhtGetManager: nil scheduler pointer")
+		return nil
+	}
+	dhtMgr, ok := sdl.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+	if !ok {
+		log.LogCallerFileLine("DhtGetManager: dht manager task not exist")
+		return nil
+	}
 
-//
-// Command type constants
-//
-const (
-	DHTINF_CMD_NULL			= 0		// null
-	DHTINF_CMD_STORE_REQ	= 1		// request to store a chunk
-	DHTINF_CMD_STORE_CFM	= 2		// confirm to store chunk request
-	DHTINF_CMD_RETRIVE_REQ	= 3		// request to retrive a chunk
-	DHTINF_CMD_RETRIVE_RSP	= 4		// confirm to retrive chunk request
-	DHTINF_CMD_MAX			= 5		// max, just for bound checking
-)
-
-//
-// Command type
-//
-type DhtCommandType	int
-
-//
-// Key
-//
-type DhtinfKey 		[]byte
-
-//
-// Chunk
-//
-type DhtinfChunk	[]byte
-
-//
-// Id
-//
-type DhtinfId		uint64
-
-//
-// Request to store a chunk
-//
-type DhtinfStoreChunkReq struct {
-	Key		DhtinfKey		// key for the chunk data
-	Chunk	DhtinfChunk		// the chunk data
-	Id		DhtinfId		// identity for this request
+	return dhtMgr
 }
 
 //
-// Confirm to sotre a chunk
+// install callback for dht manager
 //
-type DhtinfStoreChunkCfm struct {
-	Key		DhtinfKey		// key for the chunk data
-	Id		DhtinfId		// identity obtained by DhtinfStoreChunkReq.Id
+func DhtInstallCallback(dhtMgr *dht.DhtMgr, cbf dht.DhtCallback) dht.DhtErrno {
+	if dhtMgr == nil {
+		log.LogCallerFileLine("DhtInstallCallback: nil dht manager")
+		return dht.DhtEnoParameter
+	}
+	return dhtMgr.InstallCallback(cbf)
 }
 
 //
-// Request to retrive a chunk
+// uninstall callback for dht manager
 //
-type DhtinfRetriveChunkReq struct {
-	Key		DhtinfKey		// key for chunk wanted
-	Id		DhtinfId		// identity for this request
+func DhtRemoveCallback(dhtMgr *dht.DhtMgr) dht.DhtErrno {
+	return DhtInstallCallback(dhtMgr, nil)
 }
 
-//
-// Confirm to retrive a chunk
-//
-type DhtinfRetriveChunkCfm struct {
-	Key		DhtinfKey		// key for chunk wanted
-	Chunk	DhtinfChunk		// the chunk data
-	Id		DhtinfId		// identity obtained by DhtinfRetriveChunkReq.Id
-}
 
-//
-// Confirm handler interface
-//
-type DhtinfConfirmHandler interface {
-
-	//
-	// determine what "msg" is by "ty": a pointer to DhtinfRetriveChunkCfm
-	// or DhtinfStoreChunkCfm
-	//
-
-	DhtCfmCb(ty DhtCommandType, msg interface{}) interface{}
-}
-
-//
-// Request to store a chunk
-//
-func DhtinfStoreChunk(req *DhtinfStoreChunkReq) DhtErrno {
-	return DHTINF_ENO_NONE
-}
-
-//
-// Request to retrive a chunk
-//
-func DhtinfRetriveChunk(req *DhtinfRetriveChunkReq) DhtErrno {
-	return DHTINF_ENO_NONE
-}
-
-//
-// Register confirm handler
-//
-func DhtinfRegisterConfirmHandler(h DhtinfConfirmHandler) DhtErrno{
-	return DHTINF_ENO_NONE
-}
