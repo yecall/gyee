@@ -654,6 +654,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		msg.ForWhat != sch.EvDhtConInstNeighbors &&
 		msg.ForWhat != sch.EvDhtConInstGetProviderRsp &&
 		msg.ForWhat != sch.EvDhtConInstGetValRsp {
+
 		log.LogCallerFileLine("instResultInd: mismatched, it's %d", msg.ForWhat)
 		return sch.SchEnoMismatched
 	}
@@ -739,12 +740,18 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	if msg.ForWhat == sch.EvDhtConInstNeighbors &&
 		msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
 		msg.ForWhat == sch.EvDhtConInstGetValRsp {
+
 		for _, peer := range msg.Peers {
+
 			if peer.ID == target {
+
 				qryMgr.qryMgrResultReport(qcb)
+
 				if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
+					log.LogCallerFileLine("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
 					return sch.SchEnoUserTask
 				}
+
 				return sch.SchEnoNone
 			}
 		}

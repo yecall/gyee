@@ -270,7 +270,7 @@ type MsgPeCloseReq struct {
 const (
 	EvDhtMgrBase			= 1900
 	EvDhtMgrFindPeerReq		= EvDhtMgrBase + 1
-	EvDhtMgrFindPeerRsp		= EvDhtMgrBase + 2
+	EvDhtMgrFindPeerRsp		= EvDhtQryMgrQueryResultInd
 	EvDhtMgrPutProviderReq	= EvDhtMgrBase + 3
 	EvDhtMgrPutProviderRsp	= EvDhtMgrBase + 4
 	EvDhtMgrGetProviderReq	= EvDhtMgrBase + 5
@@ -396,8 +396,19 @@ type MsgDhtConMgrSendReq struct {
 	WaitRsp	bool					// wait response from peer
 	WaitMid	int						// wait message identity
 	WaitSeq int64					// wait message sequence number
+	NeedCfm	bool					// if confirm needed
+	CfmInfo interface{}				// confirm owner with this
 	Peer	*config.Node			// peer where data sent to
 	Data	interface{}				// data to be sent
+}
+
+//
+// EvDhtConMgrSendCfm
+//
+type MsgDhtConMgrSendCfm struct {
+	Eno		int						// result
+	CfmInfo interface{}				// confirm owner with this
+	Peer	*config.Node			// peer where data sent to
 }
 
 //

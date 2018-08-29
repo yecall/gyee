@@ -149,6 +149,7 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = dhtMgr.conMgrSendReq(msg.Body.(*sch.MsgDhtConMgrSendReq))
 
 	case sch.EvDhtConMgrSendCfm:
+		eno = dhtMgr.conMgrSendCfm(msg.Body.(*sch.MsgDhtConMgrSendCfm))
 
 	case sch.EvDhtConMgrCloseReq:
 		eno = dhtMgr.conMgrCloseReq(msg.Body.(*sch.MsgDhtConMgrCloseReq))
@@ -186,6 +187,13 @@ func (dhtMgr *DhtMgr)findPeerReq(msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrn
 }
 
 //
+// find peer response handler
+//
+func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
 // qryMgr query start response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
@@ -193,9 +201,30 @@ func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch
 }
 
 //
+// qryMgr query stop request handler
+//
+func (dhtMgr *DhtMgr)qryMgrqueryStopReq(msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
 // qryMgr query stop response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// conMgr send request handler
+//
+func (dhtMgr *DhtMgr)conMgrSendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// conMgr send confirm handler
+//
+func (dhtMgr *DhtMgr)conMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
@@ -252,6 +281,13 @@ func (dhtMgr *DhtMgr)getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 // get value response handler
 //
 func (dhtMgr *DhtMgr)getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// conMgr connection close request handler
+//
+func (dhtMgr *DhtMgr)conMgrCloseReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
