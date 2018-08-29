@@ -40,6 +40,8 @@ var rawSchTsk = schTaskNode {
 	next: nil,
 }
 
+var RawSchTask = rawSchTsk
+
 //
 // Default task node for scheduler to send timer event
 //

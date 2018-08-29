@@ -59,7 +59,21 @@ func DhtInstallCallback(dhtMgr *dht.DhtMgr, cbf dht.DhtCallback) dht.DhtErrno {
 // uninstall callback for dht manager
 //
 func DhtRemoveCallback(dhtMgr *dht.DhtMgr) dht.DhtErrno {
+	if dhtMgr == nil {
+		log.LogCallerFileLine("DhtRemoveCallback: nil dht manager")
+		return dht.DhtEnoParameter
+	}
 	return DhtInstallCallback(dhtMgr, nil)
 }
 
+//
+// execute dht command
+//
+func DhtCommand(dhtMgr *dht.DhtMgr, cmd int, msg interface{}) sch.SchErrno {
+	if dhtMgr == nil {
+		log.LogCallerFileLine("DhtCommand: nil dht manager")
+		return sch.SchEnoParameter
+	}
+	return dhtMgr.DhtCommand(cmd, msg)
+}
 

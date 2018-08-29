@@ -958,7 +958,6 @@ func (rutMgr *RutMgr)rutMgrNearest(target *config.NodeID, size int) (DhtErrno, [
 				}
 			}
 		}
-
 		return count
 	}
 

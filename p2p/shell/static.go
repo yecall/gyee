@@ -140,40 +140,42 @@ func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
 	case P2P_TYPE_DHT:
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Dht)
 	default:
-		eno = sch.SchEnoParameter
+		log.LogCallerFileLine("P2pStart: not supported type: %d", what)
+		return sch.SchEnoParameter
 	}
 
 	if eno != sch.SchEnoNone {
+		log.LogCallerFileLine("P2pStart: failed, eno: %d", eno)
 		return eno
 	}
 
 	//
-	// Check peer manager init result, would be blocked until its init
+	// Check peer manager init result, would be blocked until its initialization
 	// procedure ended.
 	//
 
-	var pmEno peer.PeMgrErrno
+	if what == P2P_TYPE_CHAIN {
 
-	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
-	pmEno = peMgr.PeMgrInited()
+		var pmEno peer.PeMgrErrno
 
-	if pmEno != peer.PeMgrEnoNone {
-		return sch.SchEnoUserTask
-	}
+		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+		pmEno = peMgr.PeMgrInited()
 
-	//
-	// Startup peer manager
-	//
+		if pmEno != peer.PeMgrEnoNone {
+			log.LogCallerFileLine("P2pStart: pmEno: %d", pmEno)
+			return sch.SchEnoUserTask
+		}
 
-	pmEno = peMgr.PeMgrStart()
+		//
+		// start peer manager
+		//
 
-	if pmEno != peer.PeMgrEnoNone {
+		pmEno = peMgr.PeMgrStart()
 
-		log.LogCallerFileLine("P2pStart: " +
-			"PeMgrStart failed, eno: %d",
-			pmEno)
-
-		return sch.SchEnoUserTask
+		if pmEno != peer.PeMgrEnoNone {
+			log.LogCallerFileLine("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
+			return sch.SchEnoUserTask
+		}
 	}
 
 	return sch.SchEnoNone

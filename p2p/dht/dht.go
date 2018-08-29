@@ -412,3 +412,13 @@ func (dhtMgr *DhtMgr)dispMsg(dstTask interface{}, event int, msg interface{}) sc
 	dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dstTask, event, msg)
 	return dhtMgr.sdl.SchSendMessage(&schMsg)
 }
+
+//
+// dht command
+//
+func (dhtMgr *DhtMgr)DhtCommand(cmd int, msg interface{}) sch.SchErrno {
+	schMsg := sch.SchMessage{}
+	dhtMgr.sdl.SchMakeMessage(&schMsg, &sch.RawSchTask, dhtMgr.ptnMe, cmd, msg)
+	return dhtMgr.sdl.SchSendMessage(&schMsg)
+}
+
