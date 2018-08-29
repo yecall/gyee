@@ -714,6 +714,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.p2pkgLock	= sync.Mutex{}
 	peInst.p2pkgRx		= nil
 	peInst.p2pkgTx		= make([]*P2pPackage, 0, PeInstMaxP2packages)
+	peInst.txPendSig	= make(chan interface{}, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
 	peInst.txExit		= make(chan PeMgrErrno)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
@@ -1557,6 +1558,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.p2pkgLock	= sync.Mutex{}
 	peInst.p2pkgRx		= nil
 	peInst.p2pkgTx		= make([]*P2pPackage, 0, PeInstMaxP2packages)
+	peInst.txPendSig	= make(chan interface{}, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
 	peInst.txExit		= make(chan PeMgrErrno)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
@@ -1866,6 +1868,7 @@ type peerInstance struct {
 	p2pkgLock	sync.Mutex					// lock for p2p package tx-sync
 	p2pkgRx		P2pPkgCallback				// incoming p2p package callback
 	p2pkgTx		[]*P2pPackage				// outcoming p2p packages
+	txPendSig	chan interface{}			// tx pending signal
 	txDone		chan PeMgrErrno				// TX chan
 	txExit		chan PeMgrErrno				// TX had been done
 	rxDone		chan PeMgrErrno				// RX chan
@@ -2058,6 +2061,11 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 			<-inst.txExit
 			close(inst.txDone)
 			inst.txDone = nil
+		}
+
+		if inst.txPendSig != nil {
+			close(inst.txPendSig)
+			inst.txPendSig = nil
 		}
 	}
 
@@ -2368,6 +2376,8 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	inst.txDone = nil
 	close(inst.txExit)
 	inst.txExit = nil
+	close(inst.txPendSig)
+	inst.txPendSig = nil
 
 	inst.p2pkgLock.Lock()
 	inst.p2pkgRx = nil
@@ -2926,7 +2936,7 @@ txBreak:
 		}
 
 		//
-		// send user package, lock needed
+		// send user package
 		//
 
 		if inst.txEno != PeMgrEnoNone {
@@ -2934,6 +2944,7 @@ txBreak:
 			continue
 		}
 
+		<-inst.txPendSig
 		inst.p2pkgLock.Lock()
 
 		if len(inst.p2pkgTx) > 0 {

@@ -159,7 +159,7 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	default:
 		eno = sch.SchEnoParameter
-		log.LogCallerFileLine("")
+		log.LogCallerFileLine("dhtMgrProc: invalid event, id: %d", msg.Id)
 	}
 
 	return eno

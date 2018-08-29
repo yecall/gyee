@@ -58,6 +58,7 @@ type ConInst struct {
 	txPending	*list.List				// pending package to be sent
 	txCurPkg	*conInstTxPkg			// current pending for response
 	txLock		sync.Mutex				// tx lock
+	txPendSig	chan interface{}		// tx pendings signal
 	txDone		chan int				// tx-task done signal
 	rxDone		chan int				// rx-task done signal
 }
@@ -121,7 +122,7 @@ type conInstTxPkg struct {
 // Constants related to performance
 //
 const (
-	ciTxPendingQueueSize = 64				// Max tx-pending queue size
+	ciTxPendingQueueSize = 64				// max tx-pending queue size
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 )
@@ -557,12 +558,21 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) DhtErrno {
 // Start tx-task
 //
 func (conInst *ConInst)txTaskStart() DhtErrno {
+
 	if conInst.txDone != nil {
 		log.LogCallerFileLine("txTaskStart: non-nil chan for done")
 		return DhtEnoMismatched
 	}
 	conInst.txDone = make(chan int, 1)
+
+	if conInst.txPendSig != nil {
+		log.LogCallerFileLine("txTaskStart: non-nil chan for txPendSig")
+		return DhtEnoMismatched
+	}
+	conInst.txPendSig = make(chan interface{}, ciTxPendingQueueSize)
+
 	go conInst.txProc()
+
 	return DhtEnoNone
 }
 
@@ -590,6 +600,8 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 		done := <-conInst.txDone
 		close(conInst.txDone)
 		conInst.txDone = nil
+		close(conInst.txPendSig)
+		conInst.txPendSig = nil
 
 		return DhtErrno(done)
 	}
@@ -892,6 +904,16 @@ _txLoop:
 		var pbPkg *pb.DhtPackage = nil
 		var ok bool
 
+		//
+		// fetch pending signal
+		//
+
+		<-conInst.txPendSig
+
+		//
+		// get pending and send it
+		//
+
 		conInst.txLock.Lock()
 		el := conInst.txPending.Front()
 		conInst.txPending.Remove(el)
@@ -920,6 +942,10 @@ _txLoop:
 			errUnderlying = true
 			break _txLoop
 		}
+
+		//
+		// check if peer response needed
+		//
 
 		if txPkg.responsed != nil {
 			conInst.txSetPending(txPkg)
@@ -1137,8 +1163,10 @@ func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 		Msg:		nbs,
 		ForWhat:	sch.EvDhtConInstNeighbors,
 	}
+
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
+
 	return DhtEnoNone
 }
 
@@ -1183,8 +1211,10 @@ func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 		Msg:		gvr,
 		ForWhat:	sch.EvDhtConInstGetValRsp,
 	}
+
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
+
 	return DhtEnoNone
 }
 
@@ -1229,8 +1259,10 @@ func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 		Msg:		gpr,
 		ForWhat:	sch.EvDhtConInstGetProviderRsp,
 	}
+
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
+
 	return DhtEnoNone
 }
 
