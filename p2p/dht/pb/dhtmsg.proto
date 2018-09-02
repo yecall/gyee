@@ -245,9 +245,8 @@ message DhtProviderRecord {
     }
 
     message Provider {
-        required bytes          Key             = 1;    // key
-        repeated Node           Nodes           = 2;    // provider node
-        optional bytes          Extra           = 3;    // extra information, like access control ...
+        required Node           Node            = 1;    // provider node
+        optional bytes          Extra           = 2;    // extra information, like access control ...
     }
 
     required bytes              key             = 1;    // key for what provided
