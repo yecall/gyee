@@ -564,8 +564,18 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 // try get provider from cache
 //
 func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
+
 	prdMgr.lockCache.Lock()
 	defer prdMgr.lockCache.Unlock()
+
+	if key == nil {
+		return nil
+	}
+
+	if val, ok := prdMgr.prdCache.Get(key); ok {
+		return val.(*PrdSet)
+	}
+
 	return nil
 }
 
@@ -573,18 +583,35 @@ func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
 // try get provider form data store
 //
 func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
+
 	prdMgr.lockStore.Lock()
 	defer prdMgr.lockStore.Unlock()
-	return nil
+
+	if key == nil {
+		return nil
+	}
+
+	eno, val := prdMgr.ds.Get(key)
+	if eno != DhtEnoNone || val == nil {
+		return nil
+	}
+
+	return val.(*PrdSet)
 }
 
 //
 // store a provider
 //
 func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
+
 	prdMgr.lockStore.Lock()
 	defer prdMgr.lockStore.Unlock()
-	return DhtEnoNone
+
+	if key == nil || peerId == nil {
+		return DhtEnoParameter
+	}
+
+	return prdMgr.ds.Put(key, peerId)
 }
 
 //
