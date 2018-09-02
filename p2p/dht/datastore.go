@@ -530,7 +530,7 @@ func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 
 	ddsr := &DhtDatastoreRecord {
 		Key:	k[0:],
-		Value:	make([]byte, 0),
+		Value:	nil,
 		Extra:	nil,
 	}
 

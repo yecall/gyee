@@ -1242,13 +1242,13 @@ func (dhtDsRec *DhtDatastoreRecord)DecDsRecord(dsr *DsRecord) DhtErrno {
 //
 // Encode provider store (key, provider) record
 //
-func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PrdDsRecord) DhtErrno {
+func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PsRecord) DhtErrno {
 	return DhtErrno(DhtEnoNone)
 }
 
 //
 // Decode provider store (key, provider) record
 //
-func (dhtPsRec *DhtProviderStoreRecord)DecPsRecord(psr *PrdDsRecord) DhtErrno {
+func (dhtPsRec *DhtProviderStoreRecord)DecPsRecord(psr *PsRecord) DhtErrno {
 	return DhtErrno(DhtEnoNone)
 }

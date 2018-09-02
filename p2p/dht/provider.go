@@ -28,6 +28,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	"bytes"
 )
 
 //
@@ -73,7 +74,7 @@ type PrdSet struct {
 //
 // Provider data store record
 //
-type PrdDsRecord struct {
+type PsRecord struct {
 	Key		DsKey				// provider record key
 	Value	DsValue				// provider record value
 }
@@ -619,8 +620,35 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 		return DhtEnoParameter
 	}
 
+	var dpsr = &DhtProviderStoreRecord {
+		Key:		key[0:],
+		Providers:	nil,
+		Extra:		nil,
+	}
 
-	return prdMgr.ds.Put(key, peerId)
+	if eno, val := prdMgr.ds.Get(key); eno == DhtEnoNone && val != nil {
+		psr := val.(*PsRecord)
+		if eno := dpsr.DecPsRecord(psr); eno != DhtEnoNone {
+			log.LogCallerFileLine("store: DecPsRecord failed, eno: %d", eno)
+			return eno
+		}
+	}
+
+	for _, prd := range dpsr.Providers {
+		if bytes.Equal(prd.ID[0:], peerId.ID[0:]) {
+			log.LogCallerFileLine("store: duplicated provider")
+			return DhtEnoNone
+		}
+	}
+
+	var psr = PsRecord{}
+	dpsr.Providers = append(dpsr.Providers, peerId)
+	if eno := dpsr.EncPsRecord(&psr); eno != DhtEnoNone {
+		log.LogCallerFileLine("store: EncPsRecord failed, eno: %d", eno)
+		return eno
+	}
+
+	return prdMgr.ds.Put(key, psr.Value)
 }
 
 //
@@ -661,7 +689,9 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 		prdMgr.lockCache.Lock()
 		defer prdMgr.lockCache.Unlock()
 
-		prdSet.append(prd, time.Now())
+		if _, dup := prdSet.set[config.NodeID(*k)]; !dup {
+			prdSet.append(prd, time.Now())
+		}
 
 	} else {
 
