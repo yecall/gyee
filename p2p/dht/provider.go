@@ -71,6 +71,14 @@ type PrdSet struct {
 }
 
 //
+// Provider data store record
+//
+type PrdDsRecord struct {
+	Key		DsKey				// provider record key
+	Value	DsValue				// provider record value
+}
+
+//
 // Create provider manager
 //
 func NewPrdMgr() *PrdMgr {
@@ -610,6 +618,7 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 	if key == nil || peerId == nil {
 		return DhtEnoParameter
 	}
+
 
 	return prdMgr.ds.Put(key, peerId)
 }

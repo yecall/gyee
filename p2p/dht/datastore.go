@@ -80,6 +80,14 @@ type Datastore interface {
 }
 
 //
+// Data store record
+//
+type DsRecord struct {
+	Key		DsKey				// record key
+	Value	DsValue				// record value
+}
+
+//
 // Data store based on "map" in memory, for test only
 //
 type MapDatastore struct {
@@ -509,18 +517,49 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 // get value from store by key
 //
 func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
+
 	eno, val := dsMgr.ds.Get(k)
 	if eno != DhtEnoNone {
 		return  nil
 	}
-	return  val.([]byte)
+
+	dsr := DsRecord {
+		Key:	*k,
+		Value:	val,
+	}
+
+	ddsr := &DhtDatastoreRecord {
+		Key:	k[0:],
+		Value:	make([]byte, 0),
+		Extra:	nil,
+	}
+
+	if eno := ddsr.DecDsRecord(&dsr); eno != DhtEnoNone {
+		log.LogCallerFileLine("fromStore: DecDsRecord failed, eno: %d", eno)
+		return nil
+	}
+
+	return  dsr.Value.([]byte)
 }
 
 //
 // store (key, value) pair to data store
 //
 func (dsMgr *DsMgr)store(k *DsKey, v DsValue) DhtErrno {
-	return dsMgr.ds.Put(k, v)
+
+	ddsr := DhtDatastoreRecord {
+		Key:	k[0:],
+		Value:	v.([]byte),
+		Extra:	nil,
+	}
+
+	dsr := new(DsRecord)
+	if eno := ddsr.EncDsRecord(dsr); eno != DhtEnoNone {
+		log.LogCallerFileLine("store: EncDsRecord failed, eno: %d", eno)
+		return eno
+	}
+
+	return dsMgr.ds.Put(&dsr.Key, dsr.Value)
 }
 
 //

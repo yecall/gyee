@@ -210,6 +210,24 @@ type Pong struct {
 }
 
 //
+// Data store (key, value) record
+//
+type DhtDatastoreRecord struct {
+	Key				[]byte					// key
+	Value			[]byte					// value
+	Extra			[]byte					// extra info
+}
+
+//
+// Provider store (key, provider) record
+//
+type DhtProviderStoreRecord struct {
+	Key				[]byte					// key
+	Providers		[]*config.Node			// providers
+	Extra			[]byte					// extra info
+}
+
+//
 // Extract message from package
 //
 func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
@@ -1205,4 +1223,32 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 	dhtPkg.Payload = pl
 
 	return DhtEnoNone
+}
+
+//
+// Encode data store (key, value) record
+//
+func (dhtDsRec *DhtDatastoreRecord)EncDsRecord(dsr *DsRecord) DhtErrno {
+	return DhtErrno(DhtEnoNone)
+}
+
+//
+// Decode data store (key, value) record
+//
+func (dhtDsRec *DhtDatastoreRecord)DecDsRecord(dsr *DsRecord) DhtErrno {
+	return DhtErrno(DhtEnoNone)
+}
+
+//
+// Encode provider store (key, provider) record
+//
+func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PrdDsRecord) DhtErrno {
+	return DhtErrno(DhtEnoNone)
+}
+
+//
+// Decode provider store (key, provider) record
+//
+func (dhtPsRec *DhtProviderStoreRecord)DecPsRecord(psr *PrdDsRecord) DhtErrno {
+	return DhtErrno(DhtEnoNone)
 }

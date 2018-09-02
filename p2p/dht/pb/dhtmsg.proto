@@ -227,6 +227,7 @@ message DhtMessage {
 message DhtRecord {
     required bytes              key             = 1;    // key
     required bytes              value           = 2;    // value
+    optional bytes              Extra           = 3;    // extra info
 }
 
 //
@@ -234,9 +235,22 @@ message DhtRecord {
 //
 
 message DhtProviderRecord {
-    message Provider {
-        required bytes          provider        = 1;    // one provider
+
+    message Node {
+        required bytes          IP              = 1;    // ip address
+        required uint32         UDP             = 2;    // udp port number
+        required uint32         TCP             = 3;    // tcp port number
+        required bytes          NodeId          = 4;    // node identity
+        optional bytes          Extra           = 5;    // extra information, like access control ...
     }
+
+    message Provider {
+        required bytes          Key             = 1;    // key
+        repeated Node           Nodes           = 2;    // provider node
+        optional bytes          Extra           = 3;    // extra information, like access control ...
+    }
+
     required bytes              key             = 1;    // key for what provided
     repeated Provider           providers       = 2;    // providers
+    optional bytes              Extra           = 3;    // extra information, like access control ...
 }
