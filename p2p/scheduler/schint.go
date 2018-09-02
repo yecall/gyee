@@ -141,6 +141,7 @@ const schTaskNodePoolSize = 1024						// task node pool size, must be (2^n)
 var schTaskNodePool	[schTaskNodePoolSize]schTaskNode	// task node pool
 
 type scheduler struct {
+
 	//
 	// Notice: SYNC-IPC liked mode is not supported now, a task can not send a message to other
 	// and then blocked until the message receiver task ACK it. If the SYNC-IPC is necessary in
@@ -166,6 +167,11 @@ type scheduler struct {
 // static tasks name
 //
 const (
+
+	//
+	// followings are for chain application
+	//
+
 	DcvMgrName			= "DcvMgr"			// disccover manager
 	TabMgrName			= "TabMgr"			// table
 	NgbLsnName			= "NgbLsn"			// udp neighbor listener
@@ -174,6 +180,10 @@ const (
 	PeerLsnMgrName		= "PeerLsnMgr"		// tcp peer listener
 	PeerAccepterName	= "peerAccepter"	// tcp accepter
 	PeerMgrName			= "PeerMgr"			// tcp peer manager
+
+	//
+	// followings are for DHT application
+	//
 
 	DhtMgrName			= "DhtMgr"			// dht manager
 	DhtLsnMgrName		= "DhtLsnMgr"		// dht listner manager
