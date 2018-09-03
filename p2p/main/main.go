@@ -125,7 +125,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase0"
+var tgtCase = "testCase5"
 
 //
 // create test case control block by name

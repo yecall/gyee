@@ -373,7 +373,7 @@ func (lsnMgr *LsnMgr)setupListener() DhtErrno {
 }
 
 //
-// Report current status to connection maanger
+// Report current status to connection manager
 //
 func (lsnMgr *LsnMgr)dispStaus() DhtErrno {
 	msg := sch.SchMessage{}

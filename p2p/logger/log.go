@@ -24,6 +24,7 @@ package logger
 import (
 	"fmt"
 	"runtime"
+	golog "log"
 	logg "github.com/yeeco/gyee/utils/logging"
 )
 
@@ -41,7 +42,7 @@ var (
 
 func init() {
 	Log_DisableAll		= true
-	Log_DisableGoLog	= false
+	Log_DisableGoLog	= true
 	Log_DisableFileLine = true
 	Log_DisableGyeeLog	= true
 }
@@ -57,7 +58,7 @@ func LogCallerFileLine(format string, args ... interface{}) {
 
 	if !Log_DisableGoLog {
 
-		fmt.Printf(format, args...)
+		golog.Printf(format, args...)
 
 		if !Log_DisableFileLine {
 			fmt.Printf("file: %s, line: %d", file, line)

@@ -195,7 +195,7 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 //
 func (lsnMgr *ListenerManager)lsnMgrPoweroff() sch.SchErrno {
 
-	log.LogCallerFileLine("lsnMgrPoweroff: task will be done")
+	log.LogCallerFileLine("lsnMgrPoweroff: task will be done ...")
 
 	//
 	// kill accepter task if needed

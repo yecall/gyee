@@ -2049,11 +2049,12 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 
 	if inst.state == peInstStateActivated {
 
-		if inst.rxDone != nil {
-			inst.rxDone <- PeMgrEnoNone
-			<-inst.rxExit
-			close(inst.rxDone)
-			inst.rxDone = nil
+		inst.p2pkgLock.Lock()
+		inst.p2pkgTx = nil
+		inst.p2pkgLock.Unlock()
+
+		if inst.txPendSig != nil {
+			close(inst.txPendSig)
 		}
 
 		if inst.txDone != nil {
@@ -2061,11 +2062,14 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 			<-inst.txExit
 			close(inst.txDone)
 			inst.txDone = nil
+			inst.txPendSig = nil
 		}
 
-		if inst.txPendSig != nil {
-			close(inst.txPendSig)
-			inst.txPendSig = nil
+		if inst.rxDone != nil {
+			inst.rxDone <- PeMgrEnoNone
+			<-inst.rxExit
+			close(inst.rxDone)
+			inst.rxDone = nil
 		}
 	}
 
@@ -2361,6 +2365,10 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 
 	if inst.state == peInstStateActivated {
 
+		if inst.txPendSig != nil {
+			close(inst.txPendSig)
+		}
+
 		inst.rxDone <- PeMgrEnoNone
 		<-inst.rxExit
 
@@ -2376,7 +2384,7 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	inst.txDone = nil
 	close(inst.txExit)
 	inst.txExit = nil
-	close(inst.txPendSig)
+
 	inst.txPendSig = nil
 
 	inst.p2pkgLock.Lock()
@@ -2936,7 +2944,7 @@ txBreak:
 		}
 
 		//
-		// send user package
+		// if errors, we wait and then continue
 		//
 
 		if inst.txEno != PeMgrEnoNone {
@@ -2944,7 +2952,22 @@ txBreak:
 			continue
 		}
 
-		<-inst.txPendSig
+		//
+		// check if some pending, if the signal closed, we done
+		//
+
+		if _, ok := <-(inst.txPendSig); !ok {
+
+			log.LogCallerFileLine("piTx: done with: %d", done)
+
+			inst.txExit<-done
+			break txBreak
+		}
+
+		//
+		// carry out Tx
+		//
+
 		inst.p2pkgLock.Lock()
 
 		if len(inst.p2pkgTx) > 0 {
@@ -3428,7 +3451,13 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 //
 // Print peer statistics
 //
+const doLogPeerStat  = false
+
 func (peMgr *PeerManager)logPeerStat() {
+
+	if !doLogPeerStat {
+		return
+	}
 
 	var obpNumSum = 0
 	var ibpNumSum = 0

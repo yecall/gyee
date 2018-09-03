@@ -109,8 +109,6 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 //
 func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 
-	var eno SchErrno
-
 	//
 	// check pointer to task node
 	//
@@ -194,9 +192,10 @@ taskLoop:
 
 		if msg.Id == EvSchDone {
 
+			doneInd := msg.Body.(*MsgTaskDone)
 			log.LogCallerFileLine("schCommonTask: " +
 				"done with eno: %d, task: %s",
-				eno, ptn.task.name)
+				doneInd.why, ptn.task.name)
 
 			break taskLoop
 		}
@@ -1216,21 +1215,21 @@ func (sdl *scheduler)schDeleteTask(name string) SchErrno {
 func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	//
-	// failed if in power off stage
-	//
-
-	if sdl.powerOff == true && msg.Id != EvSchPoweroff {
-		log.LogCallerFileLine("schSendMsg: in power off stage")
-		return SchEnoPowerOff
-	}
-
-	//
 	// check the message to be sent
 	//
 
 	if msg == nil {
 		log.LogCallerFileLine("schSendMsg: invalid message")
 		return SchEnoParameter
+	}
+
+	//
+	// failed if in power off stage
+	//
+
+	if sdl.powerOff == true && msg.Id != EvSchPoweroff && msg.Id != EvSchDone {
+		log.LogCallerFileLine("schSendMsg: in power off stage")
+		return SchEnoPowerOff
 	}
 
 	if msg.sender == nil {
