@@ -958,7 +958,7 @@ _txLoop:
 _checkDone:
 
 		select {
-		case done := <-conInst.rxDone:
+		case done := <-conInst.txDone:
 			log.LogCallerFileLine("txProc: done by: %d", done)
 			isDone = true
 			break _txLoop
@@ -1043,7 +1043,7 @@ _rxLoop:
 _checkDone:
 
 		select {
-		case done := <-conInst.txDone:
+		case done := <-conInst.rxDone:
 			isDone = true
 			log.LogCallerFileLine("rxProc: done by: %d", done)
 			break _rxLoop

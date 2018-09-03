@@ -3451,7 +3451,7 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 //
 // Print peer statistics
 //
-const doLogPeerStat  = false
+const doLogPeerStat  = true
 
 func (peMgr *PeerManager)logPeerStat() {
 

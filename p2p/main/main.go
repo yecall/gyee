@@ -125,7 +125,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase5"
+var tgtCase = "testCase4"
 
 //
 // create test case control block by name
@@ -277,9 +277,6 @@ txLoop:
 			tmHandler()
 
 			indCbLock.Unlock()
-
-
-		default:
 		}
 	}
 
@@ -416,7 +413,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 
 		log.LogCallerFileLine("p2pIndProc: " +
 			"inknown indication: %d",
-				what)
+			what)
 	}
 
 	return para
