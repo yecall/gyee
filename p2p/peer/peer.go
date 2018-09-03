@@ -156,6 +156,7 @@ type PeerManager struct {
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
 	nodes			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to instance pointer
 	workers			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to pointer of instance in work
+	wrksLock		sync.Mutex						// sync for "workers"
 	wrkNum			map[SubNetworkID]int			// worker peer number
 	ibpNum			map[SubNetworkID]int			// active inbound peer number
 	obpNum			map[SubNetworkID]int			// active outbound peer number
@@ -3394,6 +3395,8 @@ func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {
 // Get worker instance for peer
 //
 func (peMgr *PeerManager) getWorkerInst(snid SubNetworkID, idEx *PeerIdEx) *peerInstance {
+	peMgr.wrksLock.Lock()
+	defer peMgr.wrksLock.Unlock()
 	return peMgr.workers[snid][*idEx]
 }
 

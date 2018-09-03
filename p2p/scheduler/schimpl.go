@@ -173,6 +173,20 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 			Body:	&doneInd,
 		}
 
+		//
+		// drain possible pending messages
+		//
+
+drainLoop:
+
+		for {
+			select {
+			case <-*queMsg:
+			default:
+				break drainLoop
+			}
+		}
+
 		sdl.schSendMsg(&msg)
 	}()
 
