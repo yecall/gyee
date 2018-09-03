@@ -109,7 +109,7 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 //
 func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 
-	var eno		SchErrno
+	var eno SchErrno
 
 	//
 	// check pointer to task node
@@ -141,10 +141,7 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 	// loop to schedule, until done(or something else happened).
 	//
 	// Notice: if the message queue size of one user task is zero, then this means
-	// the user task would be a longlong loop, which need not to be shceduled by
-	// messages. In this case, we go a routine for the loop first, then we check
-	// the task until it done. mailbox.que would not be nil, see function schCreateTask
-	// for more pls.
+	// the user task would be a longlong loop.
 	//
 
 	if ptn.task.mailbox.size == 0 ||
@@ -157,31 +154,61 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 		go proc(ptn, nil)
 	}
 
+	//
+	// go a routine to check "done" signal
+	//
+
+	go func () {
+
+		why := <-*done
+
+		log.LogCallerFileLine("schCommonTask: done with: %d, task: %s", why, ptn.task.name)
+
+		doneInd := MsgTaskDone {
+			why: why,
+		}
+
+		var msg = schMessage {
+			sender:	&rawSchTsk,
+			recver:	ptn,
+			Id:		EvSchDone,
+			Body:	&doneInd,
+		}
+
+		sdl.schSendMsg(&msg)
+	}()
+
+	//
+	// loop task messages until done
+	//
+
 taskLoop:
 
 	for {
-		select {
 
-		case msg := <-*queMsg:
+		msg := <-*queMsg
 
-			//
-			// call handler, but if in power off stage, we discard all except poweroff
-			//
+		//
+		// handle task "done" in any cases
+		//
 
-			if (sdl.powerOff == false) || (sdl.powerOff == true && msg.Id == EvSchPoweroff) {
+		if msg.Id == EvSchDone {
 
-				proc(ptn, (*SchMessage)(&msg))
+			log.LogCallerFileLine("schCommonTask: " +
+				"done with eno: %d, task: %s",
+				eno, ptn.task.name)
 
-			}
-
-		case eno = <-*done:
-
-			//
-			// done
-			//
-
-			log.LogCallerFileLine("schCommonTask: done with eno: %d, task: %s", eno, ptn.task.name)
 			break taskLoop
+		}
+
+		//
+		// call handler, but if in power off stage, we discard all except poweroff
+		//
+
+		if (sdl.powerOff == false) || (sdl.powerOff == true && msg.Id == EvSchPoweroff) {
+
+			proc(ptn, (*SchMessage)(&msg))
+
 		}
 	}
 
@@ -254,49 +281,84 @@ func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
 	if ptm.tmcb.tmt == schTmTypePeriod {
 
+		tm = time.NewTicker(ptm.tmcb.dur)
+
 		//
-		// period, we loop for ever until killed
+		// go routine to check timer killed
 		//
 
-		tm = time.NewTicker(ptm.tmcb.dur)
+		var to = make(chan int)
+
+		go func() {
+			if stop := <-ptm.tmcb.stop; stop {
+				to<-EvSchDone
+			}
+		}()
+
+		//
+		// go routine to check timeout
+		//
+
+		go func() {
+			for {
+				<-tm.C
+				to<-EvTimerBase
+			}
+		}()
+
+		//
+		// loop for ever until killed
+		//
 
 timerLoop:
 
 		for {
 
-			select {
+			event := <-to
 
-			case <-tm.C:
+
+			//
+			// check if timer killed
+			//
+
+			if event == EvSchDone {
+
+				task.lock.Lock()
+
+				tm.Stop()
+				killed = true
+
+				sdl.lock.Lock()
+				cycTimerClean(ptm)
+				sdl.lock.Unlock()
+
+				break timerLoop
+			}
+
+			//
+			// must be timer expired
+			//
+
+			if event == EvTimerBase {
 
 				task.lock.Lock()
 
 				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone {
 
-					log.LogCallerFileLine("schTimerCommonTask: " +
+					log.LogCallerFileLine("schTimerCommonTask: "+
 						"send timer event failed, eno: %d, task: %s",
 						eno,
 						ptm.tmcb.taskNode.task.name)
 				}
 
-			case stop := <-ptm.tmcb.stop:
-
-				task.lock.Lock()
-
-				if stop == true {
-
-					tm.Stop()
-					killed = true
-
-					sdl.lock.Lock()
-					cycTimerClean(ptm)
-					sdl.lock.Unlock()
-
-					break timerLoop
-				}
+				task.lock.Unlock()
+				continue
 			}
 
-			task.lock.Unlock()
+			log.LogCallerFileLine("schTimerCommonTask: " +
+				"internal errors, event: %d", event)
 		}
+
 	} else if ptm.tmcb.tmt == schTmTypeAbsolute {
 
 		//
@@ -318,25 +380,34 @@ timerLoop:
 		// directly, or we will blocked until timer expired, go a routine instead.
 		//
 
-		var to = make(chan bool)
+		var to = make(chan int)
+
 		go func() {
 			<-time.After(dur)
-			to<-true
+			to<-EvTimerBase
 		}()
+
+		//
+		// go routine to check time killed
+		//
+
+		go func() {
+			if stop := <-ptm.tmcb.stop; stop {
+				to<-EvSchDone
+			}
+		}()
+
+		//
+		// handle timer events
+		//
 
 absTimerLoop:
 
 		for {
 
-			select {
+			event := <-to
 
-			case <-to:
-
-				//
-				// Notice: here we must try to obtain the task first, since function
-				// schRetTimerNode would try to get the lock of the shceduler,
-				// see function schKillTimer for details please.
-				//
+			if event == EvTimerBase {
 
 				task.lock.Lock()
 				sdl.lock.Lock()
@@ -354,22 +425,23 @@ absTimerLoop:
 
 				break absTimerLoop
 
-			case stop := <-ptm.tmcb.stop:
+			} else if event == EvSchDone {
 
 				task.lock.Lock()
 				sdl.lock.Lock()
 
-				if stop == true {
-
-					absTimerClean(ptm)
-					killed = true
-				}
+				absTimerClean(ptm)
+				killed = true
 
 				sdl.lock.Unlock()
 
 				break absTimerLoop
 			}
+
+			log.LogCallerFileLine("schTimerCommonTask: " +
+				"internal errors, event: %d", event)
 		}
+
 	} else {
 
 		//

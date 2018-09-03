@@ -45,7 +45,15 @@ const (
 	EvSchPoweron	= EvSchNull + 1
 	EvSchPoweroff	= EvSchNull + 2
 	EvSchException	= EvSchNull + 3
+	EvSchDone		= EvSchNull + 4
 )
+
+//
+// Message for task done
+//
+type MsgTaskDone struct {
+	why			SchErrno			// why done
+}
 
 //
 // Scheduler internal event
