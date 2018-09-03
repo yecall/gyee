@@ -413,3 +413,18 @@ func (sdl *Scheduler)SchGetP2pCfgName() string {
 func (sdl *Scheduler)SchGetP2pConfig() *config.Config {
 	return sdl.p2pCfg
 }
+
+//
+// Set application type
+//
+func (sdl *Scheduler)SchSetAppType(appType int) SchErrno {
+	sdl.appType = appType
+	return SchEnoNone
+}
+
+//
+// Get application type
+//
+func (sdl *Scheduler)SchGetAppType() int {
+	return sdl.appType
+}

@@ -149,6 +149,7 @@ type scheduler struct {
 	//
 
 	lock				sync.Mutex							// lock to protect the scheduler
+	appType				int									// application type
 	p2pCfg				*config.Config						// p2p network configuration
 	tkFree				*schTaskNode						// free task queue
 	freeSize			int									// number of nodes in free

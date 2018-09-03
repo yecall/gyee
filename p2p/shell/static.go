@@ -135,6 +135,8 @@ func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
 
 	var eno sch.SchErrno
 
+	sdl.SchSetAppType(int(what))
+
 	switch what {
 	case P2P_TYPE_CHAIN:
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Chain)
@@ -194,6 +196,7 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 	// they might be done when they receive the poweron message.
 	//
 
+	sdl.SchSetPoweroffStage()
 	p2pInstName := sdl.SchGetP2pCfgName()
 
 	powerOff := sch.SchMessage {
@@ -201,9 +204,19 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 		Body:	nil,
 	}
 
-	sdl.SchSetPoweroffStage()
+	var staticTasks = []string{}
+	appType := sdl.SchGetAppType()
 
-	for _, taskName := range taskStaticPoweronOrder4Chain {
+	if P2pType(appType) == P2P_TYPE_CHAIN {
+		staticTasks = taskStaticPoweronOrder4Chain
+	} else if P2pType(appType) == P2P_TYPE_DHT {
+		staticTasks = taskStaticPoweronOrder4Dht
+	} else {
+		golog.Printf("P2pStop: p2pInst: %s, invalid application type: %d", p2pInstName, appType)
+		return sch.SchEnoMismatched
+	}
+
+	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
 			golog.Printf("P2pStop: p2pInst: %s, task not exist: %s", p2pInstName, taskName)
