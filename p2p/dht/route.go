@@ -45,6 +45,8 @@ const (
 	rutMgrUpdate4Closed = 1				// update for connection instance closed
 	rutMgrUpdate4Query = 2				// update for query result
 	rutMgrMaxFails2Del = 3				// max fails to be deleted
+	rutMgrEwmaHisSize = 8				// history sample number
+	rutMgrEwmaMF = 0.1					// memorize factor for EWMA filter
 )
 
 //
@@ -56,9 +58,9 @@ type Hash [HashByteLength]byte
 // Latency measurement
 //
 type rutMgrPeerMetric struct {
-	peerId		config.NodeID			// peer identity
-	ltnSamples	[]time.Duration			// latency samples
-	ewma		time.Duration			// exponentially-weighted moving avg
+	peerId		config.NodeID	// peer identity
+	ltnSamples	[]time.Duration	// latency samples
+	ewma		time.Duration	// exponentially-weighted moving avg
 }
 
 //
@@ -482,6 +484,17 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 			rutMgr.rutMgrRmvNotify(bn)
 		}
+	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone {
+
+		//
+		// this case the latency about an specific individual peer shoud be update,
+		// should be only one peer in "req.Seens".
+		//
+
+		for idx, n := range req.Seens {
+			dur := req.Duras[idx]
+			rutMgr.rutMgrMetricSample(n.ID, dur)
+		}
 	}
 
 	return sch.SchEnoNone
@@ -572,7 +585,7 @@ func rutMgrRandomPeerId() config.NodeID {
 }
 
 //
-// Build hash from node identity
+// Build hash from random node identity
 //
 func rutMgrRandomHashPeerId() *Hash {
 	return rutMgrNodeId2Hash(rutMgrRandomPeerId())
@@ -633,15 +646,18 @@ func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration
 	rt := &rutMgr.rutTab
 
 	if m, dup := rt.metricTab[id]; dup {
-		m.ltnSamples = append(m.ltnSamples, latency)
+		len := len(m.ltnSamples)
+		next := (len + 1) & (rutMgrEwmaHisSize - 1)
+		m.ltnSamples[next] = latency
 		return rutMgr.rutMgrMetricUpdate(id)
 	}
 
 	rt.metricTab[id] = &rutMgrPeerMetric {
 		peerId:		id,
-		ltnSamples: []time.Duration{latency},
+		ltnSamples: make([]time.Duration, 0, 8),
 		ewma:		latency,
 	}
+	rt.metricTab[id].ltnSamples[0] = latency
 
 	return DhtEnoNone
 }
@@ -650,6 +666,24 @@ func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration
 // Metric update EWMA about latency
 //
 func (rutMgr *RutMgr) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
+
+	rt := &rutMgr.rutTab
+	m, exist := rt.metricTab[id]
+
+	if !exist {
+		log.LogCallerFileLine("rutMgrMetricUpdate: not found: %x", id)
+		return DhtEnoNotFound
+	}
+
+	sn := len(m.ltnSamples)
+
+	if sn <= 0 {
+		log.LogCallerFileLine("rutMgrMetricUpdate: none of samples")
+		return DhtEnoInternal
+	}
+
+	m.ewma = time.Duration((1.0 - rutMgrEwmaMF) * float64(m.ewma) + rutMgrEwmaMF * float64(m.ltnSamples[sn-1]))
+
 	return DhtEnoNone
 }
 

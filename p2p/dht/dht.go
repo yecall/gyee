@@ -52,6 +52,7 @@ const (
 	DhtEnoSerialization			// serialization errors
 	DhtEnoProtocol				// protocol errors
 	DhtEnoNotSup				// not supported
+	DhtEnoDatastore				// data store errors
 	DhtEnoUnknown				// unknown
 )
 

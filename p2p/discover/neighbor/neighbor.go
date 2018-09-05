@@ -60,7 +60,7 @@ const NgbProcName = "ngbproto"
 //
 // Mailbox size of a ngighbor instance
 //
-const ngbProcMailboxSize = 32
+const ngbProcMailboxSize = 64
 
 //
 // The control block of neighbor task instance

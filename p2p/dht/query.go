@@ -678,34 +678,27 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	//
 	// update route manager in any cases.
 	//
-	// Notice: since we had update the route manager in handshake procedure in connection
-	// manager module, we need not to update again for the peer which we must have connected
-	// to. we keep the statements temply.
-	//
 
-	if false {
+	from := msg.From
+	latency := msg.Latency
 
-		from := msg.From
-		latency := msg.Latency
-
-		updateReq2RutMgr := func(peer *config.Node, dur time.Duration) sch.SchErrno {
-			var schMsg= sch.SchMessage{}
-			var updateReq = sch.MsgDhtRutMgrUpdateReq{
-				Why: rutMgrUpdate4Query,
-				Eno: DhtEnoNone,
-				Seens: []config.Node{
-					*peer,
-				},
-				Duras: []time.Duration{
-					dur,
-				},
-			}
-			qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
-			return qryMgr.sdl.SchSendMessage(&schMsg)
+	updateReq2RutMgr := func(peer *config.Node, dur time.Duration) sch.SchErrno {
+		var schMsg= sch.SchMessage{}
+		var updateReq = sch.MsgDhtRutMgrUpdateReq{
+			Why: rutMgrUpdate4Query,
+			Eno: DhtEnoNone,
+			Seens: []config.Node{
+				*peer,
+			},
+			Duras: []time.Duration{
+				dur,
+			},
 		}
-
-		updateReq2RutMgr(&from, latency)
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
+		return qryMgr.sdl.SchSendMessage(&schMsg)
 	}
+
+	updateReq2RutMgr(&from, latency)
 
 	//
 	// update query result

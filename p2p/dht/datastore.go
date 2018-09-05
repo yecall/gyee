@@ -71,12 +71,6 @@ type Datastore interface {
 	//
 
 	Delete(key *DsKey) DhtErrno
-
-	//
-	// Query (key, value) pairs in data store
-	//
-
-	Query(query DsQuery) (eno DhtErrno, result DsQueryResult)
 }
 
 //
@@ -128,17 +122,6 @@ func (mds *MapDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
 func (mds *MapDatastore)Delete(k *DsKey) DhtErrno {
 	delete(mds.ds, *k)
 	return DhtEnoNone
-}
-
-//
-// Query
-//
-func (mds *MapDatastore)Query(q DsQuery) (eno DhtErrno, result DsQueryResult) {
-	k, ok := q.(*DsKey)
-	if !ok {
-		return DhtEnoMismatched, nil
-	}
-	return mds.Get(k)
 }
 
 //
@@ -321,7 +304,37 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 // local node get-value request handler
 //
 func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	return sch.SchEnoNone
+
+	if len(msg.Key) != DsKeyLength {
+		log.LogCallerFileLine("localGetValueReq: invalid key length")
+		return sch.SchEnoParameter
+	}
+
+	var k DsKey
+	copy(k[0:], msg.Key)
+
+	//
+	// try local data store
+	//
+
+	if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
+		return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
+	}
+
+	//
+	// try to fetch the value from peers
+	//
+
+	qry := sch.MsgDhtQryMgrQueryStartReq {
+		Target:		config.NodeID(k),
+		Msg:		msg,
+		ForWhat:	MID_GETVALUE_REQ,
+		Seq:		time.Now().UnixNano(),
+	}
+
+	schMsg := sch.SchMessage{}
+	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
+	return dsMgr.sdl.SchSendMessage(&schMsg)
 }
 
 //
