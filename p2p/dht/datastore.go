@@ -130,6 +130,11 @@ func (mds *MapDatastore)Delete(k *DsKey) DhtErrno {
 const DsMgrName = sch.DhtDsMgrName
 
 //
+// Memory map store for test flag
+//
+const mapDs4Test = false
+
+//
 // Data store manager
 //
 type DsMgr struct {
@@ -141,6 +146,7 @@ type DsMgr struct {
 	ptnQryMgr	interface{}				// pointer to query manager task node
 	ptnRutMgr	interface{}				// pointer to route manager task node
 	ds			Datastore				// data store
+	fdsCfg		FileDatastoreConfig		// file data store configuration
 }
 
 //
@@ -155,6 +161,7 @@ func NewDsMgr() *DsMgr {
 		ptnDhtMgr:	nil,
 		ptnQryMgr:	nil,
 		ds:			nil,
+		fdsCfg:		nil,
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -244,7 +251,21 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
-	dsMgr.ds = NewMapDatastore()
+	if mapDs4Test == true {
+
+		dsMgr.ds = NewMapDatastore()
+
+	} else {
+
+		fdc := FileDatastoreConfig{}
+		if eno := dsMgr.getFileDatastoreConfig(&fdc); eno != DhtEnoNone {
+			log.LogCallerFileLine("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		dsMgr.ds = NewFileDatastore(&fdc)
+	}
+
 	if dsMgr.ds == nil {
 		log.LogCallerFileLine("poweron: invalid ds")
 		return sch.SchEnoUserTask
@@ -603,3 +624,16 @@ func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchE
 	return dsMgr.sdl.SchSendMessage(&msg)
 }
 
+//
+// get file data store configuration
+//
+func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
+	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
+	dsMgr.fdsCfg = FileDatastoreConfig {
+		path:			cfg.Path,
+		shardFuncName:	cfg.ShardFuncName,
+		padLength:		cfg.PadLength,
+		sync:			cfg.Sync,
+	}
+	return DhtEnoNone
+}

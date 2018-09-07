@@ -61,7 +61,14 @@ type ConInst struct {
 	txPendSig	chan interface{}		// tx pendings signal
 	txDone		chan int				// tx-task done signal
 	rxDone		chan int				// rx-task done signal
+	cbRxLock	sync.Mutex				// lock for data plane callback
+	cbfRxData	ConInstRxDataCallback	// data plane callback entry
 }
+
+//
+// Call back type for rx data of protocols than PID_DHT
+//
+type ConInstRxDataCallback func(pid uint32, msg interface{})int
 
 //
 // Connection instance identity
@@ -146,6 +153,7 @@ func newConInst(postFixed string) *ConInst {
 		txPending:	list.New(),
 		txDone:		nil,
 		rxDone:		nil,
+		cbfRxData:	nil,
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -1025,8 +1033,17 @@ _rxLoop:
 
 		pkg := new(DhtPackage)
 		pkg.FromPbPackage(pbPkg)
+
 		if pb.ProtocolId(pkg.Pid) == PID_EXT {
-			log.LogCallerFileLine("rxProc: PID_EXT is not supported now")
+
+			conInst.cbRxLock.Lock()
+
+			if conInst.cbfRxData != nil {
+				conInst.cbfRxData(pkg.Pid, pkg.Payload)
+			}
+
+			conInst.cbRxLock.Unlock()
+
 			goto _checkDone
 		}
 

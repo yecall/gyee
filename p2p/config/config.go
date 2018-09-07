@@ -182,6 +182,7 @@ type Config struct {
 	DhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
 	DhtQryCfg			Cfg4DhtQryManager		// for dht query manager
 	DhtConCfg			Cfg4DhtConManager		// for dht connection manager
+	DhtFdsCfg			Cfg4DhtFileDatastore	// for dht file data store
 }
 
 //
@@ -305,6 +306,23 @@ type Cfg4DhtConManager struct {
 }
 
 //
+// configuration about dht file data store
+//
+
+const (
+	sfnPrefix		= "prefix"
+	sfnSuffix		= "suffix"
+	sfnNextToLast	= "next-to-last"
+)
+
+type Cfg4DhtFileDatastore struct {
+	Path				string		// data store path
+	ShardFuncName		string		// shard function name
+	PadLength			int			// padding length
+	Sync				bool		// sync file store flag
+}
+
+//
 // Default version string, formated as "M.m0.m1.m2"
 //
 const dftVersion = "0.1.0.0"
@@ -393,6 +411,13 @@ func P2pDefaultConfig() *Config {
 		DhtConCfg: Cfg4DhtConManager {
 			MaxCon:			512,
 			HsTimeout:		time.Second * 16,
+		},
+
+		DhtFdsCfg: Cfg4DhtFileDatastore {
+			Path:			P2pDefaultDataDir(true),
+			ShardFuncName:	sfnNextToLast,
+			PadLength:		2,
+			Sync:			true,
 		},
 	}
 
@@ -961,6 +986,14 @@ func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
 	config[name].DhtQryCfg.Local = &config[name].Local
 	return &config[name].DhtQryCfg
 }
+
+//
+// Get configuration for dht file data store
+//
+func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
+	return &config[name].DhtFdsCfg
+}
+
 
 //
 // Get configuration for dht listener manager

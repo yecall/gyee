@@ -71,7 +71,6 @@ type DhtMgr struct {
 	ptnDsMgr	interface{}			// pointer to task node of data store manager
 	cbLock		sync.Mutex			// lock for callback to be installed/removed
 	cbf			DhtCallback			// callback entry
-
 }
 
 //
