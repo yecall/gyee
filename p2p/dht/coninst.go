@@ -63,6 +63,7 @@ type ConInst struct {
 	rxDone		chan int				// rx-task done signal
 	cbRxLock	sync.Mutex				// lock for data plane callback
 	cbfRxData	ConInstRxDataCallback	// data plane callback entry
+	isBlind		bool					// is blind connection instance
 }
 
 //
@@ -137,7 +138,7 @@ const (
 //
 // Create connection instance
 //
-func newConInst(postFixed string) *ConInst {
+func newConInst(postFixed string, isBlind bool) *ConInst {
 
 	conInst := ConInst {
 		name:		"conInst" + postFixed,
@@ -154,6 +155,7 @@ func newConInst(postFixed string) *ConInst {
 		txDone:		nil,
 		rxDone:		nil,
 		cbfRxData:	nil,
+		isBlind:	isBlind,
 	}
 
 	conInst.tep = conInst.conInstProc

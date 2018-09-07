@@ -128,6 +128,12 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvSchPoweroff:
 		eno = dhtMgr.poweroff(ptn)
 
+	case sch.EvDhtBlindConnectReq:
+		eno = dhtMgr.blindConnectReq(msg.Body.(*sch.MsgDhtBlindConnectReq))
+
+	case sch.EvDhtBlindConnectRsp:
+		eno = dhtMgr.blindConnectRsp(msg.Body.(*sch.MsgDhtBlindConnectRsp))
+
 	case sch.EvDhtMgrFindPeerReq:
 		eno = dhtMgr.findPeerReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
 
@@ -220,6 +226,36 @@ func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
 func (dhtMgr *DhtMgr)poweroff(ptn interface{}) sch.SchErrno {
 	log.LogCallerFileLine("poweroff: task will be done ...")
 	return dhtMgr.sdl.SchTaskDone(dhtMgr.ptnMe, sch.SchEnoKilled)
+}
+
+//
+// blind connect request
+//
+func (dhtMgr *DhtMgr)blindConnectReq(msg *sch.MsgDhtBlindConnectReq) sch.SchErrno {
+
+	//
+	// for blind connect request, no queries started, send connect request to
+	// connection manager directly.
+	//
+	req := sch.MsgDhtConMgrConnectReq {
+		Task:		dhtMgr.ptnMe,
+		Peer:		msg.Peer,
+		IsBlind:	true,
+	}
+	schMsg := sch.SchMessage{}
+	dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
+	return dhtMgr.sdl.SchSendMessage(&schMsg)
+}
+
+//
+// blind connect response
+//
+func (dhtMgr *DhtMgr)blindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtBlindConnectRsp, msg)
+		log.LogCallerFileLine("blindConnectRsp: callback return: %d", rc)
+	}
+	return sch.SchEnoNone
 }
 
 //

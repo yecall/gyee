@@ -212,7 +212,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	//
 
 	sdl := conMgr.sdl
-	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
+	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), true)
 	conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil)
 	conMgr.ciSeq++
 
@@ -268,6 +268,21 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	if msg.Eno != DhtEnoNone {
 
 		//
+		// if it's a blind outbound, the request sender should be responsed here. at this
+		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
+		//
+
+		if ci.isBlind && ci.dir == conInstDirOutbound {
+			rsp := sch.MsgDhtBlindConnectRsp {
+				Eno:	msg.Eno,
+				Peer:	msg.Peer,
+			}
+			schMsg := sch.SchMessage{}
+			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
+			ci.sdl.SchSendMessage(&schMsg)
+		}
+
+		//
 		// notice: if handshake failed, connection instances should have done themself,
 		// so here we need not to request them to be closed, we just remove them from
 		// the map table(for outbounds).
@@ -302,6 +317,21 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
 			log.LogCallerFileLine("handshakeRsp: not found, id: %x", msg.Peer.ID)
 			return sch.SchEnoUserTask
+		}
+
+		//
+		// if it's a blind outbound, the request sender should be responsed here. at this
+		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
+		//
+
+		if ci.isBlind {
+			rsp := sch.MsgDhtBlindConnectRsp {
+				Eno:	DhtEnoNone,
+				Peer:	msg.Peer,
+			}
+			schMsg := sch.SchMessage{}
+			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
+			ci.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -407,7 +437,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
 	}
 
-	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq))
+	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
 	conMgr.setupConInst(ci, sender, msg.Peer)
 	conMgr.ciSeq++
 
@@ -423,7 +453,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		log.LogCallerFileLine("")
+		log.LogCallerFileLine("connctReq: SchCreateTask failed, eno: %d", eno)
 		return rsp2Sender(DhtErrno(DhtEnoScheduler))
 	}
 
@@ -550,8 +580,9 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 	schMsg := sch.SchMessage{}
 	req := sch.MsgDhtConMgrConnectReq {
-		Task:	msg.Task,
-		Peer:	msg.Peer,
+		Task:		msg.Task,
+		Peer:		msg.Peer,
+		IsBlind:	true,
 	}
 	conMgr.sdl.SchMakeMessage(&schMsg, msg.Task, conMgr.ptnMe, sch.EvDhtConMgrConnectReq, &req)
 	conMgr.sdl.SchSendMessage(&schMsg)

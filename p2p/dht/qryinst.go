@@ -184,8 +184,9 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 
 	msg := sch.SchMessage{}
 	req := sch.MsgDhtConMgrConnectReq{
-		Task:	icb.ptnInst,
-		Peer:	&icb.to,
+		Task:		icb.ptnInst,
+		Peer:		&icb.to,
+		IsBlind:	false,
 	}
 
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)

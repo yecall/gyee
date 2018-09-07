@@ -288,6 +288,8 @@ const (
 	EvDhtMgrGetValueReq		= EvDhtMgrBase + 9
 	EvDhtMgrGetValueRsp		= EvDhtMgrBase + 10
 	EvDhtMgrQueryStopReq	= EvDhtMgrBase + 11
+	EvDhtBlindConnectReq	= EvDhtMgrBase + 12
+	EvDhtBlindConnectRsp	= EvDhtMgrBase + 13
 )
 
 //
@@ -340,6 +342,21 @@ type MsgDhtMgrGetValueRsp struct {
 }
 
 //
+// EvDhtBlindConnectReq
+//
+type MsgDhtBlindConnectReq struct {
+	Peer	*config.Node			// peer to be connected
+}
+
+//
+// EvDhtBlindConnectRsp
+//
+type MsgDhtBlindConnectRsp struct {
+	Eno		int						// result code
+	Peer	*config.Node			// peer to be connected
+}
+
+//
 // DHT listener manager event
 //
 const (
@@ -384,57 +401,58 @@ const (
 // EvDhtConMgrConnectReq
 //
 type MsgDhtConMgrConnectReq struct {
-	Task	interface{}				// pointer to task node
-	Peer	*config.Node			// peer to be connected
+	Task		interface{}				// pointer to task node
+	Peer		*config.Node			// peer to be connected
+	IsBlind		bool					// is blind
 }
 
 //
 // EvDhtConMgrConnectRsp
 //
 type MsgDhtConMgrConnectRsp struct {
-	Eno		int						// result code
-	Peer	*config.Node			// peer to be connected
+	Eno			int						// result code
+	Peer		*config.Node			// peer to be connected
 }
 
 //
 // EvDhtConMgrSendReq
 //
 type MsgDhtConMgrSendReq struct {
-	Task	interface{}				// pointer to task node
-	WaitRsp	bool					// wait response from peer
-	WaitMid	int						// wait message identity
-	WaitSeq int64					// wait message sequence number
-	NeedCfm	bool					// if confirm needed
-	CfmInfo interface{}				// confirm owner with this
-	Peer	*config.Node			// peer where data sent to
-	Data	interface{}				// data to be sent
+	Task		interface{}				// pointer to task node
+	WaitRsp		bool					// wait response from peer
+	WaitMid		int						// wait message identity
+	WaitSeq 	int64					// wait message sequence number
+	NeedCfm		bool					// if confirm needed
+	CfmInfo 	interface{}				// confirm owner with this
+	Peer		*config.Node			// peer where data sent to
+	Data		interface{}				// data to be sent
 }
 
 //
 // EvDhtConMgrSendCfm
 //
 type MsgDhtConMgrSendCfm struct {
-	Eno		int						// result
-	CfmInfo interface{}				// confirm owner with this
-	Peer	*config.Node			// peer where data sent to
+	Eno			int						// result
+	CfmInfo 	interface{}				// confirm owner with this
+	Peer		*config.Node			// peer where data sent to
 }
 
 //
 // EvDhtConMgrCloseReq
 //
 type MsgDhtConMgrCloseReq struct {
-	Task	interface{}				// pointer to task node
-	Peer	*config.Node			// peer to be connected
-	Dir		int						// instance direction
+	Task		interface{}				// pointer to task node
+	Peer		*config.Node			// peer to be connected
+	Dir			int						// instance direction
 }
 
 //
 // EvDhtConMgrCloseRsp
 //
 type MsgDhtConMgrCloseRsp struct {
-	Eno		int						// result code
-	Peer	*config.Node			// peer to be connected
-	Dir		int						// instance direction
+	Eno			int						// result code
+	Peer		*config.Node			// peer to be connected
+	Dir			int						// instance direction
 }
 
 
@@ -458,55 +476,55 @@ const (
 // EvDhtConInstHandshakeReq
 //
 type MsgDhtConInstHandshakeReq struct {
-	DurHs	time.Duration			// timeout duration
+	DurHs		time.Duration			// timeout duration
 }
 
 //
 // EvDhtConInstHandshakeRsp
 //
 type MsgDhtConInstHandshakeRsp struct {
-	Eno		int						// result code
-	Inst	interface{}				// pointer connection instance
-	Peer	*config.Node			// peer
-	Dir		int						// connection instance direction
-	HsInfo	interface{}				// handshake information
-	Dur		time.Duration			// duration for handshake
+	Eno			int						// result code
+	Inst		interface{}				// pointer connection instance
+	Peer		*config.Node			// peer
+	Dir			int						// connection instance direction
+	HsInfo		interface{}				// handshake information
+	Dur			time.Duration			// duration for handshake
 }
 
 //
 // EvDhtConInstTxDataReq
 //
 type MsgDhtConInstTxDataReq struct {
-	Task	interface{}				// owner task node pointer
-	WaitRsp	bool					// wait response from peer
-	WaitMid	int						// wait message identity
-	WaitSeq int64					// wait message sequence number
-	Payload	interface{}				// payload
+	Task		interface{}				// owner task node pointer
+	WaitRsp		bool					// wait response from peer
+	WaitMid		int						// wait message identity
+	WaitSeq 	int64					// wait message sequence number
+	Payload		interface{}				// payload
 }
 
 //
 // EvDhtConInstCloseReq
 //
 type MsgDhtConInstCloseReq struct {
-	Peer	*config.NodeID			// peer identity
-	Why		int						// why to close
+	Peer		*config.NodeID			// peer identity
+	Why			int						// why to close
 }
 
 //
 // EvDhtConInstCloseRsp
 //
 type MsgDhtConInstCloseRsp struct {
-	Peer	*config.NodeID			// peer identity
-	Dir		int						// instance direction
+	Peer		*config.NodeID			// peer identity
+	Dir			int						// instance direction
 }
 
 //
 // EvDhtConInstStatusInd
 //
 type MsgDhtConInstStatusInd struct {
-	Peer	*config.NodeID			// peer identity
-	Dir		int						// instance direction
-	Status	int						// status
+	Peer		*config.NodeID			// peer identity
+	Dir			int						// instance direction
+	Status		int						// status
 }
 
 //
@@ -545,45 +563,45 @@ const (
 // EvDhtQryMgrQueryStartReq
 //
 type MsgDhtQryMgrQueryStartReq struct {
-	Target	config.NodeID			// target node identity or key
-	Msg		interface{}				// original request which results this query
-	ForWhat	int						// find-node; get-provider; get-value; put-value; ...
-	Seq		int64					// sequence number
+	Target		config.NodeID			// target node identity or key
+	Msg			interface{}				// original request which results this query
+	ForWhat		int						// find-node; get-provider; get-value; put-value; ...
+	Seq			int64					// sequence number
 }
 
 //
 // EvDhtQryMgrQueryStartRsp
 //
 type MsgDhtQryMgrQueryStartRsp struct {
-	Target	config.NodeID			// target node identity
-	Eno		int						// result code
+	Target		config.NodeID			// target node identity
+	Eno			int						// result code
 }
 
 //
 // EvDhtQryMgrQueryStopReq
 //
 type MsgDhtQryMgrQueryStopReq struct {
-	Target	config.NodeID			// target node identity
+	Target		config.NodeID			// target node identity
 }
 
 //
 // EvDhtQryMgrQueryStopRsp
 //
 type MsgDhtQryMgrQueryStopRsp struct {
-	Target	config.NodeID			// target node identity
-	Eno		int						// result code
+	Target		config.NodeID			// target node identity
+	Eno			int						// result code
 }
 
 //
 // EvDhtQryMgrQueryResultInd
 //
 type MsgDhtQryMgrQueryResultInd struct {
-	Eno		int						// result code. notice: when timeout, closests reported
-	ForWhat	int						// what's the original query for: find-node; get-value; get-provider; put-value; put provider; ...
-	Target	config.NodeID			// target or key to be looked up
-	Peers	[]*config.Node			// peers list, if target got, it always be the first one
-	Val		[]byte					// value
-	Prds	[]*config.Node			// providers
+	Eno			int						// result code. notice: when timeout, closests reported
+	ForWhat		int						// what's the original query for: find-node; get-value; get-provider; put-value; put provider; ...
+	Target		config.NodeID			// target or key to be looked up
+	Peers		[]*config.Node			// peers list, if target got, it always be the first one
+	Val			[]byte					// value
+	Prds		[]*config.Node			// providers
 }
 
 //
@@ -603,9 +621,9 @@ const (
 // EvDhtQryInstStopReq
 //
 type MsgDhtQryInstStopReq struct {
-	Target	config.NodeID			// target to be looked up
-	Peer	config.NodeID			// peer to be queried
-	Eno		int						// why stop
+	Target		config.NodeID		// target to be looked up
+	Peer		config.NodeID		// peer to be queried
+	Eno			int					// why stop
 }
 
 //
@@ -687,47 +705,47 @@ type MsgDhtRutMgrNearestReq struct {
 // EvDhtRutMgrNearestRsp
 //
 type MsgDhtRutMgrNearestRsp struct {
-	Eno		int						// result code
-	ForWhat	int						// what for
-	Target	config.NodeID			// target peer identity
-	Peers	interface{}				// nearest nodes table
-	Dists	interface{}				// distances of nearest nodes
-	Pcs		interface{}				// peer connection status table
-	Msg		interface{}				// backup for original request
+	Eno			int					// result code
+	ForWhat		int					// what for
+	Target		config.NodeID		// target peer identity
+	Peers		interface{}			// nearest nodes table
+	Dists		interface{}			// distances of nearest nodes
+	Pcs			interface{}			// peer connection status table
+	Msg			interface{}			// backup for original request
 }
 
 //
 // EvDhtRutMgrUpdateReq
 //
 type MsgDhtRutMgrUpdateReq struct {
-	Why		int						// why to request to upadte
-	Eno		int						// result code
-	Seens	[]config.Node			// nodes seen
-	Duras	[]time.Duration			// durations/latencies about seen nodes
+	Why			int					// why to request to upadte
+	Eno			int					// result code
+	Seens		[]config.Node		// nodes seen
+	Duras		[]time.Duration		// durations/latencies about seen nodes
 }
 
 //
 // EvDhtRutMgrNotificationInd
 //
 type MsgDhtRutMgrNotificationInd struct {
-	Target	config.NodeID			// target peer identity
-	Peers	interface{}				// nearest nodes table
-	Dists	interface{}				// distances of nearest nodes
+	Target		config.NodeID		// target peer identity
+	Peers		interface{}			// nearest nodes table
+	Dists		interface{}			// distances of nearest nodes
 }
 
 //
 // EvDhtRutPeerRemovedInd
 //
 type MsgDhtRutPeerRemovedInd struct {
-	Peer	config.NodeID			// target peer identity
+	Peer		config.NodeID		// target peer identity
 }
 
 //
 // EvDhtRutMgrStopNotifyReq
 //
 type MsgDhtRutMgrStopNofiyReq struct {
-	Task	interface{}				// owner task of the notifee registered
-	Target	config.NodeID			// target peer identity
+	Task		interface{}			// owner task of the notifee registered
+	Target		config.NodeID		// target peer identity
 }
 
 //
