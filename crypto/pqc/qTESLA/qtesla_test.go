@@ -30,3 +30,23 @@ func TestGenerateKeyPair(t *testing.T) {
 	fmt.Printf("pk:%v\n", len(pk))
 	fmt.Printf("sk:%v\n", len(sk))
 }
+
+func TestSign(t *testing.T) {
+	pk, sk := GenerateKeyPair()
+	msg := []byte("sign msg test")
+
+	sm, err := Sign(msg, sk)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("sm:%v\n", sm)
+
+	m, ret := Verify(sm, pk)
+	if ret {
+		fmt.Println("verify success", string(m))
+	} else {
+		fmt.Println("verify failed")
+	}
+}

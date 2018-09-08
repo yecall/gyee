@@ -41,7 +41,10 @@ package qTESLA
 #include "./qTesla_256/sha3/fips202.c"
 */
 import "C"
-import "unsafe"
+import (
+	"unsafe"
+	"errors"
+)
 
 func init() {
 
@@ -50,14 +53,38 @@ func init() {
 func GenerateKeyPair() (pk, sk []byte) {
 	pk = make([]byte, C.CRYPTO_PUBLICKEYBYTES)
 	sk = make([]byte, C.CRYPTO_SECRETKEYBYTES)
-    C.crypto_sign_keypair((*C.uchar)(unsafe.Pointer(&pk[0])), (*C.uchar)(unsafe.Pointer(&sk[0])))
+    C.crypto_sign_keypair(cBuf(pk), cBuf(sk))
     return pk, sk
 }
 
-func Signature() {
+func Sign(msg []byte, seckey []byte) ([]byte, error) {
+	sm := make([]byte, len(msg)+C.CRYPTO_BYTES)
+	var smlen C.ulonglong
+	mlen := C.ulonglong(len(msg))
 
+    ret := C.crypto_sign(cBuf(sm), &smlen, cBuf(msg), mlen, cBuf(seckey))
+
+    if ret != 0 {
+    	return nil, errors.New("sign error")
+	}
+    return sm, nil
 }
 
-func Verify() {
+func Verify(sm []byte, pubkey []byte) ([]byte, bool) {
+	m := make([]byte, len(sm)+C.CRYPTO_BYTES)
+	var mlen C.ulonglong
+    smlen := C.ulonglong(len(sm))
+	ret := C.crypto_sign_open(cBuf(m), &mlen, cBuf(sm), smlen, cBuf(pubkey))
+	if ret == 0 {
+		return m, true
+	}
+	return nil, false
+}
 
+func cBuf(goSlice []byte) *C.uchar {
+	return (*C.uchar)(unsafe.Pointer(&goSlice[0]))
+}
+
+func goBytes(cSlice []C.uchar, size C.int) []byte {
+	return C.GoBytes(unsafe.Pointer(&cSlice[0]), size)
 }
