@@ -69,7 +69,7 @@ type ConInst struct {
 //
 // Call back type for rx data of protocols than PID_DHT
 //
-type ConInstRxDataCallback func(pid uint32, msg interface{})int
+type ConInstRxDataCallback func(conInst interface{}, pid uint32, msg interface{})int
 
 //
 // Connection instance identity
@@ -1041,7 +1041,7 @@ _rxLoop:
 			conInst.cbRxLock.Lock()
 
 			if conInst.cbfRxData != nil {
-				conInst.cbfRxData(pkg.Pid, pkg.Payload)
+				conInst.cbfRxData(conInst, pkg.Pid, pkg.Payload)
 			}
 
 			conInst.cbRxLock.Unlock()

@@ -1366,6 +1366,11 @@ func testCase6(tc *testCase) {
 			log.LogCallerFileLine("testCase6: P2pStart failed, eno: %d", eno)
 			return
 		}
+		dhtMgr := dhtInst.SchGetUserTaskIF(sch.DhtMgrName).(*dht.DhtMgr)
+		if eno := dhtMgr.InstallEventCallback(dhtTestEventCallback); eno != dht.DhtEnoNone {
+			log.LogCallerFileLine("testCase6: InstallEventCallback failed, eno: %d", eno)
+			return
+		}
 	}
 
 	cm := dhtTestBuildConnMatrix(dhtInstList);
@@ -1386,6 +1391,12 @@ func testCase6(tc *testCase) {
 // build connection matrix for instance list
 //
 func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
+
+	//
+	// initialize specific connection relationship between dht instances, for example:
+	// ring, star, line, random, ...
+	//
+
 	return nil
 }
 
@@ -1393,5 +1404,150 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 // apply connection matrix for instance list
 //
 func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) dht.DhtErrno {
+
+	//
+	// setup connection between dht instance according to the connection matrix
+	//
+
 	return dht.DhtEnoNone
+}
+
+//
+// dht event callback
+//
+func dhtTestEventCallback(mgr interface{}, mid int, msg interface{}) int {
+
+	eno := -1
+
+	switch mid {
+
+	case  sch.EvDhtBlindConnectRsp:
+		eno = dhtTestBlindConnectRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtBlindConnectRsp))
+
+	case  sch.EvDhtMgrFindPeerRsp:
+		eno = dhtTestMgrFindPeerRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtQryMgrQueryResultInd))
+
+	case  sch.EvDhtQryMgrQueryStartRsp:
+		eno = dhtTestQryMgrQueryStartRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtQryMgrQueryStartRsp))
+
+	case  sch.EvDhtQryMgrQueryStopRsp:
+		eno = dhtTestQryMgrQueryStopRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtQryMgrQueryStopRsp))
+
+	case  sch.EvDhtConMgrSendCfm:
+		eno = dhtTestConMgrSendCfm(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtConMgrSendCfm))
+
+	case  sch.EvDhtMgrPutProviderRsp:
+		eno = dhtTestMgrPutProviderRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtPrdMgrAddProviderRsp))
+
+	case  sch.EvDhtMgrGetProviderRsp:
+		eno = dhtTestMgrGetProviderRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtMgrGetProviderRsp))
+
+	case  sch.EvDhtMgrPutValueRsp:
+		eno = dhtTestMgrPutValueRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtMgrPutValueRsp))
+
+	case  sch.EvDhtMgrGetValueRsp:
+		eno = dhtTestMgrGetValueRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtMgrGetValueRsp))
+
+	case  sch.EvDhtConMgrCloseRsp:
+		eno = dhtTestConMgrCloseRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtConMgrCloseRsp))
+
+	case  sch.EvDhtConInstStatusInd:
+		eno = dhtTestConInstStatusInd(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtConInstStatusInd))
+
+	default:
+		log.LogCallerFileLine("dhtTestEventCallback: unknown event: %d", mid)
+	}
+
+	return eno
+}
+
+func dhtTestBlindConnectRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtBlindConnectRsp) int {
+	return -1
+}
+
+func dhtTestMgrFindPeerRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryResultInd) int {
+	return -1
+}
+
+func dhtTestQryMgrQueryStartRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStartRsp) int {
+	return -1
+}
+
+func dhtTestQryMgrQueryStopRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStopRsp) int {
+	return -1
+}
+
+func dhtTestConMgrSendCfm(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrSendCfm) int {
+	return -1
+}
+
+func dhtTestMgrPutProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtPrdMgrAddProviderRsp) int {
+	return -1
+}
+
+func dhtTestMgrGetProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetProviderRsp) int {
+return -1
+}
+
+func dhtTestMgrPutValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrPutValueRsp) int {
+	return -1
+}
+
+func dhtTestMgrGetValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetValueRsp) int {
+	return -1
+}
+
+func dhtTestConMgrCloseRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrCloseRsp) int {
+	return -1
+}
+
+func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) int {
+
+	switch msg.Status {
+
+	case dht.CisNull:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+	case dht.CisConnecting:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+	case dht.CisConnected:
+
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+		if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
+			msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
+
+			log.LogCallerFileLine("dhtTestConInstStatusInd: " +
+				"InstallRxDataCallback failed, eno: %d, peer: %x",
+				eno, *msg.Peer)
+
+			return -1;
+		}
+
+	case dht.CisInHandshaking:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+	case dht.CisHandshaked:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+	case dht.CisInService:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+	case dht.CisClosed:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+
+	default:
+		log.LogCallerFileLine("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
+	}
+
+	return 0
+}
+
+//
+// connetion instance rx-data callback
+//
+func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interface{})int {
+	log.LogCallerFileLine("dhtTestConInstStatusInd: entered, pid: %d", pid)
+	return 0
 }
