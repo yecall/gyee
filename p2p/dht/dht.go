@@ -24,6 +24,7 @@ import (
 	"sync"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 
@@ -184,6 +185,9 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	case sch.EvDhtConMgrCloseRsp:
 		eno = dhtMgr.conMgrCloseRsp(msg.Body.(*sch.MsgDhtConMgrCloseRsp))
+
+	case sch.EvDhtConInstStatusInd:
+		eno = dhtMgr.conInstStatusInd(msg.Body.(*sch.MsgDhtConInstStatusInd))
 
 	default:
 		eno = sch.SchEnoParameter
@@ -418,9 +422,20 @@ func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno 
 }
 
 //
+// conInst status indication handler
+//
+func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+	if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(sch.EvDhtConInstStatusInd, msg)
+		log.LogCallerFileLine("conInstStatusInd: callback return: %d", rc)
+	}
+	return sch.SchEnoNone
+}
+
+//
 // install callback
 //
-func (dhtMgr *DhtMgr)InstallCallback(cbf DhtCallback) DhtErrno {
+func (dhtMgr *DhtMgr)InstallEventCallback(cbf DhtCallback) DhtErrno {
 
 	dhtMgr.cbLock.Lock()
 	defer dhtMgr.cbLock.Unlock()
@@ -435,6 +450,45 @@ func (dhtMgr *DhtMgr)InstallCallback(cbf DhtCallback) DhtErrno {
 
 	if dhtMgr.cbf == nil {
 		log.LogCallerFileLine("DhtInstallCallback: it's a nil callback, old is removed")
+	}
+
+	return DhtEnoNone
+}
+
+//
+// install rx data callback
+//
+func (dhtMgr *DhtMgr)InstallRxDataCallback(cbf ConInstRxDataCallback, peer *config.NodeID, dir ConInstDir) DhtErrno {
+
+	//
+	// this function exported for user to install callback for data received by connection
+	// instance. to do this, one should check connection instance status in his callback
+	// for event sch.EvDhtConInstStatusInd, for example, when "CisConnected" is reported.
+	//
+
+	conMgr, ok := dhtMgr.sdl.SchGetUserTaskIF(ConMgrName).(*ConMgr)
+	if !ok {
+		log.LogCallerFileLine("InstallRxDataCallback: connection manager not found")
+		return DhtEnoMismatched
+	}
+
+	cid := conInstIdentity {
+		nid:	*peer,
+		dir:	dir,
+	}
+	cis := conMgr.lookupConInst(&cid)
+	if len(cis) == 0 {
+		log.LogCallerFileLine("InstallRxDataCallback: none of instances found")
+		return DhtEnoNotFound
+	}
+
+	for idx, ci := range cis {
+		if eno := ci.InstallRxDataCallback(cbf); eno != DhtEnoNone {
+			log.LogCallerFileLine("InstallRxDataCallback: " +
+				"failed, idx: %d, eno: %d, name: %s",
+				idx, eno, ci.name)
+			return eno
+		}
 	}
 
 	return DhtEnoNone

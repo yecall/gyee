@@ -52,7 +52,7 @@ func DhtInstallCallback(dhtMgr *dht.DhtMgr, cbf dht.DhtCallback) dht.DhtErrno {
 		log.LogCallerFileLine("DhtInstallCallback: nil dht manager")
 		return dht.DhtEnoParameter
 	}
-	return dhtMgr.InstallCallback(cbf)
+	return dhtMgr.InstallEventCallback(cbf)
 }
 
 //

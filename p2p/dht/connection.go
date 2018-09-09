@@ -28,6 +28,7 @@ import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	"github.com/anacrolix/sync"
 )
 
 //
@@ -49,26 +50,28 @@ const (
 // Connection manager configuration
 //
 type conMgrCfg struct {
-	local		*config.Node					// pointer to local node specification
-	maxCon		int								// max number of connection
-	hsTimeout	time.Duration					// handshake timeout duration
+	local			*config.Node					// pointer to local node specification
+	maxCon			int								// max number of connection
+	hsTimeout		time.Duration					// handshake timeout duration
 }
 
 //
 // Connection manager
 //
 type ConMgr struct {
-	sdl			*sch.Scheduler					// pointer to scheduler
-	name		string							// my name
-	cfg			conMgrCfg						// configuration
-	tep			sch.SchUserTaskEp				// task entry
-	ptnMe		interface{}						// pointer to task node of myself
-	ptnRutMgr	interface{}						// pointer to route manager task node
-	ptnQryMgr	interface{}						// pointer to query manager task node
-	ptnLsnMgr	interface{}						// pointer to the listner manager task node
-	ciTab		map[conInstIdentity]*ConInst	// connection instance table
-	ciSeq		int64							// connection instance sequence number
-	txQueTab	map[conInstIdentity]*list.List	// outbound data pending queue
+	sdl				*sch.Scheduler					// pointer to scheduler
+	name			string							// my name
+	cfg				conMgrCfg						// configuration
+	tep				sch.SchUserTaskEp				// task entry
+	ptnMe			interface{}						// pointer to task node of myself
+	ptnRutMgr		interface{}						// pointer to route manager task node
+	ptnQryMgr		interface{}						// pointer to query manager task node
+	ptnLsnMgr		interface{}						// pointer to the listner manager task node
+	ptnDhtMgr		interface{}						// pointer to dht manager task node
+	lockInstTab		sync.Mutex						// lock for connection instable table
+	ciTab			map[conInstIdentity]*ConInst	// connection instance table
+	ciSeq			int64							// connection instance sequence number
+	txQueTab		map[conInstIdentity]*list.List	// outbound data pending queue
 }
 
 //
@@ -83,6 +86,8 @@ func NewConMgr() *ConMgr {
 		ptnMe:		nil,
 		ptnRutMgr:	nil,
 		ptnQryMgr:	nil,
+		ptnLsnMgr:	nil,
+		ptnDhtMgr:	nil,
 		ciTab:		make(map[conInstIdentity]*ConInst, 0),
 		ciSeq:		0,
 		txQueTab:	make(map[conInstIdentity]*list.List, 0),
@@ -168,8 +173,10 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 	_, conMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
 	_, conMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
 	_, conMgr.ptnLsnMgr = sdl.SchGetTaskNodeByName(LsnMgrName)
+	_, conMgr.ptnDhtMgr = sdl.SchGetTaskNodeByName(DhtMgrName)
 
-	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil || conMgr.ptnLsnMgr == nil {
+	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil ||
+		conMgr.ptnLsnMgr == nil || conMgr.ptnDhtMgr == nil {
 		log.LogCallerFileLine("poweron: internal errors")
 		return sch.SchEnoInternal
 	}
@@ -260,7 +267,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	cid := conInstIdentity {
 		nid:	msg.Peer.ID,
-		dir:	conInstDir(msg.Dir),
+		dir:	ConInstDir(msg.Dir),
 	}
 
 	var ci *ConInst = nil
@@ -275,6 +282,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		if ci.isBlind && ci.dir == conInstDirOutbound {
 			rsp := sch.MsgDhtBlindConnectRsp {
 				Eno:	msg.Eno,
+				Ptn:	ci.ptnMe,
 				Peer:	msg.Peer,
 			}
 			schMsg := sch.SchMessage{}
@@ -327,6 +335,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		if ci.isBlind {
 			rsp := sch.MsgDhtBlindConnectRsp {
 				Eno:	DhtEnoNone,
+				Ptn:	ci.ptnMe,
 				Peer:	msg.Peer,
 			}
 			schMsg := sch.SchMessage{}
@@ -485,7 +494,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
 	cid := conInstIdentity {
 		nid:	msg.Peer.ID,
-		dir:	conInstDir(msg.Dir),
+		dir:	ConInstDir(msg.Dir),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -613,21 +622,34 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		"instance status reported: %d, id: %x",
 		msg.Status, msg.Peer)
 
-	switch msg.Status {
-
-	case cisClosed:
-		return conMgr.instClosedInd(msg)
-
-	case cisNull:
-	case cisConnecting:
-	case cisConnected:
-	case cisInHandshaking:
-	case cisHandshaked:
-	case cisInService:
-	default:
+	cid := conInstIdentity {
+		nid:	*msg.Peer,
+		dir:	ConInstDir(msg.Dir),
+	}
+	cis := conMgr.lookupConInst(&cid)
+	if len(cis) == 0 {
+		log.LogCallerFileLine("instStatusInd: none of instances found")
+		return sch.SchEnoNotFound
 	}
 
-	return sch.SchEnoNone
+	switch msg.Status {
+	case CisClosed:
+		conMgr.instClosedInd(msg)
+	case CisNull:
+	case CisConnecting:
+	case CisConnected:
+	case CisInHandshaking:
+	case CisHandshaked:
+	case CisInService:
+	default:
+		log.LogCallerFileLine("instStatusInd: invalid status: %d", msg.Status)
+		return sch.SchEnoMismatched
+	}
+
+	schMsg := sch.SchMessage{}
+	conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, msg)
+
+	return conMgr.sdl.SchSendMessage(&schMsg)
 }
 
 //
@@ -637,7 +659,7 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 
 	cid := conInstIdentity {
 		nid:	*msg.Peer,
-		dir:	conInstDir(msg.Dir),
+		dir:	ConInstDir(msg.Dir),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -770,8 +792,11 @@ func (conMgr *ConMgr)getConfig() DhtErrno {
 //
 func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
 
+	conMgr.lockInstTab.Lock()
+	defer conMgr.lockInstTab.Unlock()
+
 	if cid == nil {
-		return []*ConInst{nil}
+		return nil
 	}
 
 	if cid.dir == conInstDirInbound || cid.dir == conInstDirOutbound {
@@ -864,7 +889,7 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	cid := conInstIdentity {
 		nid:	*msg.Peer,
-		dir:	conInstDir(msg.Dir),
+		dir:	ConInstDir(msg.Dir),
 	}
 
 	sdl := conMgr.sdl
@@ -888,16 +913,12 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	cis := conMgr.lookupConInst(&cid)
 
 	for _, ci := range cis {
-
 		if ci != nil {
-
 			found = true
-
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
 				log.LogCallerFileLine("instClosedInd: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
-
 			delete(conMgr.ciTab, cid)
 		}
 	}

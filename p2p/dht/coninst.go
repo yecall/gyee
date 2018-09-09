@@ -53,7 +53,7 @@ type ConInst struct {
 	con			net.Conn				// connection
 	iow			ggio.WriteCloser		// IO writer
 	ior			ggio.ReadCloser			// IO reader
-	dir			conInstDir				// connection instance directory
+	dir			ConInstDir				// connection instance directory
 	hsInfo		conInstHandshakeInfo	// handshake information
 	txPending	*list.List				// pending package to be sent
 	txCurPkg	*conInstTxPkg			// current pending for response
@@ -76,20 +76,20 @@ type ConInstRxDataCallback func(pid uint32, msg interface{})int
 //
 type conInstIdentity struct {
 	nid			config.NodeID		// node identity
-	dir			conInstDir			// connection direction
+	dir			ConInstDir			// connection direction
 }
 
 //
 // Connection instance status
 //
 const (
-	cisNull			= iota			// null, not inited
-	cisConnecting					// connecting
-	cisConnected					// connected
-	cisInHandshaking				// handshaking
-	cisHandshaked					// handshaked
-	cisInService					// in service
-	cisClosed						// closed
+	CisNull			= iota			// null, not inited
+	CisConnecting					// connecting
+	CisConnected					// connected
+	CisInHandshaking				// handshaking
+	CisHandshaked					// handshaked
+	CisInService					// in service
+	CisClosed						// closed
 )
 
 type conInstStatus int
@@ -104,7 +104,7 @@ const (
 	conInstDirUnknown	= -1		// not be initialized
 )
 
-type conInstDir int
+type ConInstDir int
 
 //
 // Handshake information
@@ -149,7 +149,7 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		con:		nil,
 		ior:		nil,
 		iow:		nil,
-		status:		cisNull,
+		status:		CisNull,
 		dir:		conInstDirUnknown,
 		txPending:	list.New(),
 		txDone:		nil,
@@ -230,7 +230,7 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 	}
 
 	if conInst.dir == conInstDirInbound {
-		conInst.status = cisConnected
+		conInst.status = CisConnected
 		return sch.SchEnoNone
 	}
 
@@ -293,7 +293,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 
 	if conInst.con == nil && conInst.dir == conInstDirOutbound {
 
-		conInst.status = cisConnecting
+		conInst.status = CisConnecting
 		conInst.statusReport()
 
 		if eno := conInst.connect2Peer(); eno != DhtEnoNone {
@@ -306,7 +306,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
 		}
 
-		conInst.status = cisConnected
+		conInst.status = CisConnected
 		conInst.statusReport()
 	}
 
@@ -314,7 +314,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	// handshake
 	//
 
-	conInst.status = cisInHandshaking
+	conInst.status = CisInHandshaking
 	conInst.hsTimeout = msg.DurHs
 	conInst.statusReport()
 
@@ -345,7 +345,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 		}
 	}
 
-	conInst.status = cisHandshaked
+	conInst.status = CisHandshaked
 	conInst.statusReport()
 
 	rsp.Eno = DhtEnoNone
@@ -361,7 +361,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
 
-	conInst.status = cisInService
+	conInst.status = CisInService
 	conInst.statusReport()
 
 	return sch.SchEnoNone
@@ -372,8 +372,8 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 
-	if conInst.status != cisHandshaked &&
-		conInst.status != cisInService &&
+	if conInst.status != CisHandshaked &&
+		conInst.status != CisInService &&
 		conInst.dir != conInstDirOutbound {
 
 		log.LogCallerFileLine("closeReq: " +
@@ -392,7 +392,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 		msg.Why, *msg.Peer)
 
 	conInst.cleanUp(DhtEnoNone)
-	conInst.status = cisClosed
+	conInst.status = CisClosed
 
 	schMsg := sch.SchMessage{}
 	rsp := sch.MsgDhtConInstCloseRsp{
@@ -525,12 +525,12 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 //
 func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 	cis2pcs := map[conInstStatus] conMgrPeerConnStat {
-		cisNull:			pcsConnNo,
-		cisConnected:		pcsConnNo,
-		cisInHandshaking:	pcsConnNo,
-		cisHandshaked:		pcsConnNo,
-		cisInService:		pcsConnYes,
-		cisClosed:			pcsConnNo,
+		CisNull:			pcsConnNo,
+		CisConnected:		pcsConnNo,
+		CisInHandshaking:	pcsConnNo,
+		CisHandshaked:		pcsConnNo,
+		CisInService:		pcsConnYes,
+		CisClosed:			pcsConnNo,
 	}
 	return cis2pcs[cis]
 }
@@ -988,7 +988,7 @@ _checkDone:
 		// the 1) case
 		//
 
-		conInst.status = cisClosed
+		conInst.status = CisClosed
 		conInst.statusReport()
 		conInst.cleanUp(DhtEnoOs)
 		return
@@ -1082,7 +1082,7 @@ _checkDone:
 		// the 1) case
 		//
 
-		conInst.status = cisClosed
+		conInst.status = CisClosed
 		conInst.statusReport()
 		conInst.cleanUp(DhtEnoOs)
 		return
@@ -1322,5 +1322,26 @@ func (conInst *ConInst)checkTxCurPending(mid int, seq int64) DhtErrno {
 			conInst.txCurPkg.responsed<-true
 		}
 	}
+	return DhtEnoNone
+}
+
+//
+// Install callback for rx data with protocol identity PID_EXT
+//
+func (conInst *ConInst)InstallRxDataCallback(cbf ConInstRxDataCallback) DhtErrno {
+
+	conInst.cbRxLock.Lock()
+	defer conInst.cbRxLock.Unlock()
+
+	if conInst.cbfRxData != nil {
+		log.LogCallerFileLine("InstallRxDataCallback: old callback will be overlapped")
+	}
+
+	if cbf == nil {
+		log.LogCallerFileLine("InstallRxDataCallback: nil callback will be set")
+	}
+
+	conInst.cbfRxData = cbf
+
 	return DhtEnoNone
 }
