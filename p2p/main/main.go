@@ -36,6 +36,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	dht		"github.com/yeeco/gyee/p2p/dht"
 )
 
 //
@@ -43,6 +44,9 @@ import (
 //
 var p2pName2Cfg = make(map[string]*config.Config)
 var p2pInst2Cfg = make(map[*sch.Scheduler]*config.Config)
+
+var dhtName2Cfg = make(map[string]*config.Config)
+var dhtInst2Cfg = make(map[*sch.Scheduler]*config.Config)
 
 //
 // Indication/Package handlers
@@ -120,12 +124,25 @@ var testCaseTable = []testCase{
 		description:	"stop p2p instance",
 		entry:			testCase5,
 	},
+	{
+		name:			"testCase6",
+		description:	"dht common test",
+		entry:			testCase6,
+	},
 }
 
 //
 // target case
 //
-var tgtCase = "testCase5"
+var tgtCase = "testCase6"
+
+//
+// port base
+//
+const (
+	portBase4P2p = 30303
+	portBase4Dht = 40404
+)
 
 //
 // create test case control block by name
@@ -162,7 +179,7 @@ func newTcb(name string) *testCaseCtrlBlock {
 //
 func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
 
-	const dataTxApply = false
+	const dataTxApply = true
 
 	//
 	// This demo simply apply timer with 1s cycle and then sends a string
@@ -501,6 +518,7 @@ func testCase0(tc *testCase) {
 	//
 
 	myCfg := *dftCfg
+	myCfg.AppType = config.P2P_TYPE_CHAIN
 	cfgName := "myCfg"
 	cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
 	p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
@@ -520,7 +538,7 @@ func testCase0(tc *testCase) {
 	// start p2p instance
 	//
 
-	if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+	if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -575,10 +593,11 @@ func testCase1(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
-		myCfg.Local.UDP = uint16(30303 + loop)
-		myCfg.Local.TCP = uint16(30303 + loop)
+		myCfg.Local.UDP = uint16(portBase4P2p + loop)
+		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 
 		if loop == 0 {
 			myCfg.NoDial = true
@@ -617,7 +636,7 @@ func testCase1(tc *testCase) {
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
-		if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase1: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -658,6 +677,7 @@ func testCase2(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
@@ -672,8 +692,8 @@ func testCase2(tc *testCase) {
 
 		n := config.Node{
 			IP:		net.IP{127, 0, 0, 1},
-			UDP:	uint16(30303 + loop),
-			TCP:	uint16(30303 + loop),
+			UDP:	uint16(portBase4P2p + loop),
+			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,
 		}
 
@@ -692,6 +712,7 @@ func testCase2(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
@@ -734,7 +755,7 @@ func testCase2(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase2: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -786,13 +807,14 @@ func testCase3(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
-		myCfg.Local.UDP = uint16(30303 + loop)
-		myCfg.Local.TCP = uint16(30303 + loop)
+		myCfg.Local.UDP = uint16(portBase4P2p + loop)
+		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
@@ -858,7 +880,7 @@ func testCase3(tc *testCase) {
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
-		if eno = shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase3: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -905,6 +927,7 @@ func testCase4(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
@@ -919,8 +942,8 @@ func testCase4(tc *testCase) {
 
 		n := config.Node{
 			IP:		net.IP{127, 0, 0, 1},
-			UDP:	uint16(30303 + loop),
-			TCP:	uint16(30303 + loop),
+			UDP:	uint16(portBase4P2p + loop),
+			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,
 		}
 
@@ -947,14 +970,15 @@ func testCase4(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.StaticNetId = config.ZeroSubNet
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
-		myCfg.Local.UDP = uint16(30303 + loop)
-		myCfg.Local.TCP = uint16(30303 + loop)
+		myCfg.Local.UDP = uint16(portBase4P2p + loop)
+		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 		myCfg.Local.ID = (*staticNodeIdList[loop]).ID
 
 		for idx, n := range staticNodeIdList {
@@ -1043,7 +1067,7 @@ func testCase4(tc *testCase) {
 		}
 	}
 
-	if eno := shell.P2pStart(p2pInstBootstrap, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+	if eno := shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -1056,7 +1080,7 @@ func testCase4(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -1104,6 +1128,7 @@ func testCase5(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
@@ -1118,8 +1143,8 @@ func testCase5(tc *testCase) {
 
 		n := config.Node{
 			IP:		net.IP{127, 0, 0, 1},
-			UDP:	uint16(30303 + loop),
-			TCP:	uint16(30303 + loop),
+			UDP:	uint16(portBase4P2p + loop),
+			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,
 		}
 
@@ -1146,14 +1171,15 @@ func testCase5(tc *testCase) {
 		}
 
 		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.StaticNetId = config.ZeroSubNet
 		myCfg.Local.IP = net.IP{127, 0, 0, 1}
-		myCfg.Local.UDP = uint16(30303 + loop)
-		myCfg.Local.TCP = uint16(30303 + loop)
+		myCfg.Local.UDP = uint16(portBase4P2p + loop)
+		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 		myCfg.Local.ID = (*staticNodeIdList[loop]).ID
 
 		for idx, n := range staticNodeIdList {
@@ -1242,7 +1268,7 @@ func testCase5(tc *testCase) {
 		}
 	}
 
-	if eno := shell.P2pStart(p2pInstBootstrap, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+	if eno := shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("testCase5: P2pStart failed, eno: %d", eno)
 		return
 	}
@@ -1255,7 +1281,7 @@ func testCase5(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
-		if eno := shell.P2pStart(p2pInst, shell.P2P_TYPE_CHAIN); eno != sch.SchEnoNone {
+		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.LogCallerFileLine("testCase5: P2pStart failed, eno: %d", eno)
 			return
 		}
@@ -1290,3 +1316,82 @@ func testCase5(tc *testCase) {
 	waitInterrupt()
 }
 
+//
+// testCase6
+//
+func testCase6(tc *testCase) {
+	
+	log.LogCallerFileLine("testCase6: going to start ycDht ...")
+
+	var dhtInstNum = 64
+	var dhtInstList = []*sch.Scheduler{}
+
+	for loop := 0; loop < dhtInstNum; loop++ {
+
+		cfgName := fmt.Sprintf("dhtInst%d", loop)
+		log.LogCallerFileLine("testCase6: handling configuration:%s ...", cfgName)
+
+		var dftCfg *config.Config = nil
+
+		if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+			log.LogCallerFileLine("testCase6: ShellDefaultConfig failed")
+			return
+		}
+
+		myCfg := *dftCfg
+		myCfg.AppType = config.P2P_TYPE_DHT
+		myCfg.Name = cfgName
+		myCfg.PrivateKey = nil
+		myCfg.PublicKey = nil
+		myCfg.Local.IP = net.IP{127, 0, 0, 1}
+		myCfg.Local.UDP = uint16(portBase4Dht + loop)
+		myCfg.Local.TCP = uint16(portBase4Dht + loop)
+
+		cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
+		dhtName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
+
+		dhtInst, eno := shell.P2pCreateInstance(dhtName2Cfg[cfgName])
+		if eno != sch.SchEnoNone {
+			log.LogCallerFileLine("testCase6: SchSchedulerInit failed, eno: %d", eno)
+			return
+		}
+
+		dhtInst2Cfg[dhtInst] = dhtName2Cfg[cfgName]
+		dhtInstList = append(dhtInstList, dhtInst)
+	}
+
+	for _, dhtInst := range dhtInstList {
+		time.Sleep(time.Second * 1)
+		if eno := shell.P2pStart(dhtInst); eno != sch.SchEnoNone {
+			log.LogCallerFileLine("testCase6: P2pStart failed, eno: %d", eno)
+			return
+		}
+	}
+
+	cm := dhtTestBuildConnMatrix(dhtInstList);
+	if cm == nil {
+		log.LogCallerFileLine("testCase6: dhtBuildConnMatrix failed")
+		return
+	}
+
+	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
+		log.LogCallerFileLine("testCase6: dhtConnMatrixApply failed, eno: %d", eno)
+		return
+	}
+
+	waitInterrupt()
+}
+
+//
+// build connection matrix for instance list
+//
+func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
+	return nil
+}
+
+//
+// apply connection matrix for instance list
+//
+func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) dht.DhtErrno {
+	return dht.DhtEnoNone
+}

@@ -45,13 +45,7 @@ var noDog = sch.SchWatchDog {
 // Create description about static tasks
 //
 
-type P2pType int
-
-const (
-	P2P_TYPE_CHAIN	P2pType = 0
-	P2P_TYPE_DHT	P2pType = 1
-	P2P_TYPE_ALL	P2pType = 2
-)
+type P2pType = config.P2pAppType
 
 func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 
@@ -61,7 +55,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 	// scheduler, please see function schimplSchedulerStart for details pls.
 	//
 
-	if what == P2P_TYPE_CHAIN {
+	if what == config.P2P_TYPE_CHAIN {
 
 		return []sch.TaskStaticDescription{
 			{Name: dcv.DcvMgrName,		Tep: dcv.NewDcvMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
@@ -73,7 +67,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 			{Name: peer.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
-	} else if what == P2P_TYPE_DHT {
+	} else if what == config.P2P_TYPE_DHT {
 
 		return []sch.TaskStaticDescription{
 			{Name: dht.DhtMgrName,	Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
@@ -127,7 +121,7 @@ func P2pCreateInstance(cfg *config.Config) (*sch.Scheduler, sch.SchErrno) {
 //
 // Start p2p instance
 //
-func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
+func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 
 	//
 	// Start all static tasks
@@ -135,15 +129,22 @@ func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
 
 	var eno sch.SchErrno
 
-	sdl.SchSetAppType(int(what))
+	what := P2pType(sdl.SchGetAppType())
 
 	switch what {
-	case P2P_TYPE_CHAIN:
+
+	case config.P2P_TYPE_CHAIN:
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Chain)
-	case P2P_TYPE_DHT:
+
+	case config.P2P_TYPE_DHT:
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Dht)
-	default:
+
+	case config.P2P_TYPE_ALL:
 		log.LogCallerFileLine("P2pStart: not supported type: %d", what)
+		return sch.SchEnoNotImpl
+
+	default:
+		log.LogCallerFileLine("P2pStart: invalid application type: %d", what)
 		return sch.SchEnoParameter
 	}
 
@@ -157,7 +158,7 @@ func P2pStart(sdl *sch.Scheduler, what P2pType) sch.SchErrno {
 	// procedure ended.
 	//
 
-	if what == P2P_TYPE_CHAIN {
+	if what == config.P2P_TYPE_CHAIN {
 
 		var pmEno peer.PeMgrErrno
 
@@ -207,11 +208,16 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 	var staticTasks = []string{}
 	appType := sdl.SchGetAppType()
 
-	if P2pType(appType) == P2P_TYPE_CHAIN {
+	if P2pType(appType) == config.P2P_TYPE_CHAIN {
+
 		staticTasks = taskStaticPoweronOrder4Chain
-	} else if P2pType(appType) == P2P_TYPE_DHT {
+
+	} else if P2pType(appType) == config.P2P_TYPE_DHT {
+
 		staticTasks = taskStaticPoweronOrder4Dht
+
 	} else {
+
 		golog.Printf("P2pStop: p2pInst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}

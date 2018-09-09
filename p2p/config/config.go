@@ -143,7 +143,19 @@ const (
 	P2pNetworkTypeStatic	= 1				// no discovering
 )
 
+//
+// Application type
+//
+type P2pAppType int
+const (
+	P2P_TYPE_CHAIN	P2pAppType = 0
+	P2P_TYPE_DHT	P2pAppType = 1
+	P2P_TYPE_ALL	P2pAppType = 2
+)
+
 type Config struct {
+
+	AppType				P2pAppType				// application type
 
 	//
 	// Chain application part
@@ -394,30 +406,32 @@ func P2pDefaultConfig() *Config {
 		// DHT application part
 		//
 
+		DhtLocal:				dftLocal,
+
 		DhtRutCfg: Cfg4DhtRouteManager {
-			NodeId:			NodeID{0},
-			RandomQryNum:	1,
-			Period:			time.Minute * 1,
+			NodeId:				NodeID{0},
+			RandomQryNum:		1,
+			Period:				time.Minute * 1,
 		},
 
 		DhtQryCfg: Cfg4DhtQryManager {
-			Local:			&dftLocal,
-			MaxPendings:	32,
-			MaxActInsts:	8,
-			QryExpired:		time.Second * 60,
-			QryInstExpired:	time.Second * 16,
+			Local:				&dftLocal,
+			MaxPendings:		32,
+			MaxActInsts:		8,
+			QryExpired:			time.Second * 60,
+			QryInstExpired:		time.Second * 16,
 		},
 
 		DhtConCfg: Cfg4DhtConManager {
-			MaxCon:			512,
-			HsTimeout:		time.Second * 16,
+			MaxCon:				512,
+			HsTimeout:			time.Second * 16,
 		},
 
 		DhtFdsCfg: Cfg4DhtFileDatastore {
-			Path:			P2pDefaultDataDir(true),
-			ShardFuncName:	sfnNextToLast,
-			PadLength:		2,
-			Sync:			true,
+			Path:				P2pDefaultDataDir(true),
+			ShardFuncName:		sfnNextToLast,
+			PadLength:			2,
+			Sync:				true,
 		},
 	}
 
@@ -559,6 +573,18 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
 		log.LogCallerFileLine("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoNodeId
+	}
+
+	//
+	// check if DHT application, we need prepare node identity for this case now,
+	// we would make individual identities for chain and dht application later.
+	//
+
+	if cfg.AppType == P2P_TYPE_DHT {
+		cfg.DhtLocal = cfg.Local
+		cfg.DhtRutCfg.NodeId = cfg.DhtLocal.ID
+		cfg.DhtQryCfg.Local = &cfg.DhtLocal
+		cfg.DhtConCfg.Local = &cfg.DhtLocal
 	}
 
 	return name, PcfgEnoNone
