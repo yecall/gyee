@@ -27,8 +27,8 @@ import (
 
 func TestGenerateKeyPair(t *testing.T) {
 	pk, sk := GenerateKeyPair()
-	fmt.Printf("pk:%v\n", len(pk))
-	fmt.Printf("sk:%v\n", len(sk))
+	fmt.Printf("pk:%v\n", pk)
+	fmt.Printf("sk:%v\n", sk)
 }
 
 func TestSign(t *testing.T) {
@@ -36,6 +36,14 @@ func TestSign(t *testing.T) {
 	msg := []byte("sign msg test")
 
 	sm, err := Sign(msg, sk)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("sm:%v\n\n", sm)
+
+	sm, err = Sign(msg, sk)
 	if err != nil {
 		fmt.Println(err)
 		return

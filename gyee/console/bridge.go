@@ -65,12 +65,13 @@ func newBridge( /*config *nebletpb.Config*/ host string, prompter UserPrompter, 
 }
 
 // output handle the error & log in js runtime
-func (b *jsBridge) output(call otto.FunctionCall) {
+func (b *jsBridge) output(call otto.FunctionCall) otto.Value{
 	output := []string{}
 	for _, argument := range call.ArgumentList {
 		output = append(output, fmt.Sprintf("%v", argument))
 	}
 	fmt.Fprintln(b.writer, strings.Join(output, " "))
+	return otto.NullValue()
 }
 
 // setHost update repl request host
