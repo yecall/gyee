@@ -1509,11 +1509,11 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
 
 	case dht.CisConnecting:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisConnecting")
 
 	case dht.CisConnected:
 
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisConnected")
 
 		if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
 			msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
@@ -1526,16 +1526,16 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 		}
 
 	case dht.CisInHandshaking:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisInHandshaking")
 
 	case dht.CisHandshaked:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisHandshaked")
 
 	case dht.CisInService:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisInService")
 
 	case dht.CisClosed:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisClosed")
 
 	default:
 		log.LogCallerFileLine("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
