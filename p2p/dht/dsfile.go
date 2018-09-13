@@ -89,7 +89,7 @@ func (fds *FileDatastore)Put(k *DsKey, v DsValue) DhtErrno {
 	dsk := ipfsds.NewKey(strKey)
 	log.LogCallerFileLine("Put: key: %s", dsk);
 
-	if err := fds.ffs.Put(dsk, v); err != nil {
+	if err := fds.ffs.Put(dsk, v.([]byte)); err != nil {
 		log.LogCallerFileLine("Put: Put failed, err: %s", err.Error())
 		return DhtEnoDatastore
 	}

@@ -161,7 +161,7 @@ func NewDsMgr() *DsMgr {
 		ptnDhtMgr:	nil,
 		ptnQryMgr:	nil,
 		ds:			nil,
-		fdsCfg:		nil,
+		fdsCfg:		FileDatastoreConfig{},
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
