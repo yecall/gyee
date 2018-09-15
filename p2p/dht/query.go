@@ -1140,7 +1140,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 
 		td := sch.SchTaskDescription{
 			Name:		icb.name,
-			MbSize:		-1,
+			MbSize:		sch.SchMaxMbSize,
 			Ep:			NewQryInst(),
 			Wd:			&sch.SchWatchDog{HaveDog:false,},
 			Flag:		sch.SchCreatedGo,

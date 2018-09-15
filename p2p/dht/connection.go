@@ -227,7 +227,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	td := sch.SchTaskDescription{
 		Name:		ci.name,
-		MbSize:		-1,
+		MbSize:		sch.SchMaxMbSize,
 		Ep:			ci,
 		Wd:			&sch.SchWatchDog{HaveDog:false,},
 		Flag:		sch.SchCreatedGo,
@@ -454,7 +454,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	td := sch.SchTaskDescription{
 		Name:		ci.name,
-		MbSize:		-1,
+		MbSize:		sch.SchMaxMbSize,
 		Ep:			ci,
 		Wd:			&sch.SchWatchDog{HaveDog:false,},
 		Flag:		sch.SchCreatedGo,

@@ -37,6 +37,7 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	dht		"github.com/yeeco/gyee/p2p/dht"
+	"bytes"
 )
 
 //
@@ -1380,7 +1381,7 @@ func testCase6(tc *testCase) {
 	}
 
 	log.LogCallerFileLine("testCase6: sleep a while for instances starup ...")
-	time.Sleep(time.Second * 8)
+	time.Sleep(time.Second * 4)
 	log.LogCallerFileLine("testCase6: going to apply connection matrix ...")
 
 	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
@@ -1430,27 +1431,58 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 		neighbors[idx] = 0
 	}
 
+	log.LogCallerFileLine("dhtTestBuildConnMatrix: total instance number: %d", instNum)
+
 	for idx, row := range m {
+
+		log.LogCallerFileLine("dhtTestBuildConnMatrix: instance index: %d", idx)
+
 		count := neighbors[idx]
 		if count >= instNeightbors {
 			continue
 		}
-		for ; count < instNeightbors; count++ {
-			for true {
+
+		for ; count < instNeightbors; {
+
+			mask := bytes.Repeat([]byte{1}, instNum)
+			randStop := false
+
+			for !randStop {
+
 				n := rand.Intn(instNum)
+				mask[n] = 0
+
+				allCovered := true
+				for _, mk := range mask {
+					allCovered = allCovered && (mk == 0)
+				}
+				randStop = allCovered
+
+				if n == idx {
+					continue
+				}
+
 				if row[n] == true {
 					continue
 				}
+
 				if neighbors[n] >= instNeightbors {
 					continue
 				}
+
 				row[n] = true
 				m[n][idx] = true
 				neighbors[n]++
 				count++
+
+				break
+			}
+
+			if randStop {
 				break
 			}
 		}
+
 		neighbors[idx] = count
 	}
 
@@ -1473,8 +1505,8 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 
 	instNum := len(p2pInstList)
 	cmBackup := make([][]bool, instNum)
-	for idx, row := range cmBackup {
-		row = append(row, cm[idx]...)
+	for idx := 0; idx < instNum; idx++ {
+		cmBackup[idx] = append(cmBackup[idx], cm[idx]...)
 	}
 
 	conCount := 0
