@@ -47,7 +47,7 @@ func init() {
 	app.Copyright = "Copyright 2017-2018 The gyee Authors"
 	app.Flags = []cli.Flag{
 		config.TestnetFlag,
-		config.DataDirFlag,
+		config.NodeDirFlag,
 	}
 	app.Commands = []cli.Command{
 		consoleCommand,

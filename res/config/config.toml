@@ -1,6 +1,34 @@
 # This is a TOML document for default config
 
-name = "default"
+name = "my name"
+node_dir = "default"
+
+[network]
+bootnode = [""]
+listen = ["0.0.0.0:7352"]
+
+[chain]
+chain_id = 1
+data_dir = "data"
+key_dir = "keystore"
+genesis = "genesis.toml"
+mine = true
 
 [rpc]
-ipcpath = "gyee.ipc"
+ipc_path = "gyee.ipc"
+rpc_listen = ["127.0.0.1:7353"]
+http_listen = ["127.0.0.1:7354"]
+
+[app]
+log_level = "debug"
+log_file = "logs/log"
+enable_crash_report = true
+crash_report_url =["crash.yeecall.com"]
+
+[metrics]
+enable_metrics = false
+enable_metrics_report = false
+metrics_report_url = ["", ""]
+
+
+[misc]

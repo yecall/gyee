@@ -112,8 +112,7 @@ func (n *Node) Start() error {
 	logging.Logger.Info("Node Start...")
 
 	if err := n.lockDataDir(); err != nil {
-		logging.Logger.Println(err)
-		return err
+		logging.Logger.Fatal(err)
 	}
 
 	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
@@ -198,12 +197,14 @@ func (n *Node) startIPC() error {
 	if err := os.MkdirAll(filepath.Dir(endpoint), 0751); err != nil {
 		return err
 	}
-	os.Remove(endpoint)
+	os.Remove(endpoint) //TODO:?为什么？确定目录在，但把文件删掉
 	listener, err := net.Listen("unix", endpoint)
 	if err != nil {
 		logging.Logger.Println(err)
 		return err
 	}
+
+	os.Chmod(endpoint, 0600)
 
 	go func() {
 		for {

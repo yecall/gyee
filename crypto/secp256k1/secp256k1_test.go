@@ -30,6 +30,7 @@ import (
 
 	"github.com/yeeco/gyee/crypto/random"
 	"math/big"
+	"fmt"
 )
 
 const TestCount = 1000
@@ -269,4 +270,20 @@ func BenchmarkRecover(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		RecoverPubkey(msg, sig)
 	}
+}
+
+func TestPrivateKeyVerify(t *testing.T) {
+	priv := random.GetEntropyCSPRNG(PrivateKeyLength)
+
+	for i:=0; i<len(priv); i++ {
+		priv[i] = 0
+	}
+	priv[len(priv)-1]=1
+
+	ret := PrivateKeyVerify(priv)
+	fmt.Println(ret)
+
+	pub, _ := GetPublicKey(priv)
+
+	fmt.Printf("%X\n", pub)
 }

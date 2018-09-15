@@ -2,6 +2,7 @@
 // sources:
 // README.md
 // config/config.toml
+// config/genesis.toml
 // library/bignumber.js
 // res.go
 package res
@@ -50,6 +51,24 @@ func readmeMd() (*asset, error) {
 func configConfigToml() (*asset, error) {
 	path := "/Users/xujiajun/go/src/github.com/yeeco/gyee/res/config/config.toml"
 	name := "config/config.toml"
+	bytes, err := bindataRead(path, name)
+	if err != nil {
+		return nil, err
+	}
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		err = fmt.Errorf("Error reading asset info %s at %s: %v", name, path, err)
+	}
+
+	a := &asset{bytes: bytes, info: fi}
+	return a, err
+}
+
+// configGenesisToml reads file data from disk. It returns an error on failure.
+func configGenesisToml() (*asset, error) {
+	path := "/Users/xujiajun/go/src/github.com/yeeco/gyee/res/config/genesis.toml"
+	name := "config/genesis.toml"
 	bytes, err := bindataRead(path, name)
 	if err != nil {
 		return nil, err
@@ -152,10 +171,11 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"README.md":            readmeMd,
-	"config/config.toml":   configConfigToml,
+	"README.md": readmeMd,
+	"config/config.toml": configConfigToml,
+	"config/genesis.toml": configGenesisToml,
 	"library/bignumber.js": libraryBignumberJs,
-	"res.go":               resGo,
+	"res.go": resGo,
 }
 
 // AssetDir returns the file names below a certain
@@ -197,11 +217,11 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
-
 var _bintree = &bintree{nil, map[string]*bintree{
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"config": &bintree{nil, map[string]*bintree{
 		"config.toml": &bintree{configConfigToml, map[string]*bintree{}},
+		"genesis.toml": &bintree{configGenesisToml, map[string]*bintree{}},
 	}},
 	"library": &bintree{nil, map[string]*bintree{
 		"bignumber.js": &bintree{libraryBignumberJs, map[string]*bintree{}},
@@ -255,3 +275,4 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
+

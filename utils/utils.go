@@ -39,7 +39,7 @@ func IntToHex(num int64) []byte {
 	return buff.Bytes()
 }
 
-func DefaultDataDir() string {
+func DefaultNodeDir() string {
 	// Try to place the data folder in the user's home dir
 	home := homeDir()
 	if home != "" {

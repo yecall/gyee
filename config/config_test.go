@@ -18,42 +18,14 @@
  *
  */
 
-package main
+package config
 
 import (
-	"net/rpc"
-
-	"github.com/urfave/cli"
-	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/utils/logging"
+	"testing"
+	"fmt"
 )
 
-type Args struct {
-	S string
+func TestGetDefaultConfig(t *testing.T) {
+	config := GetDefaultConfig()
+	fmt.Printf("%V\n", config)
 }
-
-var (
-	ipcCommand = cli.Command{
-		Name:      "ipc",
-		Usage:     "gyee ipc test",
-		ArgsUsage: "",
-		Flags: []cli.Flag{
-			cli.StringFlag{Name: "test"},
-		},
-		Category:    "",
-		Description: "",
-		Action: func(ctx *cli.Context) error {
-			conf := config.GetConfig(ctx)
-			client, err := rpc.Dial("unix", conf.IPCEndpoint())
-			var reply string
-
-			args := Args{S: "test"}
-			err = client.Call("JSService.Hello", args, &reply)
-			if err != nil {
-				logging.Logger.Info(err)
-			}
-			logging.Logger.Info(reply)
-			return nil
-		},
-	}
-)
