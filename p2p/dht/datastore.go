@@ -635,5 +635,6 @@ func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 		padLength:		cfg.PadLength,
 		sync:			cfg.Sync,
 	}
+	*fdc = dsMgr.fdsCfg
 	return DhtEnoNone
 }

@@ -66,6 +66,7 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 
 	sdl.p2pCfg = cfg
 	sdl.powerOff = false
+	sdl.appType = int(cfg.AppType)
 
 	//
 	// make maps

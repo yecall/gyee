@@ -169,7 +169,9 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	sdl := sch.SchGetScheduler(ptn)
 
+	conMgr.sdl = sdl
 	conMgr.ptnMe = ptn
+
 	_, conMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
 	_, conMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
 	_, conMgr.ptnLsnMgr = sdl.SchGetTaskNodeByName(LsnMgrName)

@@ -41,9 +41,9 @@ var (
 )
 
 func init() {
-	Log_DisableAll		= true
-	Log_DisableGoLog	= true
-	Log_DisableFileLine = true
+	Log_DisableAll		= false
+	Log_DisableGoLog	= false
+	Log_DisableFileLine = false
 	Log_DisableGyeeLog	= true
 }
 

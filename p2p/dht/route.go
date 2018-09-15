@@ -147,7 +147,7 @@ func NewRutMgr() *RutMgr {
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
 		bpTargets:		map[config.NodeID] interface{}{},
-		distLookupTab:	[]int{},
+		distLookupTab:	make([]int, 256),
 		localNodeId:	config.NodeID{},
 		rutTab:			rutMgrRouteTable{},
 		ntfTab:			make(map[rutMgrNotifeeId]*rutMgrNotifee, 0),

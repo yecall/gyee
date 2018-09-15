@@ -1323,7 +1323,7 @@ func testCase6(tc *testCase) {
 	
 	log.LogCallerFileLine("testCase6: going to start ycDht ...")
 
-	var dhtInstNum = 64
+	var dhtInstNum = 8
 	var dhtInstList = []*sch.Scheduler{}
 
 	for loop := 0; loop < dhtInstNum; loop++ {
@@ -1379,6 +1379,10 @@ func testCase6(tc *testCase) {
 		return
 	}
 
+	log.LogCallerFileLine("testCase6: sleep a while for instances starup ...")
+	time.Sleep(time.Second * 8)
+	log.LogCallerFileLine("testCase6: going to apply connection matrix ...")
+
 	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
 		log.LogCallerFileLine("testCase6: dhtConnMatrixApply failed, eno: %d", eno)
 		return
@@ -1398,7 +1402,7 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	//
 
 	var instNum = 0
-	const minInstNum = 15
+	const minInstNum = 7
 
 	if instNum = len(p2pInstList); instNum <= minInstNum {
 		log.LogCallerFileLine("dhtTestBuildConnMatrix: " +
@@ -1408,8 +1412,9 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	}
 
 	var m = make([][]bool, instNum)
-	for _, row := range m {
-		row = make([]bool, instNum)
+	for idx, _ := range m {
+		row := make([]bool, instNum)
+		m[idx] = row
 		for idx, _ := range row {
 			row[idx] = false
 		}
@@ -1420,8 +1425,7 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	//
 
 	const instNeightbors = 3
-	var neighbors = [instNum]int{}
-
+	var neighbors = make([]int, instNum)
 	for idx := 0; idx < instNum; idx++ {
 		neighbors[idx] = 0
 	}
@@ -1444,6 +1448,7 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 				m[n][idx] = true
 				neighbors[n]++
 				count++
+				break
 			}
 		}
 		neighbors[idx] = count
