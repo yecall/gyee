@@ -1345,3 +1345,10 @@ func (conInst *ConInst)InstallRxDataCallback(cbf ConInstRxDataCallback) DhtErrno
 
 	return DhtEnoNone
 }
+
+//
+// Get scheduler
+//
+func (conInst *ConInst)GetScheduler() *sch.Scheduler {
+	return conInst.sdl
+}

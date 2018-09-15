@@ -1462,43 +1462,223 @@ func dhtTestEventCallback(mgr interface{}, mid int, msg interface{}) int {
 }
 
 func dhtTestBlindConnectRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtBlindConnectRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestBlindConnectRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestBlindConnectRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestBlindConnectRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestMgrFindPeerRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryResultInd) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestMgrFindPeerRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestMgrFindPeerRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestMgrFindPeerRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestQryMgrQueryStartRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStartRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestQryMgrQueryStartRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestQryMgrQueryStartRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestQryMgrQueryStartRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestQryMgrQueryStopRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStopRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestQryMgrQueryStopRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestQryMgrQueryStopRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestQryMgrQueryStopRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestConMgrSendCfm(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrSendCfm) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestConMgrSendCfm: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestConMgrSendCfm: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestConMgrSendCfm: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestMgrPutProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtPrdMgrAddProviderRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestMgrPutProviderRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestMgrPutProviderRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestMgrPutProviderRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestMgrGetProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetProviderRsp) int {
-return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestMgrGetProviderRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestMgrGetProviderRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestMgrGetProviderRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestMgrPutValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrPutValueRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestMgrPutValueRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestMgrPutValueRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestMgrPutValueRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestMgrGetValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetValueRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestMgrGetValueRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestMgrGetValueRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestMgrGetValueRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestConMgrCloseRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrCloseRsp) int {
-	return -1
+
+	if mgr == nil {
+		log.LogCallerFileLine("dhtTestConMgrCloseRsp: nil manager")
+		return -1
+	}
+
+	sdl := mgr.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestConMgrCloseRsp: nil scheduler")
+		return -1
+	}
+
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestConMgrCloseRsp: " +
+		"instance: %s, msg: %v",
+		cfgName, *msg)
+
+	return 0
 }
 
 func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) int {
@@ -1548,6 +1728,47 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 // connetion instance rx-data callback
 //
 func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interface{})int {
-	log.LogCallerFileLine("dhtTestConInstStatusInd: entered, pid: %d", pid)
+
+	if conInst == nil || msg == nil {
+		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
+			"invalid parameters, conInst: %p, pid: %d, msg: %p",
+			conInst, pid, msg)
+		return -1
+	}
+
+	ci, ok := conInst.(*dht.ConInst)
+	if !ok {
+		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
+			"invalid connection instance, type: %T",
+			conInst)
+		return -1
+	}
+
+	data, ok := msg.([]byte)
+	if !ok {
+		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
+			"invalid message, type: %T",
+			msg)
+		return -1
+	}
+
+	if pid != uint32(dht.PID_EXT) {
+		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
+			"invalid pid: %d",
+			pid)
+		return -1
+	}
+
+	sdl := ci.GetScheduler()
+	if sdl == nil {
+		log.LogCallerFileLine("dhtTestConInstRxDataCallback: nil scheduler")
+		return -1
+	}
+	cfgName := sdl.SchGetP2pCfgName()
+
+	log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
+		"instance: %s, pid: %d, length: %d, data: %x",
+		cfgName, pid, len(data), data)
+
 	return 0
 }

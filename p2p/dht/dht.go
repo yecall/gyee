@@ -456,6 +456,13 @@ func (dhtMgr *DhtMgr)InstallEventCallback(cbf DhtCallback) DhtErrno {
 }
 
 //
+// get scheduler of manager
+//
+func (dhtMgr *DhtMgr)GetScheduler() *sch.Scheduler {
+	return dhtMgr.sdl
+}
+
+//
 // install rx data callback
 //
 func (dhtMgr *DhtMgr)InstallRxDataCallback(cbf ConInstRxDataCallback, peer *config.NodeID, dir ConInstDir) DhtErrno {
