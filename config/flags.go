@@ -22,7 +22,6 @@ package config
 
 import (
 	"github.com/urfave/cli"
-	"github.com/yeeco/gyee/utils"
 )
 
 var (
@@ -31,12 +30,58 @@ var (
 		Usage: "test network: pre-configured proof-of-work test network",
 	}
 
-	DataDirFlag = cli.StringFlag{
-		Name:  "datadir",
-		Usage: "gyee data directory",
-		Value: utils.DefaultDataDir(),
+	NodeNameFlag = cli.StringFlag{
+		Name:  "nodename",
+		Usage: "gyee node name",
+		Value: "MyNode",
 	}
+
+	NodeDirFlag = cli.StringFlag{
+		Name:  "nodedir",
+		Usage: "gyee node root directory",
+	}
+
+	//AppConfig Flag
+
+
 )
+
+func getAppConfig(ctx *cli.Context, cfg *Config) {
+	if cfg.App == nil {
+		cfg.App = &AppConfig{}
+	}
+}
+
+func getNetworkConfig(ctx *cli.Context, cfg *Config) {
+	if cfg.P2p == nil {
+		cfg.P2p = &P2pConfig{}
+	}
+}
+
+func getRpcConfig(ctx *cli.Context, cfg *Config) {
+	if cfg.Rpc == nil {
+		cfg.Rpc = &RpcConfig{}
+	}
+}
+
+func getChainConfig(ctx *cli.Context, cfg *Config) {
+	if cfg.Chain == nil {
+		cfg.Chain = &ChainConfig{}
+	}
+}
+
+func getMetricsConfig(ctx *cli.Context, cfg *Config) {
+	if cfg.Metrics == nil {
+		cfg.Metrics = &MetricsConfig{}
+	}
+}
+
+func getMiscConfig(ctx *cli.Context, cfg *Config) {
+	if cfg.Misc == nil {
+		cfg.Misc = &MiscConfig{}
+	}
+}
+
 
 func MergeFlags(action func(ctx *cli.Context) error) func(*cli.Context) error {
 	return func(ctx *cli.Context) error {

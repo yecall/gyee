@@ -19,3 +19,34 @@
  */
 
 package core
+
+import (
+	"fmt"
+
+	"github.com/yeeco/gyee/res"
+	"github.com/BurntSushi/toml"
+)
+
+type Genesis struct {
+	Consensus struct{Tetris struct{Validators []string}}
+	Init_Token_Dist []*struct{Address,Value string}
+}
+
+func LoadGenesis() (*Genesis, error) {
+	var genesis Genesis
+	data, err := res.Asset("config/genesis.toml")
+	if err != nil {
+		// Asset was not found.
+		return nil, err
+	}
+
+	if _, err := toml.Decode(string(data), &genesis); err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return &genesis, nil
+}
+
+func NewGenesisBlock() {
+
+}
