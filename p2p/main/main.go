@@ -1505,6 +1505,7 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 
 	instNum := len(p2pInstList)
 	cmBackup := make([][]bool, instNum)
+
 	for idx := 0; idx < instNum; idx++ {
 		cmBackup[idx] = append(cmBackup[idx], cm[idx]...)
 	}
@@ -1512,21 +1513,29 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 	conCount := 0
 
 	for idx, row := range cmBackup {
+
 		for n, connFlag := range row {
+
 			if connFlag {
+
 				dhtMgr := p2pInstList[idx].SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
 				local := dhtInst2Cfg[p2pInstList[idx]].Local
 				peerCfg := dhtInst2Cfg[p2pInstList[n]]
+
 				req := sch.MsgDhtBlindConnectReq {
 					Peer: &peerCfg.Local,
 				}
+
 				if eno := dhtMgr.DhtCommand(sch.EvDhtBlindConnectReq, &req); eno != sch.SchEnoNone {
 					log.LogCallerFileLine("dhtTestConnMatrixApply: DhtCommand failed, eno: %d", eno)
 					return -1
 				}
+
 				cmBackup[idx][n] = false
 				cmBackup[n][idx] = false
+
 				conCount++
+
 				log.LogCallerFileLine("dhtTestConnMatrixApply: " +
 					"blind connect request sent ok, from: %+v, to: %+v",
 					local, peerCfg.Local)
