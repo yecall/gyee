@@ -1397,19 +1397,109 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	// ring, star, line, random, ...
 	//
 
-	return nil
+	var instNum = 0
+	const minInstNum = 15
+
+	if instNum = len(p2pInstList); instNum <= minInstNum {
+		log.LogCallerFileLine("dhtTestBuildConnMatrix: " +
+			"instance not enougth, instNum: %d, should more than: %d",
+			instNum, minInstNum)
+		return nil
+	}
+
+	var m = make([][]bool, instNum)
+	for _, row := range m {
+		row = make([]bool, instNum)
+		for idx, _ := range row {
+			row[idx] = false
+		}
+	}
+
+	//
+	// an example set neighbors randomly
+	//
+
+	const instNeightbors = 3
+	var neighbors = [instNum]int{}
+
+	for idx := 0; idx < instNum; idx++ {
+		neighbors[idx] = 0
+	}
+
+	for idx, row := range m {
+		count := neighbors[idx]
+		if count >= instNeightbors {
+			continue
+		}
+		for ; count < instNeightbors; count++ {
+			for true {
+				n := rand.Intn(instNum)
+				if row[n] == true {
+					continue
+				}
+				if neighbors[n] >= instNeightbors {
+					continue
+				}
+				row[n] = true
+				m[n][idx] = true
+				neighbors[n]++
+				count++
+			}
+		}
+		neighbors[idx] = count
+	}
+
+	return m
 }
 
 //
 // apply connection matrix for instance list
 //
-func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) dht.DhtErrno {
+func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 
 	//
 	// setup connection between dht instance according to the connection matrix
 	//
 
-	return dht.DhtEnoNone
+	if len(p2pInstList) == 0 || cm == nil {
+		log.LogCallerFileLine("dhtTestConnMatrixApply: invalid parameters")
+		return -1
+	}
+
+	instNum := len(p2pInstList)
+	cmBackup := make([][]bool, instNum)
+	for idx, row := range cmBackup {
+		row = append(row, cm[idx]...)
+	}
+
+	conCount := 0
+
+	for idx, row := range cmBackup {
+		for n, connFlag := range row {
+			if connFlag {
+				dhtMgr := p2pInstList[idx].SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+				local := dhtInst2Cfg[p2pInstList[idx]].Local
+				peerCfg := dhtInst2Cfg[p2pInstList[n]]
+				req := sch.MsgDhtBlindConnectReq {
+					Peer: &peerCfg.Local,
+				}
+				if eno := dhtMgr.DhtCommand(sch.EvDhtBlindConnectReq, &req); eno != sch.SchEnoNone {
+					log.LogCallerFileLine("dhtTestConnMatrixApply: DhtCommand failed, eno: %d", eno)
+					return -1
+				}
+				cmBackup[idx][n] = false
+				cmBackup[n][idx] = false
+				conCount++
+				log.LogCallerFileLine("dhtTestConnMatrixApply: " +
+					"blind connect request sent ok, from: %+v, to: %+v",
+					local, peerCfg.Local)
+			}
+		}
+	}
+
+	log.LogCallerFileLine("dhtTestConnMatrixApply: applied, blind connection count: %d", conCount)
+
+	return 0
 }
 
 //
@@ -1727,7 +1817,7 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 //
 // connetion instance rx-data callback
 //
-func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interface{})int {
+func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interface{}) int {
 
 	if conInst == nil || msg == nil {
 		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
