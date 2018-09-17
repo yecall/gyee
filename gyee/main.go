@@ -47,8 +47,17 @@ func init() {
 	app.Copyright = "Copyright 2017-2018 The gyee Authors"
 	app.Flags = []cli.Flag{
 		config.TestnetFlag,
+		config.NodeConfigFlag,
+		config.NodeNameFlag,
 		config.NodeDirFlag,
 	}
+	app.Flags = append(config.AppFlags)
+	app.Flags = append(config.NetworkFlags)
+	app.Flags = append(config.RpcFlags)
+	app.Flags = append(config.ChainFlags)
+	app.Flags = append(config.MetricsFlags)
+	app.Flags = append(config.MiscFlags)
+
 	app.Commands = []cli.Command{
 		consoleCommand,
 		configCommand,
@@ -57,6 +66,7 @@ func init() {
 		versionCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
+
 	app.Before = func(ctx *cli.Context) error {
 		return nil
 	}

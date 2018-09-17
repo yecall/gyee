@@ -72,7 +72,8 @@ type AccountManager struct {
 
 func NewAccountManager(config *config.Config) (*AccountManager, error) {
 	am := &AccountManager{}
-	keydir := filepath.Join(config.DataDir, "keystore")
+	//TODO: 用config里的keydir来拼
+	keydir := filepath.Join(config.NodeDir, "keystore")
 	am.ks = keystore.NewKeystore(keydir)
 	//accounts := Accounts{}
 	//accounts.Accounts = make(map[string]*Account)

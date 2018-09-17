@@ -72,12 +72,12 @@ type Node struct {
 
 func NewNode(conf *config.Config) (*Node, error) {
 	logging.Logger.Info("Create new node")
-	if conf.DataDir != "" {
-		absdatadir, err := filepath.Abs(conf.DataDir)
+	if conf.NodeDir != "" {
+		absdatadir, err := filepath.Abs(conf.NodeDir)
 		if err != nil {
 			logging.Logger.Panic(err)
 		}
-		conf.DataDir = absdatadir
+		conf.NodeDir = absdatadir
 	}
 
 	node := &Node{
@@ -155,7 +155,7 @@ func (n *Node) WaitForShutdown() {
 }
 
 func (n *Node) lockDataDir() error {
-	instDir := filepath.Join(n.config.DataDir, n.config.Name)
+	instDir := filepath.Join(n.config.NodeDir, n.config.Name)
 	if err := os.MkdirAll(instDir, 0700); err != nil {
 		return err
 	}

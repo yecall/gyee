@@ -28,4 +28,6 @@ import (
 func TestGetDefaultConfig(t *testing.T) {
 	config := GetDefaultConfig()
 	fmt.Printf("%V\n", config)
+
+	SaveConfigToFile("/tmp/config.toml", config)
 }

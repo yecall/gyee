@@ -21,16 +21,18 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"io/ioutil"
 
 	"github.com/BurntSushi/toml"
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/res"
 	"github.com/yeeco/gyee/utils"
+	"github.com/yeeco/gyee/utils/logging"
+	"github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -87,13 +89,18 @@ type MiscConfig struct {
 func GetConfig(ctx *cli.Context) *Config {
 	config := GetDefaultConfig()
 
-	//TODO: 这个地方如果Flag用了datadir，d形式的alternate，貌似都找不到
-	if ctx.GlobalIsSet(NodeNameFlag.Name) {
-		config.Name = ctx.GlobalString(NodeNameFlag.Name)
+	//这个地方如果Flag用了datadir，d形式的alternate，貌似都找不到，所以取name的第一段
+	if ctx.GlobalIsSet(FlagName(NodeConfigFlag.Name)) {
+		configFile := ctx.GlobalString(FlagName(NodeConfigFlag.Name))
+		GetConfigFromFile(configFile, config)
+	}
+
+	if ctx.GlobalIsSet(FlagName(NodeNameFlag.Name)) {
+		config.Name = ctx.GlobalString(FlagName(NodeNameFlag.Name))
 	}
 
 	if ctx.GlobalIsSet(NodeDirFlag.Name) {
-		config.NodeDir = ctx.GlobalString(NodeDirFlag.Name)
+		config.NodeDir = ctx.GlobalString(FlagName(NodeDirFlag.Name))
 	}
 
 	//Get config of modules
@@ -113,15 +120,60 @@ func GetDefaultConfig() *Config {
 
 	cdata, err := res.Asset("config/config.toml")
 	if err != nil {
-		// Asset was not found.
+		logging.Logger.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatal("Failed to read the default config")
 	}
 
 	if _, err := toml.Decode(string(cdata), &config); err != nil {
-		fmt.Println(err)
+		logging.Logger.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatal("Failed to decode the default config")
 		return nil
 	}
 
 	return &config
+}
+
+func GetConfigFromFile(file string, config *Config) *Config {
+	cdata, err := ioutil.ReadFile(file)
+
+	if err != nil {
+		logging.Logger.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatalf("Failed to read the config file: %s", file)
+	}
+
+	if _, err := toml.Decode(string(cdata), config); err != nil {
+		logging.Logger.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatalf("Failed to decode the config file: %s", file)
+	}
+
+	return config
+}
+
+func SaveConfigToFile(file string, config *Config) error {
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE,0766)
+
+	if err != nil {
+		logging.Logger.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatalf("Failed to write the config file: %s", file)
+	}
+
+    encoder := toml.NewEncoder(f)
+
+    err = encoder.Encode(config)
+	if err != nil {
+		logging.Logger.WithFields(logrus.Fields{
+			"err": err,
+		}).Fatal("Failed to encode the config")
+	}
+
+    f.Close()
+
+    return nil
 }
 
 func (c *Config) IPCEndpoint() string {
@@ -146,9 +198,3 @@ func (c *Config) IPCEndpoint() string {
 	return c.Rpc.IpcPath
 }
 
-func CreateDefaultConfigFile(filename string) {
-	//if err := ioutil.WriteFile(filename, []byte(defaultConfig()), 0644); err != nil {
-	//
-	//}
-
-}
