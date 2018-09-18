@@ -51,12 +51,13 @@ func init() {
 		config.NodeNameFlag,
 		config.NodeDirFlag,
 	}
-	app.Flags = append(config.AppFlags)
-	app.Flags = append(config.NetworkFlags)
-	app.Flags = append(config.RpcFlags)
-	app.Flags = append(config.ChainFlags)
-	app.Flags = append(config.MetricsFlags)
-	app.Flags = append(config.MiscFlags)
+	app.Flags = append(app.Flags, config.AppFlags...)
+	app.Flags = append(app.Flags, config.NetworkFlags...)
+	app.Flags = append(app.Flags, config.RpcFlags...)
+	app.Flags = append(app.Flags, config.ChainFlags...)
+	app.Flags = append(app.Flags, config.MetricsFlags...)
+	app.Flags = append(app.Flags, config.MiscFlags...)
+	sort.Sort(cli.FlagsByName(app.Flags))
 
 	app.Commands = []cli.Command{
 		consoleCommand,

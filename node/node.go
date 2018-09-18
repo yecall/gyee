@@ -229,6 +229,10 @@ func (n *Node) NodeName() string {
 	return n.name
 }
 
+func (n *Node) Config() *config.Config {
+	return n.config
+}
+
 func (n *Node) AccountManager() *accounts.AccountManager {
 	return n.accountManager
 }

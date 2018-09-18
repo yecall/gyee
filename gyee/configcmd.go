@@ -44,9 +44,30 @@ Manage gyee config, generate a default config file.`,
 				Description: `
 Generate a a default config file.`,
 			},
+			{
+				Name:      "save",
+				Usage:     "Generate a default config file",
+				Action:    config.MergeFlags(saveConfig),
+				ArgsUsage: "<filename>",
+				Description: `
+Generate a a default config file.`,
+			},
 		},
 	}
 )
+
+func saveConfig(ctx *cli.Context) error {
+	fileName := ctx.Args().First()
+	if len(fileName) == 0 {
+		fmt.Println("please give a config file arg!!!")
+		return nil
+	}
+
+	node := makeNode(ctx)
+	config.SaveConfigToFile(fileName, node.Config())
+
+	return nil
+}
 
 func createDefaultConfig(ctx *cli.Context) error {
 	fileName := ctx.Args().First()
@@ -54,7 +75,7 @@ func createDefaultConfig(ctx *cli.Context) error {
 		fmt.Println("please give a config file arg!!!")
 		return nil
 	}
-	config.CreateDefaultConfigFile(fileName)
+	//config.CreateDefaultConfigFile(fileName)
 	fmt.Printf("create default config %s\n", fileName)
 	return nil
 }

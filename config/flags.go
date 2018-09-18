@@ -28,7 +28,7 @@ import (
 var (
 	TestnetFlag = cli.BoolFlag{
 		Name:  "testnet, t",
-		Usage: "test network: pre-configured proof-of-work test network",
+		Usage: "test network: pre-configured test network",
 	}
 
 	NodeConfigFlag = cli.StringFlag{
