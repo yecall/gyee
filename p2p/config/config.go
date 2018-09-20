@@ -666,7 +666,7 @@ func P2pDefaultDataDir(flag bool) string {
 		if runtime.GOOS == "darwin" {
 			home = filepath.Join(home, "Library", "yee")
 		} else if runtime.GOOS == "windows" {
-			home = filepath.Join(home, "AppData", "Roaming", "Yee")
+			home = filepath.Join(home, "AppData", "Roaming", "yee")
 		} else {
 			home = filepath.Join(home, ".yee")
 		}
@@ -711,17 +711,12 @@ func P2pGetUserHomeDir() string {
 func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 
 	//
-	// Here we apply the Ethereum crypto package to build node private key:
-	//
 	// 1) if no data directory specified, try to generate key, but do no save to file;
 	// 2) if data directory presented, try to load key from file;
 	// 3) if load failed, try to generate key and the save it to file;
 	//
-	// See bellow please, also see Ethereum function node.NodeKey pls.
-	//
 
 	if cfg.NodeDataDir == "" {
-		//key, err := ethereum.GenerateKey()
 		key, err := GenerateKey()
 		if err != nil {
 			log.LogCallerFileLine("p2pBuildPrivateKey: " +
@@ -733,7 +728,6 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 	}
 
 	keyfile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
-	//if key, err := ethereum.LoadECDSA(keyfile); err == nil {
 	if key, err := LoadECDSA(keyfile); err == nil {
 		log.LogCallerFileLine("p2pBuildPrivateKey: " +
 			"private key loaded ok from file: %s",
@@ -741,7 +735,6 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 		return key
 	}
 
-	//key, err := ethereum.GenerateKey()
 	key, err := GenerateKey()
 	if err != nil {
 		log.LogCallerFileLine("p2pBuildPrivateKey: " +
@@ -760,7 +753,6 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 		}
 	}
 
-	//if err := ethereum.SaveECDSA(keyfile, key); err != nil {
 	if err := SaveECDSA(keyfile, key); err != nil {
 		log.LogCallerFileLine("p2pBuildPrivateKey: " +
 			"SaveECDSA failed, err: %s",
@@ -949,7 +941,7 @@ func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
 //
 func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 	return &Cfg4PeerManager {
-		CfgName:			name, // config[name].CfgName
+		CfgName:			name,
 		NetworkType:		config[name].NetworkType,
 		IP:					config[name].Local.IP,
 		Port:				config[name].Local.TCP,
@@ -1020,7 +1012,6 @@ func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
 	return &config[name].DhtFdsCfg
 }
 
-
 //
 // Get configuration for dht listener manager
 //
@@ -1047,8 +1038,9 @@ func S256() elliptic.Curve {
 	return elliptic.P256()
 }
 
-
-// LoadECDSA loads a secp256k1 private key from the given file.
+//
+// LoadECDSA loads a secp256k1 private key from the given file
+//
 func LoadECDSA(file string) (*ecdsa.PrivateKey, error) {
 	buf := make([]byte, 64)
 	fd, err := os.Open(file)
@@ -1067,8 +1059,10 @@ func LoadECDSA(file string) (*ecdsa.PrivateKey, error) {
 	return ToECDSA(key)
 }
 
+//
 // SaveECDSA saves a secp256k1 private key to the given file with
 // restrictive permissions. The key data is saved hex-encoded.
+//
 func SaveECDSA(file string, key *ecdsa.PrivateKey) error {
 	k := hex.EncodeToString(FromECDSA(key))
 	return ioutil.WriteFile(file, []byte(k), 0600)
@@ -1078,14 +1072,18 @@ func GenerateKey() (*ecdsa.PrivateKey, error) {
 	return ecdsa.GenerateKey(S256(), rand.Reader)
 }
 
+//
 // ToECDSA creates a private key with the given D value.
+//
 func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 	return toECDSA(d, true)
 }
 
+//
 // toECDSA creates a private key with the given D value. The strict parameter
 // controls whether the key's length should be enforced at the curve size or
 // it can also accept legacy encodings (0 prefixes).
+//
 func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	priv := new(ecdsa.PrivateKey)
 	priv.PublicKey.Curve = S256()
@@ -1118,7 +1116,9 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 	return priv, nil
 }
 
+//
 // FromECDSA exports a private key into a binary dump.
+//
 func FromECDSA(priv *ecdsa.PrivateKey) []byte {
 	if priv == nil {
 		return nil
