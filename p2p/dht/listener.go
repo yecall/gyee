@@ -341,6 +341,11 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrAcceptInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 
+	log.LogCallerFileLine("driveSelf: connection accepted ok, " +
+		"loccal address: %s, remote address: %s",
+		con.LocalAddr().String(),
+		con.RemoteAddr().String())
+
 	return sch.SchEnoNone
 }
 

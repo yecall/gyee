@@ -1838,7 +1838,21 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 				"InstallRxDataCallback failed, eno: %d, peer: %x",
 				eno, *msg.Peer)
 
-			return -1;
+			return -1
+		}
+
+	case dht.CisAccepted:
+
+		log.LogCallerFileLine("dhtTestConInstStatusInd: CisAccepted")
+
+		if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
+			msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
+
+			log.LogCallerFileLine("dhtTestConInstStatusInd: " +
+				"InstallRxDataCallback failed, eno: %d, peer: %x",
+				eno, *msg.Peer)
+
+			return -1
 		}
 
 	case dht.CisInHandshaking:

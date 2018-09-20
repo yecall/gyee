@@ -86,6 +86,7 @@ const (
 	CisNull			= iota			// null, not inited
 	CisConnecting					// connecting
 	CisConnected					// connected
+	CisAccepted						// accepted
 	CisInHandshaking				// handshaking
 	CisHandshaked					// handshaked
 	CisInService					// in service
@@ -230,6 +231,9 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 	}
 
 	if conInst.dir == conInstDirInbound {
+		if conInst.statusReport() != DhtEnoNone {
+			return sch.SchEnoUserTask
+		}
 		conInst.status = CisConnected
 		return sch.SchEnoNone
 	}
@@ -688,6 +692,14 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 // Report instance status to connection manager
 //
 func (conInst *ConInst)statusReport() DhtErrno {
+
+	//
+	// notice: during the lifetime of the connection instance, the "Peer" might be
+	// still not known at some time. for example, when just connection be accepted
+	// and handshake procedure is not completed, so one must check the direction and
+	// status of a connection instance to apply the "peer" information indicated by
+	// the following message.
+	//
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtConInstStatusInd {

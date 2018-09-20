@@ -32,6 +32,7 @@ import (
 	"os/user"
 	"runtime"
 	"fmt"
+	"time"
 
 	"crypto/rand"
 	"encoding/hex"
@@ -41,7 +42,6 @@ import (
 	"errors"
 
 	log "github.com/yeeco/gyee/p2p/logger"
-	"time"
 )
 
 
@@ -370,6 +370,7 @@ var config = make(map[string] *Config)
 //
 // Get default non-bootstrap node config
 //
+var dftDatDir = P2pDefaultDataDir(true)
 func P2pDefaultConfig() *Config {
 
 	var defaultConfig = Config {
@@ -389,7 +390,7 @@ func P2pDefaultConfig() *Config {
 		BootstrapNodes:			BootstrapNodes,
 		StaticNodes:			nil,
 		StaticNetId:			ZeroSubNet,
-		NodeDataDir:			P2pDefaultDataDir(true),
+		NodeDataDir:			dftDatDir,
 		NodeDatabase:			datadirNodeDatabase,
 		NoDial:					false,
 		NoAccept:				false,
@@ -428,7 +429,7 @@ func P2pDefaultConfig() *Config {
 		},
 
 		DhtFdsCfg: Cfg4DhtFileDatastore {
-			Path:				P2pDefaultDataDir(true),
+			Path:				dftDatDir,
 			ShardFuncName:		sfnNextToLast,
 			PadLength:			2,
 			Sync:				true,
@@ -1009,6 +1010,9 @@ func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
 // Get configuration for dht file data store
 //
 func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
+	dir := config[name].DhtFdsCfg.Path
+	inst := config[name].Name
+	config[name].DhtFdsCfg.Path = filepath.Join(dir, inst, "fds")
 	return &config[name].DhtFdsCfg
 }
 

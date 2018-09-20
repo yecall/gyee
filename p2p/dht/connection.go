@@ -223,6 +223,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	sdl := conMgr.sdl
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), true)
 	conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil)
+	ci.status = CisAccepted
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -423,9 +424,29 @@ func (conMgr *ConMgr)lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrn
 //
 func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
-	var rsp = sch.MsgDhtConMgrConnectRsp {
-		Peer:	msg.Peer,
+	var rspNormal = sch.MsgDhtConMgrConnectRsp {
 		Eno:	DhtEnoNone,
+		Peer:	msg.Peer,
+	}
+
+	var rspBlind = sch.MsgDhtBlindConnectRsp {
+		Eno:	DhtEnoNone,
+		Peer:	msg.Peer,
+		Ptn:	nil,
+	}
+
+	var rsp interface{}
+	var rspEvent int
+	var ptrEno *int
+
+	if msg.IsBlind {
+		rsp = &rspBlind
+		ptrEno = &rspBlind.Eno
+		rspEvent = sch.EvDhtConMgrConnectRsp
+	} else {
+		rsp = &rspNormal
+		ptrEno = &rspNormal.Eno
+		rspEvent = sch.EvDhtBlindConnectRsp
 	}
 
 	var sender = msg.Task
@@ -433,8 +454,8 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	var rsp2Sender = func(eno DhtErrno) sch.SchErrno {
 		msg := sch.SchMessage{}
-		rsp.Eno = int(eno)
-		sdl.SchMakeMessage(&msg, conMgr.ptnMe, sender, sch.EvDhtConMgrConnectRsp, &rsp)
+		*ptrEno = int(eno)
+		sdl.SchMakeMessage(&msg, conMgr.ptnMe, sender, rspEvent, rsp)
 		return sdl.SchSendMessage(&msg)
 	}
 
@@ -485,6 +506,15 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		dir:	conInstDirOutbound,
 	}
 	conMgr.ciTab[cid] = ci
+
+	//
+	// if it's blind, we need not to response the sender, whom would be responsed in
+	// handshake procedure, since here handshake request had been sent ok.
+	//
+
+	if msg.IsBlind {
+		return sch.SchEnoNone
+	}
 
 	return rsp2Sender(DhtErrno(DhtEnoNone))
 }
@@ -640,6 +670,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	case CisNull:
 	case CisConnecting:
 	case CisConnected:
+	case CisAccepted:
 	case CisInHandshaking:
 	case CisHandshaked:
 	case CisInService:
