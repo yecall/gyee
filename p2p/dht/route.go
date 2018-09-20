@@ -652,9 +652,13 @@ func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration
 		return rutMgr.rutMgrMetricUpdate(id)
 	}
 
+	if latency == -1 {
+		return DhtEnoNone
+	}
+
 	rt.metricTab[id] = &rutMgrPeerMetric {
 		peerId:		id,
-		ltnSamples: make([]time.Duration, 0, 8),
+		ltnSamples: make([]time.Duration, 8),
 		ewma:		latency,
 	}
 	rt.metricTab[id].ltnSamples[0] = latency
@@ -799,7 +803,7 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 
 	tail := len(rt.bucketTab)
 	if tail == 0 {
-		rt.bucketTab[0] = list.New()
+		rt.bucketTab = append(rt.bucketTab, list.New())
 	} else {
 		tail--
 	}

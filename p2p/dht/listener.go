@@ -199,7 +199,7 @@ func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 	}
 
 	if dhtEno := lsnMgr.setupListener(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("setupReq: setupListener failed, eno: %d", dhtEno)
+		log.LogCallerFileLine("startReq: setupListener failed, eno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -210,6 +210,8 @@ func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 
 	lsnMgr.status = lmsStartup
 	lsnMgr.dispStaus()
+
+	log.LogCallerFileLine("startReq: listener starup ok, cfg: %v", lsnMgr.config)
 
 	return sch.SchEnoNone
 }
@@ -292,8 +294,8 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	// handler for sch.EvDhtLsnMgrStartReq pls.
 	//
 
-	if lsnMgr.status == lmsNull {
-		log.LogCallerFileLine("driveSelf: begig to work")
+	if lsnMgr.status == lmsStartup {
+		log.LogCallerFileLine("driveSelf: begin to work...")
 		lsnMgr.status = lmsWorking
 		lsnMgr.dispStaus()
 	}
@@ -308,6 +310,10 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	// interface to force ourself to get out from accept action, see function
 	// ForceAcceptOut.
 	//
+
+	log.LogCallerFileLine("driveSelf: " +
+		"listener:[%s:%d], try accept ...",
+		lsnMgr.config.ip.String(), lsnMgr.config.port)
 
 	lsnMgr.listener.(*net.TCPListener).SetDeadline(time.Now().Add(lmAcceptTimeout))
 	con, err := lsnMgr.listener.Accept()
@@ -342,9 +348,12 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	lsnMgr.sdl.SchSendMessage(&msg)
 
 	log.LogCallerFileLine("driveSelf: connection accepted ok, " +
-		"loccal address: %s, remote address: %s",
+		"listener:[%s:%d], loccal address: %s, remote address: %s",
+		lsnMgr.config.ip.String(), lsnMgr.config.port,
 		con.LocalAddr().String(),
 		con.RemoteAddr().String())
+
+	lsnMgr.driveMore()
 
 	return sch.SchEnoNone
 }

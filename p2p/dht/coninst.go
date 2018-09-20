@@ -30,6 +30,7 @@ import (
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
+	"io"
 )
 
 //
@@ -99,10 +100,10 @@ type conInstStatus int
 // Connection instance direction
 //
 const (
-	conInstDirInbound	= 0			// out from local
-	conInstDirOutbound	= 1			// in from peer
-	conInstDirAllbound	= 2			// in & out
-	conInstDirUnknown	= -1		// not be initialized
+	ConInstDirInbound	= 0			// out from local
+	ConInstDirOutbound	= 1			// in from peer
+	ConInstDirAllbound	= 2			// in & out
+	ConInstDirUnknown	= -1		// not be initialized
 )
 
 type ConInstDir int
@@ -151,7 +152,7 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		ior:		nil,
 		iow:		nil,
 		status:		CisNull,
-		dir:		conInstDirUnknown,
+		dir:		ConInstDirUnknown,
 		txPending:	list.New(),
 		txDone:		nil,
 		rxDone:		nil,
@@ -230,7 +231,7 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoMismatched
 	}
 
-	if conInst.dir == conInstDirInbound {
+	if conInst.dir == ConInstDirInbound {
 		if conInst.statusReport() != DhtEnoNone {
 			return sch.SchEnoUserTask
 		}
@@ -238,7 +239,7 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoNone
 	}
 
-	if conInst.dir == conInstDirOutbound {
+	if conInst.dir == ConInstDirOutbound {
 		if conInst.statusReport() != DhtEnoNone {
 			return sch.SchEnoUserTask
 		}
@@ -295,15 +296,18 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	// connect to peer if it's not
 	//
 
-	if conInst.con == nil && conInst.dir == conInstDirOutbound {
+	if conInst.con == nil && conInst.dir == ConInstDirOutbound {
 
 		conInst.status = CisConnecting
 		conInst.statusReport()
 
 		if eno := conInst.connect2Peer(); eno != DhtEnoNone {
-
+			peer := conInst.hsInfo.peer
+			hsInfo := conInst.hsInfo
 			rsp.Eno = int(eno)
-			rsp.Peer = &conInst.hsInfo.peer
+			rsp.Peer = &peer
+			rsp.Inst = nil
+			rsp.HsInfo = &hsInfo
 			rsp2ConMgr()
 
 			conInst.cleanUp(int(eno))
@@ -322,13 +326,16 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.hsTimeout = msg.DurHs
 	conInst.statusReport()
 
-	if conInst.dir == conInstDirOutbound {
+	if conInst.dir == ConInstDirOutbound {
 
 		if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
 
+			peer := conInst.hsInfo.peer
+			hsInfo := conInst.hsInfo
 			rsp.Eno = int(eno)
-			rsp.Peer = &conInst.hsInfo.peer
-			rsp.HsInfo = &conInst.hsInfo
+			rsp.Peer = &peer
+			rsp.Inst = nil
+			rsp.HsInfo = &hsInfo
 			rsp2ConMgr()
 
 			conInst.cleanUp(int(eno))
@@ -340,8 +347,9 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 		if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
 
 			rsp.Eno = int(eno)
-			rsp.Peer = &conInst.hsInfo.peer
-			rsp.HsInfo = &conInst.hsInfo
+			rsp.Peer = nil
+			rsp.HsInfo = nil
+			rsp.Inst = nil
 			rsp2ConMgr()
 
 			conInst.cleanUp(int(eno))
@@ -378,7 +386,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 
 	if conInst.status != CisHandshaked &&
 		conInst.status != CisInService &&
-		conInst.dir != conInstDirOutbound {
+		conInst.dir != ConInstDirOutbound {
 
 		log.LogCallerFileLine("closeReq: " +
 			"status mismatched, dir: %d, status: %d",
@@ -662,7 +670,7 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 //
 func (conInst *ConInst)connect2Peer() DhtErrno {
 
-	if conInst.dir != conInstDirOutbound {
+	if conInst.dir != ConInstDirOutbound {
 		log.LogCallerFileLine("connect2Peer: mismatched direction: %d", conInst.dir)
 		return DhtEnoInternal
 	}
@@ -670,6 +678,11 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 	peer := conInst.hsInfo.peer
 	dialer := &net.Dialer{Timeout: ciConn2PeerTimeout}
 	addr := &net.TCPAddr{IP: peer.IP, Port: int(peer.TCP)}
+
+	log.LogCallerFileLine("connect2Peer: try to connect, " +
+		"local: %s, remote: %s",
+		conInst.local.IP.String(),
+		addr.String())
 
 	var conn net.Conn
 	var err error
@@ -682,8 +695,15 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 	}
 
 	conInst.con = conn
-	conInst.ior = ggio.NewDelimitedReader(conn, ciMaxPackageSize)
-	conInst.iow = ggio.NewDelimitedWriter(conn)
+	r := conInst.con.(io.Reader)
+	conInst.ior = ggio.NewDelimitedReader(r, ciMaxPackageSize)
+	w := conInst.con.(io.Writer)
+	conInst.iow = ggio.NewDelimitedWriter(w)
+
+	log.LogCallerFileLine("connect2Peer: connect ok, " +
+		"local: %s, remote: %s",
+		conn.LocalAddr().String(),
+		conn.RemoteAddr().String())
 
 	return DhtEnoNone
 }
@@ -724,7 +744,7 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 	dhtMsg := new(DhtMessage)
 	dhtMsg.Mid = MID_HANDSHAKE
 	dhtMsg.Handshake = &Handshake{
-		Dir:		conInstDirOutbound,
+		Dir:		ConInstDirOutbound,
 		NodeId:		conInst.local.ID,
 		IP:			conInst.local.IP,
 		UDP:		uint32(conInst.local.UDP),
@@ -794,7 +814,7 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 	}
 
 	hs := dhtMsg.Handshake
-	if hs.Dir != conInstDirOutbound {
+	if hs.Dir != ConInstDirInbound {
 		log.LogCallerFileLine("outboundHandshake: " +
 			"mismatched direction: %d", hs.Dir)
 		return DhtEnoProtocol
@@ -859,7 +879,7 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 	}
 
 	hs := dhtMsg.Handshake
-	if hs.Dir != conInstDirOutbound {
+	if hs.Dir != ConInstDirOutbound {
 		log.LogCallerFileLine("inboundHandshake: " +
 			"mismatched direction: %d", hs.Dir)
 		return DhtEnoProtocol
@@ -871,11 +891,12 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 		UDP:	uint16(hs.UDP & 0xffff),
 		ID:		hs.NodeId,
 	}
+	conInst.cid.nid = conInst.hsInfo.peer.ID
 
 	*dhtMsg = DhtMessage{}
 	dhtMsg.Mid = MID_HANDSHAKE
 	dhtMsg.Handshake = &Handshake{
-		Dir:		conInstDirInbound,
+		Dir:		ConInstDirInbound,
 		NodeId:		conInst.local.ID,
 		IP:			conInst.local.IP,
 		UDP:		uint32(conInst.local.UDP),

@@ -490,11 +490,13 @@ func (dhtMgr *DhtMgr)InstallRxDataCallback(cbf ConInstRxDataCallback, peer *conf
 	}
 
 	for idx, ci := range cis {
-		if eno := ci.InstallRxDataCallback(cbf); eno != DhtEnoNone {
-			log.LogCallerFileLine("InstallRxDataCallback: " +
-				"failed, idx: %d, eno: %d, name: %s",
-				idx, eno, ci.name)
-			return eno
+		if ci != nil {
+			if eno := ci.InstallRxDataCallback(cbf); eno != DhtEnoNone {
+				log.LogCallerFileLine("InstallRxDataCallback: "+
+					"failed, idx: %d, eno: %d, name: %s",
+					idx, eno, ci.name)
+				return eno
+			}
 		}
 	}
 

@@ -29,6 +29,7 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/anacrolix/sync"
+	"io"
 )
 
 //
@@ -222,8 +223,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	sdl := conMgr.sdl
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), true)
-	conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil)
-	ci.status = CisAccepted
+	conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil, msg)
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -268,11 +268,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	// information in this case here.
 	//
 
-	cid := conInstIdentity {
-		nid:	msg.Peer.ID,
-		dir:	ConInstDir(msg.Dir),
-	}
-
 	var ci *ConInst = nil
 
 	if msg.Eno != DhtEnoNone {
@@ -282,7 +277,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
 		//
 
-		if ci.isBlind && ci.dir == conInstDirOutbound {
+		if ci.isBlind && ci.dir == ConInstDirOutbound {
 			rsp := sch.MsgDhtBlindConnectRsp {
 				Eno:	msg.Eno,
 				Ptn:	ci.ptnMe,
@@ -296,29 +291,35 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		//
 		// notice: if handshake failed, connection instances should have done themself,
 		// so here we need not to request them to be closed, we just remove them from
-		// the map table(for outbounds).
+		// the map table(for outbounds). inbound instance still not be mapped into ciTab
+		// and no tx data should be pending.
 		//
 
-		if msg.Dir == conInstDirOutbound {
-			delete(conMgr.ciTab, cid)
-		}
+		if msg.Dir == ConInstDirOutbound {
 
-		cid := conInstIdentity{
-			nid: msg.Peer.ID,
-			dir: conInstDirOutbound,
-		}
-
-		if li, ok := conMgr.txQueTab[cid]; ok {
-			for li.Len() > 0 {
-				li.Remove(li.Front())
+			cid := conInstIdentity{
+				nid: msg.Peer.ID,
+				dir: ConInstDirOutbound,
 			}
-			delete(conMgr.txQueTab, cid)
+			delete(conMgr.ciTab, cid)
+
+			if li, ok := conMgr.txQueTab[cid]; ok {
+				for li.Len() > 0 {
+					li.Remove(li.Front())
+				}
+				delete(conMgr.txQueTab, cid)
+			}
 		}
 
 		return sch.SchEnoNone
 	}
 
-	if msg.Dir == conInstDirInbound {
+	cid := conInstIdentity{
+		nid: msg.Peer.ID,
+		dir: ConInstDir(msg.Dir),
+	}
+
+	if msg.Dir == ConInstDirInbound {
 
 		ci = msg.Inst.(*ConInst)
 		conMgr.ciTab[cid] = ci
@@ -352,7 +353,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 		cid := conInstIdentity{
 			nid: msg.Peer.ID,
-			dir: conInstDirOutbound,
+			dir: ConInstDirOutbound,
 		}
 
 		if li, ok := conMgr.txQueTab[cid]; ok {
@@ -470,7 +471,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
-	conMgr.setupConInst(ci, sender, msg.Peer)
+	conMgr.setupConInst(ci, sender, msg.Peer, nil)
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -503,7 +504,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	cid := conInstIdentity{
 		nid:	msg.Peer.ID,
-		dir:	conInstDirOutbound,
+		dir:	ConInstDirOutbound,
 	}
 	conMgr.ciTab[cid] = ci
 
@@ -630,7 +631,7 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 	cid := conInstIdentity {
 		nid: msg.Peer.ID,
-		dir: conInstDirOutbound,
+		dir: ConInstDirOutbound,
 	}
 
 	li, ok := conMgr.txQueTab[cid]
@@ -769,7 +770,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 
 	cid := conInstIdentity {
 		nid:	msg.Peer,
-		dir:	conInstDirAllbound,
+		dir:	ConInstDirAllbound,
 	}
 
 	schMsg := sch.SchMessage{}
@@ -832,16 +833,16 @@ func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
 		return nil
 	}
 
-	if cid.dir == conInstDirInbound || cid.dir == conInstDirOutbound {
+	if cid.dir == ConInstDirInbound || cid.dir == ConInstDirOutbound {
 
 		return []*ConInst{conMgr.ciTab[*cid]}
 
-	} else if cid.dir == conInstDirAllbound {
+	} else if cid.dir == ConInstDirAllbound {
 
 		inCid := *cid
-		inCid.dir = conInstDirInbound
+		inCid.dir = ConInstDirInbound
 		outCid := *cid
-		outCid.dir = conInstDirOutbound
+		outCid.dir = ConInstDirOutbound
 
 		return []*ConInst {
 			conMgr.ciTab[inCid],
@@ -858,7 +859,7 @@ func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
 func (conMgr *ConMgr)lookupOutboundConInst(nid *config.NodeID) *ConInst {
 	ci := &conInstIdentity {
 		nid:	*nid,
-		dir:	conInstDirOutbound,
+		dir:	ConInstDirOutbound,
 	}
 	return conMgr.lookupConInst(ci)[0]
 }
@@ -869,7 +870,7 @@ func (conMgr *ConMgr)lookupOutboundConInst(nid *config.NodeID) *ConInst {
 func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 	ci := &conInstIdentity {
 		nid:	*nid,
-		dir:	conInstDirInbound,
+		dir:	ConInstDirInbound,
 	}
 	return conMgr.lookupConInst(ci)[0]
 }
@@ -877,7 +878,7 @@ func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 //
 // Setup outbound connection instance
 //
-func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node) DhtErrno {
+func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node, msg interface{}) DhtErrno {
 
 	ci.sdl = conMgr.sdl
 	ci.local = conMgr.cfg.local
@@ -899,17 +900,33 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 	}
 
 	if peer != nil {
+
 		ci.hsInfo.peer = *peer
-		ci.dir = conInstDirOutbound
+		ci.dir = ConInstDirOutbound
+
 	} else {
-		ci.dir = conInstDirInbound
-		ci.ior = ggio.NewDelimitedReader(ci.con, ciMaxPackageSize)
-		ci.iow = ggio.NewDelimitedWriter(ci.con)
+
+		ci.status = CisAccepted
+		ci.con = msg.(*sch.MsgDhtLsnMgrAcceptInd).Con
+		ci.dir = ConInstDirInbound
+
+		r := ci.con.(io.Reader)
+		ci.ior = ggio.NewDelimitedReader(r, ciMaxPackageSize)
+
+		w := ci.con.(io.Writer)
+		ci.iow = ggio.NewDelimitedWriter(w)
 	}
 
-	ci.cid = conInstIdentity{
-		nid: peer.ID,
-		dir: ci.dir,
+	if ci.dir == ConInstDirOutbound {
+		ci.cid = conInstIdentity{
+			nid: peer.ID,
+			dir: ci.dir,
+		}
+	} else {
+		ci.cid = conInstIdentity{
+			nid: config.NodeID{},
+			dir: ci.dir,
+		}
 	}
 
 	return DhtEnoNone

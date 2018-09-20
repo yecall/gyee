@@ -1831,35 +1831,40 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 
 		log.LogCallerFileLine("dhtTestConInstStatusInd: CisConnected")
 
-		if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
-			msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
+		if msg.Dir == dht.ConInstDirOutbound {
+			if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
+				msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
 
-			log.LogCallerFileLine("dhtTestConInstStatusInd: " +
-				"InstallRxDataCallback failed, eno: %d, peer: %x",
-				eno, *msg.Peer)
+				log.LogCallerFileLine("dhtTestConInstStatusInd: "+
+					"InstallRxDataCallback failed, eno: %d, peer: %x",
+					eno, *msg.Peer)
 
-			return -1
+				return -1
+			}
 		}
 
 	case dht.CisAccepted:
-
 		log.LogCallerFileLine("dhtTestConInstStatusInd: CisAccepted")
-
-		if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
-			msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
-
-			log.LogCallerFileLine("dhtTestConInstStatusInd: " +
-				"InstallRxDataCallback failed, eno: %d, peer: %x",
-				eno, *msg.Peer)
-
-			return -1
-		}
 
 	case dht.CisInHandshaking:
 		log.LogCallerFileLine("dhtTestConInstStatusInd: CisInHandshaking")
 
 	case dht.CisHandshaked:
+
 		log.LogCallerFileLine("dhtTestConInstStatusInd: CisHandshaked")
+
+		if msg.Dir == dht.ConInstDirInbound {
+			if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
+				msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
+
+				log.LogCallerFileLine("dhtTestConInstStatusInd: "+
+					"InstallRxDataCallback failed, eno: %d, peer: %x",
+					eno, *msg.Peer)
+
+				return -1
+			}
+		}
+
 
 	case dht.CisInService:
 		log.LogCallerFileLine("dhtTestConInstStatusInd: CisInService")
