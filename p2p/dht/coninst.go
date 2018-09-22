@@ -540,7 +540,7 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 		CisNull:			pcsConnNo,
 		CisConnected:		pcsConnNo,
 		CisInHandshaking:	pcsConnNo,
-		CisHandshaked:		pcsConnNo,
+		CisHandshaked:		pcsConnYes,
 		CisInService:		pcsConnYes,
 		CisClosed:			pcsConnNo,
 	}

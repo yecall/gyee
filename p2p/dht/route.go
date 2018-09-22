@@ -71,6 +71,7 @@ type rutMgrBucketNode struct {
 	hash	Hash						// hash from node.ID
 	dist	int							// distance between this node and local
 	fails	int							// counter for peer fail to response our query
+	pcs		int							// peer connection status
 }
 
 //
@@ -390,12 +391,18 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		Target:		req.Target,
 		Peers:		nil,
 		Dists:		nil,
+		Pcs:		nil,
 	}
 	var schMsg sch.SchMessage
 
 	if dhtEno == DhtEnoNone && len(nearest) > 0 {
 		rsp.Peers = nearest
 		rsp.Dists = nearestDist
+		var pcsTab []int
+		for _, p := range nearest {
+			pcsTab = append(pcsTab, p.pcs)
+		}
+		rsp.Pcs = pcsTab
 	}
 
 	rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
@@ -444,9 +451,10 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			rutMgr.rutMgrMetricSample(n.ID, dur)
 
 			bn := rutMgrBucketNode{
-				node: n,
-				hash: *hash,
-				dist: dist,
+				node:	n,
+				hash:	*hash,
+				dist:	dist,
+				pcs:	int(conInstStatus2PCS(CisHandshaked)),
 			}
 
 			rutMgr.update(&bn, dist)
@@ -495,6 +503,25 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			dur := req.Duras[idx]
 			rutMgr.rutMgrMetricSample(n.ID, dur)
 		}
+
+	} else if why == rutMgrUpdate4Closed {
+
+		//
+		// update peer connection status to be CisClosed, but do not remove it from
+		// bucket.
+		//
+
+		p := req.Seens[0].ID
+		h := rutMgrNodeId2Hash(p)
+		d := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, h)
+
+		eno, el := rutMgr.find(p, d)
+		if eno != DhtEnoNone {
+			log.LogCallerFileLine("updateReq: not found, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		el.Value.(*rutMgrBucketNode).pcs = int(conInstStatus2PCS(CisClosed))
 	}
 
 	return sch.SchEnoNone
@@ -766,7 +793,7 @@ func (rutMgr *RutMgr)find(id config.NodeID, dist int) (DhtErrno, *list.Element) 
 	}
 
 	li := rt.bucketTab[dist]
-	for el := li.Front(); el != nil; el.Next() {
+	for el := li.Front(); el != nil; el = el.Next() {
 		if el.Value.(*rutMgrBucketNode).node.ID == id {
 			return DhtEnoNone, el
 		}
@@ -784,7 +811,7 @@ func (rutMgr *RutMgr)delete(id config.NodeID) DhtErrno {
 	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
 	li := rutMgr.rutTab.bucketTab[dist]
 
-	for el := li.Front(); el != nil; el.Next() {
+	for el := li.Front(); el != nil; el = el.Next() {
 		if el.Value.(*rutMgrBucketNode).node.ID == id {
 			li.Remove(el)
 			return DhtEnoNone
@@ -1027,8 +1054,17 @@ func (rutMgr *RutMgr)rutMgrNearest(target *config.NodeID, size int) (DhtErrno, [
 	var count = 0
 	var dhtEno DhtErrno = DhtEnoNone
 
+	//
+	// please notice that distance from target to local might more closer than
+	// the tail of the bucket table. if this is true, we set the distancet "dt"
+	// to the tail. see function rutMgr.split pls.
+	//
+
 	ht := rutMgrNodeId2Hash(*target)
 	dt := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, ht)
+	if dt >= len(rutMgr.rutTab.bucketTab) {
+		dt = len(rutMgr.rutTab.bucketTab) - 1
+	}
 
 	var addClosest = func (bk *list.List) int {
 		count = len(nearest)
