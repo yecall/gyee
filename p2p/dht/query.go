@@ -379,7 +379,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	forWhat := msg.ForWhat
 	target := msg.Target
 	peers := msg.Peers.([]*rutMgrBucketNode)
-	pcs := msg.Pcs.([]conMgrPeerConnStat)
+	pcs := msg.Pcs.([]int)
 	dists := msg.Dists.([]int)
 	qcb, ok := qryMgr.qcbTab[target]
 

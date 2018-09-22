@@ -40,7 +40,7 @@ const ConMgrName = sch.DhtConMgrName
 //
 // Peer connection status
 //
-type conMgrPeerConnStat int
+type conMgrPeerConnStat = int
 
 const (
 	pcsConnNo	= iota			// not connected
