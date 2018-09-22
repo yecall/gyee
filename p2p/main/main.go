@@ -30,6 +30,8 @@ import (
 	"sync"
 	"math/rand"
 	"os/signal"
+	"bytes"
+	"errors"
 	golog	"log"
 	shell	"github.com/yeeco/gyee/p2p/shell"
 	peer	"github.com/yeeco/gyee/p2p/peer"
@@ -37,7 +39,6 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	dht		"github.com/yeeco/gyee/p2p/dht"
-	"bytes"
 )
 
 //
@@ -1395,6 +1396,16 @@ func testCase6(tc *testCase) {
 //
 // build connection matrix for instance list
 //
+const (
+	minInstNum		= 7
+	instNeightbors	= 3
+
+	lineMatrixType	= 0
+	ringMatrixType	= 1
+	starMatrixType	= 2
+	randMatrixType	= 3
+)
+
 func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 
 	//
@@ -1403,7 +1414,6 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	//
 
 	var instNum = 0
-	const minInstNum = 7
 
 	if instNum = len(p2pInstList); instNum <= minInstNum {
 		log.LogCallerFileLine("dhtTestBuildConnMatrix: " +
@@ -1421,11 +1431,85 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 		}
 	}
 
-	//
-	// an example set neighbors randomly
-	//
+	mt := lineMatrixType
 
-	const instNeightbors = 3
+	if mt == lineMatrixType {
+
+		lineMatrix(m)
+
+	} else if mt == ringMatrixType {
+
+		ringMatrix(m)
+
+	} else if mt == starMatrixType {
+
+		starMatrix(m)
+
+	} else if mt == randMatrixType{
+
+		randMatrix(m)
+
+	} else {
+
+		lineMatrix(m)
+	}
+
+	return m
+}
+
+//
+// setup line type connection matrix
+//
+func lineMatrix(m [][]bool) error {
+	instNum := cap(m[0])
+	if instNum <= minInstNum {
+		return errors.New(fmt.Sprintf("min instances number: %d", minInstNum + 1))
+	}
+	for idx := 0; idx < instNum - 1; idx++ {
+		m[idx][idx+1] = true
+	}
+	return nil
+}
+
+//
+// setup ring type connection matrix
+//
+func ringMatrix(m [][]bool) error {
+	instNum := cap(m[0])
+	if instNum <= minInstNum {
+		return errors.New(fmt.Sprintf("min instances number: %d", minInstNum + 1))
+	}
+	if err := lineMatrix(m); err != nil {
+		return nil
+	}
+	m[instNum-1][0] = true
+	return nil
+}
+
+//
+// setup star type connection matrix
+//
+func starMatrix(m [][]bool) error {
+	instNum := cap(m[0])
+	if instNum <= minInstNum {
+		return errors.New(fmt.Sprintf("min instances number: %d", minInstNum + 1))
+	}
+	for idx := 1; idx < instNum; idx++ {
+		m[0][idx] = true
+	}
+	return nil
+}
+
+//
+// setup a random connection matrix
+//
+func randMatrix(m [][]bool) error {
+
+	instNum := cap(m[0])
+	if instNum <= minInstNum {
+		return errors.New(fmt.Sprintf("min instances number: %d", minInstNum + 1))
+	}
+
 	var neighbors = make([]int, instNum)
 	for idx := 0; idx < instNum; idx++ {
 		neighbors[idx] = 0
@@ -1486,8 +1570,9 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 		neighbors[idx] = count
 	}
 
-	return m
+	return nil
 }
+
 
 //
 // apply connection matrix for instance list

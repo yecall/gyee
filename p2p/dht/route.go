@@ -801,6 +801,10 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 
 	rt := &rutMgr.rutTab
 
+	//
+	// get tail index: if not initialized, append one
+	//
+
 	tail := len(rt.bucketTab)
 	if tail == 0 {
 		rt.bucketTab = append(rt.bucketTab, list.New())
@@ -808,17 +812,37 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 		tail--
 	}
 
+	//
+	// if distance more closer to use than tail, set target bucket as tail:
+	// all those peers with distance equal or greater than tail are there,
+	// we lookup if "bn" is there.
+	//
+
+	if dist >= len(rt.bucketTab) {
+		dist = tail
+	}
+
+	bucket := rt.bucketTab[dist]
+
 	if eno, el := rutMgr.find(bn.node.ID, dist); eno == DhtEnoNone && el != nil {
-		rt.bucketTab[dist].MoveToFront(el)
+		bucket.MoveToFront(el)
 		return DhtEnoNone
 	}
 
+	//
+	// "bn" not found, new peer, check latency
+	//
+
 	eno, ewma := rutMgr.rutMgrMetricGetEWMA(bn.node.ID)
-	if eno != DhtEnoNone {
+	if eno != DhtEnoNone && eno != DhtEnoNotFound {
 		log.LogCallerFileLine("update: " +
 			"rutMgrMetricGetEWMA failed, eno: %d, ewma: %d",
 			eno, ewma)
 		return eno
+	}
+
+	if eno == DhtEnoNotFound {
+		ewma = 0
 	}
 
 	if ewma > rt.maxLatency {
@@ -828,9 +852,27 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 		return DhtEnoNone
 	}
 
-	tailBucket := rt.bucketTab[tail]
-	if tailBucket.PushBack(bn); tailBucket.Len() > rt.bucketSize {
-		rutMgr.split(tailBucket, tail)
+	//
+	// push new peer as "bn" to target bucket, and, if it is the tail bucket
+	// that the new peer pushed, we check if "split" needed; else we check if
+	// the "Back" of the targt bucket should be removed.
+	//
+
+	bucket.PushFront(bn)
+
+	if dist == tail {
+
+		if  bucket.Len() > rt.bucketSize {
+
+			rutMgr.split(bucket, tail)
+		}
+
+	} else {
+
+		if bucket.Len() > rt.bucketSize {
+
+			bucket.Remove(bucket.Back())
+		}
 	}
 
 	return DhtEnoNone
@@ -840,6 +882,11 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 // Split the tail bucket
 //
 func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
+
+	//
+	// notice: this function called recursively, this would make the buckets
+	// int the bucket table must be continued from "0" to "tail".
+	//
 
 	rt := &rutMgr.rutTab
 
