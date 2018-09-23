@@ -295,6 +295,11 @@ func (qryMgr *QryMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
 
+	if sender == nil || msg == nil {
+		log.LogCallerFileLine("queryStartReq: invalid prameters")
+		return sch.SchEnoParameter
+	}
+
 	if msg.ForWhat != MID_PUTVALUE &&
 		msg.ForWhat != MID_PUTPROVIDER &&
 		msg.ForWhat != MID_FINDNODE &&
@@ -303,6 +308,8 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 		log.LogCallerFileLine("queryStartReq: unknown what's for")
 		return sch.SchEnoMismatched
 	}
+
+	log.LogCallerFileLine("queryStartReq: sender: %p, msg: %+v", sender, msg)
 
 	var target = msg.Target
 	var forWhat = msg.ForWhat
@@ -324,6 +331,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	}
 
 	if _, dup := qryMgr.qcbTab[target]; dup {
+		log.LogCallerFileLine("queryStartReq: duplicated target: %x", target)
 		rsp.Eno = DhtEnoDuplicated
 		goto _rsp2Sender
 	}
@@ -341,10 +349,13 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, qryMgr.qmCfg.maxActInsts)
 	qcb.qryResult = nil
 	qcb.rutNtfFlag = nearestReq.NtfReq
+	qcb.status = qsPreparing
+	qryMgr.qcbTab[target] = qcb
+
+	log.LogCallerFileLine("queryStartReq: qcb: %+v", *qcb)
 
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
 	qryMgr.sdl.SchSendMessage(&schMsg)
-	qcb.status = qsPreparing
 
 	rsp.Eno = DhtEnoNone
 
@@ -365,6 +376,11 @@ _rsp2Sender:
 //
 func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
+	if msg == nil {
+		log.LogCallerFileLine("rutNearestRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
+
 	if msg.ForWhat != MID_PUTVALUE &&
 		msg.ForWhat != MID_PUTPROVIDER &&
 		msg.ForWhat != MID_FINDNODE &&
@@ -373,6 +389,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		log.LogCallerFileLine("rutNearestRsp: unknown what's for")
 		return sch.SchEnoMismatched
 	}
+
+	log.LogCallerFileLine("rutNearestRsp: msg: %+v", msg)
 
 	var dhtEno = DhtErrno(DhtEnoNone)
 
@@ -446,8 +464,13 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 			forWhat == MID_GETVALUE_REQ {
 
 			if peer.node.ID == target {
+
+				log.LogCallerFileLine("rutNearestRsp: target found: %x", target)
+
 				qryOk2Sender(&peer.node)
+
 				qryMgr.qryMgrDelQcb(delQcb4TargetInLocal, target)
+
 				return sch.SchEnoNone
 			}
 		}
@@ -607,7 +630,10 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 		// try to activate more
 		//
 
-		qryMgr.qryMgrQcbPutActived(qcb)
+		if eno, num := qryMgr.qryMgrQcbPutActived(qcb); true {
+			log.LogCallerFileLine("instStatusInd: " +
+				"qryMgrQcbPutActived return with eno: %d, num: %d", eno, num)
+		}
 
 		//
 		// check against abnormal cases
@@ -623,7 +649,12 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 		// result and end the query.
 		//
 
+		log.LogCallerFileLine("instStatusInd: pending: %d, actived: %d",
+			qcb.qryPending.Len(), len(qcb.qryActived))
+
 		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+
+			log.LogCallerFileLine("instStatusInd: query done: %x", qcb.target)
 
 			if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
 				log.LogCallerFileLine("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
@@ -1049,11 +1080,20 @@ func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 //
 func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) DhtErrno {
 
+	if len(nodes) == 0 || size <= 0 {
+		log.LogCallerFileLine("qryMgrQcbPutPending: invalid parameters")
+		return DhtEnoParameter
+	}
+
+	log.LogCallerFileLine("qryMgrQcbPutPending: " +
+		"number of nodes to be put: %d, size: %d", len(nodes), size)
+
 	li := qcb.qryPending
 
 	for _, n := range nodes {
 
 		if _, dup := qcb.qryHistory[n.node.ID]; dup {
+			log.LogCallerFileLine("qryMgrQcbPutPending: duplicated, n: %+v", n)
 			continue
 		}
 
@@ -1075,7 +1115,10 @@ func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) D
 			}
 		}
 
-		if pb { li.PushBack(n) }
+		if pb {
+			log.LogCallerFileLine("qryMgrQcbPutPending: PushBack, n: %+v", n)
+			li.PushBack(n)
+		}
 	}
 
 	for li.Len() > size {
@@ -1089,6 +1132,11 @@ func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) D
 // Put node to actived queue and start query to the node
 //
 func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
+
+	if qcb == nil {
+		log.LogCallerFileLine("qryMgrQcbPutActived: invalid parameter")
+		return DhtEnoParameter, 0
+	}
 
 	if qcb.qryPending == nil || qcb.qryPending.Len() == 0 {
 		log.LogCallerFileLine("qryMgrQcbPutActived: no pending")
@@ -1126,7 +1174,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			ptnInst:	nil,
 			ptnConMgr:	nil,
 			ptnRutMgr:	nil,
-			ptnQryMgr:	qryMgr,
+			ptnQryMgr:	nil,
 			local:		qryMgr.qmCfg.local,
 			status:		qisNull,
 			target:		qcb.target,
@@ -1137,6 +1185,8 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			conBegTime:	time.Time{},
 			conEndTime:	time.Time{},
 		}
+
+		log.LogCallerFileLine("qryMgrQcbPutActived: icb: %+v", icb)
 
 		td := sch.SchTaskDescription{
 			Name:		icb.name,
@@ -1156,13 +1206,13 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		if eno != sch.SchEnoNone || ptn == nil {
 
 			log.LogCallerFileLine("qryMgrQcbPutActived: " +
-				"SchCreateTask failed, eno: %d, ptn: %p",
-				eno, ptn)
+				"SchCreateTask failed, eno: %d, ptn: %p", eno, ptn)
 
 			dhtEno = DhtEnoScheduler
 			break
 		}
 		icb.ptnInst = ptn
+		qcb.icbSeq++
 
 		po := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweron, nil)
@@ -1176,6 +1226,10 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 	for _, el := range act {
 		qcb.qryPending.Remove(el)
 	}
+
+	log.LogCallerFileLine("qryMgrQcbPutActived: " +
+		"pending: %d, actived: %d, history: %d",
+		qcb.qryPending.Len(), len(qcb.qryActived), len(qcb.qryHistory))
 
 	return DhtErrno(dhtEno), cnt
 }

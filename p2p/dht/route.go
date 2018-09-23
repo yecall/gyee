@@ -58,9 +58,9 @@ type Hash [HashByteLength]byte
 // Latency measurement
 //
 type rutMgrPeerMetric struct {
-	peerId		config.NodeID	// peer identity
-	ltnSamples	[]time.Duration	// latency samples
-	ewma		time.Duration	// exponentially-weighted moving avg
+	peerId		config.NodeID			// peer identity
+	ltnSamples	[]time.Duration			// latency samples
+	ewma		time.Duration			// exponentially-weighted moving avg
 }
 
 //
@@ -286,6 +286,8 @@ func (rutMgr *RutMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 
+	log.LogCallerFileLine("bootstarpTimerHandler: bootstrap will be carried out ...")
+
 	if len(rutMgr.bpTargets) != 0 {
 		log.LogCallerFileLine("bootstarpTimerHandler: the previous is not completed")
 		return sch.SchEnoNone
@@ -349,7 +351,7 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	}
 
 	//
-	// when a bootstrap round is completed, we publish ourself to outside world to
+	// when a bootstrap round is completed, we publish ourselves to outside world to
 	// let others know us.
 	//
 

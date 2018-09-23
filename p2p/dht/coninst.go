@@ -65,6 +65,8 @@ type ConInst struct {
 	cbRxLock	sync.Mutex				// lock for data plane callback
 	cbfRxData	ConInstRxDataCallback	// data plane callback entry
 	isBlind		bool					// is blind connection instance
+	txPkgCnt	int64					// statistics for number of packages sent
+	rxPkgCnt	int64					// statistics for number off package received
 }
 
 //
@@ -158,6 +160,8 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		rxDone:		nil,
 		cbfRxData:	nil,
 		isBlind:	isBlind,
+		txPkgCnt:	0,
+		rxPkgCnt:	0,
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -450,8 +454,21 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 //
 func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
+	if msg == nil {
+		log.LogCallerFileLine("rutMgrNearestRsp: invalid parameters")
+		return sch.SchEnoParameter
+	}
+
+	log.LogCallerFileLine("rutMgrNearestRsp: msg: %+v", msg)
+
 	var dhtMsg = DhtMessage {
 		Mid: MID_UNKNOWN,
+	}
+
+	var nodes []*config.Node
+	bns := msg.Peers.([]*rutMgrBucketNode)
+	for idx := 0; idx < len(bns); idx++ {
+		nodes = append(nodes, &bns[idx].node)
 	}
 
 	if msg.ForWhat == MID_FINDNODE {
@@ -459,7 +476,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 		nbs := Neighbors {
 			From:		*conInst.local,
 			To:    		conInst.hsInfo.peer,
-			Nodes:		msg.Peers.([]*config.Node),
+			Nodes:		nodes,
 			Pcs:		msg.Pcs.([]int),
 			Id:			time.Now().UnixNano(),
 			Extra:		nil,
@@ -476,7 +493,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 			From:  		*conInst.local,
 			To:    		conInst.hsInfo.peer,
 			Provider:	nil,
-			Nodes:		msg.Peers.([]*config.Node),
+			Nodes:		nodes,
 			Pcs:   		msg.Pcs.([]int),
 			Id:    		time.Now().UnixNano(),
 			Extra: 		nil,
@@ -493,7 +510,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 			From:  		*conInst.local,
 			To:    		conInst.hsInfo.peer,
 			Value:		nil,
-			Nodes:		msg.Peers.([]*config.Node),
+			Nodes:		nodes,
 			Pcs:   		msg.Pcs.([]int),
 			Id:    		time.Now().UnixNano(),
 			Extra: 		nil,
@@ -561,6 +578,7 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 	}
 
 	conInst.txPending.PushBack(pkg)
+	conInst.txPendSig<-pkg
 
 	return DhtEnoNone
 }
@@ -968,12 +986,12 @@ _txLoop:
 		}
 
 		if txPkg, ok = el.Value.(*conInstTxPkg); !ok {
-			log.LogCallerFileLine("txProc: mismatched type")
+			log.LogCallerFileLine("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
 		}
 
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			log.LogCallerFileLine("txProc: mismatched type")
+			log.LogCallerFileLine("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
 		}
 
@@ -981,9 +999,13 @@ _txLoop:
 		dhtPkg.ToPbPackage(pbPkg)
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-			log.LogCallerFileLine("txProc: WriteMsg failed, err: %s", err.Error())
+			log.LogCallerFileLine("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _txLoop
+		}
+
+		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
+			log.LogCallerFileLine("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
 		}
 
 		//
@@ -1002,7 +1024,7 @@ _checkDone:
 
 		select {
 		case done := <-conInst.txDone:
-			log.LogCallerFileLine("txProc: done by: %d", done)
+			log.LogCallerFileLine("txProc: inst: %s, done by: %d", conInst.name, done)
 			isDone = true
 			break _txLoop
 		default:
@@ -1037,7 +1059,7 @@ _checkDone:
 		return
 	}
 
-	log.LogCallerFileLine("txProc: wOw! impossible errors.")
+	log.LogCallerFileLine("txProc: wOw! impossible errors, inst: %s", conInst.name)
 }
 
 //
@@ -1061,9 +1083,13 @@ _rxLoop:
 
 		pbPkg := new(pb.DhtPackage)
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-			log.LogCallerFileLine("rxProc: ReadMsg failed, err: %s", err.Error())
+			log.LogCallerFileLine("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _rxLoop
+		}
+
+		if conInst.rxPkgCnt++; conInst.rxPkgCnt % 16 == 0 {
+			log.LogCallerFileLine("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
 		}
 
 		pkg := new(DhtPackage)
@@ -1084,12 +1110,12 @@ _rxLoop:
 
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
-			log.LogCallerFileLine("rxProc: GetMessage failed, eno: %d", eno)
+			log.LogCallerFileLine("rxProc:GetMessage failed, inst: %s, eno: %d", conInst.name, eno)
 			goto _checkDone
 		}
 
 		if eno := conInst.dispatch(msg); eno != DhtEnoNone {
-			log.LogCallerFileLine("rxProc: dispatch failed, eno: %d", eno)
+			log.LogCallerFileLine("rxProc: dispatch failed, inst: %s, eno: %d", conInst.name, eno)
 		}
 
 _checkDone:
@@ -1097,7 +1123,7 @@ _checkDone:
 		select {
 		case done := <-conInst.rxDone:
 			isDone = true
-			log.LogCallerFileLine("rxProc: done by: %d", done)
+			log.LogCallerFileLine("rxProc: inst: %s, done by: %d", conInst.name, done)
 			break _rxLoop
 		default:
 		}
@@ -1131,13 +1157,21 @@ _checkDone:
 		return
 	}
 
-	log.LogCallerFileLine("rxProc: wOw! impossible errors.")
+	log.LogCallerFileLine("rxProc: wOw! impossible errors, inst: %s", conInst.name)
 }
 
 //
 // messages dispatching
 //
 func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
+
+	if msg == nil {
+		log.LogCallerFileLine("dispatch: invalid parameter")
+		return DhtEnoParameter
+	}
+
+	log.LogCallerFileLine("dispatch: try to dispatch message from peer, " +
+		"inst: %s, msg: %+v", conInst.name, *msg)
 
 	var eno DhtErrno = DhtEnoUnknown
 
@@ -1148,33 +1182,43 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 		eno = DhtEnoProtocol
 
 	case MID_FINDNODE:
+		log.LogCallerFileLine("dispatch: MID_FINDNODE from peer: %+v", *msg.FindNode)
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
+		log.LogCallerFileLine("dispatch: MID_NEIGHBORS from peer: %+v", *msg.Neighbors)
 		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
+		log.LogCallerFileLine("dispatch: MID_PUTVALUE from peer: %+v", *msg.PutValue)
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
+		log.LogCallerFileLine("dispatch: MID_GETVALUE_REQ from peer: %+v", *msg.GetValueReq)
 		eno = conInst.getValueReq(msg.GetValueReq)
 
 	case MID_GETVALUE_RSP:
+		log.LogCallerFileLine("dispatch: MID_GETVALUE_REQ from peer: %+v", *msg.GetValueRsp)
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
+		log.LogCallerFileLine("dispatch: MID_PUTPROVIDER from peer: %+v", *msg.PutProvider)
 		eno = conInst.putProvider(msg.PutProvider)
 
 	case MID_GETPROVIDER_REQ:
+		log.LogCallerFileLine("dispatch: MID_GETPROVIDER_REQ from peer: %+v", *msg.GetProviderReq)
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
+		log.LogCallerFileLine("dispatch: MID_GETPROVIDER_RSP from peer: %+v", *msg.GetProviderRsp)
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
+		log.LogCallerFileLine("dispatch: MID_PING from peer: %+v", *msg.Ping)
 		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
+		log.LogCallerFileLine("dispatch: MID_PONG from peer: %+v", *msg.Pong)
 		eno = conInst.getPong(msg.Pong)
 
 	default:

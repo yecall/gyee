@@ -510,6 +510,17 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	// would be sent from the same connection instance until this function called.
 	//
 
+	if msg == nil {
+		log.LogCallerFileLine("rutMgrNearestRsp: invalid message")
+		return sch.SchEnoParameter
+	}
+
+	var nodes []*config.Node
+	bns := msg.Peers.([]*rutMgrBucketNode)
+	for idx := 0; idx < len(bns); idx++ {
+		nodes = append(nodes, &bns[idx].node)
+	}
+
 	ci := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).ConInst.(*ConInst)
 	req := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).Msg.(*GetValueReq)
 	rsp := GetValueRsp{
@@ -517,7 +528,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		To:			ci.hsInfo.peer,
 		Key:		req.Key,
 		Value:		nil,
-		Nodes:		msg.Peers.([]*config.Node),
+		Nodes:		nodes,
 		Pcs:		msg.Pcs.([]int),
 		Id:			req.Id,
 		Extra:		nil,

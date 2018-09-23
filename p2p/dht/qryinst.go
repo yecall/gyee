@@ -120,6 +120,7 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 
 	var sdl = sch.SchGetScheduler(ptn)
+	var ptnQryMgr interface{}
 	var ptnConMgr interface{}
 	var ptnRutMgr interface{}
 	var icb *qryInstCtrlBlock
@@ -134,6 +135,11 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
+	if _, ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName); ptnQryMgr == nil {
+		log.LogCallerFileLine("powerOn: nil query manager")
+		return sch.SchEnoInternal
+	}
+
 	if _, ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName); ptnConMgr == nil {
 		log.LogCallerFileLine("powerOn: nil connection manager")
 		return sch.SchEnoInternal
@@ -145,6 +151,7 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 	}
 
 	icb.status = qisInited
+	icb.ptnQryMgr = ptnQryMgr
 	icb.ptnConMgr = ptnConMgr
 	icb.ptnRutMgr = ptnRutMgr
 	qryInst.icb = icb
@@ -375,17 +382,17 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	// an error for connection establishment. if failed, done the instance.
 	//
 
+	if icb.qTid != sch.SchInvalidTid {
+
+		sdl.SchKillTimer(icb.ptnInst, icb.qTid)
+		icb.qTid = sch.SchInvalidTid
+	}
+
 	if msg.Eno != DhtEnoNone && msg.Eno != DhtEnoDuplicated {
 
 		log.LogCallerFileLine("connectRsp:" +
 			"connect failed, eno: %d, peer: %+V",
 			msg.Eno, *msg.Peer)
-
-		if icb.qTid != sch.SchInvalidTid {
-
-			sdl.SchKillTimer(icb.ptnInst, icb.qTid)
-			icb.qTid = sch.SchInvalidTid
-		}
 
 		ind.Status = qisDone
 		icb.status = qisDone

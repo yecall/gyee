@@ -23,13 +23,13 @@ package dht
 import (
 	"fmt"
 	"time"
+	"io"
+	"sync"
 	"container/list"
 	ggio "github.com/gogo/protobuf/io"
 	log "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/anacrolix/sync"
-	"io"
 )
 
 //
@@ -443,11 +443,11 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	if msg.IsBlind {
 		rsp = &rspBlind
 		ptrEno = &rspBlind.Eno
-		rspEvent = sch.EvDhtConMgrConnectRsp
+		rspEvent = sch.EvDhtBlindConnectRsp
 	} else {
 		rsp = &rspNormal
 		ptrEno = &rspNormal.Eno
-		rspEvent = sch.EvDhtBlindConnectRsp
+		rspEvent = sch.EvDhtConMgrConnectRsp
 	}
 
 	var sender = msg.Task
@@ -591,6 +591,11 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	// send on it.
 	//
 
+	if msg == nil {
+		log.LogCallerFileLine("sendReq: invalid parameter")
+		return sch.SchEnoParameter
+	}
+
 	ci := conMgr.lookupOutboundConInst(&msg.Peer.ID)
 
 	if ci == nil {
@@ -598,6 +603,8 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	}
 
 	if ci != nil {
+
+		log.LogCallerFileLine("sendReq: connection instance found: %+v", *ci)
 
 		pkg := conInstTxPkg {
 			task:		msg.Task,
@@ -619,6 +626,8 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 		return sch.SchEnoNone
 	}
+
+	log.LogCallerFileLine("sendReq: connection instance not found, tell connection manager to build it ...")
 
 	schMsg := sch.SchMessage{}
 	req := sch.MsgDhtConMgrConnectReq {
