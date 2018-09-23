@@ -460,8 +460,10 @@ type MsgDhtConMgrCloseRsp struct {
 //
 // DHT connection instance event
 //
+const DhtConInstTxTimerId = 0
 const (
 	EvDhtConInstBase			= 2200
+	EvDhtConInstTxTimer			= EvTimerBase + DhtConInstTxTimerId
 	EvDhtConInstHandshakeReq	= EvDhtConInstBase + 1
 	EvDhtConInstHandshakeRsp	= EvDhtConInstBase + 2
 	EvDhtConInstTxDataReq		= EvDhtConInstBase + 3
@@ -771,7 +773,7 @@ type MsgDhtRutPongInd struct {
 const DhtPrdMgrCleanupTimerId	= 0
 const (
 	EvDhtPrdMgrBase				= 2600
-	EvDhtPrdMgrCleanupTimer		= EvDhtRutMgrBase + DhtPrdMgrCleanupTimerId
+	EvDhtPrdMgrCleanupTimer		= EvTimerBase + DhtPrdMgrCleanupTimerId
 	EvDhtPrdMgrAddProviderReq	= EvDhtPrdMgrBase + 1
 	EvDhtPrdMgrAddProviderRsp	= EvDhtPrdMgrBase + 2
 	EvDhtPrdMgrPutProviderReq	= EvDhtPrdMgrBase + 3

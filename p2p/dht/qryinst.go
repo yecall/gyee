@@ -526,31 +526,20 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 //
 func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErrno {
 
-	//
-	// notice: only "Neighbors" message should be dispatched here, a query instance
-	// is just for "query" than anything else.
-	//
-
-	dhtMsg, ok := msg.Msg.(*DhtMessage)
-	if !ok {
-		log.LogCallerFileLine("protoMsgInd: mismatched type")
-		return sch.SchEnoMismatched
-	}
-
 	icb := qryInst.icb
 	icb.endTime = time.Now()
 	schMsg := sch.SchMessage{}
 
-	switch dhtMsg.Mid {
+	switch msg.ForWhat {
 
-	case MID_NEIGHBORS:
+	case sch.EvDhtConInstNeighbors:
 
-		if dhtMsg.Neighbors == nil {
-			log.LogCallerFileLine("protoMsgInd: nil body")
-			return sch.SchEnoParameter
+		nbs, ok := msg.Msg.(*Neighbors)
+		if !ok {
+			log.LogCallerFileLine("protoMsgInd: mismatched type Neighbors")
+			return sch.SchEnoMismatched
 		}
 
-		nbs := dhtMsg.Neighbors
 		ind := sch.MsgDhtQryInstResultInd {
 			From:		nbs.From,
 			Target:		icb.target,
@@ -564,14 +553,13 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 
-	case MID_GETVALUE_RSP:
+	case sch.EvDhtConInstGetValRsp:
 
-		if dhtMsg.GetValueRsp == nil {
-			log.LogCallerFileLine("protoMsgInd: nil body")
-			return sch.SchEnoParameter
+		gvr, ok := msg.Msg.(*GetValueRsp)
+		if !ok {
+			log.LogCallerFileLine("protoMsgInd: mismatched type GetValueRsp")
+			return sch.SchEnoMismatched
 		}
-
-		gvr := dhtMsg.GetValueRsp
 
 		if gvr.Value != nil {
 
@@ -610,14 +598,13 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		}
 
 
-	case MID_GETPROVIDER_RSP:
+	case sch.EvDhtConInstGetProviderRsp:
 
-		if dhtMsg.GetProviderRsp == nil {
-			log.LogCallerFileLine("protoMsgInd: nil body")
-			return sch.SchEnoParameter
+		gpr, ok := msg.Msg.(*GetProviderRsp)
+		if !ok {
+			log.LogCallerFileLine("protoMsgInd: mismatched type GetProviderRsp")
+			return sch.SchEnoMismatched
 		}
-
-		gpr := dhtMsg.GetProviderRsp
 
 		if gpr.Provider != nil {
 
@@ -651,7 +638,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		}
 
 	default:
-		log.LogCallerFileLine("protoMsgInd: mismatched, mid: %d", dhtMsg.Mid)
+		log.LogCallerFileLine("protoMsgInd: mismatched, ForWhat: %d", msg.ForWhat)
 		return sch.SchEnoMismatched
 	}
 

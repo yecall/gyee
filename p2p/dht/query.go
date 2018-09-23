@@ -680,8 +680,8 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 //
 func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
 
-	if msg.ForWhat != sch.EvDhtMgrPutValueRsp &&
-		msg.ForWhat == sch.EvDhtMgrPutProviderReq &&
+	if msg.ForWhat != sch.EvDhtMgrPutValueReq &&
+		msg.ForWhat != sch.EvDhtMgrPutProviderReq &&
 		msg.ForWhat != sch.EvDhtConInstNeighbors &&
 		msg.ForWhat != sch.EvDhtConInstGetProviderRsp &&
 		msg.ForWhat != sch.EvDhtConInstGetValRsp {

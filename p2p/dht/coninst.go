@@ -24,49 +24,52 @@ import (
 	"net"
 	"time"
 	"sync"
+	"io"
+	"fmt"
 	"container/list"
 	ggio "github.com/gogo/protobuf/io"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
-	"io"
 )
 
 //
 // Dht connection instance
 //
 type ConInst struct {
-	sdl			*sch.Scheduler			// pointer to scheduler
-	name		string					// task name
-	tep			sch.SchUserTaskEp		// task entry
-	local		*config.Node			// pointer to local node specification
-	ptnMe		interface{}				// pointer to myself task node
-	ptnDhtMgr	interface{}				// pointer to dht manager task node
-	ptnRutMgr	interface{}				// pointer to route manager task node
-	ptnDsMgr	interface{}				// pointer to data store manager task node
-	ptnPrdMgr	interface{}				// pointer to provider manager task node
-	ptnConMgr	interface{}				// pointer to connection manager task node
-	ptnSrcTsk	interface{}				// for outbound, the source task requests the connection
-	status		conInstStatus			// instance status
-	hsTimeout	time.Duration			// handshake timeout value
-	cid			conInstIdentity			// connection instance identity
-	con			net.Conn				// connection
-	iow			ggio.WriteCloser		// IO writer
-	ior			ggio.ReadCloser			// IO reader
-	dir			ConInstDir				// connection instance directory
-	hsInfo		conInstHandshakeInfo	// handshake information
-	txPending	*list.List				// pending package to be sent
-	txCurPkg	*conInstTxPkg			// current pending for response
-	txLock		sync.Mutex				// tx lock
-	txPendSig	chan interface{}		// tx pendings signal
-	txDone		chan int				// tx-task done signal
-	rxDone		chan int				// rx-task done signal
-	cbRxLock	sync.Mutex				// lock for data plane callback
-	cbfRxData	ConInstRxDataCallback	// data plane callback entry
-	isBlind		bool					// is blind connection instance
-	txPkgCnt	int64					// statistics for number of packages sent
-	rxPkgCnt	int64					// statistics for number off package received
+	sdl				*sch.Scheduler			// pointer to scheduler
+	name			string					// task name
+	tep				sch.SchUserTaskEp		// task entry
+	local			*config.Node			// pointer to local node specification
+	ptnMe			interface{}				// pointer to myself task node
+	ptnDhtMgr		interface{}				// pointer to dht manager task node
+	ptnRutMgr		interface{}				// pointer to route manager task node
+	ptnDsMgr		interface{}				// pointer to data store manager task node
+	ptnPrdMgr		interface{}				// pointer to provider manager task node
+	ptnConMgr		interface{}				// pointer to connection manager task node
+	ptnSrcTsk		interface{}				// for outbound, the source task requests the connection
+	ptnSrcTskBackup	interface{}				// backup for ptnSrcTsk
+	status			conInstStatus			// instance status
+	hsTimeout		time.Duration			// handshake timeout value
+	cid				conInstIdentity			// connection instance identity
+	con				net.Conn				// connection
+	iow				ggio.WriteCloser		// IO writer
+	ior				ggio.ReadCloser			// IO reader
+	dir				ConInstDir				// connection instance directory
+	hsInfo			conInstHandshakeInfo	// handshake information
+	txPending		*list.List				// pending package to be sent
+	txCurPkg		*conInstTxPkg			// current pending for response
+	txLock			sync.Mutex				// tx lock
+	txPendSig		chan interface{}		// tx pendings signal
+	txDone			chan int				// tx-task done signal
+	rxDone			chan int				// rx-task done signal
+	cbRxLock		sync.Mutex				// lock for data plane callback
+	cbfRxData		ConInstRxDataCallback	// data plane callback entry
+	isBlind			bool					// is blind connection instance
+	txPkgCnt		int64					// statistics for number of packages sent
+	rxPkgCnt		int64					// statistics for number off package received
+	txTid			int						// tx timer identity
 }
 
 //
@@ -137,6 +140,7 @@ const (
 	ciTxPendingQueueSize = 64				// max tx-pending queue size
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
+	ciTxTimerDuration = time.Second * 8		// tx timer duration
 )
 
 //
@@ -145,23 +149,25 @@ const (
 func newConInst(postFixed string, isBlind bool) *ConInst {
 
 	conInst := ConInst {
-		name:		"conInst" + postFixed,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnConMgr:	nil,
-		ptnSrcTsk:	nil,
-		con:		nil,
-		ior:		nil,
-		iow:		nil,
-		status:		CisNull,
-		dir:		ConInstDirUnknown,
-		txPending:	list.New(),
-		txDone:		nil,
-		rxDone:		nil,
-		cbfRxData:	nil,
-		isBlind:	isBlind,
-		txPkgCnt:	0,
-		rxPkgCnt:	0,
+		name:				"conInst" + postFixed,
+		tep:				nil,
+		ptnMe:				nil,
+		ptnConMgr:			nil,
+		ptnSrcTsk:			nil,
+		ptnSrcTskBackup:	nil,
+		con:				nil,
+		ior:				nil,
+		iow:				nil,
+		status:				CisNull,
+		dir:				ConInstDirUnknown,
+		txPending:			list.New(),
+		txDone:				nil,
+		rxDone:				nil,
+		cbfRxData:			nil,
+		isBlind:			isBlind,
+		txPkgCnt:			0,
+		rxPkgCnt:			0,
+		txTid:				sch.SchInvalidTid,
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -209,6 +215,9 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = conInst.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
+
+	case sch.EvDhtConInstTxTimer:
+		eno = conInst.txTimerHandler(msg.Body.(*conInstTxPkg))
 
 	default:
 		log.LogCallerFileLine("conInstProc: unknown event: %d", msg.Id)
@@ -538,7 +547,7 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 		waitMid:	-1,
 		waitSeq:	-1,
 		submitTime:	time.Now(),
-		payload:	dhtPkg,
+		payload:	&dhtPkg,
 	}
 
 	if eno := conInst.txPutPending(&txPkg); eno != DhtEnoNone {
@@ -584,13 +593,88 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 }
 
 //
+// Set timer for tx-package which would wait response from peer
+//
+func (conInst *ConInst)txSetTimer(txPkg *conInstTxPkg) DhtErrno {
+
+	var td = sch.TimerDescription {
+		Name:	fmt.Sprintf("%s%d", conInst.name, "_txTimer"),
+		Utid:	sch.DhtConInstTxTimerId,
+		Tmt:	sch.SchTmTypeAbsolute,
+		Dur:	ciTxTimerDuration,
+		Extra:	txPkg,
+	}
+
+	eno, tid := conInst.sdl.SchSetTimer(conInst.ptnMe, &td)
+	if eno != sch.SchEnoNone {
+		log.LogCallerFileLine("txSetTimer: SchSetTimer failed, eno: %d", eno)
+		return DhtEnoScheduler
+	}
+	conInst.txTid = tid
+
+	return DhtEnoNone
+}
+
+//
+// Tx timer expired event handler
+//
+func (conInst *ConInst)txTimerHandler(txPkg *conInstTxPkg) sch.SchErrno {
+
+	if txPkg == nil || txPkg != conInst.txCurPkg {
+		log.LogCallerFileLine("txTimerHandler: package mismatched")
+		return sch.SchEnoParameter
+	}
+
+	log.LogCallerFileLine("txTimerHandler: expired, inst: %s, txPkg: %+v", conInst.name, *txPkg)
+
+	conInst.status = CisClosed
+	conInst.statusReport()
+
+	conInst.cleanUp(int(DhtEnoTimeout))
+	if eno := conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask); eno != sch.SchEnoNone {
+		log.LogCallerFileLine("txTimerHandler: SchTaskDone failed, eno: %d", eno)
+		return eno
+	}
+
+	return sch.SchEnoNone
+}
+
+//
 // Set current Tx pending
 //
 func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) DhtErrno {
+
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
-	conInst.ptnSrcTsk = txPkg.task
+
+	//
+	// notice: the conInst.ptnSrcTsk will be backuped and then modified to
+	// the pending package's owner task node pointer.
+	//
+
 	conInst.txCurPkg = txPkg
+
+	if txPkg != nil {
+
+		conInst.ptnSrcTskBackup = conInst.ptnSrcTsk
+		conInst.ptnSrcTsk = txPkg.task
+
+	} else {
+
+		//
+		// seems no switching is needed: a connection instance might live for a long time,
+		// while the original source task (the original owner of this connection) might havd
+		// been done for some reasons. so this field "conInst.ptnSrcTsk" is used as the current
+		// owner task of the tx-package wait need response from peer.
+		//
+		// when "txPkg" passed in is nil, means the current tx-packet does not want to wait
+		// response from peeer, and the tx routine would continue, we just set the owner nil.
+		//
+
+		//conInst.ptnSrcTsk = conInst.ptnSrcTskBackup
+		conInst.ptnSrcTsk = nil
+	}
+
 	return DhtEnoNone
 }
 
@@ -1009,10 +1093,13 @@ _txLoop:
 		}
 
 		//
-		// check if peer response needed
+		// check if peer response needed, since we will block here until response from peer
+		// is received if it's the case, we had to start a timer for the connection instance
+		// task before we are blocked here.
 		//
 
 		if txPkg.responsed != nil {
+			conInst.txSetTimer(txPkg)
 			conInst.txSetPending(txPkg)
 			<-txPkg.responsed
 			close(txPkg.responsed)
@@ -1251,7 +1338,10 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 //
 func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 
-	conInst.checkTxCurPending(MID_NEIGHBORS, int64(nbs.Id))
+	if eno := conInst.checkTxCurPending(MID_NEIGHBORS, int64(nbs.Id)); eno != DhtEnoNone {
+		log.LogCallerFileLine("neighbors: checkTxCurPending failed, eno: %d", eno)
+		return eno
+	}
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
@@ -1299,7 +1389,10 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 
-	conInst.checkTxCurPending(MID_GETVALUE_RSP, int64(gvr.Id))
+	if eno := conInst.checkTxCurPending(MID_GETVALUE_RSP, int64(gvr.Id)); eno != DhtEnoNone {
+		log.LogCallerFileLine("getValueRsp: checkTxCurPending failed, eno: %d", eno)
+		return eno
+	}
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
@@ -1347,7 +1440,10 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 
-	conInst.checkTxCurPending(MID_GETPROVIDER_RSP, int64(gpr.Id))
+	if eno := conInst.checkTxCurPending(MID_GETPROVIDER_RSP, int64(gpr.Id)); eno != DhtEnoNone {
+		log.LogCallerFileLine("getProviderRsp: checkTxCurPending failed, eno: %d", eno)
+		return eno
+	}
 
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
@@ -1394,12 +1490,23 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 // Check if current Tx pending package is responsed by peeer
 //
 func (conInst *ConInst)checkTxCurPending(mid int, seq int64) DhtErrno {
+
 	if conInst.txCurPkg != nil {
+
 		if conInst.txCurPkg.waitMid == mid && conInst.txCurPkg.waitSeq == seq {
+
+			log.LogCallerFileLine("checkTxCurPending: it's matched, " +
+				"inst: %s, mid: %d, seq: %d", conInst.name, mid, seq)
+
 			conInst.txCurPkg.responsed<-true
+			return DhtEnoNone
 		}
 	}
-	return DhtEnoNone
+
+	log.LogCallerFileLine("checkTxCurPending: not matched, " +
+		"inst: %s, mid: %d, seq: %d", conInst.name, mid, seq)
+
+	return DhtEnoMismatched
 }
 
 //
