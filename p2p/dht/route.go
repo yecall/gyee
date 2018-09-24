@@ -346,6 +346,12 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 		msg.Eno, msg.Target)
 
 	if _, ok := rutMgr.bpTargets[msg.Target]; !ok {
+
+		//
+		// it might come here since we publish the local node to outside world when
+		// a round of bootstrap is finished, see bellow publishing codes pls.
+		//
+
 		log.LogCallerFileLine("queryResultInd: not a bootstrap target: %x", msg.Target)
 		return sch.SchEnoMismatched
 	}
