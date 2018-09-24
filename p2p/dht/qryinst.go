@@ -461,7 +461,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	if icb.qryReq.ForWhat == MID_PUTVALUE || icb.qryReq.ForWhat == MID_PUTPROVIDER {
 
 		//
-		// tell result
+		// tell query manager about result
 		//
 
 		fwMap := map[int] int {
@@ -542,7 +542,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		ind := sch.MsgDhtQryInstResultInd {
 			From:		nbs.From,
 			Target:		icb.target,
-			ForWhat:	MID_FINDNODE,
+			ForWhat:	msg.ForWhat,
 			Latency:	icb.endTime.Sub(icb.begTime),
 			Peers:		nbs.Nodes,
 			Provider:	nil,
@@ -570,7 +570,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			ind := sch.MsgDhtQryInstResultInd{
 				From:		gvr.From,
 				Target:		icb.target,
-				ForWhat:	MID_FINDNODE,
+				ForWhat:	msg.ForWhat,
 				Latency:	icb.endTime.Sub(icb.begTime),
 				Peers:		nil,
 				Provider:	nil,
@@ -585,7 +585,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			ind := sch.MsgDhtQryInstResultInd{
 				From:		gvr.From,
 				Target:		icb.target,
-				ForWhat:	MID_FINDNODE,
+				ForWhat:	msg.ForWhat,
 				Latency:	icb.endTime.Sub(icb.begTime),
 				Peers:		gvr.Nodes,
 				Provider:	nil,
@@ -610,7 +610,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			ind := sch.MsgDhtQryInstResultInd{
 				From:		gpr.From,
 				Target:		icb.target,
-				ForWhat:	MID_FINDNODE,
+				ForWhat:	msg.ForWhat,
 				Latency:	icb.endTime.Sub(icb.begTime),
 				Peers:		nil,
 				Provider:	(*sch.Provider)(gpr.Provider),
@@ -625,7 +625,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			ind := sch.MsgDhtQryInstResultInd{
 				From:		gpr.From,
 				Target:		icb.target,
-				ForWhat:	MID_FINDNODE,
+				ForWhat:	msg.ForWhat,
 				Latency:	icb.endTime.Sub(icb.begTime),
 				Peers:		gpr.Nodes,
 				Provider:	nil,

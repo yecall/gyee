@@ -23,10 +23,10 @@ package dht
 import (
 	"net"
 	"time"
+	"bytes"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
 	config "github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
-	"bytes"
 )
 
 //
@@ -863,7 +863,7 @@ func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 	pbFn.To = dhtMsg.setNode(&fn.To, pb.DhtMessage_CONT_YES)
 	pbFn.Target = fn.Target[0:]
 	pbFn.Id = new(uint64)
-	*pbFn.Id = uint64(time.Now().UnixNano())
+	*pbFn.Id = uint64(fn.Id)
 	pbFn.Extra = fn.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -905,7 +905,7 @@ func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbNbs.From = dhtMsg.setNode(&nbs.From, pb.DhtMessage_CONT_YES)
 	pbNbs.To = dhtMsg.setNode(&nbs.To, pb.DhtMessage_CONT_YES)
 	pbNbs.Id = new(uint64)
-	*pbNbs.Id = uint64(time.Now().UnixNano())
+	*pbNbs.Id = uint64(nbs.Id)
 	pbNbs.Extra = nbs.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -983,13 +983,14 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 		GetValueReq:	pbGvr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETVALUE_REQ
+	gvr := dhtMsg.GetValueReq
 
-	pbGvr.From = dhtMsg.setNode(&dhtMsg.GetProviderReq.From, pb.DhtMessage_CONT_YES)
-	pbGvr.To = dhtMsg.setNode(&dhtMsg.GetValueReq.To, pb.DhtMessage_CONT_YES)
-	pbGvr.Key = dhtMsg.GetValueReq.Key
+	pbGvr.From = dhtMsg.setNode(&gvr.From, pb.DhtMessage_CONT_YES)
+	pbGvr.To = dhtMsg.setNode(&gvr.To, pb.DhtMessage_CONT_YES)
+	pbGvr.Key = gvr.Key
 
 	pbGvr.Id = new(uint64)
-	*pbGvr.Id = uint64(dhtMsg.GetValueReq.Id)
+	*pbGvr.Id = uint64(gvr.Id)
 	pbGvr.Extra = dhtMsg.GetProviderReq.Extra
 
 	pl, err := pbMsg.Marshal()
@@ -1021,11 +1022,12 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 		GetValueRsp:	pbGvr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETVALUE_RSP
+	gvr := dhtMsg.GetValueRsp
 
-	pbGvr.From = dhtMsg.setNode(&dhtMsg.GetValueRsp.From, pb.DhtMessage_CONT_YES)
-	pbGvr.To = dhtMsg.setNode(&dhtMsg.GetValueRsp.To, pb.DhtMessage_CONT_YES)
+	pbGvr.From = dhtMsg.setNode(&gvr.From, pb.DhtMessage_CONT_YES)
+	pbGvr.To = dhtMsg.setNode(&gvr.To, pb.DhtMessage_CONT_YES)
 
-	v := dhtMsg.GetValueRsp.Value
+	v := gvr.Value
 	pbV := &pb.DhtMessage_Value {
 		Key:	v.Key,
 		Val:	v.Val,
@@ -1033,8 +1035,8 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	pbGvr.Value = pbV
 
 	pbGvr.Id = new(uint64)
-	*pbGvr.Id = uint64(dhtMsg.GetValueRsp.Id)
-	pbGvr.Extra = dhtMsg.GetValueRsp.Extra
+	*pbGvr.Id = uint64(gvr.Id)
+	pbGvr.Extra = gvr.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
@@ -1065,21 +1067,22 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 		PutProvider:	pbPP,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PUTPROVIDER
+	pp := dhtMsg.PutProvider
 
-	pbPP.From = dhtMsg.setNode(&dhtMsg.PutProvider.From, pb.DhtMessage_CONT_YES)
-	pbPP.To = dhtMsg.setNode(&dhtMsg.PutProvider.To, pb.DhtMessage_CONT_YES)
+	pbPP.From = dhtMsg.setNode(&pp.From, pb.DhtMessage_CONT_YES)
+	pbPP.To = dhtMsg.setNode(&pp.To, pb.DhtMessage_CONT_YES)
 	pbPP.Provider = &pb.DhtMessage_Provider {
-		Key:	dhtMsg.PutProvider.Provider.Key,
+		Key:	pp.Provider.Key,
 	}
 
-	for idx, p := range dhtMsg.PutProvider.Provider.Nodes {
-		ct := dhtMsg.PutProvider.Pcs[idx]
+	for idx, p := range pp.Provider.Nodes {
+		ct := pp.Pcs[idx]
 		pbPP.Provider.Nodes = append(pbPP.Provider.Nodes, dhtMsg.setNode(p, pb.DhtMessage_ConnectionType(ct)))
 	}
 
 	pbPP.Id = new(uint64)
-	*pbPP.Id = uint64(dhtMsg.PutProvider.Id)
-	pbPP.Extra = dhtMsg.PutProvider.Extra
+	*pbPP.Id = uint64(pp.Id)
+	pbPP.Extra = pp.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
@@ -1110,13 +1113,14 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 		GetProviderReq:	pbGpr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETPROVIDER_REQ
+	gpr := dhtMsg.GetProviderReq
 
-	pbGpr.From = dhtMsg.setNode(&dhtMsg.GetProviderReq.From, pb.DhtMessage_CONT_YES)
-	pbGpr.To = dhtMsg.setNode(&dhtMsg.GetProviderReq.To, pb.DhtMessage_CONT_YES)
-	pbGpr.Key = dhtMsg.GetProviderReq.Key
+	pbGpr.From = dhtMsg.setNode(&gpr.From, pb.DhtMessage_CONT_YES)
+	pbGpr.To = dhtMsg.setNode(&gpr.To, pb.DhtMessage_CONT_YES)
+	pbGpr.Key = gpr.Key
 	pbGpr.Id = new(uint64)
-	*pbGpr.Id = uint64(dhtMsg.GetProviderReq.Id)
-	pbGpr.Extra = dhtMsg.GetProviderReq.Extra
+	*pbGpr.Id = uint64(gpr.Id)
+	pbGpr.Extra = gpr.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
@@ -1147,21 +1151,22 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 		GetProviderRsp:	pbGpr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETPROVIDER_RSP
+	gpr := dhtMsg.GetProviderRsp
 
-	pbGpr.From = dhtMsg.setNode(&dhtMsg.GetProviderRsp.From, pb.DhtMessage_CONT_YES)
-	pbGpr.To = dhtMsg.setNode(&dhtMsg.GetProviderRsp.To, pb.DhtMessage_CONT_YES)
+	pbGpr.From = dhtMsg.setNode(&gpr.From, pb.DhtMessage_CONT_YES)
+	pbGpr.To = dhtMsg.setNode(&gpr.To, pb.DhtMessage_CONT_YES)
 	pbGpr.Provider = &pb.DhtMessage_Provider {
-		Key:	dhtMsg.GetProviderRsp.Provider.Key,
+		Key:	gpr.Provider.Key,
 	}
 
-	for idx, p := range dhtMsg.GetProviderRsp.Provider.Nodes {
-		ct := dhtMsg.GetProviderRsp.Pcs[idx]
+	for idx, p := range gpr.Provider.Nodes {
+		ct := gpr.Pcs[idx]
 		pbGpr.Provider.Nodes = append(pbGpr.Provider.Nodes,dhtMsg.setNode(p, pb.DhtMessage_ConnectionType(ct)))
 	}
 
 	pbGpr.Id = new(uint64)
-	*pbGpr.Id = uint64(dhtMsg.GetProviderRsp.Id)
-	pbGpr.Extra = dhtMsg.GetProviderRsp.Extra
+	*pbGpr.Id = uint64(gpr.Id)
+	pbGpr.Extra = gpr.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {

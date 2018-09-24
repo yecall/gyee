@@ -320,12 +320,31 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 
 	if err != nil {
 
-		log.LogCallerFileLine("driveSelf: accept error: %s", err.Error())
+		doClose := false
 
-		lsnMgr.listener.Close()
-		lsnMgr.listener = nil
-		lsnMgr.status = lmsStopped
-		lsnMgr.dispStaus()
+		if netErr, ok := err.(net.Error); !ok {
+
+			doClose = true
+
+		} else if netErr.Temporary() == false && netErr.Timeout() == false {
+
+			doClose = true
+
+		} else {
+
+			lsnMgr.driveMore()
+			return sch.SchEnoOS
+		}
+
+		if doClose {
+
+			log.LogCallerFileLine("driveSelf: close listener for accept error: %s", err.Error())
+
+			lsnMgr.listener.Close()
+			lsnMgr.listener = nil
+			lsnMgr.status = lmsStopped
+			lsnMgr.dispStaus()
+		}
 
 		return sch.SchEnoUserTask
 	}

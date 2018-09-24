@@ -523,7 +523,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 
 	ci := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).ConInst.(*ConInst)
 	req := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).Msg.(*GetValueReq)
-	rsp := GetValueRsp{
+	rsp := GetValueRsp {
 		From:		*ci.local,
 		To:			ci.hsInfo.peer,
 		Key:		req.Key,

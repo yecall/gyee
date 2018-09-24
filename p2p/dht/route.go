@@ -394,6 +394,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		Peers:		nil,
 		Dists:		nil,
 		Pcs:		nil,
+		Msg:		req.Msg,
 	}
 	var schMsg sch.SchMessage
 

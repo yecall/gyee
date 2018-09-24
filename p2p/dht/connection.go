@@ -277,6 +277,11 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
 		//
 
+		if ci = msg.Inst.(*ConInst); ci == nil {
+			log.LogCallerFileLine("handshakeRsp: nil connection instance")
+			return sch.SchEnoInternal
+		}
+
 		if ci.isBlind && ci.dir == ConInstDirOutbound {
 			rsp := sch.MsgDhtBlindConnectRsp {
 				Eno:	msg.Eno,
@@ -311,7 +316,14 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 			}
 		}
 
-		return sch.SchEnoNone
+		//
+		// power off the connection instance: do not apply ci.sdl.SchTaskDone() directly
+		// since cleaning work is needed for releasing the instance.
+		//
+
+		schMsg := sch.SchMessage{}
+		ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		return ci.sdl.SchSendMessage(&schMsg)
 	}
 
 	cid := conInstIdentity{
@@ -616,7 +628,7 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		if msg.WaitRsp == true {
 			pkg.responsed = make(chan bool, 1)
 			pkg.waitMid = msg.WaitMid
-			pkg.waitSeq = int64(msg.WaitSeq)
+			pkg.waitSeq = msg.WaitSeq
 		}
 
 		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {

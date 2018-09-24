@@ -146,6 +146,7 @@ const (
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
+	ciTxMaxWaitResponseSize = 8				// tx max wait peer response queue size
 )
 
 //
@@ -354,10 +355,11 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.Peer = &peer
 			rsp.Inst = nil
 			rsp.HsInfo = &hsInfo
-			rsp2ConMgr()
 
-			conInst.cleanUp(int(eno))
-			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+			return rsp2ConMgr()
+
+			/*conInst.cleanUp(int(eno))
+			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)*/
 		}
 
 	} else {
@@ -368,10 +370,11 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.Peer = nil
 			rsp.HsInfo = nil
 			rsp.Inst = nil
-			rsp2ConMgr()
 
-			conInst.cleanUp(int(eno))
-			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+			return rsp2ConMgr()
+
+			/*conInst.cleanUp(int(eno))
+			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)*/
 		}
 	}
 
@@ -468,6 +471,11 @@ func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 //
 func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
+	//
+	// notice: here the response must for "Find_NODE" from peers, see function
+	// dispatch for more please.
+	//
+
 	if msg == nil {
 		log.LogCallerFileLine("rutMgrNearestRsp: invalid parameters")
 		return sch.SchEnoParameter
@@ -487,12 +495,23 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 
 	if msg.ForWhat == MID_FINDNODE {
 
+		if msg.Msg == nil {
+			log.LogCallerFileLine("rutMgrNearestRsp: original message is nil")
+			return sch.SchEnoMismatched
+		}
+
+		findNode, ok := msg.Msg.(*FindNode)
+		if !ok {
+			log.LogCallerFileLine("rutMgrNearestRsp: invalid original message type")
+			return sch.SchEnoMismatched
+		}
+
 		nbs := Neighbors {
 			From:		*conInst.local,
 			To:    		conInst.hsInfo.peer,
 			Nodes:		nodes,
 			Pcs:		msg.Pcs.([]int),
-			Id:			time.Now().UnixNano(),
+			Id:			findNode.Id,
 			Extra:		nil,
 		}
 
@@ -503,39 +522,16 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 
 	} else if msg.ForWhat == MID_GETPROVIDER_REQ {
 
-		gpr := GetProviderRsp {
-			From:  		*conInst.local,
-			To:    		conInst.hsInfo.peer,
-			Provider:	nil,
-			Nodes:		nodes,
-			Pcs:   		msg.Pcs.([]int),
-			Id:    		time.Now().UnixNano(),
-			Extra: 		nil,
-		}
-
-		dhtMsg = DhtMessage{
-			Mid:       		MID_GETPROVIDER_RSP,
-			GetProviderRsp:	&gpr,
-		}
+		log.LogCallerFileLine("rutMgrNearestRsp: for MID_GETPROVIDER_REQ should not come here")
+		return sch.SchEnoMismatched
 
 	} else if msg.ForWhat == MID_GETVALUE_REQ {
 
-		gvr := GetValueRsp {
-			From:  		*conInst.local,
-			To:    		conInst.hsInfo.peer,
-			Value:		nil,
-			Nodes:		nodes,
-			Pcs:   		msg.Pcs.([]int),
-			Id:    		time.Now().UnixNano(),
-			Extra: 		nil,
-		}
-
-		dhtMsg = DhtMessage{
-			Mid:       		MID_GETVALUE_RSP,
-			GetValueRsp:	&gvr,
-		}
+		log.LogCallerFileLine("rutMgrNearestRsp: for MID_GETVALUE_REQ should not come here")
+		return sch.SchEnoMismatched
 
 	} else {
+
 		log.LogCallerFileLine("rutMgrNearestRsp: unknown what's for")
 		return sch.SchEnoMismatched
 	}
@@ -583,13 +579,25 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 //
 func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 
+	if pkg == nil {
+		log.LogCallerFileLine("txPutPending: invalid parameter")
+		return DhtEnoParameter
+	}
+
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
 
 	if conInst.txPending.Len() >= ciTxPendingQueueSize {
-		log.LogCallerFileLine("txPutPending: queue full")
+		log.LogCallerFileLine("txPutPending: pending queue full")
 		return DhtEnoResource
 	}
+
+	if conInst.txWaitRsp.Len() >= ciTxMaxWaitResponseSize {
+		log.LogCallerFileLine("txPutPending: waiting response queue full")
+		return DhtEnoResource
+	}
+
+	log.LogCallerFileLine("txPutPending: put, waitMid: %d, waitSeq: %d", pkg.waitMid, pkg.waitSeq)
 
 	conInst.txPending.PushBack(pkg)
 	conInst.txPendSig<-pkg
@@ -1116,20 +1124,26 @@ _txLoop:
 		var dhtPkg *DhtPackage = nil
 		var pbPkg *pb.DhtPackage = nil
 		var ok bool
+		var el *list.Element
 
 		//
 		// fetch pending signal
 		//
 
-		<-conInst.txPendSig
+		_, ok = <-conInst.txPendSig
+		if !ok {
+			goto _checkDone
+		}
 
 		//
 		// get pending and send it
 		//
 
 		conInst.txLock.Lock()
-		el := conInst.txPending.Front()
-		conInst.txPending.Remove(el)
+		el = conInst.txPending.Front()
+		if el != nil {
+			conInst.txPending.Remove(el)
+		}
 		conInst.txLock.Unlock()
 
 		if el == nil {
@@ -1168,11 +1182,14 @@ _txLoop:
 
 		if txPkg.responsed != nil {
 
-			_, el := conInst.txSetPending(txPkg)
-			conInst.txSetTimer(el)
-		}
+			if eno, el := conInst.txSetPending(txPkg); eno == DhtEnoNone && el != nil {
+				conInst.txSetTimer(el)
+			}
 
-		conInst.txSetPending(nil)
+		} else {
+
+			conInst.txSetPending(nil)
+		}
 
 _checkDone:
 
@@ -1394,6 +1411,7 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 		NtfReq:		false,
 		Task:		conInst.ptnMe,
 		ForWhat:	MID_FINDNODE,
+		Msg:		fn,
 	}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &req)
 	conInst.sdl.SchSendMessage(&msg)
