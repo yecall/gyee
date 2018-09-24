@@ -424,7 +424,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
 
 		return sch.SchEnoUserTask
-
 	}
 
 	sendReq.Task = icb.ptnInst

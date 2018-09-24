@@ -58,8 +58,8 @@ type ConInst struct {
 	ior				ggio.ReadCloser			// IO reader
 	dir				ConInstDir				// connection instance directory
 	hsInfo			conInstHandshakeInfo	// handshake information
-	txPending		*list.List				// pending package to be sent
-	txCurPkg		*conInstTxPkg			// current pending for response
+	txPending		*list.List				// pending packages to be sent
+	txWaitRsp		*list.List				// packages had been sent but waiting for response from peer
 	txLock			sync.Mutex				// tx lock
 	txPendSig		chan interface{}		// tx pendings signal
 	txDone			chan int				// tx-task done signal
@@ -69,7 +69,6 @@ type ConInst struct {
 	isBlind			bool					// is blind connection instance
 	txPkgCnt		int64					// statistics for number of packages sent
 	rxPkgCnt		int64					// statistics for number off package received
-	txTid			int						// tx timer identity
 }
 
 //
@@ -126,11 +125,17 @@ type conInstHandshakeInfo struct {
 //
 type conInstTxPkg struct {
 	task		interface{}			// pointer to owner task node
-	responsed	chan bool			// wait response from peer signal
+
+	responsed	chan bool			// wait response from peer signal. notice: this chan is not applied for
+									// syncing as a signal really in current implement, instead, it is used
+									// as a flag for response checking, if not nil, a package sent would be
+									// push into queue (ConInst.txWaitRsp), and timer start for response.
+
 	waitMid		int					// wait message identity
 	waitSeq		int64				// wait message sequence number
 	submitTime	time.Time			// time the payload submitted
 	payload		interface{}			// payload buffer
+	txTid		int					// wait peer response timer
 }
 
 //
@@ -161,13 +166,13 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		status:				CisNull,
 		dir:				ConInstDirUnknown,
 		txPending:			list.New(),
+		txWaitRsp:			list.New(),
 		txDone:				nil,
 		rxDone:				nil,
 		cbfRxData:			nil,
 		isBlind:			isBlind,
 		txPkgCnt:			0,
 		rxPkgCnt:			0,
-		txTid:				sch.SchInvalidTid,
 	}
 
 	conInst.tep = conInst.conInstProc
@@ -217,7 +222,7 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 		eno = conInst.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
 	case sch.EvDhtConInstTxTimer:
-		eno = conInst.txTimerHandler(msg.Body.(*conInstTxPkg))
+		eno = conInst.txTimerHandler(msg.Body.(*list.Element))
 
 	default:
 		log.LogCallerFileLine("conInstProc: unknown event: %d", msg.Id)
@@ -595,14 +600,25 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 //
 // Set timer for tx-package which would wait response from peer
 //
-func (conInst *ConInst)txSetTimer(txPkg *conInstTxPkg) DhtErrno {
+func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
+
+	if el == nil {
+		log.LogCallerFileLine("txSetTimer: invalid parameter")
+		return DhtEnoParameter
+	}
+
+	txPkg, ok := el.Value.(*conInstTxPkg)
+	if !ok {
+		log.LogCallerFileLine("txSetTimer: type mismatched")
+		return DhtEnoMismatched
+	}
 
 	var td = sch.TimerDescription {
 		Name:	fmt.Sprintf("%s%d", conInst.name, "_txTimer"),
 		Utid:	sch.DhtConInstTxTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	ciTxTimerDuration,
-		Extra:	txPkg,
+		Extra:	el,
 	}
 
 	eno, tid := conInst.sdl.SchSetTimer(conInst.ptnMe, &td)
@@ -610,7 +626,8 @@ func (conInst *ConInst)txSetTimer(txPkg *conInstTxPkg) DhtErrno {
 		log.LogCallerFileLine("txSetTimer: SchSetTimer failed, eno: %d", eno)
 		return DhtEnoScheduler
 	}
-	conInst.txTid = tid
+
+	txPkg.txTid = tid
 
 	return DhtEnoNone
 }
@@ -618,14 +635,21 @@ func (conInst *ConInst)txSetTimer(txPkg *conInstTxPkg) DhtErrno {
 //
 // Tx timer expired event handler
 //
-func (conInst *ConInst)txTimerHandler(txPkg *conInstTxPkg) sch.SchErrno {
+func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 
-	if txPkg == nil || txPkg != conInst.txCurPkg {
-		log.LogCallerFileLine("txTimerHandler: package mismatched")
+	if el == nil {
+		log.LogCallerFileLine("txTimerHandler: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
-	log.LogCallerFileLine("txTimerHandler: expired, inst: %s, txPkg: %+v", conInst.name, *txPkg)
+	txPkg, ok := el.Value.(*conInstTxPkg)
+	if !ok {
+		log.LogCallerFileLine("txTimerHandler: type mismatched")
+		return sch.SchEnoMismatched
+	}
+
+	log.LogCallerFileLine("txTimerHandler: expired, " +
+		"inst: %s, el: %+v, txPkg: %+v", conInst.name, *el, *txPkg)
 
 	conInst.status = CisClosed
 	conInst.statusReport()
@@ -642,7 +666,7 @@ func (conInst *ConInst)txTimerHandler(txPkg *conInstTxPkg) sch.SchErrno {
 //
 // Set current Tx pending
 //
-func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) DhtErrno {
+func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Element){
 
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
@@ -652,12 +676,13 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) DhtErrno {
 	// the pending package's owner task node pointer.
 	//
 
-	conInst.txCurPkg = txPkg
+	var el *list.Element = nil
 
 	if txPkg != nil {
 
 		conInst.ptnSrcTskBackup = conInst.ptnSrcTsk
 		conInst.ptnSrcTsk = txPkg.task
+		el = conInst.txWaitRsp.PushBack(txPkg)
 
 	} else {
 
@@ -675,7 +700,7 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) DhtErrno {
 		conInst.ptnSrcTsk = nil
 	}
 
-	return DhtEnoNone
+	return DhtEnoNone, el
 }
 
 //
@@ -758,6 +783,49 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 
 	conInst.txTaskStop(why)
 	conInst.rxTaskStop(why)
+
+	que := conInst.txWaitRsp
+
+	for que.Len() != 0 {
+
+		el := que.Front()
+
+		if txPkg, ok := el.Value.(*conInstTxPkg); ok {
+
+			if txPkg.txTid != sch.SchInvalidTid {
+				conInst.sdl.SchKillTimer(conInst.ptnMe, txPkg.txTid)
+			}
+
+			if txPkg.task != nil {
+
+				//
+				// tell the package owner task about timeout
+				//
+
+				schMsg := sch.SchMessage{}
+				ind := sch.MsgDhtConInstTxInd {
+					Eno:		DhtEnoTimeout,
+					WaitMid:	txPkg.waitMid,
+					WaitSeq:	txPkg.waitSeq,
+				}
+
+				conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtConInstTxInd, &ind)
+				conInst.sdl.SchSendMessage(&schMsg)
+			}
+
+			if txPkg.responsed != nil {
+
+				//
+				// see comments about field "responsed" pls
+				//
+
+				close(txPkg.responsed)
+				txPkg.responsed = nil
+			}
+		}
+
+		que.Remove(el)
+	}
 
 	if conInst.con != nil {
 		conInst.con.Close()
@@ -1099,10 +1167,9 @@ _txLoop:
 		//
 
 		if txPkg.responsed != nil {
-			conInst.txSetTimer(txPkg)
-			conInst.txSetPending(txPkg)
-			<-txPkg.responsed
-			close(txPkg.responsed)
+
+			_, el := conInst.txSetPending(txPkg)
+			conInst.txSetTimer(el)
 		}
 
 		conInst.txSetPending(nil)
@@ -1338,8 +1405,10 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 //
 func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 
-	if eno := conInst.checkTxCurPending(MID_NEIGHBORS, int64(nbs.Id)); eno != DhtEnoNone {
-		log.LogCallerFileLine("neighbors: checkTxCurPending failed, eno: %d", eno)
+	eno, txPkg := conInst.checkTxCurPending(MID_NEIGHBORS, int64(nbs.Id))
+
+	if eno != DhtEnoNone || txPkg == nil {
+		log.LogCallerFileLine("neighbors: checkTxCurPending failed, eno: %d, txPkg: %p", eno, txPkg)
 		return eno
 	}
 
@@ -1350,7 +1419,7 @@ func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 		ForWhat:	sch.EvDhtConInstNeighbors,
 	}
 
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 
 	return DhtEnoNone
@@ -1389,8 +1458,10 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 
-	if eno := conInst.checkTxCurPending(MID_GETVALUE_RSP, int64(gvr.Id)); eno != DhtEnoNone {
-		log.LogCallerFileLine("getValueRsp: checkTxCurPending failed, eno: %d", eno)
+	eno, txPkg := conInst.checkTxCurPending(MID_GETVALUE_RSP, int64(gvr.Id))
+
+	if eno != DhtEnoNone || txPkg == nil {
+		log.LogCallerFileLine("getValueRsp: checkTxCurPending failed, eno: %d, txPkg: %p", eno, txPkg)
 		return eno
 	}
 
@@ -1401,7 +1472,7 @@ func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 		ForWhat:	sch.EvDhtConInstGetValRsp,
 	}
 
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 
 	return DhtEnoNone
@@ -1440,7 +1511,9 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 
-	if eno := conInst.checkTxCurPending(MID_GETPROVIDER_RSP, int64(gpr.Id)); eno != DhtEnoNone {
+	eno, txPkg := conInst.checkTxCurPending(MID_GETPROVIDER_RSP, int64(gpr.Id))
+
+	if eno != DhtEnoNone || txPkg == nil {
 		log.LogCallerFileLine("getProviderRsp: checkTxCurPending failed, eno: %d", eno)
 		return eno
 	}
@@ -1452,7 +1525,7 @@ func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 		ForWhat:	sch.EvDhtConInstGetProviderRsp,
 	}
 
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnSrcTsk, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 
 	return DhtEnoNone
@@ -1489,24 +1562,43 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 //
 // Check if current Tx pending package is responsed by peeer
 //
-func (conInst *ConInst)checkTxCurPending(mid int, seq int64) DhtErrno {
+func (conInst *ConInst)checkTxCurPending(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
 
-	if conInst.txCurPkg != nil {
+	que := conInst.txWaitRsp
 
-		if conInst.txCurPkg.waitMid == mid && conInst.txCurPkg.waitSeq == seq {
+	for el := que.Front(); el != nil; el = el.Next() {
 
-			log.LogCallerFileLine("checkTxCurPending: it's matched, " +
-				"inst: %s, mid: %d, seq: %d", conInst.name, mid, seq)
+		if txPkg, ok := el.Value.(*conInstTxPkg); ok {
 
-			conInst.txCurPkg.responsed<-true
-			return DhtEnoNone
+			if txPkg.waitMid == mid && txPkg.waitSeq == seq {
+
+				log.LogCallerFileLine("checkTxCurPending: it's found, mid: %d, seq: %d", mid, seq)
+
+				if txPkg.responsed != nil {
+
+					//
+					// see comments about field "responsed" please
+					//
+
+					txPkg.responsed<-true
+					close(txPkg.responsed)
+				}
+
+				if txPkg.txTid != sch.SchInvalidTid {
+					conInst.sdl.SchKillTimer(conInst.ptnMe, txPkg.txTid)
+					txPkg.txTid = sch.SchInvalidTid
+				}
+
+				que.Remove(el)
+
+				return DhtEnoNone, txPkg
+			}
 		}
 	}
 
-	log.LogCallerFileLine("checkTxCurPending: not matched, " +
-		"inst: %s, mid: %d, seq: %d", conInst.name, mid, seq)
+	log.LogCallerFileLine("checkTxCurPending: not found, mid: %d, seq: %d", mid, seq)
 
-	return DhtEnoMismatched
+	return DhtEnoNotFound, nil
 }
 
 //

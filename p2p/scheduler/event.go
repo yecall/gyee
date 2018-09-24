@@ -473,6 +473,7 @@ const (
 	EvDhtConInstGetProviderRsp	= EvDhtConInstBase + 7
 	EvDhtConInstGetValRsp		= EvDhtConInstBase + 8
 	EvDhtConInstNeighbors		= EvDhtConInstBase + 9
+	EvDhtConInstTxInd			= EvDhtConInstBase + 10
 )
 
 //
@@ -542,8 +543,17 @@ type MsgDhtConInstGetProviderRsp struct {
 // EvDhtConInstGetValRsp
 //
 type MsgDhtConInstGetValRsp struct {
-	ConInst		interface{}		// connection instance who sent this meeage
-	Msg			interface{}		// the message pointer
+	ConInst		interface{}			// connection instance who sent this meeage
+	Msg			interface{}			// the message pointer
+}
+
+//
+// EvDhtConInstTxInd
+//
+type MsgDhtConInstTxInd struct {
+	Eno			int					// result code
+	WaitMid		int					// wait message identity
+	WaitSeq		int64				// wait message sequence number
 }
 
 //
