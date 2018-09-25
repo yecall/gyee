@@ -383,6 +383,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoParameter
 	}
 
+	log.LogCallerFileLine("rutNearestRsp: msg: %+v", msg)
+
 	if msg.ForWhat != MID_PUTVALUE &&
 		msg.ForWhat != MID_PUTPROVIDER &&
 		msg.ForWhat != MID_FINDNODE &&
@@ -392,17 +394,25 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoMismatched
 	}
 
-	log.LogCallerFileLine("rutNearestRsp: msg: %+v", msg)
+	if (msg.Eno == DhtEnoNone) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
+		log.LogCallerFileLine("rutNearestRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
 
 	var dhtEno = DhtErrno(DhtEnoNone)
 
 	forWhat := msg.ForWhat
 	target := msg.Target
+
 	peers := msg.Peers.([]*rutMgrBucketNode)
 	pcs := msg.Pcs.([]int)
 	dists := msg.Dists.([]int)
-	qcb, ok := qryMgr.qcbTab[target]
+	if (msg.Eno == DhtEnoNone) && (len(peers) != len(pcs) || len(peers) != len(dists)) {
+		log.LogCallerFileLine("rutNearestRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
 
+	qcb, ok := qryMgr.qcbTab[target]
 	if !ok {
 		log.LogCallerFileLine("rutNearestRsp: qcb not exist, target: %x", target)
 		return sch.SchEnoNotFound
@@ -681,6 +691,13 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 // Instance query result indication handler
 //
 func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
+
+	if msg == nil {
+		log.LogCallerFileLine("instResultInd: invalid parameter")
+		return sch.SchEnoParameter
+	}
+
+	log.LogCallerFileLine("instResultInd: msg: %+v", *msg)
 
 	if msg.ForWhat != sch.EvDhtMgrPutValueReq &&
 		msg.ForWhat != sch.EvDhtMgrPutProviderReq &&
@@ -1180,6 +1197,8 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			log.LogCallerFileLine("qryMgrQcbPutActived: duplicated node: %X", pending.node.ID)
 			continue
 		}
+
+		log.LogCallerFileLine("qryMgrQcbPutActived: pending to be activated: %+v", *pending)
 
 		icb := qryInstCtrlBlock {
 			sdl:		qryMgr.sdl,

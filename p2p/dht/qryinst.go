@@ -196,6 +196,9 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 		IsBlind:	false,
 	}
 
+	log.LogCallerFileLine("startReq: ask connection manager for peer, " +
+		"inst: %s, req: %+v", qryInst.icb.name, req)
+
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
 	icb.sdl.SchSendMessage(&msg)
 
@@ -369,6 +372,13 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 //
 func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno {
 
+	if msg == nil {
+		log.LogCallerFileLine("connectRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
+
+	log.LogCallerFileLine("connectRsp: msg: %+v", *msg)
+
 	icb := qryInst.icb
 	sdl := icb.sdl
 
@@ -428,6 +438,9 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 		return sch.SchEnoUserTask
 	}
+
+	log.LogCallerFileLine("connectRsp: setupQryPkg ok, " +
+		"inst: %s, icb.qryReq: %+v", icb.name, *icb.qryReq)
 
 	sendReq.Task = icb.ptnInst
 	sendReq.Peer = &icb.to

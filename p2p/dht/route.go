@@ -25,10 +25,11 @@ import (
 	"crypto/rand"
 	"container/list"
 	"crypto/sha256"
+	"bytes"
+	golog "log"
 	log	"github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	"bytes"
 )
 
 //
@@ -384,6 +385,8 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 		rutMgr.sdl.SchSendMessage(&msg)
 	}
 
+	rutMgr.showRoute("bootstrap-round-completed")
+
 	return sch.SchEnoNone
 }
 
@@ -455,13 +458,13 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 	why := req.Why
 	eno := req.Eno
 
-	log.LogCallerFileLine("updateReq: why: %d, eno: %d", why, eno)
-
 	//
 	// check "why" and "eno"
 	//
 
 	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone {
+
+		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Handshake, eno: DhtEnoNone")
 
 		//
 		// new peer picked ok
@@ -485,6 +488,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			}
 
 			rutMgr.update(&bn, dist)
+			rutMgr.showRoute("handshake-update")
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
@@ -493,6 +497,8 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout {
+
+		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoTimeout")
 
 		//
 		// query peer time out, check fail counter
@@ -518,8 +524,12 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			}
 
 			rutMgr.rutMgrRmvNotify(bn)
+			rutMgr.showRoute("query-timeout-delete")
 		}
+
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone {
+
+		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoNone")
 
 		//
 		// this case the latency about an specific individual peer shoud be update,
@@ -532,6 +542,8 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 	} else if why == rutMgrUpdate4Closed {
+
+		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Closed")
 
 		//
 		// update peer connection status to be CisClosed, but do not remove it from
@@ -549,7 +561,13 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 		el.Value.(*rutMgrBucketNode).pcs = int(conInstStatus2PCS(CisClosed))
+
+	} else {
+
+		log.LogCallerFileLine("updateReq: invalid (why:%d, eno:%d)", why, eno)
+		return sch.SchEnoMismatched
 	}
+
 
 	return sch.SchEnoNone
 }
@@ -694,6 +712,7 @@ func (rutMgr *RutMgr)rutMgrSetupRouteTable() DhtErrno {
 	rt.bucketSize = rutMgrBucketSize
 	rt.maxLatency = rutMgrMaxLatency
 	rt.bucketTab = make([]*list.List, 0, HashBitLength + 1)
+	rt.bucketTab = append(rt.bucketTab, list.New())
 	rt.metricTab = make(map[config.NodeID]*rutMgrPeerMetric, 0)
 	return DhtEnoNone
 }
@@ -822,7 +841,7 @@ func (rutMgr *RutMgr)find(id config.NodeID, dist int) (DhtErrno, *list.Element) 
 	rt := &rutMgr.rutTab
 
 	if dist >= len(rt.bucketTab) {
-		return DhtEnoNotFound, nil
+		dist = len(rt.bucketTab) - 1
 	}
 
 	li := rt.bucketTab[dist]
@@ -840,8 +859,15 @@ func (rutMgr *RutMgr)find(id config.NodeID, dist int) (DhtErrno, *list.Element) 
 //
 func (rutMgr *RutMgr)delete(id config.NodeID) DhtErrno {
 
+	log.LogCallerFileLine("delete: id: %x", id)
+
 	hash := rutMgrNodeId2Hash(id)
 	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
+
+	if dist >= len(rutMgr.rutTab.bucketTab) {
+		dist = len(rutMgr.rutTab.bucketTab) - 1
+	}
+
 	li := rutMgr.rutTab.bucketTab[dist]
 
 	for el := li.Front(); el != nil; el = el.Next() {
@@ -936,6 +962,37 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 	}
 
 	return DhtEnoNone
+}
+
+//
+// Just for debug to show the route table
+//
+func (rutMgr *RutMgr)showRoute(tag string) {
+	if true {
+		dht := rutMgr.sdl.SchGetP2pCfgName()
+		golog.Printf("showRoute: dht: %s, rutTab: %+v", dht, rutMgr.rutTab)
+		rt := rutMgr.rutTab
+		for idx := 0; idx < len(rt.bucketTab); idx++ {
+			golog.Printf("showRoute: "+
+				"=============================== tag: %s, dht: %s bucket: %d ==============================", tag, dht, idx)
+			li := rt.bucketTab[idx]
+			count := 0;
+			for el := li.Front(); el != nil; el = el.Next() {
+				bn, ok := el.Value.(*rutMgrBucketNode)
+				if !ok {
+					golog.Printf("showRoute: dht: %s, invalid bucket node found, idx: %d", idx)
+					continue
+				}
+				count++
+				golog.Printf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>", dht, count)
+				golog.Printf("dht: %s, showRoute: node: %+v", dht, bn.node)
+				golog.Printf("dht: %s, showRoute: hash: %x", dht, bn.hash)
+				golog.Printf("dht: %s, showRoute: dist: %d", dht, bn.dist)
+				golog.Printf("dht: %s, showRoute: fails: %d", dht, bn.fails)
+				golog.Printf("dht: %s, showRoute: pcs: %d", dht, bn.pcs)
+			}
+		}
+	}
 }
 
 //
