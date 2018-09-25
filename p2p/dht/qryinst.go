@@ -291,6 +291,9 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 //
 func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 
+	log.LogCallerFileLine("icbTimerHandler: " +
+		"query instance timer expired, inst: %s", qryInst.icb.name)
+
 	if qryInst != msg {
 		log.LogCallerFileLine("icbTimerHandler: instance pointer mismatched")
 		return sch.SchEnoMismatched
@@ -337,7 +340,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 		Why:	rutMgrUpdate4Query,
 		Eno:	DhtEnoTimeout,
 		Seens:	[]config.Node{icb.to},
-		Duras:	nil,
+		Duras:	[]time.Duration{-1},
 	}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
 	sdl.SchSendMessage(&schMsg)

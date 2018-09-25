@@ -25,8 +25,9 @@ import (
 	"time"
 	"container/list"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
+	"bytes"
 )
 
 //
@@ -83,6 +84,7 @@ type qryCtrlBlock struct {
 	ptnOwner	interface{}								// owner task node pointer
 	qryReq		*sch.MsgDhtQryMgrQueryStartReq			// original query request message
 	seq			int										// sequence number
+	forWhat		int										// what's the query control block for
 	target		config.NodeID							// target for looking up
 	status		QryStatus								// query status
 	qryHistory	map[config.NodeID]*qryPendingInfo		// history peers had been queried
@@ -311,9 +313,8 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 
 	log.LogCallerFileLine("queryStartReq: sender: %p, msg: %+v", sender, msg)
 
-	var target = msg.Target
 	var forWhat = msg.ForWhat
-	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target:target, Eno:DhtEnoUnknown}
+	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno:DhtEnoUnknown}
 	var qcb *qryCtrlBlock = nil
 	var schMsg = sch.SchMessage{}
 
@@ -323,15 +324,15 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	//
 
 	var nearestReq = sch.MsgDhtRutMgrNearestReq{
-		Target:		target,
-		Max:		rutMgrMaxNearest,
-		NtfReq:		true,
-		Task:		qryMgr.ptnMe,
-		ForWhat:	forWhat,
+		Target:  msg.Target,
+		Max:     rutMgrMaxNearest,
+		NtfReq:  true,
+		Task:    qryMgr.ptnMe,
+		ForWhat: forWhat,
 	}
 
-	if _, dup := qryMgr.qcbTab[target]; dup {
-		log.LogCallerFileLine("queryStartReq: duplicated target: %x", target)
+	if _, dup := qryMgr.qcbTab[msg.Target]; dup {
+		log.LogCallerFileLine("queryStartReq: duplicated target: %x", msg.Target)
 		rsp.Eno = DhtEnoDuplicated
 		goto _rsp2Sender
 	}
@@ -340,9 +341,10 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.ptnOwner = sender
 	qcb.qryReq = msg
 	qcb.seq = qryMgr.qcbSeq
+	qcb.forWhat = forWhat
 	qryMgr.qcbSeq++
 	qcb.icbSeq = 0
-	qcb.target = target
+	qcb.target = msg.Target
 	qcb.status = qsNull
 	qcb.qryHistory = make(map[config.NodeID]*rutMgrBucketNode, 0)
 	qcb.qryPending = nil
@@ -350,7 +352,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.qryResult = nil
 	qcb.rutNtfFlag = nearestReq.NtfReq
 	qcb.status = qsPreparing
-	qryMgr.qcbTab[target] = qcb
+	qryMgr.qcbTab[msg.Target] = qcb
 
 	log.LogCallerFileLine("queryStartReq: qcb: %+v", *qcb)
 
@@ -578,7 +580,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
 			log.LogCallerFileLine("rutNotificationInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -656,7 +658,7 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 
 			log.LogCallerFileLine("instStatusInd: query done: %x", qcb.target)
 
-			if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
 				log.LogCallerFileLine("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 				return sch.SchEnoUserTask
 			}
@@ -707,7 +709,18 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	}
 
 	//
-	// update route manager in any cases.
+	// remove possible local node identity from message
+	//
+
+	for idx, peer := range msg.Peers {
+		if bytes.Compare(peer.ID[0:], qryMgr.qmCfg.local.ID[0:]) == 0 {
+			msg.Peers = append(msg.Peers[0:idx], msg.Peers[idx+1:]...)
+			msg.Pcs = append(msg.Pcs[0:idx], msg.Pcs[idx+1:]...)
+		}
+	}
+
+	//
+	// for the peer send the message, update route manager
 	//
 
 	from := msg.From
@@ -769,7 +782,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 			if peer.ID == target {
 
-				qryMgr.qryMgrResultReport(qcb)
+				qryMgr.qryMgrResultReport(qcb, DhtEnoNone, peer, msg.Value, msg.Provider)
 
 				if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
 					log.LogCallerFileLine("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
@@ -819,7 +832,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
 			log.LogCallerFileLine("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -878,7 +891,7 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
 			log.LogCallerFileLine("instStopRsp: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -895,11 +908,12 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 	// here we try active more instances for one had been removed
 	//
 
-	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
-		return sch.SchEnoNone
+	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno != DhtEnoNone {
+		log.LogCallerFileLine("instStopRsp: qryMgrQcbPutActived failed, eno: %d", dhtEno)
+		return sch.SchEnoUserTask
 	}
 
-	return sch.SchEnoUserTask
+	return sch.SchEnoNone
 }
 
 //
@@ -1050,6 +1064,7 @@ func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.NodeID, peer *config.N
 		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
 		icb.sdl.SchSendMessage(&po)
 	}
+
 	delete(qcb.qryActived, *peer)
 
 	return DhtEnoNone
@@ -1270,7 +1285,7 @@ func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
 		return sch.SchEnoParameter
 	}
 
-	qryMgr.qryMgrResultReport(qcb)
+	qryMgr.qryMgrResultReport(qcb, DhtEnoTimeout, nil, nil, nil)
 	qryMgr.qryMgrDelQcb(delQcb4Timeout, qcb.target)
 
 	return sch.SchEnoNone
@@ -1279,13 +1294,60 @@ func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
 //
 // Query result report
 //
-func (qryMgr *QryMgr)qryMgrResultReport(qcb *qryCtrlBlock) DhtErrno {
+func (qryMgr *QryMgr)qryMgrResultReport(
+	qcb		*qryCtrlBlock,
+	eno		int,
+	peer	*config.Node,
+	val		[]byte,
+	prd		*sch.Provider) DhtErrno {
+
+	//
+	// notice:
+	//
+	// 0) the target backup in qcb has it's meaning with "forWhat", as:
+	//
+	//		target						forWhat
+	// =================================================
+	//		peer identity				FIND_NODE
+	//		key of value				GET_VALUE
+	//		key of value				GET_PROVIDER
+	//
+	// 1) if eno indicated none of errors, then, the target is found, according to "forWhat",
+	// one can obtain peer or value or provider from parameters passed in;
+	//
+	// 2) if eno indicated anything than EnoNone, then parameters "peer", "val", "prd" are
+	// all be nil, and the peer(node) identities suggested to by queried are backup in the
+	// query result in "qcb";
+	//
+	// the event EvDhtQryMgrQueryResultInd handler should take the above into account to deal
+	// with this event when it's received in the owner task of the "qcb".
+	//
+
+	if eno != DhtEnoNone {
+		if peer != nil || val != nil || prd != nil {
+			log.LogCallerFileLine("qryMgrResultReport: invalid parameters, " +
+				"eno: %d, peer: %p, val: %p, prd: %p", eno, peer, &val, prd)
+			return DhtEnoParameter
+		}
+	} else {
+		if peer == nil && val == nil && prd == nil {
+			log.LogCallerFileLine("qryMgrResultReport: invalid parameters, " +
+				"eno: %d, peer: %p, val: %p, prd: %p", eno, peer, &val, prd)
+			return DhtEnoParameter
+		}
+	}
 
 	var msg = sch.SchMessage{}
 	var ind = sch.MsgDhtQryMgrQueryResultInd{
-		Eno:	DhtEnoTimeout,
+		Eno:	eno,
 		Target:	qcb.target,
+		Val:	val,
+		Prds:	nil,
 		Peers:	nil,
+	}
+
+	if prd != nil {
+		ind.Prds = prd.Nodes
 	}
 
 	li := qcb.qryResult

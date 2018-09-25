@@ -28,6 +28,7 @@ import (
 	log	"github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
+	"bytes"
 )
 
 //
@@ -40,7 +41,7 @@ const (
 	HashByteLength = 32					// 32 bytes(256 bits) hash applied
 	HashBitLength = HashByteLength * 8	// hash bits
 	rutMgrMaxLatency = time.Second * 60	// max latency in metric
-	rutMgrMaxNofifee = 64				// max notifees could be
+	rutMgrMaxNofifee = 128				// max notifees could be
 	rutMgrUpdate4Handshake = 0			// update for handshaking
 	rutMgrUpdate4Closed = 1				// update for connection instance closed
 	rutMgrUpdate4Query = 2				// update for query result
@@ -306,6 +307,7 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 		}
 
 		rutMgr.bpTargets[req.Target] = &req.Target
+		log.LogCallerFileLine("bootstarpTimerHandler: query will be start, target: %x", req.Target)
 
 		sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		sdl.SchSendMessage(&msg)
@@ -319,13 +321,19 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 //
 func (rutMgr *RutMgr)queryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 
-	//
-	// do nothing, just debug out, since we had start a bootstrap timer
-	//
+	if msg == nil {
+		log.LogCallerFileLine("queryStartRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
 
 	log.LogCallerFileLine("queryStartRsp: " +
 		"bootstrap startup response, eno: %d, target: %x",
 		msg.Eno, msg.Target)
+
+	if _, exist := rutMgr.bpTargets[msg.Target]; !exist {
+		log.LogCallerFileLine("queryStartRsp: not a bootstrap target: %x", msg.Target)
+		return sch.SchEnoMismatched
+	}
 
 	return sch.SchEnoNone
 }
@@ -341,17 +349,16 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	// a specific peer but just created randomly).
 	//
 
+	if msg == nil {
+		log.LogCallerFileLine("queryResultInd: invalid parameter")
+		return sch.SchEnoParameter
+	}
+
 	log.LogCallerFileLine("queryResultInd: " +
 		"bootstrap result indication, eno: %d, target: %x",
 		msg.Eno, msg.Target)
 
 	if _, ok := rutMgr.bpTargets[msg.Target]; !ok {
-
-		//
-		// it might come here since we publish the local node to outside world when
-		// a round of bootstrap is finished, see bellow publishing codes pls.
-		//
-
 		log.LogCallerFileLine("queryResultInd: not a bootstrap target: %x", msg.Target)
 		return sch.SchEnoMismatched
 	}
@@ -362,6 +369,7 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	//
 
 	if delete(rutMgr.bpTargets, msg.Target); len(rutMgr.bpTargets) == 0 {
+
 		var msg = sch.SchMessage{}
 		var req = sch.MsgDhtQryMgrQueryStartReq {
 			Target:		rutMgr.localNodeId,
@@ -369,6 +377,9 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 			ForWhat:	MID_FINDNODE,
 			Seq:		time.Now().UnixNano(),
 		}
+
+		rutMgr.bpTargets[req.Target] = &req.Target
+
 		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		rutMgr.sdl.SchSendMessage(&msg)
 	}
@@ -419,6 +430,13 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 
 	if dhtEno != DhtEnoNone  {
 		return sch.SchEnoUserTask
+	}
+
+	if req.NtfReq == true {
+		if dhtEno = rutMgr.rutMgrNotifeeReg(tskSender, &req.Target, req.Max, nil, nil); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("nearestReq: rutMgrNotifeeReg failed, eno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
 	}
 
 	return sch.SchEnoNone
@@ -540,17 +558,23 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 // Stop notify request handler
 //
 func (rutMgr *RutMgr)stopNotifyReq(msg *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErrno {
+
 	var nfi = rutMgrNotifeeId {
 		task:	msg.Task,
 		target:	msg.Target,
 	}
+
 	if _, exist := rutMgr.ntfTab[nfi]; exist == false {
+
 		log.LogCallerFileLine("stopNotifyReq: " +
 			"notifee not found, task: %p, target: %x",
 			nfi.task, nfi.target)
+
 		return sch.SchEnoUserTask
 	}
+
 	delete(rutMgr.ntfTab, nfi)
+
 	return sch.SchEnoNone
 }
 
@@ -987,7 +1011,6 @@ func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
 // Register notifee
 //
 func (rutMgr *RutMgr)rutMgrNotifeeReg(
-
 	task	interface{},
 	id		*config.NodeID,
 	max		int,
@@ -1031,6 +1054,7 @@ func (rutMgr *RutMgr)rutMgrNotify() DhtErrno {
 		target := &ntf.id.target
 		size := ntf.max
 
+		old := rutMgr.ntfTab[key].nearests
 		eno, nearest, dist := rutMgr.rutMgrNearest(target, size)
 		if eno != DhtEnoNone {
 			log.LogCallerFileLine("rutMgrNotify: rutMgrNearest failed, eno: %d", eno)
@@ -1038,15 +1062,30 @@ func (rutMgr *RutMgr)rutMgrNotify() DhtErrno {
 			continue
 		}
 
-		rutMgr.ntfTab[key].nearests = nearest
-		rutMgr.ntfTab[key].dists = dist
+		doNotify := false
 
-		ind.Target = *target
-		ind.Peers = nearest
-		ind.Dists = dist
+		if len(old) != len(nearest) {
+			doNotify = true
+		} else {
+			for idx, n := range nearest {
+				if bytes.Compare(old[idx].node.ID[0:], n.node.ID[0:]) != 0 {
+					doNotify = true
+				}
+			}
+		}
 
-		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, task, sch.EvDhtRutMgrNotificationInd, &ind)
-		rutMgr.sdl.SchSendMessage(&msg)
+		if doNotify {
+
+			rutMgr.ntfTab[key].nearests = nearest
+			rutMgr.ntfTab[key].dists = dist
+
+			ind.Target = *target
+			ind.Peers = nearest
+			ind.Dists = dist
+
+			rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, task, sch.EvDhtRutMgrNotificationInd, &ind)
+			rutMgr.sdl.SchSendMessage(&msg)
+		}
 	}
 
 	return DhtEnoNone

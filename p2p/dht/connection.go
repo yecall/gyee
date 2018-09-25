@@ -272,6 +272,8 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	if msg.Eno != DhtEnoNone {
 
+		log.LogCallerFileLine("handshakeRsp: handshake failed, connection instance: %s", ci.name)
+
 		//
 		// if it's a blind outbound, the request sender should be responsed here. at this
 		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
@@ -671,6 +673,11 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 // Instance status indication handler
 //
 func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+
+	if msg == nil {
+		log.LogCallerFileLine("instStatusInd: invalid parameter")
+		return sch.SchEnoParameter
+	}
 
 	log.LogCallerFileLine("instStatusInd: " +
 		"instance status reported: %d, id: %x",
