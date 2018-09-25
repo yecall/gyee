@@ -645,26 +645,28 @@ func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 //
 func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+
 	if el == nil {
-		log.LogCallerFileLine("txTimerHandler: invalid parameter")
+		log.LogCallerFileLine("txTimerHandler: invalid parameter, dht: %s, inst: %s", dht, conInst.name)
 		return sch.SchEnoParameter
 	}
 
 	txPkg, ok := el.Value.(*conInstTxPkg)
 	if !ok {
-		log.LogCallerFileLine("txTimerHandler: type mismatched")
+		log.LogCallerFileLine("txTimerHandler: type mismatched, dht: %s, inst: %s", dht, conInst.name)
 		return sch.SchEnoMismatched
 	}
 
 	log.LogCallerFileLine("txTimerHandler: expired, " +
-		"inst: %s, el: %+v, txPkg: %+v", conInst.name, *el, *txPkg)
+		"dht: %s, inst: %s, el: %+v, txPkg: %+v", dht, conInst.name, *el, *txPkg)
 
 	conInst.status = CisClosed
 	conInst.statusReport()
 
 	conInst.cleanUp(int(DhtEnoTimeout))
 	if eno := conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("txTimerHandler: SchTaskDone failed, eno: %d", eno)
+		log.LogCallerFileLine("txTimerHandler: SchTaskDone failed, dht: %s, inst: %s, eno: %d", dht, conInst.name, eno)
 		return eno
 	}
 
