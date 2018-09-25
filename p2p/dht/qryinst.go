@@ -106,6 +106,9 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 	case sch.EvDhtQryInstProtoMsgInd:
 		eno = qryInst.protoMsgInd(msg.Body.(*sch.MsgDhtQryInstProtoMsgInd))
 
+	case sch.EvDhtConInstTxInd:
+		eno = qryInst.conInstTxInd(msg.Body.(*sch.MsgDhtConInstTxInd))
+
 	default:
 		log.LogCallerFileLine("qryInstProc: unknown event: %d", msg.Id)
 		return sch.SchEnoParameter
@@ -666,6 +669,19 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 	}
 
 	return icb.sdl.SchSendMessage(&schMsg)
+}
+
+//
+// Tx status indication handler
+//
+func (qryInst *QryInst)conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
+	dht := qryInst.icb.sdl.SchGetP2pCfgName()
+	if msg == nil {
+		log.LogCallerFileLine("conInstTxInd： invalid parameter, dht: %s, inst: %s", dht, qryInst.icb.name)
+		return sch.SchEnoParameter
+	}
+	log.LogCallerFileLine("conInstTxInd： dht: %s, inst: %s, msg: %+v", dht, qryInst.icb.name, *msg)
+	return sch.SchEnoNone
 }
 
 //
