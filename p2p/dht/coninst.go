@@ -579,8 +579,11 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 //
 func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+
 	if pkg == nil {
-		log.LogCallerFileLine("txPutPending: invalid parameter")
+		log.LogCallerFileLine("txPutPending: invalid parameter, dht: %s, inst: %s, hsInfo: %+v",
+			dht, conInst.name, conInst.hsInfo)
 		return DhtEnoParameter
 	}
 
@@ -588,16 +591,19 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 	defer conInst.txLock.Unlock()
 
 	if conInst.txPending.Len() >= ciTxPendingQueueSize {
-		log.LogCallerFileLine("txPutPending: pending queue full")
+		log.LogCallerFileLine("txPutPending: pending queue full, dht: %s, inst: %s, hsInfo: %+v",
+			dht, conInst.name, conInst.hsInfo)
 		return DhtEnoResource
 	}
 
 	if conInst.txWaitRsp.Len() >= ciTxMaxWaitResponseSize {
-		log.LogCallerFileLine("txPutPending: waiting response queue full")
+		log.LogCallerFileLine("txPutPending: waiting response queue full, dht: %s, inst: %s, hsInfo: %+v",
+			dht, conInst.name, conInst.hsInfo)
 		return DhtEnoResource
 	}
 
-	log.LogCallerFileLine("txPutPending: put, waitMid: %d, waitSeq: %d", pkg.waitMid, pkg.waitSeq)
+	log.LogCallerFileLine("txPutPending: put, dht: %s, inst: %s, hsInfo: %+v, waitMid: %d, waitSeq: %d",
+		dht, conInst.name, conInst.hsInfo, pkg.waitMid, pkg.waitSeq)
 
 	conInst.txPending.PushBack(pkg)
 	conInst.txPendSig<-pkg
@@ -610,14 +616,16 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 //
 func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+
 	if el == nil {
-		log.LogCallerFileLine("txSetTimer: invalid parameter")
+		log.LogCallerFileLine("txSetTimer: invalid parameter, dht: %s, inst: %s", dht, conInst.name)
 		return DhtEnoParameter
 	}
 
 	txPkg, ok := el.Value.(*conInstTxPkg)
 	if !ok {
-		log.LogCallerFileLine("txSetTimer: type mismatched")
+		log.LogCallerFileLine("txSetTimer: type mismatched, dht: %s, inst: %s", dht, conInst.name)
 		return DhtEnoMismatched
 	}
 
@@ -631,7 +639,7 @@ func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 
 	eno, tid := conInst.sdl.SchSetTimer(conInst.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("txSetTimer: SchSetTimer failed, eno: %d", eno)
+		log.LogCallerFileLine("txSetTimer: SchSetTimer failed, dht: %s, inst: %s, eno: %d", dht, conInst.name, eno)
 		return DhtEnoScheduler
 	}
 
@@ -648,18 +656,20 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 	dht := conInst.sdl.SchGetP2pCfgName()
 
 	if el == nil {
-		log.LogCallerFileLine("txTimerHandler: invalid parameter, dht: %s, inst: %s", dht, conInst.name)
+		log.LogCallerFileLine("txTimerHandler: invalid parameter, dht: %s, inst: %s, hsInfo: %+v",
+			dht, conInst.name, conInst.hsInfo)
 		return sch.SchEnoParameter
 	}
 
 	txPkg, ok := el.Value.(*conInstTxPkg)
 	if !ok {
-		log.LogCallerFileLine("txTimerHandler: type mismatched, dht: %s, inst: %s", dht, conInst.name)
+		log.LogCallerFileLine("txTimerHandler: type mismatched, dht: %s, inst: %s, hsInfo: %+v",
+			dht, conInst.name, conInst.hsInfo)
 		return sch.SchEnoMismatched
 	}
 
-	log.LogCallerFileLine("txTimerHandler: expired, " +
-		"dht: %s, inst: %s, el: %+v, txPkg: %+v", dht, conInst.name, *el, *txPkg)
+	log.LogCallerFileLine("txTimerHandler: expired, dht: %s, inst: %s, el: %+v, hsInfo: %+v, txPkg: %+v",
+		dht, conInst.name, *el, conInst.hsInfo, *txPkg)
 
 	conInst.status = CisClosed
 	conInst.statusReport()
@@ -677,6 +687,20 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 // Set current Tx pending
 //
 func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Element){
+
+	//
+	// notice txPkg passed in can be nil
+	//
+
+	dht := conInst.sdl.SchGetP2pCfgName()
+
+	if txPkg != nil {
+		log.LogCallerFileLine("txSetPending: dht: %s, inst: %s, hsInfo: %+v, txPkg: %+v",
+			dht, conInst.name, conInst.hsInfo, *txPkg)
+	} else {
+		log.LogCallerFileLine("txSetPending: dht: %s, inst: %s, hsInfo: %+v, txPkg: nil",
+			dht, conInst.name, conInst.hsInfo)
+	}
 
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
@@ -1338,64 +1362,103 @@ _checkDone:
 //
 func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+
 	if msg == nil {
-		log.LogCallerFileLine("dispatch: invalid parameter")
+		log.LogCallerFileLine("dispatch: invalid parameter, " +
+			"dht: %s, inst: %s", dht, conInst.name)
 		return DhtEnoParameter
 	}
 
 	log.LogCallerFileLine("dispatch: try to dispatch message from peer, " +
-		"inst: %s, msg: %+v", conInst.name, *msg)
+		"dht: %s, inst: %s, msg: %+v", dht, conInst.name, *msg)
 
 	var eno DhtErrno = DhtEnoUnknown
 
 	switch msg.Mid {
 
 	case MID_HANDSHAKE:
-		log.LogCallerFileLine("dispatch: re-handshake is not supported now")
+
+		log.LogCallerFileLine("dispatch: re-handshake is not supported now, " +
+			"dht: %s, inst: %s", dht, conInst.name)
+
 		eno = DhtEnoProtocol
 
 	case MID_FINDNODE:
-		log.LogCallerFileLine("dispatch: MID_FINDNODE from peer: %+v", *msg.FindNode)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_FINDNODE from peer: %+v",
+			dht, conInst.name, *msg.FindNode)
+
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
-		log.LogCallerFileLine("dispatch: MID_NEIGHBORS from peer: %+v", *msg.Neighbors)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s,  MID_NEIGHBORS from peer: %+v",
+			dht, conInst.name, *msg.Neighbors)
+
 		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
-		log.LogCallerFileLine("dispatch: MID_PUTVALUE from peer: %+v", *msg.PutValue)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_PUTVALUE from peer: %+v",
+			dht, conInst.name, *msg.PutValue)
+
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
-		log.LogCallerFileLine("dispatch: MID_GETVALUE_REQ from peer: %+v", *msg.GetValueReq)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_GETVALUE_REQ from peer: %+v",
+			dht, conInst.name, *msg.GetValueReq)
+
 		eno = conInst.getValueReq(msg.GetValueReq)
 
 	case MID_GETVALUE_RSP:
-		log.LogCallerFileLine("dispatch: MID_GETVALUE_REQ from peer: %+v", *msg.GetValueRsp)
+
+		log.LogCallerFileLine("dispatch:  dht: %s, inst: %s, MID_GETVALUE_REQ from peer: %+v",
+			dht, conInst.name, *msg.GetValueRsp)
+
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
-		log.LogCallerFileLine("dispatch: MID_PUTPROVIDER from peer: %+v", *msg.PutProvider)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_PUTPROVIDER from peer: %+v",
+			dht, conInst.name, *msg.PutProvider)
+
 		eno = conInst.putProvider(msg.PutProvider)
 
 	case MID_GETPROVIDER_REQ:
-		log.LogCallerFileLine("dispatch: MID_GETPROVIDER_REQ from peer: %+v", *msg.GetProviderReq)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_GETPROVIDER_REQ from peer: %+v",
+			dht, conInst.name, *msg.GetProviderReq)
+
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
-		log.LogCallerFileLine("dispatch: MID_GETPROVIDER_RSP from peer: %+v", *msg.GetProviderRsp)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_GETPROVIDER_RSP from peer: %+v",
+			dht, conInst.name, *msg.GetProviderRsp)
+
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
-		log.LogCallerFileLine("dispatch: MID_PING from peer: %+v", *msg.Ping)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_PING from peer: %+v",
+			dht, conInst.name, *msg.Ping)
+
 		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
-		log.LogCallerFileLine("dispatch: MID_PONG from peer: %+v", *msg.Pong)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, MID_PONG from peer: %+v",
+			dht, conInst.name, *msg.Pong)
+
 		eno = conInst.getPong(msg.Pong)
 
 	default:
-		log.LogCallerFileLine("dispatch: invalid message identity: %d", msg.Mid)
+
+		log.LogCallerFileLine("dispatch: dht: %s, inst: %s, invalid message identity: %d",
+			dht, conInst.name, msg.Mid)
+
 		eno = DhtEnoProtocol
 	}
 

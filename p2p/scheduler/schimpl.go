@@ -210,8 +210,8 @@ taskLoop:
 
 			doneInd := msg.Body.(*MsgTaskDone)
 			log.LogCallerFileLine("schCommonTask: " +
-				"done with eno: %d, task: %s",
-				doneInd.why, ptn.task.name)
+				"sdl: %s, done with eno: %d, task: %s",
+				sdl.p2pCfg.CfgName, doneInd.why, ptn.task.name)
 
 			break taskLoop
 		}
