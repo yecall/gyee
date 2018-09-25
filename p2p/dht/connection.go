@@ -744,7 +744,9 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 			Seens:	[]config.Node {
 				*node,
 			},
-			Duras:	nil,
+			Duras:	[]time.Duration {
+				-1,
+			},
 		}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 		return sdl.SchSendMessage(&schMsg)
@@ -980,7 +982,9 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 			Seens:	[]config.Node {
 				*node,
 			},
-			Duras:	nil,
+			Duras:	[]time.Duration {
+				-1,
+			},
 		}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 		return sdl.SchSendMessage(&schMsg)
