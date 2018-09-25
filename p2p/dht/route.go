@@ -450,8 +450,10 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 //
 func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
+	dht := rutMgr.sdl.SchGetP2pCfgName()
+
 	if req == nil || len(req.Seens) != len(req.Duras) || len(req.Seens) == 0 {
-		log.LogCallerFileLine("updateReq: invalid prameter")
+		log.LogCallerFileLine("updateReq: invalid prameter, dht: %s", dht)
 		return sch.SchEnoUserTask
 	}
 
@@ -464,7 +466,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone {
 
-		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Handshake, eno: DhtEnoNone")
+		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Handshake, eno: DhtEnoNone", dht)
 
 		//
 		// new peer picked ok
@@ -492,13 +494,13 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
-			log.LogCallerFileLine("updateReq: rutMgrNotify failed, eno: %d", dhtEno)
+			log.LogCallerFileLine("updateReq: dht: %s, rutMgrNotify failed, eno: %d", dht, dhtEno)
 			return sch.SchEnoUserTask
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout {
 
-		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoTimeout")
+		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoTimeout", dht)
 
 		//
 		// query peer time out, check fail counter
@@ -510,7 +512,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			log.LogCallerFileLine("updateReq: not found, eno: %d", eno)
+			log.LogCallerFileLine("updateReq: not found, dht: %s, eno: %d", dht, eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -519,7 +521,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 			if eno := rutMgr.delete(p); eno != DhtEnoNone {
 
-				log.LogCallerFileLine("updateReq: delete failed, eno: %d, id: %x", eno, p)
+				log.LogCallerFileLine("updateReq: delete failed, dht: %s, eno: %d, id: %x", dht, eno, p)
 				return sch.SchEnoUserTask
 			}
 
@@ -529,7 +531,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone {
 
-		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoNone")
+		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
 
 		//
 		// this case the latency about an specific individual peer shoud be update,
@@ -543,7 +545,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Closed {
 
-		log.LogCallerFileLine("updateReq: why: rutMgrUpdate4Closed")
+		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Closed", dht)
 
 		//
 		// update peer connection status to be CisClosed, but do not remove it from
@@ -556,7 +558,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			log.LogCallerFileLine("updateReq: not found, eno: %d", eno)
+			log.LogCallerFileLine("updateReq: not found, dht: %s, eno: %d", dht, eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -564,7 +566,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else {
 
-		log.LogCallerFileLine("updateReq: invalid (why:%d, eno:%d)", why, eno)
+		log.LogCallerFileLine("updateReq: dht: %s, invalid (why:%d, eno:%d)", dht, why, eno)
 		return sch.SchEnoMismatched
 	}
 
@@ -974,7 +976,7 @@ func (rutMgr *RutMgr)showRoute(tag string) {
 		rt := rutMgr.rutTab
 		for idx := 0; idx < len(rt.bucketTab); idx++ {
 			golog.Printf("showRoute: "+
-				"=============================== tag: %s, dht: %s bucket: %d ==============================", tag, dht, idx)
+				"=============================== tag: %s, dht: %s, bucket: %d ==============================", tag, dht, idx)
 			li := rt.bucketTab[idx]
 			count := 0;
 			for el := li.Front(); el != nil; el = el.Next() {

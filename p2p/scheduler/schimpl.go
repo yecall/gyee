@@ -161,7 +161,8 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 
 		why := <-*done
 
-		log.LogCallerFileLine("schCommonTask: done with: %d, task: %s", why, ptn.task.name)
+		log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
+			sdl.p2pCfg.CfgName, why, ptn.task.name)
 
 		doneInd := MsgTaskDone {
 			why: why,

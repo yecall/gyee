@@ -294,11 +294,19 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 //
 func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 
+	if msg == nil {
+		log.LogCallerFileLine("icbTimerHandler: invalid parameter")
+		return sch.SchEnoParameter
+	}
+
+	dht := qryInst.icb.sdl.SchGetP2pCfgName()
+
 	log.LogCallerFileLine("icbTimerHandler: " +
-		"query instance timer expired, inst: %s", qryInst.icb.name)
+		"query instance timer expired, dht: %s, inst: %s",
+		dht, qryInst.icb.name)
 
 	if qryInst != msg {
-		log.LogCallerFileLine("icbTimerHandler: instance pointer mismatched")
+		log.LogCallerFileLine("icbTimerHandler: dht: %s, instance pointer mismatched", dht)
 		return sch.SchEnoMismatched
 	}
 
@@ -313,8 +321,8 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 
 	if (icb.status != qisWaitConnect && icb.status != qisWaitResponse) || icb.qTid == sch.SchInvalidTid {
 		log.LogCallerFileLine("icbTimerHandler:" +
-			"mismatched, status: %d, qTid: %d",
-			icb.status, icb.qTid)
+			"mismatched, dht: %s, status: %d, qTid: %d",
+			dht, icb.status, icb.qTid)
 		return sch.SchEnoMismatched
 	}
 
