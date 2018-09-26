@@ -386,7 +386,6 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	rsp.HsInfo = &conInst.hsInfo
 	rsp2ConMgr()
 
-
 	//
 	// service startup
 	//
@@ -671,7 +670,7 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 		return sch.SchEnoMismatched
 	}
 
-	log.LogCallerFileLine("txTimerHandler: invalid parameter, dht: %s, inst: %s, hsInfo: %+v, local: %+v, txPkg: %+v",
+	log.LogCallerFileLine("txTimerHandler: dht: %s, inst: %s, hsInfo: %+v, local: %+v, txPkg: %+v",
 		dht, conInst.name, conInst.hsInfo, *conInst.local, *txPkg)
 
 	conInst.status = CisClosed
@@ -1147,6 +1146,7 @@ func (conInst *ConInst)txProc() {
 	// longlong loop in a blocked mode
 	//
 
+	dht := conInst.sdl.SchGetP2pCfgName()
 	conInst.con.SetDeadline(time.Time{})
 	errUnderlying := false
 	isDone := false
@@ -1187,12 +1187,12 @@ _txLoop:
 		}
 
 		if txPkg, ok = el.Value.(*conInstTxPkg); !ok {
-			log.LogCallerFileLine("txProc: mismatched type, inst: %s", conInst.name)
+			log.LogCallerFileLine("txProc: mismatched type, dht: %s, inst: %s", dht, conInst.name)
 			goto _checkDone
 		}
 
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			log.LogCallerFileLine("txProc: mismatched type, inst: %s", conInst.name)
+			log.LogCallerFileLine("txProc: mismatched type, dht: %s, inst: %s", dht, conInst.name)
 			goto _checkDone
 		}
 
@@ -1200,13 +1200,14 @@ _txLoop:
 		dhtPkg.ToPbPackage(pbPkg)
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-			log.LogCallerFileLine("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+			log.LogCallerFileLine("txProc: WriteMsg failed, dht: %s, inst: %s, err: %s",
+				dht, conInst.name, err.Error())
 			errUnderlying = true
 			break _txLoop
 		}
 
 		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
-			log.LogCallerFileLine("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
+			log.LogCallerFileLine("txProc: dht: %s, inst: %s, txPkgCnt: %d", dht, conInst.name, conInst.txPkgCnt)
 		}
 
 		//
@@ -1230,7 +1231,7 @@ _checkDone:
 
 		select {
 		case done := <-conInst.txDone:
-			log.LogCallerFileLine("txProc: inst: %s, done by: %d", conInst.name, done)
+			log.LogCallerFileLine("txProc: dht: %s, inst: %s, done by: %d", dht, conInst.name, done)
 			isDone = true
 			break _txLoop
 		default:
@@ -1265,7 +1266,7 @@ _checkDone:
 		return
 	}
 
-	log.LogCallerFileLine("txProc: wOw! impossible errors, inst: %s", conInst.name)
+	log.LogCallerFileLine("txProc: wOw! impossible errors, dht: %s, inst: %s", dht, conInst.name)
 }
 
 //
@@ -1277,6 +1278,7 @@ func (conInst *ConInst)rxProc() {
 	// longlong loop in a blocked mode
 	//
 
+	dht := conInst.sdl.SchGetP2pCfgName()
 	conInst.con.SetDeadline(time.Time{})
 	errUnderlying := false
 	isDone := false
@@ -1289,13 +1291,15 @@ _rxLoop:
 
 		pbPkg := new(pb.DhtPackage)
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-			log.LogCallerFileLine("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+			log.LogCallerFileLine("rxProc: ReadMsg failed, dht: %s, inst: %s, err: %s, hsInfo: %+v, local: %+v",
+				dht, conInst.name, err.Error(), conInst.hsInfo, *conInst.local)
 			errUnderlying = true
 			break _rxLoop
 		}
 
 		if conInst.rxPkgCnt++; conInst.rxPkgCnt % 16 == 0 {
-			log.LogCallerFileLine("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
+			log.LogCallerFileLine("rxProc: dht: %s, inst: %s, rxPkgCnt: %d",
+				dht, conInst.name, conInst.rxPkgCnt)
 		}
 
 		pkg := new(DhtPackage)
@@ -1316,12 +1320,14 @@ _rxLoop:
 
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
-			log.LogCallerFileLine("rxProc:GetMessage failed, inst: %s, eno: %d", conInst.name, eno)
+			log.LogCallerFileLine("rxProc:GetMessage failed, dht: %s, inst: %s, eno: %d",
+				dht, conInst.name, eno)
 			goto _checkDone
 		}
 
 		if eno := conInst.dispatch(msg); eno != DhtEnoNone {
-			log.LogCallerFileLine("rxProc: dispatch failed, inst: %s, eno: %d", conInst.name, eno)
+			log.LogCallerFileLine("rxProc: dispatch failed, dht: %s, inst: %s, eno: %d",
+				dht, conInst.name, eno)
 		}
 
 _checkDone:
@@ -1329,7 +1335,7 @@ _checkDone:
 		select {
 		case done := <-conInst.rxDone:
 			isDone = true
-			log.LogCallerFileLine("rxProc: inst: %s, done by: %d", conInst.name, done)
+			log.LogCallerFileLine("rxProc: dht: %s, inst: %s, done by: %d", dht, conInst.name, done)
 			break _rxLoop
 		default:
 		}
@@ -1363,7 +1369,7 @@ _checkDone:
 		return
 	}
 
-	log.LogCallerFileLine("rxProc: wOw! impossible errors, inst: %s", conInst.name)
+	log.LogCallerFileLine("rxProc: wOw! impossible errors, dht: %s, inst: %s", dht, conInst.name)
 }
 
 //
@@ -1497,10 +1503,10 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 //
 func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 
-	eno, txPkg := conInst.checkTxCurPending(MID_NEIGHBORS, int64(nbs.Id))
+	eno, txPkg := conInst.checkTxWaitResponse(MID_NEIGHBORS, int64(nbs.Id))
 
 	if eno != DhtEnoNone || txPkg == nil {
-		log.LogCallerFileLine("neighbors: checkTxCurPending failed, eno: %d, txPkg: %p", eno, txPkg)
+		log.LogCallerFileLine("neighbors: checkTxWaitResponse failed, eno: %d, txPkg: %p", eno, txPkg)
 		return eno
 	}
 
@@ -1550,10 +1556,10 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
 
-	eno, txPkg := conInst.checkTxCurPending(MID_GETVALUE_RSP, int64(gvr.Id))
+	eno, txPkg := conInst.checkTxWaitResponse(MID_GETVALUE_RSP, int64(gvr.Id))
 
 	if eno != DhtEnoNone || txPkg == nil {
-		log.LogCallerFileLine("getValueRsp: checkTxCurPending failed, eno: %d, txPkg: %p", eno, txPkg)
+		log.LogCallerFileLine("getValueRsp: checkTxWaitResponse failed, eno: %d, txPkg: %p", eno, txPkg)
 		return eno
 	}
 
@@ -1603,10 +1609,10 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
 
-	eno, txPkg := conInst.checkTxCurPending(MID_GETPROVIDER_RSP, int64(gpr.Id))
+	eno, txPkg := conInst.checkTxWaitResponse(MID_GETPROVIDER_RSP, int64(gpr.Id))
 
 	if eno != DhtEnoNone || txPkg == nil {
-		log.LogCallerFileLine("getProviderRsp: checkTxCurPending failed, eno: %d", eno)
+		log.LogCallerFileLine("getProviderRsp: checkTxWaitResponse failed, eno: %d", eno)
 		return eno
 	}
 
@@ -1652,9 +1658,9 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 }
 
 //
-// Check if current Tx pending package is responsed by peeer
+// Check if pending packages sent is responsed by peeer
 //
-func (conInst *ConInst)checkTxCurPending(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
+func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
 
 	que := conInst.txWaitRsp
 
@@ -1664,7 +1670,7 @@ func (conInst *ConInst)checkTxCurPending(mid int, seq int64) (DhtErrno, *conInst
 
 			if txPkg.waitMid == mid && txPkg.waitSeq == seq {
 
-				log.LogCallerFileLine("checkTxCurPending: it's found, mid: %d, seq: %d", mid, seq)
+				log.LogCallerFileLine("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 
 				if txPkg.responsed != nil {
 
@@ -1688,7 +1694,7 @@ func (conInst *ConInst)checkTxCurPending(mid int, seq int64) (DhtErrno, *conInst
 		}
 	}
 
-	log.LogCallerFileLine("checkTxCurPending: not found, mid: %d, seq: %d", mid, seq)
+	log.LogCallerFileLine("checkTxWaitResponse: not found, mid: %d, seq: %d", mid, seq)
 
 	return DhtEnoNotFound, nil
 }
