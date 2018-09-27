@@ -269,10 +269,9 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 
 	var ci *ConInst = nil
+	var dht = conMgr.sdl.SchGetP2pCfgName()
 
 	if msg.Eno != DhtEnoNone {
-
-		log.LogCallerFileLine("handshakeRsp: handshake failed, connection instance: %s", ci.name)
 
 		//
 		// if it's a blind outbound, the request sender should be responsed here. at this
@@ -280,15 +279,17 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		//
 
 		if ci = msg.Inst.(*ConInst); ci == nil {
-			log.LogCallerFileLine("handshakeRsp: nil connection instance")
+			log.LogCallerFileLine("handshakeRsp: nil connection instance, dht: %s", dht)
 			return sch.SchEnoInternal
 		}
+
+		log.LogCallerFileLine("handshakeRsp: handshake failed, dht: %s, inst: %s", dht, ci.name)
 
 		if ci.isBlind && ci.dir == ConInstDirOutbound {
 			rsp := sch.MsgDhtBlindConnectRsp {
 				Eno:	msg.Eno,
-				Ptn:	ci.ptnMe,
 				Peer:	msg.Peer,
+				Ptn:	ci.ptnMe,
 			}
 			schMsg := sch.SchMessage{}
 			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
@@ -316,6 +317,18 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				}
 				delete(conMgr.txQueTab, cid)
 			}
+
+			//
+			// connect-response to source task
+			//
+
+			rsp := sch.MsgDhtConMgrConnectRsp {
+				Eno:	msg.Eno,
+				Peer:	msg.Peer,
+			}
+			schMsg := sch.SchMessage{}
+			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
+			ci.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -328,12 +341,19 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		return ci.sdl.SchSendMessage(&schMsg)
 	}
 
+	log.LogCallerFileLine("handshakeRsp: ok responsed, dht: %s, msg: %+v", dht, *msg)
+
 	cid := conInstIdentity{
 		nid: msg.Peer.ID,
 		dir: ConInstDir(msg.Dir),
 	}
 
-	if msg.Dir == ConInstDirInbound {
+	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
+
+		log.LogCallerFileLine("handshakeRsp: invalid direction, dht: %s, dir: %d", msg.Dir)
+		return sch.SchEnoUserTask
+
+	} else if msg.Dir == ConInstDirInbound {
 
 		ci = msg.Inst.(*ConInst)
 		conMgr.ciTab[cid] = ci
@@ -341,13 +361,12 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	} else {
 
 		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
-			log.LogCallerFileLine("handshakeRsp: not found, id: %x", msg.Peer.ID)
+			log.LogCallerFileLine("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
 			return sch.SchEnoUserTask
 		}
 
 		//
-		// if it's a blind outbound, the request sender should be responsed here. at this
-		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
+		// connect-response to source task
 		//
 
 		if ci.isBlind {
@@ -359,16 +378,19 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 			schMsg := sch.SchMessage{}
 			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
 			ci.sdl.SchSendMessage(&schMsg)
+		} else {
+			rsp := sch.MsgDhtConMgrConnectRsp {
+				Eno:	msg.Eno,
+				Peer:	msg.Peer,
+			}
+			schMsg := sch.SchMessage{}
+			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
+			ci.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
 		// submit the pending package for outbound instance if any
 		//
-
-		cid := conInstIdentity{
-			nid: msg.Peer.ID,
-			dir: ConInstDirOutbound,
-		}
 
 		if li, ok := conMgr.txQueTab[cid]; ok {
 
@@ -403,6 +425,10 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	// we need to update the route manager
 	//
 
+	log.LogCallerFileLine("handshakeRsp: all ok, try to update route manager, " +
+		"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, ci.name, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+
 	update := sch.MsgDhtRutMgrUpdateReq {
 		Why:	rutMgrUpdate4Handshake,
 		Eno:	DhtEnoNone,
@@ -416,9 +442,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	schMsg := sch.SchMessage{}
 	conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
-	conMgr.sdl.SchSendMessage(&schMsg)
-
-	return sch.SchEnoNone
+	return conMgr.sdl.SchSendMessage(&schMsg)
 }
 
 //
@@ -523,15 +547,11 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	conMgr.ciTab[cid] = ci
 
 	//
-	// if it's blind, we need not to response the sender, whom would be responsed in
-	// handshake procedure, since here handshake request had been sent ok.
+	// should not send connect-response message to source task here, instead, this is done
+	// when handshake procedure is completed.
 	//
 
-	if msg.IsBlind {
-		return sch.SchEnoNone
-	}
-
-	return rsp2Sender(DhtErrno(DhtEnoNone))
+	return sch.SchEnoNone
 }
 
 //

@@ -146,7 +146,7 @@ const (
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
-	ciTxMaxWaitResponseSize = 8				// tx max wait peer response queue size
+	ciTxMaxWaitResponseSize = 32				// tx max wait peer response queue size
 )
 
 //
@@ -296,6 +296,8 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	// response message to connection manager task.
 	//
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+
 	rsp := sch.MsgDhtConInstHandshakeRsp {
 		Eno:	DhtEnoUnknown,
 		Inst:	conInst,
@@ -306,6 +308,11 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	}
 
 	rsp2ConMgr := func() sch.SchErrno {
+
+		log.LogCallerFileLine("handshakeReq: rsp2ConMgr, " +
+			"dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, rsp: %+v",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), rsp)
+
 		schMsg := sch.SchMessage{}
 		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
 		return conInst.sdl.SchSendMessage(&schMsg)
@@ -333,6 +340,9 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
 		}
 
+		log.LogCallerFileLine("handshakeReq: connect ok, dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 		conInst.status = CisConnected
 		conInst.statusReport()
 	}
@@ -357,12 +367,12 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.HsInfo = &hsInfo
 
 			return rsp2ConMgr()
-
-			/*conInst.cleanUp(int(eno))
-			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)*/
 		}
 
 	} else {
+
+		log.LogCallerFileLine("handshakeReq: dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 		if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
 
@@ -372,9 +382,6 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.Inst = nil
 
 			return rsp2ConMgr()
-
-			/*conInst.cleanUp(int(eno))
-			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)*/
 		}
 	}
 
@@ -389,6 +396,10 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	//
 	// service startup
 	//
+
+	log.LogCallerFileLine("handshakeReq: ok, try to start tx and rx for connection instance, " +
+		"dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
@@ -882,8 +893,11 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 //
 func (conInst *ConInst)connect2Peer() DhtErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+
 	if conInst.dir != ConInstDirOutbound {
-		log.LogCallerFileLine("connect2Peer: mismatched direction: %d", conInst.dir)
+		log.LogCallerFileLine("connect2Peer: mismatched direction: dht: %s, inst: %s, dir: %d",
+			dht, conInst.name, conInst.dir)
 		return DhtEnoInternal
 	}
 
@@ -892,7 +906,8 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 	addr := &net.TCPAddr{IP: peer.IP, Port: int(peer.TCP)}
 
 	log.LogCallerFileLine("connect2Peer: try to connect, " +
-		"local: %s, remote: %s",
+		"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, conInst.name, conInst.dir,
 		conInst.local.IP.String(),
 		addr.String())
 
@@ -901,7 +916,8 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 
 	if conn, err = dialer.Dial("tcp", addr.String()); err != nil {
 		log.LogCallerFileLine("connect2Peer: " +
-			"dial failed, to: %s, err: %s",
+			"dial failed, dht: %s, inst: %s, local: %s, to: %s, err: %s",
+			dht, conInst.name, conInst.dir, conInst.local.IP.String(),
 			addr.String(), err.Error())
 		return DhtEnoOs
 	}
@@ -913,7 +929,8 @@ func (conInst *ConInst)connect2Peer() DhtErrno {
 	conInst.iow = ggio.NewDelimitedWriter(w)
 
 	log.LogCallerFileLine("connect2Peer: connect ok, " +
-		"local: %s, remote: %s",
+		"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, conInst.name, conInst.dir,
 		conn.LocalAddr().String(),
 		conn.RemoteAddr().String())
 
@@ -953,6 +970,10 @@ func (conInst *ConInst)statusReport() DhtErrno {
 //
 func (conInst *ConInst)outboundHandshake() DhtErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+	log.LogCallerFileLine("outboundHandshake: begin, dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 	dhtMsg := new(DhtMessage)
 	dhtMsg.Mid = MID_HANDSHAKE
 	dhtMsg.Handshake = &Handshake{
@@ -972,38 +993,51 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 
 	pbPkg := dhtMsg.GetPbPackage()
 	if pbPkg == nil {
-		log.LogCallerFileLine("outboundHandshake: GetPbPackage failed")
+		log.LogCallerFileLine("outboundHandshake: GetPbPackage failed, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 		return DhtEnoSerialization
 	}
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-		log.LogCallerFileLine("outboundHandshake: WriteMsg failed, err: %s", err.Error())
+		log.LogCallerFileLine("outboundHandshake: WriteMsg failed, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, err: %s",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			"err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
 	*pbPkg = pb.DhtPackage{}
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-		log.LogCallerFileLine("outboundHandshake: ReadMsg failed, err: %s", err.Error())
+		log.LogCallerFileLine("outboundHandshake: ReadMsg failed, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, err: %s",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			err.Error())
 		return DhtEnoSerialization
 	}
 
 	if *pbPkg.Pid != PID_DHT {
-		log.LogCallerFileLine("outboundHandshake: invalid pid: %d", pbPkg.Pid)
+		log.LogCallerFileLine("outboundHandshake: invalid pid, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, pid: %d",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			pbPkg.Pid)
 		return DhtEnoProtocol
 	}
 
 	if *pbPkg.PayloadLength <= 0 {
-		log.LogCallerFileLine("outboundHandshake: " +
-			"invalid payload length: %d",
+		log.LogCallerFileLine("outboundHandshake: invalid payload length, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, length: %d",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
 			*pbPkg.PayloadLength)
 		return DhtEnoProtocol
 	}
 
 	if len(pbPkg.Payload) != int(*pbPkg.PayloadLength) {
-		log.LogCallerFileLine("outboundHandshake: " +
-			"payload length mismatched, PlLen: %d, real: %d",
+		log.LogCallerFileLine("outboundHandshake: payload length mismatched, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, PlLen: %d, real: %d",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
 			*pbPkg.PayloadLength, len(pbPkg.Payload))
 		return DhtEnoProtocol
 	}
@@ -1015,20 +1049,27 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 
 	*dhtMsg = DhtMessage{}
 	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
-		log.LogCallerFileLine("outboundHandshake: GetMessage failed, eno: %d", eno)
+		log.LogCallerFileLine("outboundHandshake: GetMessage failed, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, eno: %d",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			eno)
 		return eno
 	}
 
 	if dhtMsg.Mid != MID_HANDSHAKE {
-		log.LogCallerFileLine("outboundHandshake: " +
-			"invalid MID: %d", dhtMsg.Mid)
+		log.LogCallerFileLine("outboundHandshake: invalid MID, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, MID: %d",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			dhtMsg.Mid)
 		return DhtEnoProtocol
 	}
 
 	hs := dhtMsg.Handshake
 	if hs.Dir != ConInstDirInbound {
-		log.LogCallerFileLine("outboundHandshake: " +
-			"mismatched direction: %d", hs.Dir)
+		log.LogCallerFileLine("outboundHandshake: mismatched direction, " +
+			"dht: %s, inst: %s, dir: %d, local: %s, remote: %s, hsdir: %d",
+			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			hs.Dir)
 		return DhtEnoProtocol
 	}
 
@@ -1039,6 +1080,9 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 		ID:		hs.NodeId,
 	}
 
+	log.LogCallerFileLine("outboundHandshake: end ok, dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 	return DhtEnoNone
 }
 
@@ -1047,29 +1091,34 @@ func (conInst *ConInst)outboundHandshake() DhtErrno {
 //
 func (conInst *ConInst)inboundHandshake() DhtErrno {
 
+	dht := conInst.sdl.SchGetP2pCfgName()
+	log.LogCallerFileLine("inboundHandshake: begin, dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 	pkg := new(pb.DhtPackage)
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pkg); err != nil {
-		log.LogCallerFileLine("inboundHandshake: ReadMsg failed, err: %s", err.Error())
+		log.LogCallerFileLine("inboundHandshake: ReadMsg failed, dht: %s, inst: %s, err: %s",
+			dht, conInst.name, err.Error())
 		return DhtEnoSerialization
 	}
 
 	if *pkg.Pid != PID_DHT {
-		log.LogCallerFileLine("inboundHandshake: invalid pid: %d", pkg.Pid)
+		log.LogCallerFileLine("inboundHandshake: invalid pid, dht: %s, inst: %s, pid: %d",
+			dht, conInst.name, pkg.Pid)
 		return DhtEnoProtocol
 	}
 
 	if *pkg.PayloadLength <= 0 {
-		log.LogCallerFileLine("inboundHandshake: " +
-			"invalid payload length: %d",
-			*pkg.PayloadLength)
+		log.LogCallerFileLine("inboundHandshake: invalid payload length: %d, dht: %s, inst: %s",
+			*pkg.PayloadLength, dht, conInst.name)
 		return DhtEnoProtocol
 	}
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
 		log.LogCallerFileLine("inboundHandshake: " +
-			"payload length mismatched, PlLen: %d, real: %d",
-			*pkg.PayloadLength, len(pkg.Payload))
+			"payload length mismatched, PlLen: %d, real: %d, dht: %s, inst: %s",
+			*pkg.PayloadLength, len(pkg.Payload), dht, conInst.name)
 		return DhtEnoProtocol
 	}
 
@@ -1080,20 +1129,21 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 
 	dhtMsg := new(DhtMessage)
 	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
-		log.LogCallerFileLine("inboundHandshake: GetMessage failed, eno: %d", eno)
+		log.LogCallerFileLine("inboundHandshake: GetMessage failed, eno: %d, dht: %s, inst: %s",
+			eno, dht, conInst.name)
 		return eno
 	}
 
 	if dhtMsg.Mid != MID_HANDSHAKE {
-		log.LogCallerFileLine("inboundHandshake: " +
-			"invalid MID: %d", dhtMsg.Mid)
+		log.LogCallerFileLine("inboundHandshake: invalid MID: %d, dht: %s, inst: %s",
+			dhtMsg.Mid, dht, conInst.name)
 		return DhtEnoProtocol
 	}
 
 	hs := dhtMsg.Handshake
 	if hs.Dir != ConInstDirOutbound {
-		log.LogCallerFileLine("inboundHandshake: " +
-			"mismatched direction: %d", hs.Dir)
+		log.LogCallerFileLine("inboundHandshake: mismatched direction: %d, dht: %s, inst: %s",
+			hs.Dir, dht, conInst.name)
 		return DhtEnoProtocol
 	}
 
@@ -1124,15 +1174,20 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 
 	pbPkg := dhtMsg.GetPbPackage()
 	if pbPkg == nil {
-		log.LogCallerFileLine("inboundHandshake: GetPbPackage failed")
+		log.LogCallerFileLine("inboundHandshake: GetPbPackage failed, dht: %s, inst: %s",
+			dht, conInst.name)
 		return DhtEnoSerialization
 	}
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-		log.LogCallerFileLine("inboundHandshake: WriteMsg failed, err: %s", err.Error())
+		log.LogCallerFileLine("inboundHandshake: WriteMsg failed, err: %s, dht: %s, inst: %s",
+			err.Error(), dht, conInst.name)
 		return DhtEnoSerialization
 	}
+
+	log.LogCallerFileLine("inboundHandshake: end ok, dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	return DhtEnoNone
 }
@@ -1199,17 +1254,6 @@ _txLoop:
 		pbPkg = new(pb.DhtPackage)
 		dhtPkg.ToPbPackage(pbPkg)
 
-		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-			log.LogCallerFileLine("txProc: WriteMsg failed, dht: %s, inst: %s, err: %s",
-				dht, conInst.name, err.Error())
-			errUnderlying = true
-			break _txLoop
-		}
-
-		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
-			log.LogCallerFileLine("txProc: dht: %s, inst: %s, txPkgCnt: %d", dht, conInst.name, conInst.txPkgCnt)
-		}
-
 		//
 		// check if peer response needed, since we will block here until response from peer
 		// is received if it's the case, we had to start a timer for the connection instance
@@ -1227,7 +1271,18 @@ _txLoop:
 			conInst.txSetPending(nil)
 		}
 
-_checkDone:
+		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
+			log.LogCallerFileLine("txProc: WriteMsg failed, dht: %s, inst: %s, err: %s",
+				dht, conInst.name, err.Error())
+			errUnderlying = true
+			break _txLoop
+		}
+
+		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
+			log.LogCallerFileLine("txProc: dht: %s, inst: %s, txPkgCnt: %d", dht, conInst.name, conInst.txPkgCnt)
+		}
+
+	_checkDone:
 
 		select {
 		case done := <-conInst.txDone:
@@ -1661,6 +1716,9 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 // Check if pending packages sent is responsed by peeer
 //
 func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
+
+	conInst.txLock.Lock()
+	defer conInst.txLock.Unlock()
 
 	que := conInst.txWaitRsp
 

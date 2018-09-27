@@ -979,7 +979,7 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
 	case delQcb4InteralErrors:
 
 		//
-		// nothing for aboved cases, see bellow outside of this "switch".
+		// nothing for above cases, see bellow outside of this "switch".
 		//
 
 	case delQcb4Command:
@@ -1204,7 +1204,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			sdl:		qryMgr.sdl,
 			seq:		qcb.icbSeq,
 			qryReq:		qcb.qryReq,
-			name:		"qryMgrIcb" + fmt.Sprintf("%d", qcb.icbSeq),
+			name:		"qryMgrIcb" + fmt.Sprintf("_q%d_i%d", qcb.seq, qcb.icbSeq),
 			ptnInst:	nil,
 			ptnConMgr:	nil,
 			ptnRutMgr:	nil,

@@ -371,18 +371,22 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 
 	if delete(rutMgr.bpTargets, msg.Target); len(rutMgr.bpTargets) == 0 {
 
-		var msg = sch.SchMessage{}
-		var req = sch.MsgDhtQryMgrQueryStartReq {
-			Target:		rutMgr.localNodeId,
-			Msg:		nil,
-			ForWhat:	MID_FINDNODE,
-			Seq:		time.Now().UnixNano(),
+		if bytes.Compare(rutMgr.localNodeId[0:], msg.Target[0:]) != 0 {
+
+			var msg= sch.SchMessage{}
+			var req = sch.MsgDhtQryMgrQueryStartReq{
+				Target:  rutMgr.localNodeId,
+				Msg:     nil,
+				ForWhat: MID_FINDNODE,
+				Seq:     time.Now().UnixNano(),
+			}
+
+			rutMgr.bpTargets[req.Target] = &req.Target
+
+			rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
+			rutMgr.sdl.SchSendMessage(&msg)
+
 		}
-
-		rutMgr.bpTargets[req.Target] = &req.Target
-
-		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
-		rutMgr.sdl.SchSendMessage(&msg)
 	}
 
 	rutMgr.showRoute("bootstrap-round-completed")
