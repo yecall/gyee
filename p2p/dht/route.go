@@ -741,8 +741,8 @@ func (rutMgr *RutMgr) rutMgrMetricSample(id config.NodeID, latency time.Duration
 	rt := &rutMgr.rutTab
 
 	if m, dup := rt.metricTab[id]; dup {
-		len := len(m.ltnSamples)
-		next := (len + 1) & (rutMgrEwmaHisSize - 1)
+		num := len(m.ltnSamples)
+		next := (num + 1) & (rutMgrEwmaHisSize - 1)
 		m.ltnSamples[next] = latency
 		return rutMgr.rutMgrMetricUpdate(id)
 	}
@@ -996,7 +996,7 @@ func (rutMgr *RutMgr)showRoute(tag string) {
 			for el := li.Front(); el != nil; el = el.Next() {
 				bn, ok := el.Value.(*rutMgrBucketNode)
 				if !ok {
-					golog.Printf("showRoute: dht: %s, invalid bucket node found, idx: %d", idx)
+					golog.Printf("showRoute: dht: %s, invalid bucket node found, idx: %d", dht, idx)
 					continue
 				}
 				count++

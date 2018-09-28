@@ -38,7 +38,7 @@ const (
 	sfnNextToLast	= "next-to-last"
 )
 
-var sfn2ShardIdV1 = map[string](func (padLen int) *ipfsfs.ShardIdV1) {
+var sfn2ShardIdV1 = map[string]func (padLen int) *ipfsfs.ShardIdV1 {
 	sfnPrefix:		ipfsfs.Prefix,
 	sfnSuffix:		ipfsfs.Suffix,
 	sfnNextToLast:	ipfsfs.NextToLast,

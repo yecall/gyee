@@ -565,7 +565,7 @@ func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtEr
 	pv.From = *dhtMsg.getNode(pbMsg.From)
 	pv.To = *dhtMsg.getNode(pbMsg.To)
 
-	for _, v := range(pbMsg.Values) {
+	for _, v := range pbMsg.Values {
 		val := DhtValue {
 			Key: v.Key,
 			Val: v.Val,
