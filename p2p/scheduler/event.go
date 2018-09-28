@@ -700,6 +700,7 @@ const (
 	EvDhtRutMgrStopNotifyReq	= EvDhtRutMgrBase + 6
 	EvDhtRutPingInd				= EvDhtRutMgrBase + 7
 	EvDhtRutPongInd				= EvDhtRutMgrBase + 8
+	EvDhtRutRefreshReq			= EvDhtRutMgrBase + 9
 )
 
 //

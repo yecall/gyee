@@ -37,7 +37,7 @@ import (
 //
 const (
 	RutMgrName = sch.DhtRutMgrName		// Route manager name registered in scheduler
-	rutMgrMaxNearest = 32				// Max nearest peers can be retrieved for a time
+	rutMgrMaxNearest = 8				// Max nearest peers can be retrieved for a time
 	rutMgrBucketSize = 32				// bucket size
 	HashByteLength = 32					// 32 bytes(256 bits) hash applied
 	HashBitLength = HashByteLength * 8	// hash bits
@@ -190,6 +190,9 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvSchPoweroff:
 		eno = rutMgr.poweroff(ptn)
 
+	case sch.EvDhtRutRefreshReq:
+		eno = rutMgr.refreshReq()
+
 	case sch.EvDhtRutBootstrapTimer:
 		eno = rutMgr.bootstarpTimerHandler()
 
@@ -281,6 +284,13 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 func (rutMgr *RutMgr)poweroff(ptn interface{}) sch.SchErrno {
 	log.LogCallerFileLine("poweroff: task will be done ...")
 	return rutMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+}
+
+//
+// Route table refresh handler
+//
+func (rutMgr *RutMgr)refreshReq() sch.SchErrno {
+	return rutMgr.bootstarpTimerHandler()
 }
 
 //

@@ -1390,6 +1390,26 @@ func testCase6(tc *testCase) {
 		return
 	}
 
+	time.Sleep(time.Second*8)
+
+	if eno := dhtTestBootstrapStart(dhtInstList); eno != dht.DhtEnoNone {
+		log.LogCallerFileLine("testCase6: dhtTestBootstrapStart failed, eno: %d", eno)
+		return
+	}
+
+	time.Sleep(time.Second * 8)
+	golog.Printf("testCase6: going to stop dht instances ...")
+
+	for dhtInst, _ := range dhtInst2Cfg {
+		if eno := shell.P2pStop(dhtInst); eno != sch.SchEnoNone {
+			golog.Printf("testCase6: " +
+				"P2pStop failed, instance: %s",
+				dhtInst.SchGetP2pCfgName())
+		}
+	}
+
+	golog.Printf("testCase6: it's the end")
+
 	waitInterrupt()
 }
 
@@ -1631,6 +1651,17 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 	log.LogCallerFileLine("dhtTestConnMatrixApply: applied, blind connection count: %d", conCount)
 
 	return 0
+}
+
+//
+// dht start route bootstrap(refreshing)
+//
+func dhtTestBootstrapStart(dhtInstList []*sch.Scheduler) int {
+	for _, dhtInst := range dhtInstList {
+		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr.DhtCommand(sch.EvDhtRutRefreshReq, nil)
+	}
+	return dht.DhtEnoNone
 }
 
 //

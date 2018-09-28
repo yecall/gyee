@@ -135,6 +135,9 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtBlindConnectRsp:
 		eno = dhtMgr.blindConnectRsp(msg.Body.(*sch.MsgDhtBlindConnectRsp))
 
+	case sch.EvDhtRutRefreshReq:
+		eno = dhtMgr.rutRefreshReq()
+
 	case sch.EvDhtMgrFindPeerReq:
 		eno = dhtMgr.findPeerReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
 
@@ -260,6 +263,15 @@ func (dhtMgr *DhtMgr)blindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrn
 		log.LogCallerFileLine("blindConnectRsp: callback return: %d", rc)
 	}
 	return sch.SchEnoNone
+}
+
+//
+// request to resfresh route table
+//
+func (dhtMgr *DhtMgr)rutRefreshReq() sch.SchErrno {
+	msg := sch.SchMessage{}
+	dhtMgr.sdl.SchMakeMessage(&msg, dhtMgr.ptnMe, dhtMgr.ptnRutMgr, sch.EvDhtRutRefreshReq, nil)
+	return dhtMgr.sdl.SchSendMessage(&msg)
 }
 
 //
@@ -520,4 +532,3 @@ func (dhtMgr *DhtMgr)DhtCommand(cmd int, msg interface{}) sch.SchErrno {
 	dhtMgr.sdl.SchMakeMessage(&schMsg, &sch.RawSchTask, dhtMgr.ptnMe, cmd, msg)
 	return dhtMgr.sdl.SchSendMessage(&schMsg)
 }
-

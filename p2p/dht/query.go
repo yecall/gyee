@@ -23,11 +23,11 @@ package dht
 import (
 	"fmt"
 	"time"
+	"bytes"
 	"container/list"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
-	"bytes"
 )
 
 //
@@ -35,9 +35,11 @@ import (
 //
 const (
 	QryMgrName = sch.DhtQryMgrName		// query manage name registered in shceduler
-	qryMgrMaxPendings = 32				// max pendings can be held in the list
+	qryMgrMaxPendings = 64				// max pendings can be held in the list
 	qryMgrMaxActInsts = 8				// max concurrent actived instances for one query
 	qryMgrQryExpired = time.Second * 60	// duration to get expired for a query
+	qryMgrQryMaxWidth = 64				// not the true "width", the max number of peers queryied
+	qryMgrQryMaxDepth = 8				// the max depth for a query
 	qryInstExpired = time.Second * 16	// duration to get expired for a query instance
 )
 
@@ -75,7 +77,10 @@ type qryResultInfo struct {
 //
 // Query pending node info
 //
-type qryPendingInfo = rutMgrBucketNode
+type qryPendingInfo struct {
+	rutMgrBucketNode				// bucket node
+	depth		int					// depth
+}
 
 //
 // Query control block
@@ -94,6 +99,8 @@ type qryCtrlBlock struct {
 	qryTid		int										// query timer identity
 	icbSeq		int										// query instance control block sequence number
 	rutNtfFlag	bool									// if notification asked for
+	width		int										// the current number of peer had been queried
+	depth		int										// the current max depth of query
 }
 
 //
@@ -128,6 +135,7 @@ type qryInstCtrlBlock struct {
 	endTime		time.Time						// query end time
 	conBegTime	time.Time						// time to start connection
 	conEndTime	time.Time						// time connection established
+	depth		int								// the current depth of the query instance
 }
 
 //
@@ -346,12 +354,14 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.icbSeq = 0
 	qcb.target = msg.Target
 	qcb.status = qsNull
-	qcb.qryHistory = make(map[config.NodeID]*rutMgrBucketNode, 0)
+	qcb.qryHistory = make(map[config.NodeID]*qryPendingInfo, 0)
 	qcb.qryPending = nil
 	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, qryMgr.qmCfg.maxActInsts)
 	qcb.qryResult = nil
 	qcb.rutNtfFlag = nearestReq.NtfReq
 	qcb.status = qsPreparing
+	qcb.width = 0
+	qcb.depth = 0
 	qryMgr.qcbTab[msg.Target] = qcb
 
 	log.LogCallerFileLine("queryStartReq: qcb: %+v", *qcb)
@@ -503,7 +513,16 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 
 	qcb.qryPending = list.New()
 
-	if dhtEno = qcb.qryMgrQcbPutPending(peers, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
+	pendInfo := []*qryPendingInfo{}
+	for idx := 0; idx < len(peers); idx++ {
+		var pi = qryPendingInfo{
+			rutMgrBucketNode:*peers[idx],
+			depth: 0,
+		}
+		pendInfo = append(pendInfo, &pi)
+	}
+
+	if dhtEno = qcb.qryMgrQcbPutPending(pendInfo, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
 
 		if dhtEno, _ = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
 
@@ -566,8 +585,17 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 		return sch.SchEnoUserTask
 	}
 
-	qpi := msg.Peers.([]*qryPendingInfo)
-	qcb.qryMgrQcbPutPending(qpi, qryMgr.qmCfg.maxPendings)
+	qpi := msg.Peers.([]*rutMgrBucketNode)
+	pendInfo := []*qryPendingInfo{}
+	for idx := 0; idx < len(qpi); idx++ {
+		var pi = qryPendingInfo{
+			rutMgrBucketNode:*qpi[idx],
+			depth: 0,
+		}
+		pendInfo = append(pendInfo, &pi)
+	}
+
+	qcb.qryMgrQcbPutPending(pendInfo, qryMgr.qmCfg.maxPendings)
 
 	//
 	// try to active more instances since pendings added
@@ -771,6 +799,14 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
+	icb, ok := qcb.qryActived[from.ID]
+	if !ok || icb == nil {
+		log.LogCallerFileLine("instResultInd: target not found: %x", target)
+		return DhtEnoNotFound
+	}
+
+	depth := icb.depth
+
 	for idx, peer := range msg.Peers {
 
 		hash := rutMgrNodeId2Hash(peer.ID)
@@ -812,8 +848,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	}
 
 	//
-	// put peers reported in the message into query control block pending queue,
-	// and try to active more query instances after that.
+	// delete query instance control block since we got the result
 	//
 
 	if eno := qryMgr.qryMgrDelIcb(delQcb4QryInstResultInd, &msg.Target, &msg.From.ID); eno != DhtEnoNone {
@@ -821,11 +856,45 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
+	//
+	// check the query depth and width, if reached, we end the query by reporting the result and
+	// removing the query control block
+	//
+
+	if depth > qcb.depth {
+		qcb.depth = depth
+	}
+
+	if qcb.depth > qryMgrQryMaxDepth || len(qcb.qryHistory) >= qryMgrQryMaxWidth {
+
+		log.LogCallerFileLine("instResultInd: limited to stop query, depth: %d, width: %d", qcb.depth, len(qcb.qryHistory))
+
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+
+		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
+			log.LogCallerFileLine("instResultInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+			return sch.SchEnoUserTask
+		}
+
+		return sch.SchEnoNone
+	}
+
+	//
+	// put peers reported in the message into query control block pending queue,
+	// and try to active more query instances after that.
+	//
+
 	for idx, peer := range msg.Peers {
 		var qpi = qryPendingInfo {
-			node: *peer,
-			hash: *hashList[idx],
-			dist: distList[idx],
+			rutMgrBucketNode: rutMgrBucketNode {
+				node: *peer,
+				hash: *hashList[idx],
+				dist: distList[idx],
+			},
+			depth: depth + 1,
 		}
 		qpiList = append(qpiList, &qpi)
 	}
@@ -1335,7 +1404,7 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 	// one can obtain peer or value or provider from parameters passed in;
 	//
 	// 2) if eno indicated anything than EnoNone, then parameters "peer", "val", "prd" are
-	// all be nil, and the peer(node) identities suggested to by queried are backup in the
+	// all be nil, and the peer(node) identities suggested to by query are backup in the
 	// query result in "qcb";
 	//
 	// the event EvDhtQryMgrQueryResultInd handler should take the above into account to deal
