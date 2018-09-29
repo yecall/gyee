@@ -89,7 +89,7 @@ func (c *Core) Start() error {
 	c.blockChain.Start()
 
 	//如果开启挖矿
-	if true {
+	if c.config.Chain.Mine {
 		members := c.blockChain.GetValidators()
 		blockHeight := c.blockChain.CurrentBlockHeight()
 		mid := c.node.NodeID()

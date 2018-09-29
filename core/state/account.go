@@ -19,3 +19,40 @@
  */
 
 package state
+
+import (
+	"math/big"
+
+	"github.com/yeeco/gyee/common"
+)
+
+type account struct {
+	address common.Hash
+	balance *big.Int
+	nonce   uint64
+	//TODO: contract部分的数据
+}
+
+func (acc *account) ToBytes() ([]byte, error) {
+	return nil, nil
+}
+
+func (acc *account) FromBytes(bytes []byte) error {
+	return nil
+}
+
+func (acc *account) Balance() *big.Int {
+	return acc.balance
+}
+
+func (acc *account) Address() common.Hash {
+	return acc.address
+}
+
+func (acc *account) Nonce() uint64 {
+	return acc.nonce
+}
+
+func (acc *account) NonceInc() {
+	acc.nonce++
+}

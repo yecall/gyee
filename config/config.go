@@ -103,6 +103,8 @@ func GetConfig(ctx *cli.Context) *Config {
 		config.NodeDir = ctx.GlobalString(FlagName(NodeDirFlag.Name))
 	}
 
+	//TODO: dir是绝对路径还是相对路径要判断一下并处理
+
 	//Get config of modules
 	getAppConfig(ctx, config)
 	getNetworkConfig(ctx, config)

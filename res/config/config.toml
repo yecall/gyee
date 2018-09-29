@@ -1,7 +1,7 @@
 # This is a TOML document for default config
 
 name = "my name"
-node_dir = "default"
+#node_dir = "default"
 
 [network]
 bootnode = [""]
