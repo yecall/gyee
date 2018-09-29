@@ -308,11 +308,15 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	}
 
 	rsp2ConMgr := func() sch.SchErrno {
-
-		log.LogCallerFileLine("handshakeReq: rsp2ConMgr, " +
-			"dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, rsp: %+v",
-			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), rsp)
-
+		if conInst.con != nil {
+			log.LogCallerFileLine("handshakeReq: rsp2ConMgr, "+
+				"dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, rsp: %+v",
+				dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), rsp)
+		} else {
+			log.LogCallerFileLine("handshakeReq: rsp2ConMgr, "+
+				"dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, rsp: %+v",
+				dht, conInst.name, conInst.dir, "none", "none", rsp)
+		}
 		schMsg := sch.SchMessage{}
 		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
 		return conInst.sdl.SchSendMessage(&schMsg)
@@ -332,16 +336,14 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			hsInfo := conInst.hsInfo
 			rsp.Eno = int(eno)
 			rsp.Peer = &peer
-			rsp.Inst = nil
+			rsp.Inst = conInst
 			rsp.HsInfo = &hsInfo
-			rsp2ConMgr()
 
-			conInst.cleanUp(int(eno))
-			return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+			return rsp2ConMgr()
 		}
 
 		log.LogCallerFileLine("handshakeReq: connect ok, dht: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-			dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+		dht, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 		conInst.status = CisConnected
 		conInst.statusReport()
@@ -363,7 +365,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			hsInfo := conInst.hsInfo
 			rsp.Eno = int(eno)
 			rsp.Peer = &peer
-			rsp.Inst = nil
+			rsp.Inst = conInst
 			rsp.HsInfo = &hsInfo
 
 			return rsp2ConMgr()
@@ -379,7 +381,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.Eno = int(eno)
 			rsp.Peer = nil
 			rsp.HsInfo = nil
-			rsp.Inst = nil
+			rsp.Inst = conInst
 
 			return rsp2ConMgr()
 		}
@@ -1307,7 +1309,10 @@ _txLoop:
 
 		conInst.status = CisClosed
 		conInst.statusReport()
+
 		conInst.cleanUp(DhtEnoOs)
+		conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+
 		return
 	}
 
@@ -1410,7 +1415,10 @@ _checkDone:
 
 		conInst.status = CisClosed
 		conInst.statusReport()
+
 		conInst.cleanUp(DhtEnoOs)
+		conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+
 		return
 	}
 

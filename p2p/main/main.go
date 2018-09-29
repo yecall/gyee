@@ -142,7 +142,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase6"
+var tgtCase = "testCase7"
 
 //
 // port base
@@ -1311,11 +1311,19 @@ func testCase5(tc *testCase) {
 	time.Sleep(time.Second * 2)
 	golog.Printf("testCase5: going to stop p2p instances ...")
 
-	for p2pInst, _ := range p2pInst2Cfg {
-		if eno := shell.P2pStop(p2pInst); eno != sch.SchEnoNone {
-			golog.Printf("testCase5: " +
-				"P2pStop failed, instance: %s",
-				p2pInst.SchGetP2pCfgName())
+
+	stopCount := len(p2pInst2Cfg)
+	stopChain := make(chan bool, stopCount)
+
+	for dhtInst, _ := range p2pInst2Cfg {
+		go shell.P2pStop(dhtInst, stopChain)
+	}
+
+_waitStop:
+	for {
+		<-stopChain
+		if stopCount--; stopCount == 0 {
+			break _waitStop
 		}
 	}
 
@@ -1413,7 +1421,7 @@ func testCase7(tc *testCase) {
 
 	log.LogCallerFileLine("testCase7: going to start ycDht ...")
 
-	var dhtInstNum = 8
+	var dhtInstNum = 32
 	var dhtInstList = []*sch.Scheduler{}
 
 	for loop := 0; loop < dhtInstNum; loop++ {
@@ -1481,11 +1489,18 @@ func testCase7(tc *testCase) {
 	time.Sleep(time.Second * 8)
 	golog.Printf("testCase7: going to stop dht instances ...")
 
+	stopCount := len(dhtInst2Cfg)
+	stopChain := make(chan bool, stopCount)
+
 	for dhtInst, _ := range dhtInst2Cfg {
-		if eno := shell.P2pStop(dhtInst); eno != sch.SchEnoNone {
-			golog.Printf("testCase7: " +
-				"P2pStop failed, instance: %s",
-				dhtInst.SchGetP2pCfgName())
+		go shell.P2pStop(dhtInst, stopChain)
+	}
+
+_waitStop:
+	for {
+		<-stopChain
+		if stopCount--; stopCount == 0 {
+			break _waitStop
 		}
 	}
 
@@ -1789,7 +1804,8 @@ func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 		val := make([]byte, 128, 128)
 		rand.Read(val)
 		req.Val = []byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val))
-		req.Key = sha256.Sum256(req.Val)[0:]
+		key := sha256.Sum256(req.Val)
+		req.Key = key[0:]
 		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrPutValueReq, &req)
 		kv := DhtTestKV {
@@ -1831,12 +1847,13 @@ func dhtTestPutProvider(dhtInstList []*sch.Scheduler) (int, []*DhtTestPrd) {
 	prdList := []*DhtTestPrd{}
 	req := sch.MsgDhtPrdMgrAddProviderReq {
 		Key:	nil,
-		Prd:	nil,
+		Prd:	config.Node{},
 	}
 	for _, dhtInst := range dhtInstList {
 		val := make([]byte, 128, 128)
 		rand.Read(val)
-		req.Key = sha256.Sum256([]byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val)))[0:]
+		key := sha256.Sum256([]byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val)))
+		req.Key = key[0:]
 		req.Prd = dhtInst.SchGetP2pConfig().Local
 		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrPutProviderReq, &req)

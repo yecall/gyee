@@ -181,10 +181,16 @@ func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) 
 //
 func P2pPoweroff(p2pInst *sch.Scheduler) P2pErrno {
 
-	if eno := P2pStop(p2pInst); eno != sch.SchEnoNone {
+	stopChain := make(chan bool, 1)
+
+	if eno := P2pStop(p2pInst, stopChain); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("P2pPoweroff: P2pStop failed, eno: %d", eno)
+		close(stopChain)
 		return P2pEnoScheduler
 	}
+
+	<-stopChain
+	close(stopChain)
 
 	return P2pEnoNone
 }

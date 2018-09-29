@@ -393,6 +393,13 @@ func (sdl *Scheduler)SchGetTaskNumber() int {
 }
 
 //
+// Show names about alived tasks
+//
+func (sdl *Scheduler)SchShowTaskName() []string {
+	return sdl.schShowTaskName()
+}
+
+//
 // Test if task exist with specific name
 //
 func (sdl *Scheduler)SchTaskExist(name string) bool {

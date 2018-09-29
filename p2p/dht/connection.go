@@ -73,6 +73,7 @@ type ConMgr struct {
 	ciTab			map[conInstIdentity]*ConInst	// connection instance table
 	ciSeq			int64							// connection instance sequence number
 	txQueTab		map[conInstIdentity]*list.List	// outbound data pending queue
+	ibInstTemp		map[string]*ConInst				// temp map for inbound instances
 }
 
 //
@@ -92,6 +93,7 @@ func NewConMgr() *ConMgr {
 		ciTab:		make(map[conInstIdentity]*ConInst, 0),
 		ciSeq:		0,
 		txQueTab:	make(map[conInstIdentity]*list.List, 0),
+		ibInstTemp: make(map[string]*ConInst, 0),
 	}
 
 	conMgr.tep = conMgr.conMgrProc
@@ -200,7 +202,13 @@ func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 	log.LogCallerFileLine("poweroff: task will be done ...")
 
 	po := sch.SchMessage{}
+
 	for _, ci := range conMgr.ciTab {
+		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		conMgr.sdl.SchSendMessage(&po)
+	}
+
+	for _, ci := range conMgr.ibInstTemp {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
@@ -243,6 +251,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	}
 
 	ci.ptnMe = ptn
+	conMgr.ibInstTemp[ci.name] = ci
 	po := sch.SchMessage{}
 	sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweron, nil)
 	sdl.SchSendMessage(&po)
@@ -297,10 +306,16 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		}
 
 		//
-		// notice: if handshake failed, connection instances should have done themself,
-		// so here we need not to request them to be closed, we just remove them from
-		// the map table(for outbounds). inbound instance still not be mapped into ciTab
-		// and no tx data should be pending.
+		// remove temp map for inbound connection instance
+		//
+
+		if ci.dir == ConInstDirInbound {
+			delete(conMgr.ibInstTemp, ci.name)
+		}
+
+		//
+		// we just remove outbound instance from the map table(for outbounds). notice that
+		// inbound instance still not be mapped into ciTab and no tx data should be pending.
 		//
 
 		if msg.Dir == ConInstDirOutbound {
@@ -327,8 +342,8 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				Peer:	msg.Peer,
 			}
 			schMsg := sch.SchMessage{}
-			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
-			ci.sdl.SchSendMessage(&schMsg)
+			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
+			conMgr.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -337,8 +352,8 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		//
 
 		schMsg := sch.SchMessage{}
-		ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
-		return ci.sdl.SchSendMessage(&schMsg)
+		conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		return conMgr.sdl.SchSendMessage(&schMsg)
 	}
 
 	log.LogCallerFileLine("handshakeRsp: ok responsed, dht: %s, msg: %+v", dht, *msg)
@@ -355,8 +370,13 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	} else if msg.Dir == ConInstDirInbound {
 
+		//
+		// put inbound instance to map and remove the temp map for it
+		//
+
 		ci = msg.Inst.(*ConInst)
 		conMgr.ciTab[cid] = ci
+		delete(conMgr.ibInstTemp, ci.name)
 
 	} else {
 
@@ -376,16 +396,16 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				Peer:	msg.Peer,
 			}
 			schMsg := sch.SchMessage{}
-			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
-			ci.sdl.SchSendMessage(&schMsg)
+			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
+			conMgr.sdl.SchSendMessage(&schMsg)
 		} else {
 			rsp := sch.MsgDhtConMgrConnectRsp {
 				Eno:	msg.Eno,
 				Peer:	msg.Peer,
 			}
 			schMsg := sch.SchMessage{}
-			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
-			ci.sdl.SchSendMessage(&schMsg)
+			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
+			conMgr.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -565,10 +585,14 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	}
 
 	schMsg := sch.SchMessage{}
-	sender := msg.Task
 	sdl := conMgr.sdl
+	_, sender := sdl.SchGetTaskNodeByName(msg.Task)
 
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno{
+		if sender == nil {
+			log.LogCallerFileLine("closeReq: rsp2Sender: nil sender")
+			return sch.SchEnoMismatched
+		}
 		rsp := sch.MsgDhtConMgrCloseRsp{
 			Eno:	int(eno),
 			Peer:	msg.Peer,

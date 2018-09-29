@@ -442,7 +442,7 @@ type MsgDhtConMgrSendCfm struct {
 // EvDhtConMgrCloseReq
 //
 type MsgDhtConMgrCloseReq struct {
-	Task		interface{}				// pointer to task node
+	Task		string				// owner task name
 	Peer		*config.Node			// peer to be connected
 	Dir			int						// instance direction
 }

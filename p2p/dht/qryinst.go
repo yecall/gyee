@@ -266,19 +266,20 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 	log.LogCallerFileLine("stopReq: stopped for eno: %d, target: %x, peer: %x",
 		msg.Eno, msg.Target, msg.Peer)
 
-	if icb.status == qisWaitConnect {
-
-		req := sch.MsgDhtConMgrCloseReq {
-			Task:	icb.ptnInst,
-			Peer:	&icb.to,
-		}
-		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
-		sdl.SchSendMessage(&schMsg)
+	if icb.status == qisWaitConnect  || icb.status == qisWaitResponse {
 
 		if icb.qTid != sch.SchInvalidTid {
 			sdl.SchKillTimer(icb.ptnInst, icb.qTid)
 			icb.qTid = sch.SchInvalidTid
 		}
+
+		req := sch.MsgDhtConMgrCloseReq {
+			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
+			Peer:	&icb.to,
+		}
+
+		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
+		sdl.SchSendMessage(&schMsg)
 	}
 
 	rsp := sch.MsgDhtQryInstStopRsp {
@@ -287,9 +288,7 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 	}
 
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStopRsp, &rsp)
-	sdl.SchSendMessage(&schMsg)
-
-	return sch.SchEnoNone
+	return sdl.SchSendMessage(&schMsg)
 }
 
 //
@@ -337,9 +336,9 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	// resources had been allocated to the connection instance.
 	//
 
-	if icb.status == qisWaitConnect {
+	if icb.status == qisWaitConnect || icb.status == qisWaitResponse {
 		req := sch.MsgDhtConMgrCloseReq{
-			Task:	icb.ptnInst,
+			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
 			Peer:	&icb.to,
 		}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)

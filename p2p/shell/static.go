@@ -23,6 +23,7 @@ package shell
 
 import (
 	"time"
+	"fmt"
 	golog	"log"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
@@ -188,7 +189,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 //
 // Stop p2p instance
 //
-func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
+func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 
 	//
 	// Set power off stage first, and after that, we send poweroff message
@@ -265,10 +266,22 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 			break
 		}
 
+		tkNames := sdl.SchShowTaskName()
+		strNames := ""
+		for _, n := range tkNames {
+			if len(strNames) != 0 {
+				strNames = fmt.Sprintf("%s,%s", strNames, n)
+			} else {
+				strNames = n
+			}
+		}
+
 		golog.Printf("P2pStop: " +
-			"p2pInst: %s, wait seconds: %d, remain tasks: %d",
-			p2pInstName, seconds, tasks)
+			"p2pInst: %s, wait seconds: %d, remain tasks: %d, names: %s",
+			p2pInstName, seconds, tasks, strNames)
 	}
+
+	c<-true
 
 	return sch.SchEnoNone
 }

@@ -1576,6 +1576,19 @@ func (sdl *scheduler)schGetTaskNumber() int {
 }
 
 //
+//
+//
+func (sdl *scheduler)schShowTaskName() []string {
+	sdl.lock.Lock()
+	defer sdl.lock.Unlock()
+	var names []string = nil
+	for n, _ := range sdl.tkMap {
+		names = append(names, n)
+	}
+	return names
+}
+
+//
 // Start scheduler
 //
 func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string) (eno SchErrno, name2Ptn *map[string]interface{}){
