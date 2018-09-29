@@ -446,7 +446,8 @@ func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
 //
 func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 
-	log.LogCallerFileLine("peMgrPoweroff: task will be done")
+	sdl := peMgr.sdl.SchGetP2pCfgName()
+	log.LogCallerFileLine("peMgrPoweroff: sdl: %s, task will be done", sdl)
 
 	//
 	// disable peer status indication callback
@@ -2040,9 +2041,10 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 		return PeMgrEnoMismatched
 	}
 
+	sdl := inst.sdl.SchGetP2pCfgName()
 	log.LogCallerFileLine("piPoweroff: " +
-		"task will be done, name: %s",
-		inst.sdl.SchGetTaskName(inst.ptnMe))
+		"task will be done, sdl: %s, name: %s",
+		sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 
 	//
 	// done Tx and Rx routines if peer activated
@@ -2873,6 +2875,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 		_pkg.Payload = append(_pkg.Payload, pkg.Payload...)
 
 		inst.p2pkgTx = append(inst.p2pkgTx, _pkg)
+		inst.txPendSig<-_pkg
 
 		inst.p2pkgLock.Unlock()
 	}
@@ -2932,6 +2935,8 @@ txBreak:
 		// check if we are done
 		//
 
+chkDone:
+
 		select {
 
 		case done = <-inst.txDone:
@@ -2954,15 +2959,14 @@ txBreak:
 		}
 
 		//
-		// check if some pending, if the signal closed, we done
+		// check if some pending, if the signal closed, we check if it's done
 		//
 
 		if _, ok := <-(inst.txPendSig); !ok {
 
 			log.LogCallerFileLine("piTx: done with: %d", done)
 
-			inst.txExit<-done
-			break txBreak
+			goto chkDone
 		}
 
 		//

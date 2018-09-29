@@ -96,6 +96,7 @@ const (
 	CisHandshaked					// handshaked
 	CisInService					// in service
 	CisClosed						// closed
+	CisOutOfService				// out of service but is not closed
 )
 
 type conInstStatus int
@@ -1304,14 +1305,14 @@ _txLoop:
 	if errUnderlying == true {
 
 		//
-		// the 1) case
+		// the 1) case: report the status and then wait and hen singal done
 		//
 
-		conInst.status = CisClosed
+		conInst.status = CisOutOfService
 		conInst.statusReport()
 
-		conInst.cleanUp(DhtEnoOs)
-		conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+		<-conInst.txDone
+		conInst.txDone<-DhtEnoNone
 
 		return
 	}
@@ -1319,10 +1320,11 @@ _txLoop:
 	if isDone == true {
 
 		//
-		// the 2) case
+		// the 2) case: signal the done
 		//
 
-		conInst.txDone <- DhtEnoNone
+		conInst.txDone<-DhtEnoNone
+
 		return
 	}
 
@@ -1410,14 +1412,14 @@ _checkDone:
 	if errUnderlying == true {
 
 		//
-		// the 1) case
+		// the 1) case: report the status and then wait and then signal done
 		//
 
-		conInst.status = CisClosed
+		conInst.status = CisOutOfService
 		conInst.statusReport()
 
-		conInst.cleanUp(DhtEnoOs)
-		conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+		<-conInst.rxDone
+		conInst.rxDone <- DhtEnoNone
 
 		return
 	}
@@ -1425,10 +1427,11 @@ _checkDone:
 	if isDone == true {
 
 		//
-		// the 2) case
+		// the 2) case: signal the done
 		//
 
-		conInst.txDone <- DhtEnoNone
+		conInst.rxDone <- DhtEnoNone
+
 		return
 	}
 

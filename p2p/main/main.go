@@ -185,9 +185,9 @@ func newTcb(name string) *testCaseCtrlBlock {
 //
 // Tx routine
 //
+var dataTxApply = true
 func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
 
-	const dataTxApply = true
 
 	//
 	// This demo simply apply timer with 1s cycle and then sends a string
@@ -327,7 +327,6 @@ func p2pIndProc(what int, para interface{}) interface{} {
 
 	indCbLock.Lock()
 	defer indCbLock.Unlock()
-
 
 	//
 	// check what is indicated
@@ -1311,12 +1310,12 @@ func testCase5(tc *testCase) {
 	time.Sleep(time.Second * 2)
 	golog.Printf("testCase5: going to stop p2p instances ...")
 
-
+	dataTxApply = false
 	stopCount := len(p2pInst2Cfg)
 	stopChain := make(chan bool, stopCount)
 
-	for dhtInst, _ := range p2pInst2Cfg {
-		go shell.P2pStop(dhtInst, stopChain)
+	for p2pInst, _ := range p2pInst2Cfg {
+		go shell.P2pStop(p2pInst, stopChain)
 	}
 
 _waitStop:

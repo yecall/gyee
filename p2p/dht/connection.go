@@ -738,8 +738,13 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	}
 
 	switch msg.Status {
+
 	case CisClosed:
 		conMgr.instClosedInd(msg)
+
+	case CisOutOfService:
+		conMgr.instOutOfServiceInd(msg)
+
 	case CisNull:
 	case CisConnecting:
 	case CisConnected:
@@ -1057,6 +1062,34 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		log.LogCallerFileLine("instClosedInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
+
+	return sch.SchEnoNone
+}
+
+//
+// instance out of service status indication handler
+//
+func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+
+	cid := conInstIdentity {
+		nid:	*msg.Peer,
+		dir:	ConInstDir(msg.Dir),
+	}
+
+	//
+	// only one instance should be returned after lookup
+	//
+
+	cis := conMgr.lookupConInst(&cid)
+	for _, ci := range cis {
+		if ci != nil {
+			po := sch.SchMessage{}
+			conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+			conMgr.sdl.SchSendMessage(&po)
+		}
+	}
+
+	delete(conMgr.ciTab, cid)
 
 	return sch.SchEnoNone
 }
