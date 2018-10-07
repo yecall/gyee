@@ -219,33 +219,33 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 
 	} else {
 
-		golog.Printf("P2pStop: p2pInst: %s, invalid application type: %d", p2pInstName, appType)
+		golog.Printf("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}
 
 	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
-			golog.Printf("P2pStop: p2pInst: %s, task not exist: %s", p2pInstName, taskName)
+			golog.Printf("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
 			continue
 		}
 
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
 
-			golog.Printf("P2pStop: p2pInst: %s, " +
+			golog.Printf("P2pStop: inst: %s, " +
 				"SchSendMessageByName failed, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
 		} else {
 
-			golog.Printf("P2pStop: p2pInst: %s, " +
+			golog.Printf("P2pStop: inst: %s, " +
 				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 		}
 	}
 
-	golog.Printf("P2pStop: p2pInst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
-	golog.Printf("P2pStop: p2pInst: %s, wait all tasks to be done ...", p2pInstName)
+	golog.Printf("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	golog.Printf("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
 	// just wait all to be done
@@ -262,7 +262,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			golog.Printf("P2pStop: p2pInst: %s, all tasks are done", p2pInstName)
+			golog.Printf("P2pStop: inst: %s, all tasks are done", p2pInstName)
 			break
 		}
 
@@ -277,7 +277,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 		}
 
 		golog.Printf("P2pStop: " +
-			"p2pInst: %s, wait seconds: %d, remain tasks: %d, names: %s",
+			"inst: %s, wait seconds: %d, remain tasks: %d, names: %s",
 			p2pInstName, seconds, tasks, strNames)
 	}
 

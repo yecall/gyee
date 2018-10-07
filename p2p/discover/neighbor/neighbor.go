@@ -115,6 +115,9 @@ func (inst *neighborInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 //
 func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	sdl := inst.sdl.SchGetP2pCfgName()
+	log.LogCallerFileLine("ngbProtoProc: sdl: %s, inst.name: %s, msg.Id: %d", sdl, inst.name, msg.Id)
+
 	var protoEno NgbProtoErrno
 
 	switch msg.Id {
@@ -1317,11 +1320,13 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	// create a neighbor instance and setup the map
 	//
 
+	ngbMgr.fnInstSeq++
+
 	var ngbInst = neighborInst {
 		sdl:		ngbMgr.sdl,
 		ngbMgr:		ngbMgr,
 		ptn:		nil,
-		name:		strPeerNodeId,
+		name:		fmt.Sprintf("%s%d_findnode_%s", NgbProcName, ngbMgr.fnInstSeq, strPeerNodeId),
 		msgType:	um.UdpMsgTypeFindNode,
 		msgBody:	findNode,
 		tidFN:		sch.SchInvalidTid,
@@ -1338,10 +1343,8 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	// when everything is ok, see bellow pls.
 	//
 
-	ngbMgr.fnInstSeq++
-
 	var dc = sch.SchTaskDescription {
-		Name:	fmt.Sprintf("%s%d_findnode_%s", NgbProcName, ngbMgr.fnInstSeq, strPeerNodeId),
+		Name:	ngbInst.name,
 		MbSize:	ngbProcMailboxSize,
 		Ep:		&ngbInst,
 		Wd:		&noDog,

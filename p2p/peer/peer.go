@@ -727,9 +727,10 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	//
 
 	peMgr.ibInstSeq++
+	peInst.name = peInst.name + fmt.Sprintf("_inbound_%s", fmt.Sprintf("%d_", peMgr.ibInstSeq) + peInst.raddr.String())
 
 	var tskDesc  = sch.SchTaskDescription {
-		Name:		fmt.Sprintf("inbound_%s", fmt.Sprintf("%d_", peMgr.ibInstSeq) + peInst.raddr.String()),
+		Name:		peInst.name,
 		MbSize:		PeInstMailboxSize,
 		Ep:			peInst,
 		Wd:			&sch.SchWatchDog{HaveDog:false,},
@@ -737,7 +738,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		DieCb:		nil,
 		UserDa:		peInst,
 	}
-	peInst.name = peInst.name + tskDesc.Name
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
 	eno != sch.SchEnoNone || ptnInst == nil {
@@ -1571,9 +1571,10 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	//
 
 	peMgr.obInstSeq++
+	peInst.name = peInst.name + fmt.Sprintf("_Outbound_%s", fmt.Sprintf("%d", peMgr.obInstSeq))
 
 	var tskDesc  = sch.SchTaskDescription {
-		Name:		fmt.Sprintf("Outbound_%s", fmt.Sprintf("%d", peMgr.obInstSeq)),
+		Name:		peInst.name,
 		MbSize:		PeInstMailboxSize,
 		Ep:			peInst,
 		Wd:			&sch.SchWatchDog{HaveDog:false,},
@@ -1581,7 +1582,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 		DieCb:		nil,
 		UserDa:		peInst,
 	}
-	peInst.name = peInst.name + tskDesc.Name
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
 	eno != sch.SchEnoNone || ptnInst == nil {
@@ -1991,6 +1991,9 @@ func (pi *peerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 //
 func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	sdl := pi.sdl.SchGetP2pCfgName()
+	log.LogCallerFileLine("peerInstProc: sdl: %s, pi.name: %s, msg.Id: %d", sdl,  pi.name, msg.Id)
+
 	var eno PeMgrErrno
 
 	switch msg.Id {
@@ -2053,28 +2056,23 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	if inst.state == peInstStateActivated {
 
 		inst.p2pkgLock.Lock()
-
 		if inst.txPendSig != nil {
 			close(inst.txPendSig)
-			inst.txPendSig = nil
 		}
 		inst.p2pkgRx = nil
 		inst.p2pkgTx = nil
-
 		inst.p2pkgLock.Unlock()
 
 		if inst.txDone != nil {
 			inst.txDone <- PeMgrEnoNone
 			<-inst.txExit
 			close(inst.txDone)
-			inst.txDone = nil
 		}
 
 		if inst.rxDone != nil {
 			inst.rxDone <- PeMgrEnoNone
 			<-inst.rxExit
 			close(inst.rxDone)
-			inst.rxDone = nil
 		}
 	}
 
@@ -2356,6 +2354,7 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	//
 
 	_ = msg
+	sdl := inst.sdl.SchGetP2pCfgName()
 
 	if inst == nil {
 		log.LogCallerFileLine("piCloseReq: invalid parameters")
@@ -2370,33 +2369,29 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 
 	if inst.state == peInstStateActivated {
 
+		inst.p2pkgLock.Lock()
 		if inst.txPendSig != nil {
-
-			inst.p2pkgLock.Lock()
-
 			close(inst.txPendSig)
-			inst.txPendSig = nil
-			inst.p2pkgRx = nil
-			inst.p2pkgTx = nil
-
-			inst.p2pkgLock.Unlock()
 		}
+		inst.p2pkgRx = nil
+		inst.p2pkgTx = nil
+		inst.p2pkgLock.Unlock()
 
+		log.LogCallerFileLine("piCloseReq: try to done piRx, sdl: %s, inst: %s", sdl, inst.name)
 		inst.rxDone <- PeMgrEnoNone
 		<-inst.rxExit
+		log.LogCallerFileLine("piCloseReq: piRx done, sdl: %s, inst: %s", sdl, inst.name)
 
+		log.LogCallerFileLine("piCloseReq: try to done piTx, sdl: %s, inst: %s", sdl, inst.name)
 		inst.txDone <- PeMgrEnoNone
 		<-inst.txExit
+		log.LogCallerFileLine("piCloseReq: piTx done, sdl: %s, inst: %s", sdl, inst.name)
 	}
 
 	close(inst.rxDone)
-	inst.rxDone = nil
 	close(inst.rxExit)
-	inst.rxExit = nil
 	close(inst.txDone)
-	inst.txDone = nil
 	close(inst.txExit)
-	inst.txExit = nil
 
 	//
 	// stop timer
@@ -2416,8 +2411,8 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 		if err := inst.conn.Close(); err != nil {
 
 			log.LogCallerFileLine("piCloseReq: " +
-				"close connection failed, err: %s",
-				err.Error())
+				"close connection failed, sdl: %s, inst: %s, err: %s",
+				sdl, inst.name, err.Error())
 
 			return PeMgrEnoOs
 		}
@@ -2928,6 +2923,8 @@ func piTx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	//
 
+	sdl := inst.sdl.SchGetP2pCfgName()
+
 	var done PeMgrErrno = PeMgrEnoNone
 
 txBreak:
@@ -2944,7 +2941,7 @@ chkDone:
 
 		case done = <-inst.txDone:
 
-			log.LogCallerFileLine("piTx: done with: %d", done)
+			log.LogCallerFileLine("piTx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
 
 			inst.txExit<-done
 			break txBreak
@@ -2967,7 +2964,8 @@ chkDone:
 
 		if _, ok := <-(inst.txPendSig); !ok {
 
-			log.LogCallerFileLine("piTx: txPendSig closed, go to check done ...")
+			log.LogCallerFileLine("piTx: txPendSig closed, go to check done. " +
+				"sdl: %s, inst: %s", sdl, inst.name)
 
 			goto chkDone
 		}
@@ -3004,8 +3002,8 @@ chkDone:
 				//
 
 				log.LogCallerFileLine("piTx: " +
-					"call P2pIndHandler for SendPackage failed, eno: %d",
-					eno)
+					"call P2pIndHandler for SendPackage failed, sdl: %s, inst: %s, eno: %d",
+					sdl, inst.name, eno)
 
 				inst.txEno = eno
 
@@ -3052,6 +3050,8 @@ func piRx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	//
 
+	sdl := inst.sdl.SchGetP2pCfgName()
+
 	var done PeMgrErrno = PeMgrEnoNone
 	var peerInfo = PeerInfo{}
 	var pkgCb = P2pPackage4Callback{}
@@ -3068,7 +3068,7 @@ rxBreak:
 
 		case done = <-inst.rxDone:
 
-			log.LogCallerFileLine("piRx: done with: %d", done)
+			log.LogCallerFileLine("piRx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
 
 			inst.rxExit<-done
 			break rxBreak
@@ -3100,8 +3100,8 @@ rxBreak:
 			//
 
 			log.LogCallerFileLine("piRx: " +
-				"call P2pIndHandler for RecvPackage failed, eno: %d",
-				eno)
+				"call P2pIndHandler for RecvPackage failed, sdl: %s, inst: %s, eno: %d",
+				sdl, inst.name, eno)
 
 			inst.peMgr.Lock4Cb.Lock()
 
@@ -3141,9 +3141,8 @@ rxBreak:
 			if eno := inst.piP2pPkgProc(upkg); eno != PeMgrEnoNone {
 
 				log.LogCallerFileLine("piRx: " +
-					"piP2pMsgProc failed, eno: %d, inst: %s",
-					eno,
-					fmt.Sprintf("%+v", *inst))
+					"piP2pMsgProc failed, sdl: %s, inst: %s, eno: %d",
+					sdl, inst.name, eno)
 			}
 
 		} else if upkg.Pid == uint32(PID_EXT) {
@@ -3181,8 +3180,8 @@ rxBreak:
 			//
 
 			log.LogCallerFileLine("piRx: " +
-				"package discarded for unknown pid: %d",
-				upkg.Pid)
+				"package discarded for unknown pid: sdl: %s, inst: %s, %d",
+				 sdl, inst.name, upkg.Pid)
 		}
 	}
 

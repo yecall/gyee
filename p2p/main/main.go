@@ -174,6 +174,8 @@ func newTcb(name string) *testCaseCtrlBlock {
 	case "testCase3":
 	case "testCase4":
 	case "testCase5":
+	case "testCase6":
+	case "testCase7":
 	default:
 		log.LogCallerFileLine("newTcb: undefined test: %s", name)
 		return nil
@@ -1115,7 +1117,7 @@ func testCase5(tc *testCase) {
 
 	log.LogCallerFileLine("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 32
 
 	var bootstrapIp net.IP
 	var bootstrapId string = ""
@@ -1204,15 +1206,15 @@ func testCase5(tc *testCase) {
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
-				snid0 := config.SubNetworkID{0xff, byte(idx & 0x0f)}
+				snid0 := config.SubNetworkID{0xff, byte(idx & 0x1f)}
 				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
 				myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
 				myCfg.SubNetMaxInBounds[snid0] = config.MaxPeers
 				myCfg.SubNetMaxOutbounds[snid0] = 0
 			}
 		} else {
-			snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
-			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
+			snid0 := config.SubNetworkID{0xff, byte(loop & 0x1f)}
+			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x1f)}
 			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
 			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
 			myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
