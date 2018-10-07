@@ -142,7 +142,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase7"
+var tgtCase = "testCase5"
 
 //
 // port base
@@ -186,6 +186,7 @@ func newTcb(name string) *testCaseCtrlBlock {
 // Tx routine
 //
 var dataTxApply = true
+var dataTxTmApply = false
 func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
 
 
@@ -299,7 +300,9 @@ txLoop:
 
 			indCbLock.Lock()
 
-			tmHandler()
+			if dataTxTmApply {
+				tmHandler()
+			}
 
 			indCbLock.Unlock()
 		}
@@ -1307,10 +1310,9 @@ func testCase5(tc *testCase) {
 	// Sleep and then stop p2p instance
 	//
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 8)
 	golog.Printf("testCase5: going to stop p2p instances ...")
 
-	dataTxApply = false
 	stopCount := len(p2pInst2Cfg)
 	stopChain := make(chan bool, stopCount)
 

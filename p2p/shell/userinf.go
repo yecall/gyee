@@ -101,6 +101,8 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 		sdl := target.(*sch.Scheduler)
 		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
 
+		peMgr.Lock4Cb.Lock()
+
 		if peMgr.P2pIndHandler != nil {
 			log.LogCallerFileLine("P2pRegisterCallback: old handler will be overlapped")
 		}
@@ -109,8 +111,8 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 			log.LogCallerFileLine("P2pRegisterCallback: user registers nil indication handler")
 		}
 
-		peMgr.Lock4Cb.Lock()
 		peMgr.P2pIndHandler = cb.(peer.P2pIndCallback)
+
 		peMgr.Lock4Cb.Unlock()
 
 		return P2pEnoNone

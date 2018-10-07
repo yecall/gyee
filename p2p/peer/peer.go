@@ -1400,7 +1400,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 	//
 	// This is an event from an instance task of outbound or inbound peer whom
-	// is required to be closed by the peer manager, confiming that the connection
+	// is required to be closed by the peer manager, confirming that the connection
 	// had been closed.
 	//
 
@@ -2053,19 +2053,21 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	if inst.state == peInstStateActivated {
 
 		inst.p2pkgLock.Lock()
-		inst.p2pkgTx = nil
-		inst.p2pkgLock.Unlock()
 
 		if inst.txPendSig != nil {
 			close(inst.txPendSig)
+			inst.txPendSig = nil
 		}
+		inst.p2pkgRx = nil
+		inst.p2pkgTx = nil
+
+		inst.p2pkgLock.Unlock()
 
 		if inst.txDone != nil {
 			inst.txDone <- PeMgrEnoNone
 			<-inst.txExit
 			close(inst.txDone)
 			inst.txDone = nil
-			inst.txPendSig = nil
 		}
 
 		if inst.rxDone != nil {
@@ -2369,7 +2371,15 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	if inst.state == peInstStateActivated {
 
 		if inst.txPendSig != nil {
+
+			inst.p2pkgLock.Lock()
+
 			close(inst.txPendSig)
+			inst.txPendSig = nil
+			inst.p2pkgRx = nil
+			inst.p2pkgTx = nil
+
+			inst.p2pkgLock.Unlock()
 		}
 
 		inst.rxDone <- PeMgrEnoNone
@@ -2387,13 +2397,6 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	inst.txDone = nil
 	close(inst.txExit)
 	inst.txExit = nil
-
-	inst.txPendSig = nil
-
-	inst.p2pkgLock.Lock()
-	inst.p2pkgRx = nil
-	inst.p2pkgTx = nil
-	inst.p2pkgLock.Unlock()
 
 	//
 	// stop timer
@@ -2964,7 +2967,7 @@ chkDone:
 
 		if _, ok := <-(inst.txPendSig); !ok {
 
-			log.LogCallerFileLine("piTx: done with: %d", done)
+			log.LogCallerFileLine("piTx: txPendSig closed, go to check done ...")
 
 			goto chkDone
 		}
