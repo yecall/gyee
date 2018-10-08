@@ -2455,8 +2455,9 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	// response about this event sent.
 	//
 
+	sdl := inst.sdl.SchGetP2pCfgName()
+
 	var schEno sch.SchErrno
-	_ = msg
 
 	//
 	// setup pingpong timer
@@ -2473,7 +2474,8 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 
 	if schEno, tid = inst.sdl.SchSetTimer(inst.ptnMe, &tmDesc);
 		schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		log.LogCallerFileLine("piEstablishedInd: SchSetTimer failed, eno: %d", schEno)
+		log.LogCallerFileLine("piEstablishedInd: SchSetTimer failed, " +
+			"sdl: %s, inst: %s, eno: %d", sdl, inst.name, schEno)
 		return PeMgrEnoScheduler
 	}
 
@@ -2495,6 +2497,9 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	//
 
 	inst.peMgr.Lock4Cb.Lock()
+
+	log.LogCallerFileLine("piEstablishedInd: apply P2pIndPeerActivated indication, " +
+		"sdl: %s, inst: %s", sdl, inst.name)
 
 	if inst.peMgr.P2pIndHandler != nil {
 
@@ -2521,9 +2526,8 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	go piTx(inst)
 	go piRx(inst)
 
-	log.LogCallerFileLine("piEstablishedInd: " +
-		"piTx and piRx are in going ... inst: %s",
-		fmt.Sprintf("%+v", *inst))
+	log.LogCallerFileLine("piEstablishedInd: piTx and piRx are in going, " +
+		"sdl: %s, inst: %s", sdl, inst.name)
 
 	return PeMgrEnoNone
 }

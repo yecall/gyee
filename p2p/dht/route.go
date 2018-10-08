@@ -1042,7 +1042,7 @@ func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
 		elNext = el.Next()
 		bn := el.Value.(*rutMgrBucketNode)
 		if bn.dist > dist {
-			newLi.PushBack(el)
+			newLi.PushBack(bn)
 			li.Remove(el)
 		}
 		if elNext == nil {

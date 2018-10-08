@@ -142,7 +142,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase5"
+var tgtCase = "testCase6"
 
 //
 // port base
