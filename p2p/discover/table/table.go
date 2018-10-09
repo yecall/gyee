@@ -1968,7 +1968,6 @@ func (tabMgr *TableManager)tabUpdateNodeDb4Bounding(pn *Node, pit *time.Time, po
 
 			return TabMgrEnoDatabase
 		}
-
 	}
 
 	if pit != nil {
