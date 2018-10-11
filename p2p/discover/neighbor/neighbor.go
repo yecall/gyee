@@ -50,21 +50,12 @@ const (
 
 type NgbMgrErrno int
 
-//
-// Neighbor task name: since this type of instance is created dynamic, no fixed name defined,
-// instead, peer node id string is applied as the task name, and this is prefixxed, Please see
-// how this type of task instance is created for more.
-//
-const NgbProcName = "ngbproto"
+const (
+	NgbProcName = "ngbproto"	// Neighbor task name
+	ngbProcMailboxSize = 64		// Mailbox size of a ngighbor instance
+)
 
-//
-// Mailbox size of a ngighbor instance
-//
-const ngbProcMailboxSize = 64
-
-//
 // The control block of neighbor task instance
-//
 type neighborInst struct {
 	sdl		*sch.Scheduler		// pointer to scheduler
 	ngbMgr	*NeighborManager	// pointer to neighbor manager
@@ -77,194 +68,92 @@ type neighborInst struct {
 	tidPP	int					// Pingpong timer identity
 }
 
-//
 // Protocol handler errno
-//
 const (
 	NgbProtoEnoNone	= 0
+
 	NgbProtoEnoParameter = iota + 100	// +100, an offset is necessary to distinct this errno from
 										// those NgbMgrEnoxxx.
-	NgbProtoEnoScheduler
-	NgbProtoEnoOs
-	NgbProtoEnoEncode
-	NgbProtoEnoTimeout
-	NgbProtoEnoUdp
+
+	NgbProtoEnoScheduler				// scheduler
+	NgbProtoEnoOs						// operating system
+	NgbProtoEnoEncode					// encoding/decoding
+	NgbProtoEnoTimeout					// timeout
+	NgbProtoEnoUdp						// udp
 )
 
 type NgbProtoErrno int
 
-//
 // Timeouts, zero value would be no timeout
-//
 const (
-	NgbProtoWriteTimeout			= 8 * time.Second
-	NgbProtoReadTimeout				= 0
-	NgbProtoPingResponseTimeout		= 20 * time.Second
-	NgbProtoFindNodeResponseTimeout = 20 * time.Second
+	NgbProtoWriteTimeout			= 8 * time.Second		// for underlying sending
+	NgbProtoReadTimeout				= 0						// for underlying receiving
+	NgbProtoPingResponseTimeout		= 20 * time.Second		// for ping
+	NgbProtoFindNodeResponseTimeout = 20 * time.Second		// for find node
 )
 
-//
-// Entry point exported to shceduler
-//
 func (inst *neighborInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return inst.tep(ptn, msg)
 }
 
-//
-// Neighbor task entry
-//
 func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	sdl := inst.sdl.SchGetP2pCfgName()
 	log.LogCallerFileLine("ngbProtoProc: sdl: %s, inst.name: %s, msg.Id: %d", sdl, inst.name, msg.Id)
 
 	var protoEno NgbProtoErrno
-
 	switch msg.Id {
-
 	case sch.EvSchPoweroff:
 		protoEno = inst.NgbProtoPoweroff(ptn)
-
 	case sch.EvNblFindNodeReq:
 		protoEno = inst.NgbProtoFindNodeReq(ptn, msg.Body.(*um.FindNode))
-
 	case sch.EvNblPingpongReq:
 		protoEno = inst.NgbProtoPingReq(ptn, msg.Body.(*um.Ping))
-
 	case sch.EvNblPingpongRsp:
 		protoEno = inst.NgbProtoPingRsp(msg.Body.(*um.Pong))
-
 	case sch.EvNblFindNodeRsp:
 		protoEno = inst.NgbProtoFindNodeRsp(msg.Body.(*um.Neighbors))
-
 	case sch.EvNblFindNodeTimer:
 		protoEno = inst.NgbProtoFindNodeTimeout()
-
 	case sch.EvNblPingpongTimer:
 		protoEno = inst.NgbProtoPingTimeout()
-
 	default:
-
-		log.LogCallerFileLine("NgbProtoProc: " +
-			"invalid message, msg.Id: %d",
-			msg.Id)
-
+		log.LogCallerFileLine("NgbProtoProc: invalid message, msg.Id: %d", msg.Id)
 		protoEno = NgbProtoEnoParameter
 	}
 
 	if protoEno != NgbProtoEnoNone {
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
-//
-// power off handler
-//
 func (inst *neighborInst) NgbProtoPoweroff(ptn interface{}) NgbProtoErrno {
-
-	if ptn != inst.ptn {
-		return NgbMgrEnoMismatched
-	}
-
-	log.LogCallerFileLine("NgbProtoPoweroff: " +
-		"task will be done, name: %s",
-		inst.sdl.SchGetTaskName(inst.ptn))
-
-	if inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled) != sch.SchEnoNone {
-		return NgbProtoEnoScheduler
-	}
-
+	log.LogCallerFileLine("NgbProtoPoweroff: task will be done, name: %s", inst.sdl.SchGetTaskName(inst.ptn))
+	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled)
 	return NgbProtoEnoNone
 }
-//
-// FindNode request handler
-//
+
 func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) NgbProtoErrno {
-
-	//
-	// check FindNode request
-	//
-
-	if inst.msgType != um.UdpMsgTypeFindNode || inst.msgBody == nil {
-
-		log.LogCallerFileLine("NgbProtoFindNodeReq: " +
-			"invalid find node request")
-
-		return NgbProtoEnoParameter
-	}
-
-	//
-	// encode request
-	//
-
 	var pum = new(um.UdpMsg)
-	if eno := pum.Encode(um.UdpMsgTypeFindNode, fn); eno != um.UdpMsgEnoNone {
-
-		log.LogCallerFileLine("NgbProtoFindNodeReq: " +
-			"encode failed, eno: %d",
-			eno)
-
-		return NgbProtoEnoEncode
-	}
-
-	buf, bytes := pum.GetRawMessage()
-	if buf == nil || bytes == 0 {
-
-		log.LogCallerFileLine("NgbProtoFindNodeReq: " +
-			"invalid encoded  message")
-
-		return NgbProtoEnoEncode
-	}
-
-	//
-	// send encoded request
-	//
+	pum.Encode(um.UdpMsgTypeFindNode, fn)
+	buf, _ := pum.GetRawMessage()
 
 	var dst = net.UDPAddr{}
 	dst.IP = append(dst.IP, fn.To.IP...)
 	dst.Port = int(fn.To.UDP)
 
 	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
-
-		//
-		// response FindNode  NgbProtoEnoUdp to table task
-		//
-
-		log.LogCallerFileLine("NgbProtoFindNodeReq：" +
-			"sendUdpMsg failed, dst: %s, eno: %d",
-			dst.String(), eno)
-
 		var rsp = sch.NblFindNodeRsp{}
 		var schMsg  = sch.SchMessage{}
-
 		rsp.Result = (NgbProtoEnoUdp << 16) + tab.TabMgrEnoUdp
 		rsp.FindNode = inst.msgBody.(*um.FindNode)
-
 		inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		inst.sdl.SchSendMessage(&schMsg)
-
-		//
-		// remove ourself from map in manager. notice: since we had setup the calback
-		// for task done(killed), this cleaning would carried out by scheduler, but
-		// we do cleaning here to obtain a more clear seen.
-		//
-
 		inst.ngbMgr.cleanMap(inst.name)
-
-		//
-		// done the instance task
-		//
-
 		inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
-
 	 	return NgbProtoEnoUdp
 	 }
-
-	 //
-	 // start timer to wait response("Neighbors" message) from peer
-	 //
 
 	 var tmd  = sch.TimerDescription {
 		 Name:	NgbProcName + "_timer_findnode",
@@ -273,82 +162,20 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 		 Dur:	NgbProtoFindNodeResponseTimeout,
 		 Extra:	nil,
 	 }
-
-	 var (
-	 	eno	sch.SchErrno
-	 	tid int
-	 )
-
-	 if eno, tid = inst.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
-		 log.LogCallerFileLine("NgbProtoFindNodeReq: SchSetTimer failed, eno: %d", eno)
-	 	return NgbProtoEnoScheduler
-	 }
-
-	 inst.tidFN = tid
+	_, inst.tidFN = inst.sdl.SchSetTimer(ptn, &tmd)
 
 	 return NgbProtoEnoNone
 }
 
-//
-// Ping request handler
-//
 func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbProtoErrno {
+	pum := new(um.UdpMsg)
+	pum.Encode(um.UdpMsgTypePing, ping)
+	buf, _ := pum.GetRawMessage()
 
-	//
-	// check Ping request
-	//
-
-	if inst.msgType != um.UdpMsgTypePing || inst.msgBody == nil {
-
-		log.LogCallerFileLine("NgbProtoPingReq:" +
-			" invalid ping request")
-
-		return NgbProtoEnoParameter
-	}
-
-	//
-	// encode request
-	//
-
-	var pum = new(um.UdpMsg)
-	if eno := pum.Encode(um.UdpMsgTypePing, ping); eno != um.UdpMsgEnoNone {
-
-		log.LogCallerFileLine("NgbProtoPingReq: " +
-			"encode failed, eno: %d",
-			eno)
-
-		return NgbProtoEnoEncode
-	}
-
-	buf, bytes := pum.GetRawMessage()
-	if buf == nil || bytes == 0 {
-
-		log.LogCallerFileLine("NgbProtoPingReq: " +
-			"invalid encoded  message")
-
-		return NgbProtoEnoEncode
-	}
-
-	//
-	// send encoded request
-	//
-
-	var dst = net.UDPAddr{}
+	dst := net.UDPAddr{}
 	dst.IP = append(dst.IP, ping.To.IP...)
 	dst.Port = int(ping.To.UDP)
-
-	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("NgbProtoPingReq：" +
-			"sendUdpMsg failed, dst: %s, eno: %d",
-			dst.String(), eno)
-
-		return NgbProtoEnoOs
-	}
-
-	//
-	// start time for response
-	//
+	sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst)
 
 	var tmd  = sch.TimerDescription {
 		Name:	NgbProcName + "_timer_pingpong",
@@ -357,60 +184,19 @@ func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbPro
 		Dur:	NgbProtoPingResponseTimeout,
 		Extra:	nil,
 	}
-
-	var (
-		eno	sch.SchErrno
-		tid int
-	)
-
-	if eno, tid = inst.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("NgbProtoPingReq: SchSetTimer failed, eno: %d", eno)
-		return NgbProtoEnoScheduler
-	}
-
-	inst.tidPP = tid
-
+	_, inst.tidPP = inst.sdl.SchSetTimer(ptn, &tmd)
 	return NgbProtoEnoNone
 }
 
-//
-// Ping response handler
-//
 func (inst *neighborInst) NgbProtoPingRsp(msg *um.Pong) NgbProtoErrno {
-
-	//
-	// Check the response, 1) if it's good, dispatch it to table task, and
-	// then done this neighbor task instance; 2) if needed, kill timers in
-	// running; 3) done the task, clean the map held by manager task...
-	//
-
-	// we must be a "Ping" instance
 	if inst.msgType != um.UdpMsgTypePing || inst.msgBody == nil {
-
-		log.LogCallerFileLine("NgbProtoPingRsp: " +
-			"response mismatched with request")
-
 		return NgbProtoEnoParameter
 	}
 
-	//
-	// this "Pong" must be from node which we had pinged, notice that the
-	// function "CompareWith" make a full matching between tow nodes.
-	//
-
-	var ping = inst.msgBody.(*um.Ping)
+	ping := inst.msgBody.(*um.Ping)
 	if equ := ping.To.CompareWith(&msg.From); equ != um.CmpNodeEqu {
-
-		log.LogCallerFileLine("NgbProtoPingRsp: " +
-			"node mismatched, equ: %d",
-			equ)
-
 		return NgbProtoEnoParameter
 	}
-
-	//
-	// kill pingpong timer if needed
-	//
 
 	if inst.tidPP != sch.SchInvalidTid {
 		if eno := inst.sdl.SchKillTimer(inst.ptn, inst.tidPP); eno != sch.SchEnoNone {
@@ -419,239 +205,99 @@ func (inst *neighborInst) NgbProtoPingRsp(msg *um.Pong) NgbProtoErrno {
 		inst.tidPP = sch.SchInvalidTid
 	}
 
-	//
-	// send response to table task
-	//
-
-	var rsp = sch.NblPingRsp{}
-	var schMsg  = sch.SchMessage{}
-
+	rsp := sch.NblPingRsp{}
+	schMsg := sch.SchMessage{}
 	rsp.Result = NgbProtoEnoNone
 	rsp.Ping = inst.msgBody.(*um.Ping)
 	rsp.Pong = msg
-
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 
-	//
-	// remove ourself from map in manager. notice: since we had setup the calback
-	// for task done(killed), this cleaning would carried out by scheduler, but
-	// we do cleaning here to obtain a more clear seen.
-	//
-
 	inst.ngbMgr.cleanMap(inst.name)
-
-	//
-	// done the instance task
-	//
-
 	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
-
 	return NgbProtoEnoNone
 }
 
-//
-// Find response handler
-//
 func (inst *neighborInst) NgbProtoFindNodeRsp(msg *um.Neighbors) NgbProtoErrno {
-
-	//
-	// Check the response, 1) if it's good, dispatch it to table task, and
-	// then done this neighbor task instance; 2) if needed, kill timers in
-	// running; 3) done the task, clean the map held by manager task...
-	//
-
-	//
-	// we must be a "FindNode" instance
-	//
-
 	if inst.msgType != um.UdpMsgTypeFindNode || inst.msgBody == nil {
-
-		log.LogCallerFileLine("NgbProtoFindNodeRsp: " +
-			"response mismatched with request")
-
 		return NgbProtoEnoParameter
 	}
 
-	//
-	// this response must be from node which we had pinged, notice that the
-	// function "CompareWith" make a full matching between tow nodes.
-	//
-
-	var findNode = inst.msgBody.(*um.FindNode)
+	findNode := inst.msgBody.(*um.FindNode)
 	if equ := findNode.To.CompareWith(&msg.From); equ != um.CmpNodeEqu {
-
-		log.LogCallerFileLine("NgbProtoFindNodeRsp: " +
-			"node mismatched, equ: %d",
-			equ)
-
 		return NgbProtoEnoParameter
 	}
-
-	//
-	// kill findnode timer if needed
-	//
 
 	if inst.tidFN != sch.SchInvalidTid {
-
 		if eno := inst.sdl.SchKillTimer(inst.ptn, inst.tidFN); eno != sch.SchEnoNone {
 			return NgbProtoEnoScheduler
 		}
-
 		inst.tidFN = sch.SchInvalidTid
 	}
 
-	//
-	// send response to table task
-	//
-
-	var rsp = sch.NblFindNodeRsp{}
-	var schMsg  = sch.SchMessage{}
-
+	rsp := sch.NblFindNodeRsp{}
+	schMsg := sch.SchMessage{}
 	rsp.Result = (NgbProtoEnoNone << 16) + tab.TabMgrEnoNone
 	rsp.FindNode = inst.msgBody.(*um.FindNode)
 	rsp.Neighbors = msg
-
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 
-	//
-	// remove ourself from map in manager. notice: since we had setup the calback
-	// for task done(killed), this cleaning would carried out by scheduler, but
-	// we do cleaning here to obtain a more clear seen.
-	//
-
 	inst.ngbMgr.cleanMap(inst.name)
-
-	//
-	// done the instance task
-	//
-
 	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
 
 	return NgbProtoEnoNone
 }
 
-//
-// FindNode timeout handler
-//
 func (inst *neighborInst) NgbProtoFindNodeTimeout() NgbProtoErrno {
-
-	//
-	// response FindNode timeout to table task
-	//
-
-	var rsp = sch.NblFindNodeRsp{}
-	var schMsg  = sch.SchMessage{}
-
+	rsp := sch.NblFindNodeRsp{}
+	schMsg := sch.SchMessage{}
 	rsp.Result = (NgbProtoEnoTimeout << 16) + tab.TabMgrEnoTimeout
 	rsp.FindNode = inst.msgBody.(*um.FindNode)
-
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 
-	//
-	// remove ourself from map in manager. notice: since we had setup the calback
-	// for task done(killed), this cleaning would carried out by scheduler, but
-	// we do cleaning here to obtain a more clear seen.
-	//
-
 	inst.ngbMgr.cleanMap(inst.name)
-
-	//
-	// done the instance task
-	//
-
 	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
-
 	return NgbProtoEnoNone
 }
 
-//
-// Ping timeout handler
-//
 func (inst *neighborInst) NgbProtoPingTimeout() NgbProtoErrno {
-
-	//
-	// response Ping timeout to table task
-	//
-
-	var rsp = sch.NblPingRsp{}
-	var schMsg  = sch.SchMessage{}
-
+	rsp := sch.NblPingRsp{}
+	schMsg := sch.SchMessage{}
 	rsp.Result = NgbProtoEnoTimeout
 	rsp.Ping = inst.msgBody.(*um.Ping)
-
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 
-	//
-	// remove ourself from map in manager. notice: since we had setup the calback
-	// for task done(killed), this cleaning would carried out by scheduler, but
-	// we do cleaning here to obtain a more clear seen.
-	//
-
 	inst.ngbMgr.cleanMap(inst.name)
-
-	//
-	// done the instance task
-	//
-
 	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
-
 	return NgbProtoEnoNone
 }
 
-//
-// Callbacked when died
-//
 func (ni *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
-
-	//
-	// kill any timer if needed, should not care the result returned from
-	// scheduler, for timer might have been killed by scheduler.
-	//
-
 	if ni.tidPP != sch.SchInvalidTid {
 		ni.sdl.SchKillTimer(ni.ptn, ni.tidPP)
 		ni.tidPP = sch.SchInvalidTid
 	}
-
 	if ni.tidFN != sch.SchInvalidTid {
 		ni.sdl.SchKillTimer(ni.ptn, ni.tidFN)
 		ni.tidFN = sch.SchInvalidTid
 	}
-
-	//
-	// clean the map
-	//
-
 	ni.ngbMgr.cleanMap(ni.name)
 
-	//
 	// any more ...?
-	//
-
 	return sch.SchEnoNone
 }
 
-//
-// Neighbor manager task name
-//
-const NgbMgrName = sch.NgbMgrName
-
-//
-// Timeouts
-//
 const (
-	expiration  = 20 * time.Second
+	NgbMgrName = sch.NgbMgrName				// Neighbor manager task name
+	expiration  = 20 * time.Second			// Timeouts
 )
 
-//
 // Control block of neighbor manager task
-//
 type NeighborManager struct {
-	cfg			config.Cfg4UdpNgbManager		// configuration
+	cfg			config.Cfg4UdpNgbManager	// configuration
 	lock		sync.Mutex					// lock for protection
 	sdl			*sch.Scheduler				// pointer to scheduler
 	name		string						// name
@@ -665,9 +311,6 @@ type NeighborManager struct {
 	ppInstSeq	int							// pingpong instance sequence number
 }
 
-//
-// Create neighbor manager
-//
 func NewNgbMgr() *NeighborManager {
 	var ngbMgr = NeighborManager{
 		sdl:       nil,
@@ -679,114 +322,53 @@ func NewNgbMgr() *NeighborManager {
 		fnInstSeq: 0,
 		ppInstSeq: 0,
 	}
-
 	ngbMgr.tep = ngbMgr.ngbMgrProc
-
 	return &ngbMgr
 }
 
-//
-// Entry point exported to shceduler
-//
 func (ngbMgr *NeighborManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return ngbMgr.tep(ptn, msg)
 }
 
-//
-// Neighbor manager task entry
-//
 func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
-	//
-	// Messages are from udp listener task or table task. The former would dispatch udpmsgs
-	// (which are decoded from raw protobuf messages received by UDP); the later, would request
-	// us to init Ping procedure or FindNode procedure. By checking the sch.SchMessage.Id we
-	// can determine what the current message for. Here, we play game like following:
-	//
-	// 1) for reqest from table task, the manager create a neighbor task to handle it, and
-	// backups the peer node identity in a map;
-	// 2) for udpmsg indication messages which could is not in the map, the manager response
-	// them at once;
-	// 3) for udpmsg indication messages which are from those peer nodes in the map, the manager
-	// dispatch them to the neighbor task instances created in step 1);
-	// 4) the neighbor task should install a callback to clean itself from the map when its'
-	// instance done;
-	//
-
 	var eno NgbMgrErrno
 
 	switch msg.Id {
-
 	case sch.EvSchPoweron:
 		return ngbMgr.PoweronHandler(ptn)
-
 	case sch.EvSchPoweroff:
 		return ngbMgr.PoweroffHandler(ptn)
-
-	//
-	// udpmsg from udp listener task
-	//
-
 	case sch.EvNblMsgInd:
 		eno = ngbMgr.UdpMsgInd(msg.Body.(*UdpMsgInd))
-
-	//
-	// findnode request from table task
-	//
-
 	case sch.EvNblFindNodeReq:
 		eno = ngbMgr.FindNodeReq(msg.Body.(*um.FindNode))
-
-	//
-	// ping request from table task
-	//
-
 	case sch.EvNblPingpongReq:
 		eno = ngbMgr.PingpongReq(msg.Body.(*um.Ping))
-
 	default:
-
-		log.LogCallerFileLine("NgbMgrProc: " +
-			"invalid message id: %d",
-			msg.Id)
-
+		log.LogCallerFileLine("NgbMgrProc:  invalid message id: %d", msg.Id)
 		eno = NgbMgrEnoParameter
 	}
 
 	if eno != NgbMgrEnoNone {
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
-//
-// Poweron handler
-//
 func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
-
 	var eno sch.SchErrno
 	var ptnTab interface{}
 	var ptnLsn interface{}
 
 	ngbMgr.ptnMe = ptn
 	ngbMgr.sdl = sch.SchGetScheduler(ptn)
-
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("PoweronHandler: " +
-			"setupConfig failed, eno: %d",
-			eno)
+		log.LogCallerFileLine("PoweronHandler: setupConfig failed, eno: %d", eno)
 		return eno
 	}
 
-	//
-	// if static network, no neighbor manager needed
-	//
-
 	if ngbMgr.cfg.NetworkType == config.P2pNetworkTypeStatic {
-
-		log.LogCallerFileLine("tabMgrPoweron: static type, tabMgr is not needed")
-
+		log.LogCallerFileLine("tabMgrPoweron: static subnet, tabMgr is not needed, done it ...")
 		ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return sch.SchEnoNone
 	}
@@ -794,13 +376,6 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 	ngbMgr.tabMgr = ngbMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
 	eno, ptnTab = ngbMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 	eno, ptnLsn = ngbMgr.sdl.SchGetTaskNodeByName(sch.NgbLsnName)
-
-	if ptnTab == nil {
-		log.LogCallerFileLine("PoweronHandler: " +
-			"invalid table task node pointer")
-		return sch.SchEnoUnknown
-	}
-
 	ngbMgr.ptnMe = ptn
 	ngbMgr.ptnTab = ptnTab
 	ngbMgr.ptnLsn = ptnLsn
@@ -808,104 +383,51 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-//
-// Poweroff handler
-//
 func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
-
-	log.LogCallerFileLine("PoweroffHandler: task will be done")
-
-	//
-	// send poweroff to kill all peer instance tasks
-	//
-
+	log.LogCallerFileLine("PoweroffHandler: task will be done, name: %s", ngbMgr.sdl.SchGetTaskName(ptn))
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
 
 	ngbMgr.lock.Lock()
-
 	ngbMgr.sdl.SchSetSender(&powerOff, ngbMgr.ptnMe)
 	for _, ngbInst := range ngbMgr.ngbMap {
 		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
 		ngbMgr.sdl.SchSendMessage(&powerOff)
 	}
-
 	ngbMgr.lock.Unlock()
-
-	//
-	// done ourself
-	//
 
 	return ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
-//
-// udpmsg handler
-//
 func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
-
 	var eno NgbMgrErrno
-
 	switch msg.msgType {
-
 	case um.UdpMsgTypePing:
 		eno = ngbMgr.PingHandler(msg.msgBody.(*um.Ping))
-
 	case um.UdpMsgTypePong:
 		eno = ngbMgr.PongHandler(msg.msgBody.(*um.Pong))
-
 	case um.UdpMsgTypeFindNode:
 		eno = ngbMgr.FindNodeHandler(msg.msgBody.(*um.FindNode))
-
 	case um.UdpMsgTypeNeighbors:
 		eno = ngbMgr.NeighborsHandler(msg.msgBody.(*um.Neighbors))
-
 	default:
-
-		log.LogCallerFileLine("NgbMgrUdpMsgHandler: " +
-			"invalid udp message type: %d",
-			msg.msgType)
-
+		log.LogCallerFileLine("NgbMgrUdpMsgHandler: invalid udp message type: %d", msg.msgType)
 		eno = NgbMgrEnoParameter
 	}
-
 	return eno
 }
 
-//
-// Ping handler
-//
 func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
-
-	//
-	// Here we are pinged by another node
-	//
-	// currently relay is not supported, check if we are the target, if false, we
-	// just discard this ping message.
-	//
-
 	if ping.To.NodeId != ngbMgr.cfg.ID {
-
-		log.LogCallerFileLine("PingHandler: " +
-			"not the target: %s",
-			config.P2pNodeId2HexString(ngbMgr.cfg.ID))
-
 		return NgbMgrEnoParameter
 	}
-
 	if expired(ping.Expiration) {
-		log.LogCallerFileLine("PingHandler: request timeout")
 		return NgbMgrEnoTimeout
 	}
 
-	//
-	// send Pong if the sub network identity spcefied is matched
-	//
-
 	matched := false
-
 	for _, snid := range ngbMgr.cfg.SubNetIdList {
 		if snid == ping.SubNetId {
 			matched = true
@@ -927,7 +449,6 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 		Expiration:		0,
 		Extra:			nil,
 	}
-
 	toAddr := net.UDPAddr {
 		IP: 	ping.From.IP,
 		Port:	int(ping.From.UDP),
@@ -936,109 +457,51 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 
 	pum := new(um.UdpMsg)
 	if eno := pum.Encode(um.UdpMsgTypePong, &pong); eno != um.UdpMsgEnoNone {
-
-		log.LogCallerFileLine("PingHandler: " +
-			"Encode failed, eno: %d",
-			eno)
-
 		return NgbMgrEnoEncode
 	}
-
-	if buf, bytes := pum.GetRawMessage(); buf != nil && bytes > 0 {
-
-		if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
-
-			log.LogCallerFileLine("PingHandler: " +
-				"sendUdpMsg failed, eno: %d",
-				eno)
-
-			return NgbMgrEnoUdp
-		}
-	} else {
-
-		log.LogCallerFileLine("PingHandler: " +
-			"invalid buffer, buf: %p, length: %d",
-			interface{}(buf), bytes)
-
+	buf, bytes := pum.GetRawMessage()
+	if buf == nil || bytes <= 0 {
 		return NgbMgrEnoEncode
 	}
-
-	//
-	// check if neighbor task instance exist for the sender node, if none,
-	// we then send message to table manager to tell we are pinged, so it
-	// could determine what to do in its' running context.
-	//
+	if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
+		return NgbMgrEnoUdp
+	}
 
 	strPeerNodeId := config.P2pNodeId2HexString(ping.From.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(ping.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
-
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == true {
 		return NgbMgrEnoNone
 	}
 
-	var schMsg = sch.SchMessage{}
-
+	schMsg := sch.SchMessage{}
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblPingedInd, ping)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
-
 	return NgbMgrEnoNone
 }
 
-//
-// Pong handler
-//
 func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
-
-	//
-	// Here we got pong from another node
-	//
-	// currently relay is not supported, check if we are the target, if false, we
-	// just discard this Pong message.
-	//
-
 	if pong.To.NodeId != ngbMgr.cfg.ID {
-
-		log.LogCallerFileLine("PongHandler: " +
-			"not the target: %s",
-			config.P2pNodeId2HexString(ngbMgr.cfg.ID))
-
 		return NgbMgrEnoParameter
 	}
-
 	if expired(pong.Expiration) {
-		log.LogCallerFileLine("PongHandler: request timeout")
 		return NgbMgrEnoTimeout
 	}
-
-	//
-	// check if neighbor task instance exist for the sender node, if none,
-	// we then send message to table manager to tell we are pinged, so it
-	// could determine what to do in its' running context.
-	//
 
 	strPeerNodeId := config.P2pNodeId2HexString(pong.From.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(pong.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
 
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
-
-		var schMsg = sch.SchMessage{}
+		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblPongedInd, pong)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
-
 		return NgbMgrEnoNone
 	}
 
-	//
-	// ping task instance exist, we just dispatch this Pong to it
-	//
-
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypePing) {
-
 		ptnNgb := ngbMgr.getMap(strPeerNodeId).ptn
-
-		var schMsg= sch.SchMessage{}
+		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptnNgb, sch.EvNblPingpongRsp, pong)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -1046,83 +509,35 @@ func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-//
-// FindNode handler
-//
 func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno {
-
-	//
-	// Here we are requested to FindNode by another node. We need to check our buckets
-	// to response the peer node with our neighbors, but we do not start neighbor task
-	// instance to init a procedure of finding nodes(notice that, this is defferent from
-	// that when we receiving Ping or Pong from peers, if the instances for peers are not
-	// exist, we do start instances to init Ping procedures). This is saying that: if a
-	// node send FindNode message to us, then our node must be known to the sender, so we
-	// need not to carry a bounding procedure for this sender.
-	//
-	// For the reason described aboved, We just call interface exported by table module
-	// to add the sender node to bucket and node database.
-	//
-
 	if findNode.To.NodeId != ngbMgr.cfg.ID {
-		log.LogCallerFileLine("FindNodeHandler: " +
-				"local is not the destination: %s",
-				fmt.Sprintf("%X", findNode.To.NodeId))
 		return NgbMgrEnoParameter
 	}
-
 	if expired(findNode.Expiration) {
-		log.LogCallerFileLine("FindNodeHandler: request timeout")
 		return NgbMgrEnoTimeout
 	}
 
-	//
-	// Response the sender with our neighbors closest to it.
-	// Notice: if the target of this FindNode message is same as the sender
-	// node identity, then the buckets of the sender might be all empty, in
-	// such case, if the closest set is empty, we then append our local node
-	// as a neighbor for the sender; if the closest not exceed the max, we
-	// append local node; if the closet is max, substitute the tail node with
-	// local. See bellow please.
-	//
-
-	var nodes = make([]*tab.Node, 0)
-	var umNodes = make([]*um.Node, 0)
-
-	local := ngbMgr.localNode()
-
+	nodes := make([]*tab.Node, 0)
+	umNodes := make([]*um.Node, 0)
 	if findNode.SubNetId != config.AnySubNet {
-
 		mgr := ngbMgr.tabMgr.TabGetInstBySubNetId(&findNode.SubNetId)
-
 		if mgr == nil {
-
-			log.LogCallerFileLine("FindNodeHandler: table manager mismatched")
 			return NgbMgrEnoMismatched
 		}
-
-		nodes = append(nodes, mgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)...)
-
+		nodes = append(nodes,
+			mgr.TabClosest(tab.Closest4Queried,
+							tab.NodeID(findNode.Target),
+							tab.TabInstQPendingMax)...)
 	} else {
-
-		var nodeMap = make(map[tab.NodeID]*tab.Node, 0)
-		var mgr *tab.TableManager
-
+		mgr := (*tab.TableManager)(nil)
 		for _, mgr = range ngbMgr.tabMgr.SubNetMgrList {
-
 			if mgr == nil {
 				continue
 			}
-
-			ns := mgr.TabClosest(tab.Closest4Queried, tab.NodeID(findNode.Target), tab.TabInstQPendingMax)
-
-			for _, n := range ns {
-				nodeMap[n.ID] = n
-			}
-		}
-
-		for _, n := range nodeMap {
-			nodes = append(nodes, n)
+			nodes = append(nodes,
+				mgr.TabClosest(tab.Closest4Queried,
+					tab.NodeID(findNode.Target),
+					tab.TabInstQPendingMax)...)
 		}
 	}
 
@@ -1141,18 +556,12 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	}
 
 	if len(nodes) == 0 && findNode.SubNetId == config.AnySubNet {
-
 		nodes = append(nodes, tab.TabBuildNode(&cfgNode))
-
 	} else if findNode.From.NodeId == findNode.Target {
-
 		num := len(nodes)
 		if num < tab.TabInstQPendingMax {
-
 			nodes = append(nodes, tab.TabBuildNode(&cfgNode))
-
 		} else {
-
 			nodes[num-1] = tab.TabBuildNode(&cfgNode)
 		}
 	}
@@ -1167,6 +576,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		umNodes = append(umNodes, &umn)
 	}
 
+	local := ngbMgr.localNode()
 	neighbors := um.Neighbors{
 		From: 			*local,
 		To:				findNode.From,
@@ -1178,52 +588,21 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		Extra:			nil,
 
 	}
-
 	toAddr := net.UDPAddr {
 		IP: 	findNode.From.IP,
 		Port:	int(findNode.From.UDP),
 		Zone:	"",
 	}
-
 	pum := new(um.UdpMsg)
-	if eno := pum.Encode(um.UdpMsgTypeNeighbors, &neighbors); eno != um.UdpMsgEnoNone {
-
-		log.LogCallerFileLine("FindNodeHandler: " +
-			"Encode failed, eno: %d", eno)
-
-		return NgbMgrEnoEncode
-	}
-
-	if buf, bytes := pum.GetRawMessage(); buf != nil && bytes > 0 {
-
-		if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
-
-			log.LogCallerFileLine("FindNodeHandler: " +
-				"sendUdpMsg failed, eno: %d", eno)
-
-			return NgbMgrEnoUdp
-		}
-
-	} else {
-
-		log.LogCallerFileLine("FindNodeHandler: " +
-			"invalid buffer, buf: %p, length: %d",
-			interface{}(buf), bytes)
-
-		return NgbMgrEnoEncode
-	}
-
-	//
-	// here we had been queried, we send message to table manager to tell this, so it
-	// could determine what to do in its' running context.
-	//
+	pum.Encode(um.UdpMsgTypeNeighbors, &neighbors)
+	buf, _ := pum.GetRawMessage()
+	sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr)
 
 	strPeerNodeId := config.P2pNodeId2HexString(findNode.From.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(findNode.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
-
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
-		var schMsg= sch.SchMessage{}
+		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblQueriedInd, findNode)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -1231,31 +610,10 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	return NgbMgrEnoNone
 }
 
-//
-// Neighbors handler
-//
 func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
-
-	//
-	// Here we got Neighbors from another node
-	//
-	// currently relay is not supported, check if we are the target, if false, we
-	// just discard this ping message.
-	//
-	// Notice: unlike Ping or Pong, if an instance of neighbor task is not exist
-	// for peer node, we do not start a neighbor instance here in this function,
-	// instead, we discard this "Neighbors" message then return at once.
-	//
-
 	if nbs.To.NodeId != ngbMgr.cfg.ID {
-
-		log.LogCallerFileLine("NeighborsHandler: " +
-			"not the target: %s",
-			config.P2pNodeId2HexString(ngbMgr.cfg.ID))
-
 		return NgbMgrEnoParameter
 	}
-
 	if expired(nbs.Expiration) {
 		return NgbMgrEnoTimeout
 	}
@@ -1263,62 +621,36 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	strPeerNodeId := config.P2pNodeId2HexString(nbs.From.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(nbs.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
-
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeFindNode) == false {
 		log.LogCallerFileLine("NeighborsHandler: not found, id: %s", strPeerNodeId)
 		return NgbMgrEnoNotFound
 	}
 
 	ptnNgb := ngbMgr.getMap(strPeerNodeId).ptn
-
-	var schMsg = sch.SchMessage{}
+	schMsg := sch.SchMessage{}
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptnNgb, sch.EvNblFindNodeRsp, nbs)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
 
 	return NgbMgrEnoNone
 }
 
-//
-// FindNode request handler
-//
 func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
-
-	//
-	// Here we are requested to FindNode by local table task: we encode and send the message to
-	// destination node, and the create a neighbor task to deal with the findnode procedure. See
-	// comments in NgbMgrProc for more pls.
-	//
-
 	var rsp = sch.NblFindNodeRsp{}
 	var schMsg  = sch.SchMessage{}
-
 	var funcRsp2Tab = func () NgbMgrErrno {
-
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
 	}
 
-	//
-	// check if duplicated: if true, tell table task it's duplicated
-	// by event EvNblFindNodeRsp
-	//
-
 	strPeerNodeId := config.P2pNodeId2HexString(findNode.To.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(findNode.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
-
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) {
-
 		rsp.Result = (NgbMgrEnoDuplicated << 16) + tab.TabMgrEnoDuplicated
 		rsp.FindNode = findNode
-
 		return funcRsp2Tab()
 	}
-
-	//
-	// create a neighbor instance and setup the map
-	//
 
 	ngbMgr.fnInstSeq++
 
@@ -1337,12 +669,6 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	var noDog = sch.SchWatchDog {
 		HaveDog:false,
 	}
-
-	//
-	// notice: instance task created to be suspended, and it would be started
-	// when everything is ok, see bellow pls.
-	//
-
 	var dc = sch.SchTaskDescription {
 		Name:	ngbInst.name,
 		MbSize:	ngbProcMailboxSize,
@@ -1355,85 +681,48 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 
 	eno, ptn := ngbMgr.sdl.SchCreateTask(&dc)
 	if eno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("FindNodeReq: " +
-			"SchCreateTask failed, eno: %d",
-			eno)
-
 		rsp.Result = (NgbMgrEnoScheduler << 16) + tab.TabMgrEnoScheduler
 		rsp.FindNode = findNode
+		return funcRsp2Tab()
+	}
 
+	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
+		rsp.Result = (NgbMgrEnoScheduler << 16) + tab.TabMgrEnoScheduler
+		rsp.FindNode = findNode
 		return funcRsp2Tab()
 	}
 
 	rsp.Result = NgbMgrEnoNone
 	rsp.FindNode = findNode
-
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
-
-	//
-	// backup task pointer; setup the map; start instance;
-	//
-
 	ngbInst.ptn = ptn
 	ngbMgr.setupMap(ngbInst.name, &ngbInst)
-
-	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
-
-		log.LogCallerFileLine("FindNodeReq: " +
-			"start instance failed, eno: %d",
-			eno)
-
-		return NgbMgrEnoScheduler
-	}
-
 	return NgbMgrEnoNone
 }
 
-//
-// Pingpong(ping) request handler
-//
 func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
-
-	//
-	// Here we are requested to Ping another node by local table task
-	//
-
 	var rsp = sch.NblPingRsp{}
 	var schMsg  = sch.SchMessage{}
-
 	var funcRsp2Tab = func () NgbMgrErrno {
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
 	}
-
 	var funcReq2Inst = func(ptn interface{}) NgbMgrErrno {
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblPingpongReq, ping)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
 	}
 
-	//
-	// check if duplicated: if true, tell table task it's duplicated by event EvNblFindNodeRsp
-	//
-
 	strPeerNodeId := config.P2pNodeId2HexString(ping.To.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(ping.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
-
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) {
-
 		rsp.Result = NgbMgrEnoDuplicated
 		rsp.Ping = ping
-
 		return funcRsp2Tab()
 	}
-
-	//
-	// create a neighbor instance and setup the map
-	//
 
 	var ngbInst = neighborInst {
 		sdl:		ngbMgr.sdl,
@@ -1464,88 +753,58 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	}
 
 	eno, ptn := ngbMgr.sdl.SchCreateTask(&dc)
-
 	if eno != sch.SchEnoNone {
-
 		rsp.Result = NgbMgrEnoScheduler
 		rsp.Ping = ping
-
 		return funcRsp2Tab()
 	}
 
 	if eno := funcReq2Inst(ptn); eno != NgbMgrEnoNone {
-
-		log.LogCallerFileLine("PingpongReq: " +
-			"funcReq2Inst failed, eno: %d",
-			eno)
-
 		rsp.Result = int(eno)
 		rsp.Ping = ping
-
 		return funcRsp2Tab()
 	}
 
-	//
-	// backup task pointer; setup the map; start instance;
-	//
+	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
+		rsp.Result = NgbMgrEnoScheduler
+		rsp.Ping = ping
+		return funcRsp2Tab()
+	}
 
 	ngbInst.ptn = ptn
 	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
-
-	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
-		return NgbMgrEnoScheduler
-	}
-
 	return NgbMgrEnoNone
 }
 
-//
-// Setup map for neighbor instance
-//
 func (ngbMgr *NeighborManager) setupMap(name string, inst *neighborInst) {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
 	ngbMgr.ngbMap[name] = inst
 }
 
-//
-// Clean map for neighbor instance
-//
 func (ngbMgr *NeighborManager) cleanMap(name string) {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
 	delete(ngbMgr.ngbMap, name)
 }
 
-//
-// Check map for neighbor instance
-//
 func (ngbMgr *NeighborManager) checkMap(name string, umt um.UdpMsgType) bool {
-
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
 
 	ngb, ok := ngbMgr.ngbMap[name]
-
 	if umt == um.UdpMsgTypeAny {
 		return ok
 	}
-
 	return ok && ngb.msgType == umt
 }
 
-//
-// Get instance from map
-//
 func (ngbMgr *NeighborManager) getMap(name string) *neighborInst {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
 	return ngbMgr.ngbMap[name]
 }
 
-//
-// Construct local udpmsg.Endpoint object
-//
 func (ngbMgr *NeighborManager) localEndpoint() *um.Endpoint {
 	return &um.Endpoint {
 		IP:		ngbMgr.cfg.IP,
@@ -1554,9 +813,6 @@ func (ngbMgr *NeighborManager) localEndpoint() *um.Endpoint {
 	}
 }
 
-//
-// Construct local udpmsg.Node object
-//
 func (ngbMgr *NeighborManager) localNode() *um.Node {
 	return &um.Node {
 		IP:		ngbMgr.cfg.IP,
@@ -1566,28 +822,13 @@ func (ngbMgr *NeighborManager) localNode() *um.Node {
 	}
 }
 
-//
-// Check if request or response timeout
-//
 func expired(ts uint64) bool {
-
-	//
-	// If ts is zero, it would be never expired; but notice
-	// if (ts < 0) is true, it would be always expired.
-	//
-
 	if ts == 0 { return false }
-
 	return time.Unix(int64(ts), 0).Before(time.Now())
 }
 
-//
-//Setup configuraion
-//
 func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
-
 	var ptCfg *config.Cfg4UdpNgbManager = nil
-
 	if ptCfg = config.P2pConfig4UdpNgbManager(ngbMgr.sdl.SchGetP2pCfgName()); ptCfg == nil {
 		log.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbManager failed")
 		return sch.SchEnoConfig
@@ -1600,7 +841,8 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 	ngbMgr.cfg.NetworkType	= ptCfg.NetworkType
 	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
 
-	if len(ngbMgr.cfg.SubNetIdList) == 0 && ngbMgr.cfg.NetworkType == config.P2pNetworkTypeDynamic {
+	if len(ngbMgr.cfg.SubNetIdList) == 0 &&
+		ngbMgr.cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList, config.AnySubNet)
 	}
 

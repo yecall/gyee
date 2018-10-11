@@ -27,9 +27,7 @@ import (
 	pb		"github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
 )
 
-//
-// UDP messages for discovering protocol tasks
-//
+// message type
 const (
 	UdpMsgTypePing		= iota
 	UdpMsgTypePong
@@ -819,16 +817,10 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	return UdpMsgEnoNone
 }
 
-//
-// Get buffer and length of bytes for message encoded
-//
 func (pum *UdpMsg) GetRawMessage() (buf []byte, len int) {
-
 	if pum.Eno != UdpMsgEnoNone {
-
 		return nil, 0
 	}
-
 	return *pum.Pbuf, pum.Len
 }
 

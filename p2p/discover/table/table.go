@@ -3007,34 +3007,17 @@ func TabBuildNode(pn *config.Node) *Node {
 	}
 }
 
-//
-// Get sub network identity of manager instance
-//
 func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
-
-	//
-	// notice: "tabMgr" must be the target sub network manager instance
-	//
-
+	tabMgr.lock.Lock()
+	defer tabMgr.lock.Unlock()
 	return &tabMgr.snid
 }
 
-//
-// Get manager instance by sub network identity
-//
 func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManager {
-
-	//
-	// notice: "tabMgr" must one of the managers since "SubNetMgrList"
-	// is referenced by all of them.
-	//
-	// notice: if we are an AnySubNet, return the AnySubNet manager then,
-	// in this case, it should be only one instance in the list.
-	//
-
+	tabMgr.lock.Lock()
+	defer tabMgr.lock.Unlock()
 	if tabMgr.snid != AnySubNet {
 		return tabMgr.SubNetMgrList[*snid]
 	}
-
 	return tabMgr.SubNetMgrList[AnySubNet]
 }

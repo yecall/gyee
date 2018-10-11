@@ -720,20 +720,13 @@ func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.Sc
 	return sch.SchEnoNone
 }
 
-//
-// Send message with specific scheduler
-//
 func sendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
-
 	var schMsg = sch.SchMessage{}
-
 	req := sch.NblDataReq {
 		Payload:	buf,
 		TgtAddr:	toAddr,
 	}
-
 	sdl.SchMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req)
 	sdl.SchSendMessage(&schMsg)
-
 	return sch.SchEnoNone
 }
