@@ -25,9 +25,9 @@ import (
 	"sync"
 	"time"
 	"fmt"
+	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 )

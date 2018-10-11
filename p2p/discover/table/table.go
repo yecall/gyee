@@ -2966,36 +2966,19 @@ func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgr
 	return TabMgrEnoNone
 }
 
-//
-// Fetch closest nodes for target
-// Notice: inside the table manager task, this function MUST NOT be called,
-// since we had obtain the lock at the entry of the task handler.
-//
 const Closest4Querying	= 1
 const Closest4Queried	= 0
 
 func (tabMgr *TableManager)TabClosest(forWhat int, target NodeID, size int) []*Node {
-
-	//
-	// We would be called by other task, we need to lock and
-	// defer unlock.
-	//
-
+	// Fetch closest nodes for target
+	// Notice: inside the table manager task, this function MUST NOT be called,
+	// since we had obtain the lock at the entry of the task handler.
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
-
 	return tabMgr.tabClosest(forWhat, target, size)
 }
 
-//
-// Build a table node for config.Node
-//
 func TabBuildNode(pn *config.Node) *Node {
-
-	//
-	// Need not to lock
-	//
-
 	return &Node{
 		Node: config.Node{
 			IP:  pn.IP,
@@ -3008,12 +2991,16 @@ func TabBuildNode(pn *config.Node) *Node {
 }
 
 func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
+	// Notice: inside the table manager task, this function MUST NOT be called,
+	// since we had obtain the lock at the entry of the task handler.
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	return &tabMgr.snid
 }
 
 func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManager {
+	// Notice: inside the table manager task, this function MUST NOT be called,
+	// since we had obtain the lock at the entry of the task handler.
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	if tabMgr.snid != AnySubNet {

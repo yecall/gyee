@@ -429,7 +429,7 @@ func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.Sc
 	}
 
 	if sent != len(buf) {
-		log.LogCallerFileLine("sendUdpMsg: WriteToUDP failed, len: %d, sent: %d", 	len(buf), sent)
+		log.LogCallerFileLine("sendUdpMsg: WriteToUDP failed, len: %d, sent: %d", len(buf), sent)
 		return sch.SchEnoOS
 	}
 

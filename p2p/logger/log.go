@@ -82,7 +82,7 @@ func LogCallerFileLine(format string, args ... interface{}) {
 	textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)
 
 	// Seems globalLogger.Printf not work with "\n" or "\r\n" to return and get a new line,
-	// but log.Printf does work.
+	// but log.Printf does.
 
 	// globalLogger.Printf("%s", textAndFileLine)
 	log.Printf("%s", textAndFileLine)
