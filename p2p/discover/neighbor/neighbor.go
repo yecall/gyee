@@ -33,9 +33,7 @@ import (
 )
 
 
-//
 // errno
-//
 const (
 	NgbMgrEnoNone	= iota
 	NgbMgrEnoParameter
