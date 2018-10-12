@@ -524,13 +524,13 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 	}
 
 	// update database for the neighbor node.
-	// DON'T care the result, we should go ahead to remove the instance
+	// DON'T care the result
 	if eno := mgr.tabUpdateNodeDb4Query(inst, result); eno != TabMgrEnoNone {
 		log.LogCallerFileLine("tabMgrFindNodeRsp: tabUpdateNodeDb4Query failed, " +
 			"eno: %d, subnet: %x", eno, snid)
 	}
 
-	// update buckets：DON'T care the result, we must go ahead to remove the instance
+	// update buckets：DON'T care the result
 	mgr.tabUpdateBucket(inst, result)
 
 	// delete the active instance
@@ -546,7 +546,7 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 		return TabMgrEnoNone
 	}
 
-	// deal with the peer and those neighbors the peer reported, we add them into the
+	// deal with the peer and those neighbors the peer reported, add them into the
 	// BOUND pending queue for bounding, see bellow pls.
 	mgr.tabAddPendingBoundInst(&msg.Neighbors.From)
 	for _, node := range msg.Neighbors.Nodes {
@@ -759,7 +759,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 	// if it's a static type, no database cleaner needed
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
-		log.LogCallerFileLine("ndbcPoweron: static type, nodeDbCleaner is not needed")
+		log.LogCallerFileLine("ndbcPoweron: static subnet type, nodeDbCleaner will be done ...")
 		sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return TabMgrEnoNone
 	}
@@ -908,7 +908,6 @@ func tabSetupLog2DistanceLookupTable(lkt []int) TabMgrErrno {
 }
 
 func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErrno {
-
 	// If we are in refreshing, return at once. When the pending table for query
 	// is empty, this flag is set to false;
 	// If the "tid"(target identity) passed in is nil, we build a random one;
@@ -987,9 +986,9 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	return TabMgrEnoNone
 }
 
-// Caculate the distance between two nodes.
-// Notice: the return "d" more larger, it's more closer
 func (tabMgr *TableManager)tabLog2Dist(h1 Hash, h2 Hash) int {
+	// Caculate the distance between two nodes.
+	// Notice: the return "d" more larger, it's more closer
 	var d = 0
 	for i, b := range h2 {
 		delta := tabMgr.dlkTab[h1[i] ^ b]
