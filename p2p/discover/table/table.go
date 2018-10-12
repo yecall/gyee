@@ -1657,7 +1657,6 @@ func (tabMgr *TableManager)tabActiveQueryInst() TabMgrErrno {
 		}
 
 		for _, qi := range tabMgr.queryIcb {
-
 			if qi.req.(*um.FindNode).To.NodeId == p.node.ID {
 				tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
 				continue
@@ -1668,7 +1667,7 @@ func (tabMgr *TableManager)tabActiveQueryInst() TabMgrErrno {
 			break
 		}
 
-		// Do query
+		// Do query we can
 		if eno := tabMgr.tabQuery(p.target, nodes); eno != TabMgrEnoNone {
 			log.LogCallerFileLine("tabActiveQueryInst: tabQuery failed, eno: %d", eno)
 			return eno
