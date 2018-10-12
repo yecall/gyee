@@ -311,11 +311,7 @@ type NeighborManager struct {
 
 func NewNgbMgr() *NeighborManager {
 	var ngbMgr = NeighborManager{
-		sdl:       nil,
 		name:      NgbMgrName,
-		tep:       nil,
-		ptnMe:     nil,
-		ptnTab:    nil,
 		ngbMap:    make(map[string]*neighborInst),
 		fnInstSeq: 0,
 		ppInstSeq: 0,
