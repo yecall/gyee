@@ -67,11 +67,7 @@ const (
 func NewLsnMgr() *ListenerManager {
 	var lsnMgr = ListenerManager{
 		name:      LsnMgrName,
-		tep:       nil,
-		conn:      nil,
 		state:     LmsNull,
-		ptnMe:     nil,
-		ptnReader: nil,
 	}
 	lsnMgr.tep = lsnMgr.lsnMgrProc
 	return &lsnMgr
