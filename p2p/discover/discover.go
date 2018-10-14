@@ -27,8 +27,6 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
-
-
 //
 // errno
 //

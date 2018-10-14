@@ -807,7 +807,7 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		log.LogCallerFileLine("EncodeNeighbors: fialed, err: %s", err.Error())
+		log.LogCallerFileLine("EncodeNeighbors: failed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
