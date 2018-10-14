@@ -36,15 +36,15 @@ import (
 const PeerLsnMgrName = sch.PeerLsnMgrName
 
 type ListenerManager struct {
-	sdl			*sch.Scheduler			// pointer to scheduler
-	name		string					// name
-	tep			sch.SchUserTaskEp		// entry
-	ptn			interface{}				// the listner task node pointer
-	ptnPeerMgr	interface{}				// the peer manager task node pointer
+	sdl			*sch.Scheduler				// pointer to scheduler
+	name		string						// name
+	tep			sch.SchUserTaskEp			// entry
+	ptn			interface{}					// the listner task node pointer
+	ptnPeerMgr	interface{}					// the peer manager task node pointer
 	cfg			*config.Cfg4PeerListener	// configuration
-	listener	net.Listener			// listener of net
-	listenAddr	*net.TCPAddr			// listen address
-	accepter	*acceptTskCtrlBlock		// pointer to accepter
+	listener	net.Listener				// listener of net
+	listenAddr	*net.TCPAddr				// listen address
+	accepter	*acceptTskCtrlBlock			// pointer to accepter
 }
 
 //

@@ -1,42 +1,24 @@
+/*
+ *  Copyright (C) 2017 gyee authors
+ *
+ *  This file is part of the gyee library.
+ *
+ *  the gyee library is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  the gyee library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 package table
-
-
-//
-//
-// Notice: this file is a copy from the "Ethereum" source listed as following:
-//
-//		github.com/ethereum/go-ethereum/p2p/discover/database.go
-//		~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-// And the following is the Ethereums' Claims (header of Ethereums' source):
-//
-//
-//
-// Copyright 2015 The go-ethereum Authors
-// This file is part of the go-ethereum library.
-//
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
-
-// Contains the node database, storing previously seen nodes and any collected
-// metadata about them for QoS purposes.
-
-
-
-//
-// We had modified some source codes (mainly to pass the compiler).
-//
 
 import (
 	"bytes"
@@ -47,37 +29,22 @@ import (
 	"time"
 	"crypto/sha256"
 
-	//
-	// Modified: 20180503, yeeco
-	//
-	// "github.com/ethereum/go-ethereum/crypto"
-	//
-
-	//"github.com/ethereum/go-ethereum/log"
-	log "github.com/yeeco/gyee/p2p/logger"
-	config "github.com/yeeco/gyee/p2p/config"
-
-	//
-	// Modified: 20180503, yeeco
-	//
-	//"github.com/ethereum/go-ethereum/rlp"
-	//
-
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
+
+	log "github.com/yeeco/gyee/p2p/logger"
+	config "github.com/yeeco/gyee/p2p/config"
 )
 
 var (
-	nodeDBNilNodeID      = NodeID{}       // Special node ID to use as a nil element.
 	nodeDBNodeExpiration = 24 * time.Hour // Time after which an unseen node should be dropped.
 	nodeDBCleanupCycle   = time.Hour      // Time period for running the expiration task.
 )
 
-// nodeDB stores all nodes we know about.
 type nodeDB struct {
 	lvl    *leveldb.DB   // Interface to the database itself
 	self   NodeID        // Own node id to prevent adding it into the database
@@ -85,7 +52,6 @@ type nodeDB struct {
 	quit   chan struct{} // Channel to signal the expiring thread to stop
 }
 
-// Schema layout for the node database
 var (
 	nodeDBVersionKey = []byte("version") // Version of the database to flush if changes
 	nodeDBItemPrefix = []byte("n:")      // Identifier to prefix node entries with
@@ -96,9 +62,6 @@ var (
 	nodeDBDiscoverFindFails = nodeDBDiscoverRoot + ":findfail"
 )
 
-// newNodeDB creates a new node database for storing and retrieving infos about
-// known peers in the network. If no path is given, an in-memory, temporary
-// database is constructed.
 func newNodeDB(path string, version int, self NodeID) (*nodeDB, error) {
 	if path == "" {
 		return newMemoryNodeDB(self)
@@ -106,8 +69,6 @@ func newNodeDB(path string, version int, self NodeID) (*nodeDB, error) {
 	return newPersistentNodeDB(path, version, self)
 }
 
-// newMemoryNodeDB creates a new in-memory node database without a persistent
-// backend.
 func newMemoryNodeDB(self NodeID) (*nodeDB, error) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
@@ -120,8 +81,6 @@ func newMemoryNodeDB(self NodeID) (*nodeDB, error) {
 	}, nil
 }
 
-// newPersistentNodeDB creates/opens a leveldb backed persistent node database,
-// also flushing its contents in case of a version mismatch.
 func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error) {
 	opts := &opt.Options{OpenFilesCacheCapacity: 5}
 	db, err := leveldb.OpenFile(path, opts)
@@ -131,22 +90,16 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 	if err != nil {
 		return nil, err
 	}
-	// The nodes contained in the cache correspond to a certain protocol version.
-	// Flush all nodes if the version doesn't match.
 	currentVer := make([]byte, binary.MaxVarintLen64)
 	currentVer = currentVer[:binary.PutVarint(currentVer, int64(version))]
-
 	blob, err := db.Get(nodeDBVersionKey, nil)
 	switch err {
 	case leveldb.ErrNotFound:
-		// Version not found (i.e. empty cache), insert it
 		if err := db.Put(nodeDBVersionKey, currentVer, nil); err != nil {
 			db.Close()
 			return nil, err
 		}
-
 	case nil:
-		// Version present, flush if different
 		if !bytes.Equal(blob, currentVer) {
 			db.Close()
 			if err = os.RemoveAll(path); err != nil {
@@ -162,32 +115,23 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 	}, nil
 }
 
-// makeKey generates the leveldb key-blob from a node id and its particular
-// field of interest.
 func makeKey(id []byte, field string) []byte {
-	if bytes.Equal(id[:], nodeDBNilNodeID[:]) {
-		return []byte(field)
-	}
 	return append(nodeDBItemPrefix, append(id[:], field...)...)
 }
 
-// splitKey tries to split a database key into a node id and a field part.
 func splitKey(key []byte) (id NodeIdEx, field string) {
-	// If the key is not of a node, return it plainly
 	if !bytes.HasPrefix(key, nodeDBItemPrefix) {
 		return NodeIdEx{}, string(key)
 	}
-	// Otherwise split the id and field
 	item := key[len(nodeDBItemPrefix):]
 	copy(id[:], item[:len(id)])
 	field = string(item[len(id):])
-
 	return id, field
 }
 
-// fetchInt64 retrieves an integer instance associated with a particular
-// database key.
 func (db *nodeDB) fetchInt64(key []byte) int64 {
+	// in our application, we need to fetch timestamp value which stored as int64 type,
+	// see function storeInt64 please.
 	blob, err := db.lvl.Get(key, nil)
 	if err != nil {
 		return 0
@@ -199,79 +143,46 @@ func (db *nodeDB) fetchInt64(key []byte) int64 {
 	return val
 }
 
-// storeInt64 update a specific database entry to the current time instance as a
-// unix timestamp.
 func (db *nodeDB) storeInt64(key []byte, n int64) error {
+	// the main purpose of this function is to store timestamp vaule as type int64.
+	// in our application, timestamps about ping/pong/update are applied.
 	blob := make([]byte, binary.MaxVarintLen64)
 	blob = blob[:binary.PutVarint(blob, n)]
-
 	return db.lvl.Put(key, blob, nil)
 }
 
-// node retrieves a node with a given id from the database.
 func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
-
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-
 	blob, err := db.lvl.Get(makeKey(idEx, nodeDBDiscoverRoot), nil)
 	if err != nil {
 		return nil
 	}
 	node := new(Node)
-
-	//
-	// Modified: 20180612, yeeco
-	//
-	//if err := rlp.DecodeBytes(blob, node); err != nil {
-	//
 	if err := DecodeBytes(blob, node, nil); err != nil {
-		//log.Error("Failed to decode node RLP", "err", err)
 		log.LogCallerFileLine("node: DecodeBytes failed")
 		return nil
 	}
-
-	//
-	// Modified: 20180503, yeeco
-	//
-	// node.sha = crypto.Keccak256Hash(node.ID[:])
-	//
 	node.sha = sha256.Sum256(id[:])
-
 	return node
 }
 
-// updateNode inserts - potentially overwriting - a node into the peer database.
 func (db *nodeDB) updateNode(snid SubNetworkID, node *Node) error {
-	//
-	// Modified: 20180612, yeeco
-	//
-	//blob, err := rlp.EncodeToBytes(node)
-	//
 	blob, err := EncodeToBytes(snid, node)
 	if err != nil {
 		return err
 	}
-	//
-	// Modified: 20180503, yeeco
-	//
-	// return db.lvl.Put(makeKey(node.ID, nodeDBDiscoverRoot), blob, nil)
-	//
 	var idEx = []byte{}
 	idEx = append(idEx, node.ID[:]...)
 	idEx = append(idEx, snid[:]...)
-
 	return db.lvl.Put(makeKey(idEx, nodeDBDiscoverRoot), blob, nil)
 }
 
-// deleteNode deletes all information/keys associated with a node.
 func (db *nodeDB) deleteNode(snid SubNetworkID, id NodeID) error {
-
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-
 	deleter := db.lvl.NewIterator(util.BytesPrefix(makeKey(idEx, "")), nil)
 	for deleter.Next() {
 		if err := db.lvl.Delete(deleter.Key(), nil); err != nil {
@@ -281,48 +192,12 @@ func (db *nodeDB) deleteNode(snid SubNetworkID, id NodeID) error {
 	return nil
 }
 
-// ensureExpirer is a small helper method ensuring that the data expiration
-// mechanism is running. If the expiration goroutine is already running, this
-// method simply returns.
-//
-// The goal is to start the data evacuation only after the network successfully
-// bootstrapped itself (to prevent dumping potentially useful seed nodes). Since
-// it would require significant overhead to exactly trace the first successful
-// convergence, it's simpler to "ensure" the correct state when an appropriate
-// condition occurs (i.e. a successful bonding), and discard further events.
-func (db *nodeDB) ensureExpirer() {
-	db.runner.Do(func() { go db.expirer() })
-}
-
-// expirer should be started in a go routine, and is responsible for looping ad
-// infinitum and dropping stale data from the database.
-func (db *nodeDB) expirer() {
-	tick := time.NewTicker(nodeDBCleanupCycle)
-	defer tick.Stop()
-	for {
-		select {
-		case <-tick.C:
-			if err := db.expireNodes(); err != nil {
-				//log.Error("Failed to expire nodedb items", "err", err)
-				log.LogCallerFileLine("expirer: expireNodes failed, err: %s", err.Error())
-			}
-		case <-db.quit:
-			return
-		}
-	}
-}
-
-// expireNodes iterates over the database and deletes all nodes that have not
-// been seen (i.e. received a pong from) for some allotted time.
 func (db *nodeDB) expireNodes() error {
 	threshold := time.Now().Add(-nodeDBNodeExpiration)
-
-	// Find discovered nodes that are older than the allowance
 	it := db.lvl.NewIterator(nil, nil)
 	defer it.Release()
 
 	for it.Next() {
-		// Skip the item if not a discovery node
 		id, field := splitKey(it.Key())
 		if field != nodeDBDiscoverRoot {
 			continue
@@ -330,25 +205,21 @@ func (db *nodeDB) expireNodes() error {
 
 		var nodeId NodeID
 		var snid SubNetworkID
-
 		snid = SubNetworkID{id[config.NodeIDBytes], id[config.NodeIDBytes+1]}
 		copy(nodeId[0:], id[:config.NodeIDBytes])
 
-		// Skip the node if not expired yet (and not self)
 		if !bytes.Equal(id[2:], db.self[:]) {
 
 			if seen := db.lastPong(snid, nodeId); seen.After(threshold) {
 				continue
 			}
 		}
-		// Otherwise delete all associated information
 		db.deleteNode(snid, nodeId)
 	}
+
 	return nil
 }
 
-// lastPing retrieves the time of the last ping packet send to a remote node,
-// requesting binding.
 func (db *nodeDB) lastPing(snid SubNetworkID, id NodeID) time.Time {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
@@ -356,7 +227,6 @@ func (db *nodeDB) lastPing(snid SubNetworkID, id NodeID) time.Time {
 	return time.Unix(db.fetchInt64(makeKey(idEx, nodeDBDiscoverPing)), 0)
 }
 
-// updateLastPing updates the last time we tried contacting a remote node.
 func (db *nodeDB) updateLastPing(snid SubNetworkID, id NodeID, instance time.Time) error {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
@@ -364,7 +234,6 @@ func (db *nodeDB) updateLastPing(snid SubNetworkID, id NodeID, instance time.Tim
 	return db.storeInt64(makeKey(idEx, nodeDBDiscoverPing), instance.Unix())
 }
 
-// lastPong retrieves the time of the last successful contact from remote node.
 func (db *nodeDB) lastPong(snid SubNetworkID, id NodeID) time.Time {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
@@ -372,7 +241,6 @@ func (db *nodeDB) lastPong(snid SubNetworkID, id NodeID) time.Time {
 	return time.Unix(db.fetchInt64(makeKey(idEx, nodeDBDiscoverPong)), 0)
 }
 
-// updateLastPong updates the last time a remote node successfully contacted.
 func (db *nodeDB) updateLastPong(snid SubNetworkID, id NodeID, instance time.Time) error {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
@@ -380,7 +248,6 @@ func (db *nodeDB) updateLastPong(snid SubNetworkID, id NodeID, instance time.Tim
 	return db.storeInt64(makeKey(idEx, nodeDBDiscoverPong), instance.Unix())
 }
 
-// findFails retrieves the number of findnode failures since bonding.
 func (db *nodeDB) findFails(snid SubNetworkID, id NodeID) int {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
@@ -388,7 +255,6 @@ func (db *nodeDB) findFails(snid SubNetworkID, id NodeID) int {
 	return int(db.fetchInt64(makeKey(idEx, nodeDBDiscoverFindFails)))
 }
 
-// updateFindFails updates the number of findnode failures since bonding.
 func (db *nodeDB) updateFindFails(snid SubNetworkID, id NodeID, fails int) error {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
@@ -396,8 +262,6 @@ func (db *nodeDB) updateFindFails(snid SubNetworkID, id NodeID, fails int) error
 	return db.storeInt64(makeKey(idEx, nodeDBDiscoverFindFails), int64(fails))
 }
 
-// querySeeds retrieves random nodes to be used as potential seed nodes
-// for bootstrapping.
 func (db *nodeDB) querySeeds(snid SubNetworkID, n int, maxAge time.Duration) []*Node {
 	var (
 		now   = time.Now()
@@ -409,9 +273,6 @@ func (db *nodeDB) querySeeds(snid SubNetworkID, n int, maxAge time.Duration) []*
 
 seek:
 	for seeks := 0; len(nodes) < n && seeks < n*5; seeks++ {
-		// Seek to a random entry. The first byte is incremented by a
-		// random amount each time in order to increase the likelihood
-		// of hitting all existing nodes in very small databases.
 		ctr := id[0]
 		rand.Read(id[:])
 		id[0] = ctr + id[0]%16
@@ -425,13 +286,8 @@ seek:
 		n, nSnid := nextNode(it)
 		if n == nil {
 			id[0] = 0
-			continue seek // iterator exhausted
+			continue seek
 		}
-		//
-		// Modified: 20180503, yeeco
-		//
-		// if n.ID == db.self {
-		//
 
 		if snid != AnySubNet {
 			if *nSnid != snid {
@@ -443,43 +299,30 @@ seek:
 			continue seek
 		}
 
-		//
-		// Modified: 20180503, yeeco
-		//
-		// if now.Sub(db.lastPong(n.ID)) > maxAge {
-		//
-
 		if now.Sub(db.lastPong(snid, n.ID)) > maxAge {
 			continue seek
 		}
+
 		for i := range nodes {
 			if nodes[i].ID == n.ID {
-				continue seek // duplicate
+				continue seek
 			}
 		}
+
 		nodes = append(nodes, n)
 	}
 	return nodes
 }
 
-// reads the next node record from the iterator, skipping over other
-// database entries.
 func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 	for end := false; !end; end = !it.Next() {
-		//id, field := splitKey(it.Key())
 		_, field := splitKey(it.Key())
 		if field != nodeDBDiscoverRoot {
 			continue
 		}
 		var n Node
-		//
-		// Modified: 20180612, yeeco
-		//
-		//if err := rlp.DecodeBytes(it.Value(), &n); err != nil {
-		//
 		var snid SubNetworkID = AnySubNet
 		if err := DecodeBytes(it.Value(), &n, &snid); err != nil {
-			//log.Warn("Failed to decode node RLP", "id", id, "err", err)
 			log.LogCallerFileLine("nextNode: DecodeBytes failed")
 			continue
 		}
@@ -488,24 +331,13 @@ func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 	return nil, nil
 }
 
-// close flushes and closes the database files.
 func (db *nodeDB) close() {
 	close(db.quit)
 	db.lvl.Close()
 }
 
-
-
-//
-// Added by yeeco to remove the reference to Ethereum's rlp
-//
 func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
-	if node == nil {
-		return nil, nil
-	}
-
 	blob := make([]byte, 0)
-
 	blob = append(blob, node.IP...)
 
 	udp := node.UDP
@@ -525,9 +357,6 @@ func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
 	return blob, nil
 }
 
-//
-// Added by yeeco to remove the reference to Ethereum's rlp
-//
 func DecodeBytes(blob []byte, node *Node, snid *SubNetworkID) error {
 	node.IP = append(node.IP, blob[0:16]...)
 	node.UDP = uint16((blob[16] << 8) + blob[17])

@@ -27,9 +27,7 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
-//
 // errno
-//
 const (
 	DcvMgrEnoNone		= iota
 	DcvMgrEnoParameter
@@ -38,9 +36,7 @@ const (
 
 type DcvMgrErrno int
 
-//
 // Discover manager
-//
 const DcvMgrName = sch.DcvMgrName
 
 type DiscoverManager struct {
@@ -53,10 +49,6 @@ type DiscoverManager struct {
 	sdl			*sch.Scheduler		// pointer to scheduler
 }
 
-
-//
-// Create discover manager
-//
 func NewDcvMgr() *DiscoverManager {
 	var dcvMgr = DiscoverManager {
 		name:     DcvMgrName,
@@ -72,34 +64,22 @@ func NewDcvMgr() *DiscoverManager {
 	return &dcvMgr
 }
 
-//
-// Entry point exported to shceduler
-//
 func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return dcvMgr.tep(ptn, msg)
 }
 
-//
-// Discover manager entry
-//
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
 	var eno DcvMgrErrno = DcvMgrEnoNone
 
 	switch msg.Id {
-
 	case sch.EvSchPoweron:
 		eno = dcvMgr.DcvMgrPoweron(ptn)
-
 	case sch.EvSchPoweroff:
 		eno = dcvMgr.DcvMgrPoweroff(ptn)
-
 	case sch.EvDcvFindNodeReq:
 		eno = dcvMgr.DcvMgrFindNodeReq(msg.Body.(*sch.MsgDcvFindNodeReq))
-
 	case sch.EvTabRefreshRsp:
 		eno = dcvMgr.DcvMgrTabRefreshRsp(msg.Body.(*sch.MsgTabRefreshRsp))
-
 	default:
 		log.LogCallerFileLine("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
@@ -113,25 +93,15 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	return sch.SchEnoNone
 }
 
-//
-// Poweron handler
-//
 func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
-
 	var eno sch.SchErrno
-
 	dcvMgr.ptnMe = ptn
 	dcvMgr.sdl = sch.SchGetScheduler(ptn)
 	sdl := dcvMgr.sdl
 
-	//
 	// if it's a static type, no discover manager needed
-	//
-
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
-
 		log.LogCallerFileLine("DcvMgrPoweron: static type, dcvMgr is not needed")
-
 		sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return DcvMgrEnoNone
 	}
@@ -154,89 +124,34 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	return DcvMgrEnoNone
 }
 
-
-//
-// Poweroff handler
-//
 func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
-
-	log.LogCallerFileLine("DcvMgrPoweroff: task will be done")
-
+	log.LogCallerFileLine("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.sdl.SchGetTaskName(ptn))
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return DcvMgrEnoScheduler
 	}
-
 	return DcvMgrEnoNone
 }
 
-//
-// FindNode request handler
-//
 func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvMgrErrno {
-
-	//
-	// When peer manager task considers that more peers needed, it then send FindNode
-	// request to here the discover task to ask for more, see function peMgrAsk4More
-	// for details about please.
-	//
-	// When EvDcvFindNodeReq received, we should requtst the table manager task to
-	// refresh itself to get more by sending sch.EvTabRefreshReq to it, and we would
-	// responsed by sch.EvTabRefreshRsp, with message type as sch.MsgTabRefreshRsp.
-	// And then, we can response the peer manager task with sch.EvDcvFindNodeRsp event
-	// with sch.MsgDcvFindNodeRsp message.
-	//
-
 	var schMsg = sch.SchMessage{}
 	var reqRefresh = sch.MsgTabRefreshReq{req.Snid,nil,nil}
-
-	//
-	// Update "more" counter
-	//
-
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
-
-		log.LogCallerFileLine("DcvMgrFindNodeReq: " +
-			"no more needed, subnet: %x, more: %d",
+		log.LogCallerFileLine("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
 			reqRefresh.Snid, dcvMgr.more)
-
 		return DcvMgrEnoNone
 	}
-
-	//
-	// More needed, ask the table task to refresh
-	//
-
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnTab, sch.EvTabRefreshReq, &reqRefresh)
 	dcvMgr.sdl.SchSendMessage(&schMsg)
-
 	return DcvMgrEnoNone
 }
 
-//
-// Table refreshed response handler
-//
 func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) DcvMgrErrno {
-
-	//
-	// We receive the response about event sch.EvTabRefreshReq we hand sent to table
-	// manager task. For more, see comments aboved in function DcvMgrFindNodeReq pls.
-	//
-
 	if dcvMgr.more <= 0 {
-
-		//
 		// since nodes reported to peer manager might be useless for these nods might
-		// be duplicated nodes, we can not return, nodes still need to be reported in
-		// this case.
-		//
-
+		// be duplicated ones in current implement, we should improve this later.
 		// return DcvMgrEnoNone
 	}
-
-	//
-	// Report nodes to peer manager and update "more" counter
-	//
 
 	var schMsg = sch.SchMessage{}
 	var r = sch.MsgDcvFindNodeRsp{
@@ -246,11 +161,6 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r)
 	dcvMgr.sdl.SchSendMessage(&schMsg)
-
-	//
-	// Update "more" counter
-	//
-
 	dcvMgr.more -= len(r.Nodes)
 
 	return DcvMgrEnoNone
