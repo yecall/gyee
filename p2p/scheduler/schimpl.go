@@ -1576,13 +1576,13 @@ func (sdl *scheduler)schGetTaskNumber() int {
 }
 
 //
-//
+// Show task names
 //
 func (sdl *scheduler)schShowTaskName() []string {
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 	var names []string = nil
-	for n, _ := range sdl.tkMap {
+	for n := range sdl.tkMap {
 		names = append(names, n)
 	}
 	return names

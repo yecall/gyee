@@ -87,7 +87,7 @@ func (fds *FileDatastore)Put(k *DsKey, v DsValue) DhtErrno {
 
 	strKey := fmt.Sprintf("%x", *k)
 	dsk := ipfsds.NewKey(strKey)
-	log.LogCallerFileLine("Put: key: %s", dsk);
+	log.LogCallerFileLine("Put: key: %s", dsk)
 
 	if err := fds.ffs.Put(dsk, v.([]byte)); err != nil {
 		log.LogCallerFileLine("Put: Put failed, err: %s", err.Error())
@@ -104,7 +104,7 @@ func (fds *FileDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
 
 	strKey := fmt.Sprintf("%x", *k)
 	dsk := ipfsds.NewKey(strKey)
-	log.LogCallerFileLine("Get: key: %s", dsk);
+	log.LogCallerFileLine("Get: key: %s", dsk)
 
 	val, err := fds.ffs.Get(dsk)
 
@@ -129,7 +129,7 @@ func (fds *FileDatastore)Delete(k *DsKey) DhtErrno {
 
 	strKey := fmt.Sprintf("%x", *k)
 	dsk := ipfsds.NewKey(strKey)
-	log.LogCallerFileLine("Delete: key: %s", dsk);
+	log.LogCallerFileLine("Delete: key: %s", dsk)
 
 	if err := fds.ffs.Delete(dsk); err != nil {
 		log.LogCallerFileLine("Delete: Delete failed, err: %s", err.Error())

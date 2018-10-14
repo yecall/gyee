@@ -341,7 +341,7 @@ func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 			continue
 		}
 		var n Node
-		var snid SubNetworkID = AnySubNet
+		var snid = AnySubNet
 		if err := DecodeBytes(it.Value(), &n, &snid); err != nil {
 			log.LogCallerFileLine("nextNode: DecodeBytes failed")
 			continue

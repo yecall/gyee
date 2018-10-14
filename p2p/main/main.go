@@ -588,7 +588,7 @@ func testCase1(tc *testCase) {
 	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
@@ -794,7 +794,7 @@ func testCase3(tc *testCase) {
 	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
@@ -919,7 +919,7 @@ func testCase4(tc *testCase) {
 	var p2pInstNum = 8
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
@@ -1120,7 +1120,7 @@ func testCase5(tc *testCase) {
 	var p2pInstNum = 32
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
 	var bootstrapNodes = []*config.Node{}
@@ -1318,7 +1318,7 @@ func testCase5(tc *testCase) {
 	stopCount := len(p2pInst2Cfg)
 	stopChain := make(chan bool, stopCount)
 
-	for p2pInst, _ := range p2pInst2Cfg {
+	for p2pInst := range p2pInst2Cfg {
 		go shell.P2pStop(p2pInst, stopChain)
 	}
 
@@ -1392,7 +1392,7 @@ func testCase6(tc *testCase) {
 		}
 	}
 
-	cm := dhtTestBuildConnMatrix(dhtInstList);
+	cm := dhtTestBuildConnMatrix(dhtInstList)
 	if cm == nil {
 		log.LogCallerFileLine("testCase6: dhtBuildConnMatrix failed")
 		return
@@ -1474,7 +1474,7 @@ func testCase7(tc *testCase) {
 		}
 	}
 
-	cm := dhtTestBuildConnMatrix(dhtInstList);
+	cm := dhtTestBuildConnMatrix(dhtInstList)
 	if cm == nil {
 		log.LogCallerFileLine("testCase7: dhtBuildConnMatrix failed")
 		return
@@ -1495,7 +1495,7 @@ func testCase7(tc *testCase) {
 	stopCount := len(dhtInst2Cfg)
 	stopChain := make(chan bool, stopCount)
 
-	for dhtInst, _ := range dhtInst2Cfg {
+	for dhtInst := range dhtInst2Cfg {
 		go shell.P2pStop(dhtInst, stopChain)
 	}
 
@@ -1542,10 +1542,10 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	}
 
 	var m = make([][]bool, instNum)
-	for idx, _ := range m {
+	for idx := range m {
 		row := make([]bool, instNum)
 		m[idx] = row
-		for idx, _ := range row {
+		for idx := range row {
 			row[idx] = false
 		}
 	}

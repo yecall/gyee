@@ -827,19 +827,16 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 		log.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbManager failed")
 		return sch.SchEnoConfig
 	}
-
 	ngbMgr.cfg.IP			= ptCfg.IP
 	ngbMgr.cfg.UDP			= ptCfg.UDP
 	ngbMgr.cfg.TCP			= ptCfg.TCP
 	ngbMgr.cfg.ID			= ptCfg.ID
 	ngbMgr.cfg.NetworkType	= ptCfg.NetworkType
 	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
-
 	if len(ngbMgr.cfg.SubNetIdList) == 0 &&
 		ngbMgr.cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList, config.AnySubNet)
 	}
-
 	return sch.SchEnoNone
 }
 

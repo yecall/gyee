@@ -992,7 +992,7 @@ func (rutMgr *RutMgr)showRoute(tag string) {
 			golog.Printf("showRoute: "+
 				"=============================== tag: %s, dht: %s, bucket: %d ==============================", tag, dht, idx)
 			li := rt.bucketTab[idx]
-			count := 0;
+			count := 0
 			for el := li.Front(); el != nil; el = el.Next() {
 				bn, ok := el.Value.(*rutMgrBucketNode)
 				if !ok {

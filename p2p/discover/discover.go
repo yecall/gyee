@@ -58,9 +58,7 @@ func NewDcvMgr() *DiscoverManager {
 		ptnPeMgr: nil,
 		more:     config.MaxOutbounds,
 	}
-
 	dcvMgr.tep = dcvMgr.dcvMgrProc
-
 	return &dcvMgr
 }
 
@@ -70,7 +68,6 @@ func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	var eno DcvMgrErrno = DcvMgrEnoNone
-
 	switch msg.Id {
 	case sch.EvSchPoweron:
 		eno = dcvMgr.DcvMgrPoweron(ptn)
@@ -84,12 +81,10 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		log.LogCallerFileLine("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
 	}
-
 	if eno != DcvMgrEnoNone {
 		log.LogCallerFileLine("DcvMgrProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
@@ -152,17 +147,14 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 		// be duplicated ones in current implement, we should improve this later.
 		// return DcvMgrEnoNone
 	}
-
 	var schMsg = sch.SchMessage{}
 	var r = sch.MsgDcvFindNodeRsp{
 		Snid:	rsp.Snid,
 		Nodes:	rsp.Nodes,
 	}
-
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r)
 	dcvMgr.sdl.SchSendMessage(&schMsg)
 	dcvMgr.more -= len(r.Nodes)
-
 	return DcvMgrEnoNone
 }
 

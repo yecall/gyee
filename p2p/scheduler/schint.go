@@ -35,7 +35,6 @@ type schMessage SchMessage
 //
 // User task entry point
 //
-type schUserTaskEp = SchUserTaskEp
 type schUserTaskInf = SchUserTaskInf
 
 //

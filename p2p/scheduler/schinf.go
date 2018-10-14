@@ -29,11 +29,8 @@ import(
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
-//
 // Scheduler interface errnos
-//
 type SchErrno int
-
 const (
 	SchEnoNone			SchErrno = 0	// none of errors
 	SchEnoParameter		SchErrno = 1	// invalid parameters
@@ -74,9 +71,7 @@ var SchErrnoDescription = []string {
 	"max value errno can be",
 }
 
-//
 // Errno string
-//
 func (eno SchErrno) SchErrnoString() string {
 	if eno < SchEnoNone || eno >= SchEnoMax {
 		return fmt.Sprintf("Can't be stringzed, invalid eno:%d", eno)
@@ -84,38 +79,28 @@ func (eno SchErrno) SchErrnoString() string {
 	return SchErrnoDescription[eno]
 }
 
-//
 // error interface
-//
 func (eno SchErrno) Error() string {
 	return eno.SchErrnoString()
 }
 
-//
 // Export scheduler type
-//
 type Scheduler = scheduler
 
-//
 // User task entry point: notice, parameter ptn would be type of pointer to schTaskNode,
 // the user task should never try to access the field directly, instead, interface func
 // provide by scheduler module should by applied. for example, when user task try to set
 // a timer, it should then pass this ptn to function SchSetTimer, see it pls. Also,
 // user task should try to interpret the msg.body by msg.id, which is defined by user
 // task than scheduler itself, of course, timer event is an exception.
-//
 type SchUserTaskEp = func(ptn interface{}, msg *SchMessage) SchErrno
 
-//
 // User task inteface for scheduler
-//
 type SchUserTaskInf interface {
 	TaskProc4Scheduler(ptn interface{}, msg *SchMessage) SchErrno
 }
 
-//
 // message type for scheduling between user tasks
-//
 type SchMessage struct {
 	sender 	*schTaskNode	// sender task node pointer
 	recver	*schTaskNode	// receiver task node pointer
@@ -123,15 +108,12 @@ type SchMessage struct {
 	Body	interface{}		// message body
 }
 
-//
 // Watch dog for a user task
-//
 const (
 	SchDeaultWatchCycle			= time.Second
 	SchDefaultDogCycle			= time.Second
 	SchDefaultDogDieThresold	= 2
 )
-
 type SchWatchDog struct {
 	lock			sync.Mutex
 	HaveDog			bool				// if dog would come out
@@ -141,19 +123,14 @@ type SchWatchDog struct {
 	DieThreshold	int					// threshold counter of dog-bited to die
 }
 
-//
 // Flag for user just be created
-//
 const (
 	SchCreatedGo		= iota			// go at once
 	SchCreatedSuspend					// suspended
 )
 
-//
 // max mail box size
-//
 const SchMaxMbSize	 = 256
-
 type SchTaskDescription struct {
 	Name	string						// user task name
 	MbSize	int							// mailbox size
@@ -164,22 +141,16 @@ type SchTaskDescription struct {
 	UserDa	interface{}					// user data area pointer
 }
 
-//
 // Timer type
-//
 const (
 	SchTmTypePeriod		= 0		// cycle timer
 	SchTmTypeAbsolute	= 1		// absolute timer
 )
-
 type SchTimerType int
 
-//
 // Timer description
-//
 const SchMaxTaskTimer 	= 128	// max timers can be held by one user task
 const SchInvalidTid		= -1	// invalid timer identity
-
 type TimerDescription struct {
 	Name	string				// timer name
 	Utid	int					// user timer identity
@@ -188,9 +159,7 @@ type TimerDescription struct {
 	Extra	interface{}			// extra data return to timer owner when expired
 }
 
-//
 // Static user task description
-//
 type TaskStaticDescription struct {
 	Name	string								// task name
 	Tep		SchUserTaskInf						// task inteface, it's the user control block which exports its' entry point
@@ -200,37 +169,27 @@ type TaskStaticDescription struct {
 	Flag	int									// flag: start at once or to be suspended
 }
 
-//
 // Scheduler init
-//
 func SchSchedulerInit(cfg *config.Config) (*Scheduler, SchErrno) {
 	return schSchedulerInit(cfg)
 }
 
-//
 // Start scheduler
-//
 func (sdl *Scheduler)SchSchedulerStart(tsd []TaskStaticDescription, tpo []string) (SchErrno, *map[string]interface{}){
 	return sdl.schSchedulerStart(tsd, tpo)
 }
 
-//
 // Create a single task
-//
 func (sdl *Scheduler)SchCreateTask(taskDesc *SchTaskDescription)(SchErrno, interface{}) {
 	return sdl.schCreateTask((*schTaskDescription)(taskDesc))
 }
 
-//
 // Start task by task node pointer
-//
 func (sdl *Scheduler)SchStartTaskEx(ptn interface{}) SchErrno {
 	return sdl.schStartTaskEx(ptn.(*schTaskNode))
 }
 
-//
 // Stop a single task by task node pointer
-//
 func (sdl *Scheduler)SchStopTask(ptn interface{}) SchErrno {
 	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
 		log.LogCallerFileLine("SchStopTask: SchTaskDone failed, eno: %d", eno)
@@ -239,31 +198,23 @@ func (sdl *Scheduler)SchStopTask(ptn interface{}) SchErrno {
 	return SchEnoNone
 }
 
-//
 // Get user task node pointer
-//
 func (sdl *Scheduler)SchGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
 	return sdl.schGetTaskNodeByName(name)
 }
 
-//
 // Send message to a specific task
-//
 func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
-
 	eno, src := sdl.SchGetTaskNodeByName(srcTask)
 	if eno != SchEnoNone || src == nil {
 		return eno
 	}
-
 	eno, dst := sdl.SchGetTaskNodeByName(dstTask)
 	if eno != SchEnoNone || dst == nil {
 		return eno
 	}
-
 	msg.sender = src.(*schTaskNode)
 	msg.recver = dst.(*schTaskNode)
-
 	return sdl.SchSendMessage(msg)
 }
 
@@ -271,39 +222,29 @@ func (sdl *Scheduler)SchSendMessage(msg *SchMessage) SchErrno {
 	return sdl.schSendMsg((*schMessage)(msg))
 }
 
-//
 // Set sender of message
-//
 func (sdl *Scheduler)SchSetSender(msg *SchMessage, sender interface{}) SchErrno {
 	msg.sender = sender.(*schTaskNode)
 	return SchEnoNone
 }
 
-//
 // Get sender of message
-//
 func (sdl *Scheduler)SchGetSender(msg *SchMessage) interface{} {
 	return msg.sender
 }
 
-//
 // Set receiver of message
-//
 func (sdl *Scheduler)SchSetRecver(msg *SchMessage, recver interface{}) SchErrno {
 	msg.recver = recver.(*schTaskNode)
 	return SchEnoNone
 }
 
-//
-// Set receiver of message
-//
+// Get receiver of message
 func (sdl *Scheduler)SchGetRecver(msg *SchMessage) interface{} {
 	return msg.recver
 }
 
-//
 // Make scheduling message
-//
 func (sdl *Scheduler)SchMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
 
 	if msg == nil || s == nil || r == nil {
@@ -318,37 +259,27 @@ func (sdl *Scheduler)SchMakeMessage(msg *SchMessage, s, r interface{}, id int, b
 	return SchEnoNone
 }
 
-//
-// Set a timer
-//
+// Set timer
 func (sdl *Scheduler)SchSetTimer(ptn interface{}, tdc *TimerDescription) (eno SchErrno, tid int) {
 	return sdl.schSetTimer(ptn.(*schTaskNode), (*timerDescription)(tdc))
 }
 
-//
-// Kill a timer
-//
+// Kill timer
 func (sdl *Scheduler)SchKillTimer(ptn interface{}, tid int) SchErrno {
 	return sdl.schKillTimer(ptn.(*schTaskNode), tid)
 }
 
-//
-// Done a task
-//
+// Done task
 func (sdl *Scheduler)SchTaskDone(ptn interface{}, eno SchErrno) SchErrno {
 	return sdl.schTaskDone(ptn.(*schTaskNode), eno)
 }
 
-//
 // Get scheduler by task node
-//
 func SchGetScheduler(ptn interface{}) *Scheduler {
 	return ptn.(*schTaskNode).task.sdl
 }
 
-//
 // Get user task interface exported to scheduler
-//
 func (sdl *Scheduler)SchGetUserTaskIF(tn string) interface{} {
 	eno, ptn := sdl.SchGetTaskNodeByName(tn)
 	if eno != SchEnoNone {
@@ -357,81 +288,59 @@ func (sdl *Scheduler)SchGetUserTaskIF(tn string) interface{} {
 	return ptn.(*schTaskNode).task.utep
 }
 
-//
 // Get user data area pointer
-//
 func (sdl *Scheduler)SchGetUserDataArea(ptn interface{}) interface{} {
 	return sdl.schGetUserDataArea(ptn.(*schTaskNode))
 }
 
-//
 // Set user data area pointer
-//
 func (sdl *Scheduler)SchSetUserDataArea(ptn interface{}, uda interface{}) SchErrno {
 	return sdl.schSetUserDataArea(ptn.(*schTaskNode), uda)
 }
 
-//
 // Set the power off stage flag to tell the scheduler it's going to be turn off
-//
 func (sdl *Scheduler)SchSetPoweroffStage() SchErrno {
 	return sdl.schSetPoweroffStage()
 }
 
-//
 // Get task name
-//
 func (sdl *Scheduler)SchGetTaskName(ptn interface{}) string {
 	return sdl.schGetTaskName(ptn.(*schTaskNode))
 }
 
-//
 // Get task number
-//
 func (sdl *Scheduler)SchGetTaskNumber() int {
 	return sdl.schGetTaskNumber()
 }
 
-//
 // Show names about alived tasks
-//
 func (sdl *Scheduler)SchShowTaskName() []string {
 	return sdl.schShowTaskName()
 }
 
-//
 // Test if task exist with specific name
-//
 func (sdl *Scheduler)SchTaskExist(name string) bool {
 	eno, ptn := sdl.SchGetTaskNodeByName(name)
 	return eno == SchEnoNone && ptn != nil
 }
 
-//
 // Get p2p network configuration name
-//
 func (sdl *Scheduler)SchGetP2pCfgName() string {
 	return sdl.p2pCfg.CfgName
 }
 
-//
 // Get p2p configuration
-//
 func (sdl *Scheduler)SchGetP2pConfig() *config.Config {
 	return sdl.p2pCfg
 }
 
-//
 // Set application type
-//
 func (sdl *Scheduler)SchSetAppType(appType int) SchErrno {
 	sdl.appType = appType
 	return SchEnoNone
 }
 
-//
 // Get application type
-//
 func (sdl *Scheduler)SchGetAppType() int {
 	return sdl.appType
 }

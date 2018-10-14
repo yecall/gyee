@@ -163,7 +163,7 @@ func (ih *InmemHub) RemoveNode(node *InmemService) {
 }
 
 func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
-	for n, _ := range ih.nodes {
+	for n := range ih.nodes {
 		if n != from {
 			if rand.Intn(100) < from.outMiss {
 				//fmt.Println("drop:", message.from, message.msgType)

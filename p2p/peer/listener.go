@@ -315,13 +315,13 @@ acceptLoop:
 }
 
 func (accepter *acceptTskCtrlBlock)PauseAccept() bool {
-	log.LogCallerFileLine("PauseAccept: try to pause accepting inbound")
+	log.LogCallerFileLine("PauseAccept: try to pause inbound")
 	accepter.lockAccept.Lock()
 	return true
 }
 
 func (accepter *acceptTskCtrlBlock)ResumeAccept() bool {
-	log.LogCallerFileLine("ResumeAccept: try to resume accepting inbound")
+	log.LogCallerFileLine("ResumeAccept: try to resume inbound")
 	accepter.lockAccept.Unlock()
 	return true
 }
