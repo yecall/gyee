@@ -25,7 +25,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"os"
-	"sync"
 	"time"
 	"crypto/sha256"
 
@@ -41,25 +40,33 @@ import (
 )
 
 var (
-	nodeDBNodeExpiration = 24 * time.Hour // Time after which an unseen node should be dropped.
-	nodeDBCleanupCycle   = time.Hour      // Time period for running the expiration task.
+	nodeDBNodeExpiration = 24 * time.Hour // Time for node to be expired
+	nodeDBCleanupCycle   = time.Hour      // Time period to cleanup
 )
 
 type nodeDB struct {
-	lvl    *leveldb.DB   // Interface to the database itself
-	self   NodeID        // Own node id to prevent adding it into the database
-	runner sync.Once     // Ensures we can start at most one expirer
-	quit   chan struct{} // Channel to signal the expiring thread to stop
+	lvl    *leveldb.DB   // Pointer to level database
+	self   NodeID        // Identity of the owner node of this database
 }
 
 var (
-	nodeDBVersionKey = []byte("version") // Version of the database to flush if changes
-	nodeDBItemPrefix = []byte("n:")      // Identifier to prefix node entries with
-
-	nodeDBDiscoverRoot      = ":discover"
-	nodeDBDiscoverPing      = nodeDBDiscoverRoot + ":lastping"
-	nodeDBDiscoverPong      = nodeDBDiscoverRoot + ":lastpong"
-	nodeDBDiscoverFindFails = nodeDBDiscoverRoot + ":findfail"
+	// Since it's possible an old database might be present and not suitable fro application,
+	// a "version" field is applied to keep this case off: When a node database is opened, it
+	// is checked against the preferred version, if mismatched, truncate to empty.
+	versionKey = []byte("version")
+	// In current implement, the application operates the database often with the identity of
+	// the peer node as the parameter, and the operating context indicated by the interface
+	// function name, like "updateLastPing", "updateLastPong". But in the database, a context
+	// should be recognized to construct unique key. Fot this, we apply follwing key layout:
+	// for node:
+	//		key=nodeId + root
+	// for node with context:
+	//		key=nodeId + root + context
+	// See function makeKey for more.
+	rootKey			= "dcvMgr"				// root
+	pingKey			= rootKey + ":lpi"		// last ping
+	pongKey			= rootKey + ":lpo"		// last pong
+	findfailKey		= rootKey + ":ffa"		// find fail
 )
 
 func newNodeDB(path string, version int, self NodeID) (*nodeDB, error) {
@@ -77,7 +84,6 @@ func newMemoryNodeDB(self NodeID) (*nodeDB, error) {
 	return &nodeDB{
 		lvl:  db,
 		self: self,
-		quit: make(chan struct{}),
 	}, nil
 }
 
@@ -92,10 +98,10 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 	}
 	currentVer := make([]byte, binary.MaxVarintLen64)
 	currentVer = currentVer[:binary.PutVarint(currentVer, int64(version))]
-	blob, err := db.Get(nodeDBVersionKey, nil)
+	blob, err := db.Get(versionKey, nil)
 	switch err {
 	case leveldb.ErrNotFound:
-		if err := db.Put(nodeDBVersionKey, currentVer, nil); err != nil {
+		if err := db.Put(versionKey, currentVer, nil); err != nil {
 			db.Close()
 			return nil, err
 		}
@@ -111,21 +117,16 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 	return &nodeDB{
 		lvl:  db,
 		self: self,
-		quit: make(chan struct{}),
 	}, nil
 }
 
 func makeKey(id []byte, field string) []byte {
-	return append(nodeDBItemPrefix, append(id[:], field...)...)
+	return append(id[:], field...)
 }
 
 func splitKey(key []byte) (id NodeIdEx, field string) {
-	if !bytes.HasPrefix(key, nodeDBItemPrefix) {
-		return NodeIdEx{}, string(key)
-	}
-	item := key[len(nodeDBItemPrefix):]
-	copy(id[:], item[:len(id)])
-	field = string(item[len(id):])
+	copy(id[:], key[:len(id)])
+	field = string(key[len(id):])
 	return id, field
 }
 
@@ -155,7 +156,7 @@ func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	blob, err := db.lvl.Get(makeKey(idEx, nodeDBDiscoverRoot), nil)
+	blob, err := db.lvl.Get(makeKey(idEx, rootKey), nil)
 	if err != nil {
 		return nil
 	}
@@ -176,7 +177,7 @@ func (db *nodeDB) updateNode(snid SubNetworkID, node *Node) error {
 	var idEx = []byte{}
 	idEx = append(idEx, node.ID[:]...)
 	idEx = append(idEx, snid[:]...)
-	return db.lvl.Put(makeKey(idEx, nodeDBDiscoverRoot), blob, nil)
+	return db.lvl.Put(makeKey(idEx, rootKey), blob, nil)
 }
 
 func (db *nodeDB) deleteNode(snid SubNetworkID, id NodeID) error {
@@ -199,10 +200,9 @@ func (db *nodeDB) expireNodes() error {
 
 	for it.Next() {
 		id, field := splitKey(it.Key())
-		if field != nodeDBDiscoverRoot {
+		if field != rootKey {
 			continue
 		}
-
 		var nodeId NodeID
 		var snid SubNetworkID
 		snid = SubNetworkID{id[config.NodeIDBytes], id[config.NodeIDBytes+1]}
@@ -224,45 +224,49 @@ func (db *nodeDB) lastPing(snid SubNetworkID, id NodeID) time.Time {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	return time.Unix(db.fetchInt64(makeKey(idEx, nodeDBDiscoverPing)), 0)
+	return time.Unix(db.fetchInt64(makeKey(idEx, pingKey)), 0)
 }
 
 func (db *nodeDB) updateLastPing(snid SubNetworkID, id NodeID, instance time.Time) error {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	return db.storeInt64(makeKey(idEx, nodeDBDiscoverPing), instance.Unix())
+	return db.storeInt64(makeKey(idEx, pingKey), instance.Unix())
 }
 
 func (db *nodeDB) lastPong(snid SubNetworkID, id NodeID) time.Time {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	return time.Unix(db.fetchInt64(makeKey(idEx, nodeDBDiscoverPong)), 0)
+	return time.Unix(db.fetchInt64(makeKey(idEx, pongKey)), 0)
 }
 
 func (db *nodeDB) updateLastPong(snid SubNetworkID, id NodeID, instance time.Time) error {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	return db.storeInt64(makeKey(idEx, nodeDBDiscoverPong), instance.Unix())
+	return db.storeInt64(makeKey(idEx, pongKey), instance.Unix())
 }
 
 func (db *nodeDB) findFails(snid SubNetworkID, id NodeID) int {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	return int(db.fetchInt64(makeKey(idEx, nodeDBDiscoverFindFails)))
+	return int(db.fetchInt64(makeKey(idEx, findfailKey)))
 }
 
 func (db *nodeDB) updateFindFails(snid SubNetworkID, id NodeID, fails int) error {
 	var idEx = []byte{}
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
-	return db.storeInt64(makeKey(idEx, nodeDBDiscoverFindFails), int64(fails))
+	return db.storeInt64(makeKey(idEx, findfailKey), int64(fails))
 }
 
 func (db *nodeDB) querySeeds(snid SubNetworkID, n int, maxAge time.Duration) []*Node {
+	// this function called to find out nodes with age less than maxAge, and the max
+	// number of these nodes should not exceed n passed in.
+	// in our application, since we are looking for nodes to flood information, we should
+	// not "Likes Or Dislikes" this or that.
 	var (
 		now   = time.Now()
 		nodes = make([]*Node, 0, n)
@@ -272,52 +276,68 @@ func (db *nodeDB) querySeeds(snid SubNetworkID, n int, maxAge time.Duration) []*
 	defer it.Release()
 
 seek:
+
+	// max try: n*5
 	for seeks := 0; len(nodes) < n && seeks < n*5; seeks++ {
+
+		// segment nodes by the first byte, see comments about function it.Seek
+		// for more please:
 		ctr := id[0]
 		rand.Read(id[:])
 		id[0] = ctr + id[0]%16
 
+		// construct the key
 		var idEx = []byte{}
 		idEx = append(idEx, id[:]...)
 		idEx = append(idEx, snid[:]...)
 
-		it.Seek(makeKey(idEx, nodeDBDiscoverRoot))
+		// seek to first, comment segment about it.Seek:
+		// "Seek moves the iterator to the first key/value pair whose key is greater
+		// than or equal to the given key"
+		it.Seek(makeKey(idEx, rootKey))
 
+		// check if we got some
 		n, nSnid := nextNode(it)
 		if n == nil {
 			id[0] = 0
 			continue seek
 		}
 
+		// check sub network identity
 		if snid != AnySubNet {
 			if *nSnid != snid {
 				continue seek
 			}
 		}
 
+		// check if just node of ourselves local
 		if n.ID == db.self {
 			continue seek
 		}
 
+		// check age
 		if now.Sub(db.lastPong(snid, n.ID)) > maxAge {
 			continue seek
 		}
 
+		// check if duplicated
 		for i := range nodes {
 			if nodes[i].ID == n.ID {
 				continue seek
 			}
 		}
 
+		// got
 		nodes = append(nodes, n)
 	}
+
 	return nodes
 }
 
 func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 	for end := false; !end; end = !it.Next() {
 		_, field := splitKey(it.Key())
-		if field != nodeDBDiscoverRoot {
+		if field != rootKey {
 			continue
 		}
 		var n Node
@@ -332,7 +352,6 @@ func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 }
 
 func (db *nodeDB) close() {
-	close(db.quit)
 	db.lvl.Close()
 }
 
