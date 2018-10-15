@@ -24,6 +24,7 @@ package scheduler
 import (
 			"time"
 			"strings"
+			"runtime"
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
@@ -403,7 +404,7 @@ timerLoop:
 		}()
 
 		//
-		// go routine to check time killed
+		// go routine to check timer killed
 		//
 
 		go func() {
@@ -1258,6 +1259,15 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		return SchEnoParameter
 	}
 
+	_, file, line, _ := runtime.Caller(2)
+	log.LogCallerFileLine("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
+		sdl.p2pCfg.CfgName,
+		sdl.schGetTaskName(msg.sender),
+		sdl.schGetTaskName(msg.recver),
+		msg.Id,
+		file,
+		line)
+
 	//
 	// put message to receiver mailbox. More work might be needed, such as
 	// checking against the sender and receiver name to see if they are in
@@ -1552,9 +1562,21 @@ func (sdl *scheduler)schSetUserDataArea(ptn *schTaskNode, uda interface{}) SchEr
 // Set the power off stage flag to tell the scheduler it's going to be turn off
 //
 func (sdl *scheduler)schSetPoweroffStage() SchErrno {
+	sdl.lock.Lock()
+	defer  sdl.lock.Unlock()
 	sdl.powerOff = true
 	return SchEnoNone
 }
+
+//
+// Get the power off stage flag
+//
+func (sdl *scheduler)schGetPoweroffStage() bool {
+	sdl.lock.Lock()
+	defer  sdl.lock.Unlock()
+	return sdl.powerOff
+}
+
 //
 // Get task name
 //

@@ -303,6 +303,11 @@ func (sdl *Scheduler)SchSetPoweroffStage() SchErrno {
 	return sdl.schSetPoweroffStage()
 }
 
+// get the power off stage flag
+func (sdl *Scheduler)SchGetPoweroffStage() bool {
+	return sdl.schGetPoweroffStage()
+}
+
 // Get task name
 func (sdl *Scheduler)SchGetTaskName(ptn interface{}) string {
 	return sdl.schGetTaskName(ptn.(*schTaskNode))

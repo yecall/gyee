@@ -24,7 +24,6 @@ import (
 	"net"
 	"sync"
 	"time"
-	"fmt"
 	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
@@ -652,7 +651,7 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 		sdl:		ngbMgr.sdl,
 		ngbMgr:		ngbMgr,
 		ptn:		nil,
-		name:		fmt.Sprintf("%s%d_findnode_%s", NgbProcName, ngbMgr.fnInstSeq, strPeerNodeId),
+		name:		strPeerNodeId,
 		msgType:	um.UdpMsgTypeFindNode,
 		msgBody:	findNode,
 		tidFN:		sch.SchInvalidTid,
@@ -691,7 +690,6 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	rsp.FindNode = findNode
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
-	ngbInst.ptn = ptn
 	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
 
 	return NgbMgrEnoNone
@@ -739,7 +737,7 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	ngbMgr.ppInstSeq++
 
 	var dc = sch.SchTaskDescription {
-		Name:	fmt.Sprintf("%s%d_pingpong_%s", NgbProcName, ngbMgr.ppInstSeq, strPeerNodeId),
+		Name:	strPeerNodeId,
 		MbSize:	ngbProcMailboxSize,
 		Ep:		&ngbInst,
 		Wd:		&noDog,
@@ -787,7 +785,6 @@ func (ngbMgr *NeighborManager) cleanMap(name string) {
 func (ngbMgr *NeighborManager) checkMap(name string, umt um.UdpMsgType) bool {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
-
 	ngb, ok := ngbMgr.ngbMap[name]
 	if umt == um.UdpMsgTypeAny {
 		return ok

@@ -60,10 +60,10 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 
 		return []sch.TaskStaticDescription{
 			{Name: dcv.DcvMgrName,		Tep: dcv.NewDcvMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: tab.NdbcName,		Tep: tab.NewNdbCleaner(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: ngb.LsnMgrName,		Tep: ngb.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: ngb.NgbMgrName,		Tep: ngb.NewNgbMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
@@ -91,10 +91,10 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 //
 var taskStaticPoweronOrder4Chain = []string {
 	dcv.DcvMgrName,
-	tab.TabMgrName,
 	tab.NdbcName,
 	ngb.LsnMgrName,
 	ngb.NgbMgrName,
+	tab.TabMgrName,
 	peer.PeerMgrName,
 	peer.PeerLsnMgrName,
 }

@@ -142,6 +142,7 @@ type PeerManager struct {
 	accepter		*acceptTskCtrlBlock				// pointer to accepter
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
+	killLock		sync.Mutex						// sync for instance killing
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
 	nodes			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to instance pointer
 	workers			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to pointer of instance in work
@@ -369,6 +370,8 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	}
 	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
+		log.LogCallerFileLine("peMgrPoweroff: sdl: %s, peer name: %s, task name: %s",
+			sdl, peerInst.name, peMgr.sdl.SchGetTaskName(peerInst.ptnMe))
 		SetP2pkgCallback(nil, peerInst.ptnMe)
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
 		peMgr.sdl.SchSendMessage(&powerOff)
@@ -1041,6 +1044,9 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 }
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
+	peMgr.killLock.Lock()
+	defer peMgr.killLock.Unlock()
+
 	if ptn == nil && node == nil {
 		log.LogCallerFileLine("peMgrKillInst: invalid parameters")
 		return PeMgrEnoParameter
@@ -1104,7 +1110,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	// resume accepter if necessary
 	if peMgr.cfg.noAccept == false &&
 		peMgr.acceptPaused == true  &&
-			peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
+		peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
 		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: resume accepter, cfgName: %s", peMgr.cfg.cfgName)
 		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
 	}
@@ -1538,6 +1544,12 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	close(inst.rxExit)
 	close(inst.txDone)
 	close(inst.txExit)
+
+	// if in power off stage, done it for sch.EvPeCloseCfm would be discarded by scheduler
+	// in this stage.
+	if inst.sdl.SchGetPoweroffStage() == true {
+		return inst.peMgr.peMgrKillInst(inst.ptnMe, &inst.node, inst.dir)
+	}
 
 	// stop timer
 	if inst.ppTid != sch.SchInvalidTid {
