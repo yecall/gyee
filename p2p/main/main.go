@@ -142,7 +142,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase6"
+var tgtCase = "testCase5"
 
 //
 // port base
@@ -1117,7 +1117,7 @@ func testCase5(tc *testCase) {
 
 	log.LogCallerFileLine("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 32
+	var p2pInstNum = 8
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
@@ -1206,15 +1206,15 @@ func testCase5(tc *testCase) {
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
-				snid0 := config.SubNetworkID{0xff, byte(idx & 0x1f)}
+				snid0 := config.SubNetworkID{0xff, byte(idx & 0x07)}
 				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
 				myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
 				myCfg.SubNetMaxInBounds[snid0] = config.MaxPeers
 				myCfg.SubNetMaxOutbounds[snid0] = 0
 			}
 		} else {
-			snid0 := config.SubNetworkID{0xff, byte(loop & 0x1f)}
-			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x1f)}
+			snid0 := config.SubNetworkID{0xff, byte(loop & 0x07)}
+			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x07)}
 			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
 			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
 			myCfg.SubNetMaxPeers[snid0] = config.MaxPeers

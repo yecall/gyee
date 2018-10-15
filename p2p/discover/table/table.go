@@ -68,7 +68,7 @@ type Hash [HashLength]byte
 // Some constants about database(levelDb)
 //
 const (
-	ndbVersion = 4
+	ndbVersion = 1
 )
 
 //
@@ -395,7 +395,7 @@ func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 		mgr.queryPending	= make([]*queryPendingEntry, 0, TabInstQPendingMax)
 		mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
 		mgr.dlkTab			= make([]int, 256)
-		mgr.snid = snid
+		mgr.snid			= snid
 		tabMgr.SubNetMgrList[snid] = mgr
 
 		for loop := 0; loop < cap(mgr.buckets); loop++ {
@@ -1344,8 +1344,8 @@ func (tabMgr *TableManager)tabUpdateBucket(inst *instCtrlBlock, result int) TabM
 func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 	// Update node database while local node is a bootstrap node for an unexcepeted
 	// bounding procedure: this procedure is inited by neighbor manager task when a
-	// Ping or Pong message recived without an responding neighbor instance can be mapped
-	// it. In this case, the neighbor manager then carry the pingpong procedure (if Ping
+	// Ping or Pong message recived without a responding neighbor instance can be mapped
+	// to it. In this case, the neighbor manager then carry the pingpong procedure (if Ping
 	// received, a Pong sent firstly), and when Pong recvied, it is sent to here the
 	// table manager task, see Ping, Pong handler in file neighbor.go for details pls.
 	id := n.NodeId
@@ -1893,12 +1893,10 @@ func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgr
 		},
 		sha: *TabNodeId2Hash(NodeID(umn.NodeId)),
 	}
-
 	if err := mgr.nodeDb.updateNode(snid, &n); err != nil {
 		log.LogCallerFileLine("TabUpdateNode: update: updateNode failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
-
 	return TabMgrEnoNone
 }
 

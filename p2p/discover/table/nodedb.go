@@ -52,8 +52,9 @@ type nodeDB struct {
 var (
 	// Since it's possible an old database might be present and not suitable fro application,
 	// a "version" field is applied to keep this case off: When a node database is opened, it
-	// is checked against the preferred version, if mismatched, truncate to empty.
-	versionKey = []byte("version")
+	// is checked against the preferred version, if mismatched, truncate to empty. The key for
+	// version looks like: nodeId + versionKey.
+	versionKey = "version"
 	// In current implement, the application operates the database often with the identity of
 	// the peer node as the parameter, and the operating context indicated by the interface
 	// function name, like "updateLastPing", "updateLastPong". But in the database, a context
@@ -96,12 +97,16 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 	if err != nil {
 		return nil, err
 	}
+	var idEx = []byte{}
+	idEx = append(idEx, self[:]...)
+	idEx = append(idEx, ZeroSubNet[:]...)
+	verKey := makeKey(idEx, versionKey)
 	currentVer := make([]byte, binary.MaxVarintLen64)
 	currentVer = currentVer[:binary.PutVarint(currentVer, int64(version))]
-	blob, err := db.Get(versionKey, nil)
+	blob, err := db.Get(verKey, nil)
 	switch err {
 	case leveldb.ErrNotFound:
-		if err := db.Put(versionKey, currentVer, nil); err != nil {
+		if err := db.Put(verKey, currentVer, nil); err != nil {
 			db.Close()
 			return nil, err
 		}
@@ -197,7 +202,6 @@ func (db *nodeDB) expireNodes() error {
 	threshold := time.Now().Add(-nodeDBNodeExpiration)
 	it := db.lvl.NewIterator(nil, nil)
 	defer it.Release()
-
 	for it.Next() {
 		id, field := splitKey(it.Key())
 		if field != rootKey {
@@ -207,16 +211,13 @@ func (db *nodeDB) expireNodes() error {
 		var snid SubNetworkID
 		snid = SubNetworkID{id[config.NodeIDBytes], id[config.NodeIDBytes+1]}
 		copy(nodeId[0:], id[:config.NodeIDBytes])
-
 		if !bytes.Equal(id[2:], db.self[:]) {
-
 			if seen := db.lastPong(snid, nodeId); seen.After(threshold) {
 				continue
 			}
 		}
 		db.deleteNode(snid, nodeId)
 	}
-
 	return nil
 }
 
@@ -294,12 +295,13 @@ seek:
 		// seek to first, comment segment about it.Seek:
 		// "Seek moves the iterator to the first key/value pair whose key is greater
 		// than or equal to the given key"
-		it.Seek(makeKey(idEx, rootKey))
+		if it.Seek(makeKey(idEx, rootKey)) != true {
+			continue seek
+		}
 
 		// check if we got some
 		n, nSnid := nextNode(it)
 		if n == nil {
-			id[0] = 0
 			continue seek
 		}
 
@@ -356,6 +358,7 @@ func (db *nodeDB) close() {
 }
 
 func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
+	// Test version, only IPV4 supported
 	blob := make([]byte, 0)
 	blob = append(blob, node.IP...)
 
@@ -377,15 +380,16 @@ func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
 }
 
 func DecodeBytes(blob []byte, node *Node, snid *SubNetworkID) error {
-	node.IP = append(node.IP, blob[0:16]...)
-	node.UDP = uint16((blob[16] << 8) + blob[17])
-	node.TCP = uint16((blob[18] << 8) + blob[19])
-	copy(node.ID[0:], blob[20:20+cap(node.ID)])
+	// Test version, only IPV4 supported
+	node.IP = append(node.IP, blob[0:4]...)
+	node.UDP = (uint16(blob[4]) << 8) +uint16(blob[5])
+	node.TCP = (uint16(blob[6]) << 8) +uint16(blob[7])
+	copy(node.ID[0:], blob[8:8+cap(node.ID)])
 	if snid != nil {
-		(*snid)[0] = blob[20+cap(node.ID)]
-		(*snid)[1] = blob[20+cap(node.ID)+1]
+		(*snid)[0] = blob[8+cap(node.ID)]
+		(*snid)[1] = blob[8+cap(node.ID)+1]
 	}
-	copy(node.sha[0:], blob[20+cap(node.ID)+2:])
+	copy(node.sha[0:], blob[8+cap(node.ID)+2:])
 	return nil
 }
 

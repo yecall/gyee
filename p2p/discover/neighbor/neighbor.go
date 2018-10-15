@@ -385,7 +385,7 @@ func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
 	}
 
 	ngbMgr.lock.Lock()
-	ngbMgr.sdl.SchSetSender(&powerOff, ngbMgr.ptnMe)
+	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, ngbInst := range ngbMgr.ngbMap {
 		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
 		ngbMgr.sdl.SchSendMessage(&powerOff)
@@ -595,7 +595,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	strPeerNodeId := config.P2pNodeId2HexString(findNode.From.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(findNode.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
-	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == false {
+	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeFindNode) == false {
 		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblQueriedInd, findNode)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
@@ -679,6 +679,7 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 		rsp.FindNode = findNode
 		return funcRsp2Tab()
 	}
+	ngbInst.ptn = ptn
 
 	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
 		rsp.Result = (NgbMgrEnoScheduler << 16) + tab.TabMgrEnoScheduler
@@ -691,7 +692,8 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
 	ngbInst.ptn = ptn
-	ngbMgr.setupMap(ngbInst.name, &ngbInst)
+	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
+
 	return NgbMgrEnoNone
 }
 
@@ -752,6 +754,7 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 		rsp.Ping = ping
 		return funcRsp2Tab()
 	}
+	ngbInst.ptn = ptn
 
 	if eno := funcReq2Inst(ptn); eno != NgbMgrEnoNone {
 		rsp.Result = int(eno)
@@ -765,7 +768,6 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 		return funcRsp2Tab()
 	}
 
-	ngbInst.ptn = ptn
 	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
 	return NgbMgrEnoNone
 }

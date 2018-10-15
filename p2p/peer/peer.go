@@ -344,11 +344,11 @@ func (peMgr *PeerManager)PeMgrInited() PeMgrErrno {
 }
 
 func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
+	log.LogCallerFileLine("PeMgrStart: EvPeMgrStartReq sent ok, target: %s",
+		peMgr.sdl.SchGetTaskName(peMgr.ptnMe))
 	var msg = sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
 	peMgr.sdl.SchSendMessage(&msg)
-	log.LogCallerFileLine("PeMgrStart: EvPeMgrStartReq sent ok, target: %s",
-		peMgr.sdl.SchGetTaskName(peMgr.ptnMe))
 	return PeMgrEnoNone
 }
 
@@ -367,7 +367,7 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
-	peMgr.sdl.SchSetSender(&powerOff, peMgr.ptnMe)
+	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
 		SetP2pkgCallback(nil, peerInst.ptnMe)
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
@@ -556,9 +556,10 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		if !peMgr.cfg.noAccept && !peMgr.acceptPaused {
 			// bugs: we can not pause accepter simply, a duration of delay should
 			// be apply before pausing it.
-			log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, " +
-				"cfgName: %s", peMgr.cfg.cfgName)
-			peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+
+			//log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, " +
+			//	"cfgName: %s", peMgr.cfg.cfgName)
+			//peMgr.acceptPaused = peMgr.accepter.PauseAccept()
 		}
 	}
 
@@ -872,13 +873,13 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
-			log.LogCallerFileLine("peMgrHandshakeRsp: TabBucketAddNode failed, node: %s",
-				fmt.Sprintf("%+v", *rsp.peNode))
+			log.LogCallerFileLine("peMgrHandshakeRsp: TabBucketAddNode failed, eno: %d, node: %s",
+				tabEno, fmt.Sprintf("%+v", *rsp.peNode))
 		}
 		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
-			log.LogCallerFileLine("peMgrHandshakeRsp: TabUpdateNode failed, node: %s",
-				fmt.Sprintf("%+v", *rsp.peNode))
+			log.LogCallerFileLine("peMgrHandshakeRsp: TabUpdateNode failed, eno: %d, node: %s",
+				tabEno, fmt.Sprintf("%+v", *rsp.peNode))
 		}
 	}
 
@@ -909,11 +910,10 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 		log.LogCallerFileLine("peMgrCloseReq: none of instance for subnet: %x, id: %x", snid, req.Node.ID)
 		return PeMgrEnoNotfound
 	}
-	if inst.killing {
+	if inst.killing == true {
 		log.LogCallerFileLine("peMgrCloseReq: try to kill same instance twice")
 		return PeMgrEnoDuplicated
 	}
-	inst.killing = true
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
 	var schMsg= sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
@@ -1301,7 +1301,8 @@ func (pi *peerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 
 func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	sdl := pi.sdl.SchGetP2pCfgName()
-	log.LogCallerFileLine("peerInstProc: sdl: %s, pi.name: %s, msg.Id: %d", sdl,  pi.name, msg.Id)
+	log.LogCallerFileLine("peerInstProc: sdl: %s, pi.name: %s, msg.Id: %d, sender: %s",
+		sdl,  pi.name, msg.Id, pi.sdl.SchGetTaskName(pi.sdl.SchGetSender(msg)))
 	var eno PeMgrErrno
 	switch msg.Id {
 	case sch.EvSchPoweroff:
@@ -1332,6 +1333,11 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 
 func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	sdl := inst.sdl.SchGetP2pCfgName()
+	if inst.killing == true {
+		log.LogCallerFileLine("piPoweroff: task already in killing, sdl: %s, name: %s",
+			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
+		return PeMgrEnoNone
+	}
 	log.LogCallerFileLine("piPoweroff: task will be done, sdl: %s, name: %s",
 		sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 
@@ -1500,7 +1506,13 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	_ = msg
 	sdl := inst.sdl.SchGetP2pCfgName()
-	var node = inst.node
+	if inst.killing == true {
+		log.LogCallerFileLine("piCloseReq: already in killing, sdl: %s, task: %s",
+			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
+		return PeMgrEnoDuplicated
+	}
+	inst.killing = true
+	node := inst.node
 
 	// stop tx/rx rontines
 	if inst.state == peInstStateActivated {
@@ -1543,7 +1555,7 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	}
 
 	// confirm peer manager
-	var req = MsgCloseCfm {
+	var cfm = MsgCloseCfm {
 		result: PeMgrEnoNone,
 		dir:	inst.dir,
 		snid:	inst.snid,
@@ -1551,7 +1563,7 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 		ptn:	inst.ptnMe,
 	}
 	var schMsg = sch.SchMessage{}
-	inst.sdl.SchMakeMessage(&schMsg, inst.peMgr.ptnMe, inst.peMgr.ptnMe, sch.EvPeCloseCfm, &req)
+	inst.sdl.SchMakeMessage(&schMsg, inst.peMgr.ptnMe, inst.peMgr.ptnMe, sch.EvPeCloseCfm, &cfm)
 	inst.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
 }
@@ -1633,7 +1645,10 @@ func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 		return PeMgrEnoNone
 	}
 
-	inst.sdl.SchMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPePingpongReq, nil)
+	pr := MsgPingpongReq {
+		seq: uint64(time.Now().UnixNano()),
+	}
+	inst.sdl.SchMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPePingpongReq, &pr)
 	inst.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
 }
@@ -1678,7 +1693,6 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 		log.LogCallerFileLine("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
-	// update instance state
 	inst.state = peInstStateHandshook
 	return PeMgrEnoNone
 }
@@ -1799,7 +1813,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno, []*PeerId){
 
 func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	idExOut := PeerIdEx{Id: *id, Dir: PeInstOutPos}
-	idExIn := PeerIdEx{Id: *id, Dir: PeInstOutPos}
+	idExIn := PeerIdEx{Id: *id, Dir: PeInstInPos}
 	idExList := []PeerIdEx{idExOut, idExIn}
 	for _, idEx := range idExList {
 		if inst := peMgr.getWorkerInst(*snid, &idEx); inst != nil {
