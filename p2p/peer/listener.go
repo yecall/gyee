@@ -200,10 +200,7 @@ func (accepter *acceptTskCtrlBlock)TaskProc4Scheduler(ptn interface{}, msg *sch.
 	return accepter.tep(ptn, msg)
 }
 
-func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
-	_ = msg
-
+func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
 	_, accepter.ptnLsnMgr = accepter.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
 	if accepter.ptnLsnMgr == nil {
 		log.LogCallerFileLine("PeerAcceptProc: invalid listener manager task pointer")

@@ -18,7 +18,6 @@
  *
  */
 
-
 package peer
 
 import (
@@ -27,6 +26,7 @@ import (
 	"fmt"
 	"sync"
 	"math/rand"
+	"container/list"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
@@ -61,25 +61,28 @@ type PeerId = config.NodeID
 type PeerInfo Handshake
 
 // Peer manager configuration
-const defaultConnectTimeout = 15 * time.Second		// default dial outbound timeout value, currently
+const (
+	defaultConnectTimeout = 15 * time.Second		// default dial outbound timeout value, currently
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-const defaultHandshakeTimeout = 8 * time.Second		// default handshake timeout value, currently
+	defaultHandshakeTimeout = 8 * time.Second		// default handshake timeout value, currently
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-const defaultActivePeerTimeout = 15 * time.Second	// default read/write operation timeout after a peer
+	defaultActivePeerTimeout = 15 * time.Second		// default read/write operation timeout after a peer
 													// connection is activaged in working.
-
-const maxTcpmsgSize = 1024*1024*4					// max size of a tcpmsg package could be, currently
+	maxTcpmsgSize = 1024*1024*4						// max size of a tcpmsg package could be, currently
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-const durDcvFindNodeTimer = time.Second * 20		// duration to wait for find node response from discover task,
+	durDcvFindNodeTimer = time.Second * 20			// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 
-const durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
+	durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
+
+	maxIndicationQueueSize = 256					// max indication queue size
+)
 
 const (
 	peerIdle			= iota						// idle
@@ -153,13 +156,12 @@ type PeerManager struct {
 	ibpTotalNum		int								// total active inbound peer number
 	acceptPaused	bool							// if accept task paused
 	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
-
-	txLock			sync.Mutex						// lock for data sending action from shell
-	Lock4Cb			sync.Mutex						// lock for indication callback
-	P2pIndHandler	P2pIndCallback					// indication callback installed by p2p user from shell
-
+	indChan			chan interface{}				// indication signal
+	indQueue		*list.List						// indication queue
+	indQueSize		int								// indication queue max size
+	indDiscarded	int								// number of indication discarded
 	ssTid			int								// statistics timer identity
-	staticsStatus	map[PeerIdEx]int				// statu about static nodes
+	staticsStatus	map[PeerIdEx]int				// status about static nodes
 }
 
 func NewPeerMgr() *PeerManager {
@@ -176,6 +178,10 @@ func NewPeerMgr() *PeerManager {
 		obpNum:       	map[SubNetworkID]int{},
 		ibpTotalNum:	0,
 		acceptPaused: 	false,
+		indChan:		make(chan interface{}),
+		indQueue:		list.New(),
+		indQueSize:		maxIndicationQueueSize,
+		indDiscarded:	0,
 		randoms:      	map[SubNetworkID][]*config.Node{},
 		staticsStatus:	map[PeerIdEx]int{},
 	}
@@ -248,7 +254,6 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 }
 
 func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
-
 	peMgr.ptnMe	= ptn
 	peMgr.sdl = sch.SchGetScheduler(ptn)
 	_, peMgr.ptnLsn = peMgr.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
@@ -373,36 +378,26 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	log.LogCallerFileLine("peMgrPoweroff: sdl: %s, task will be done, name: %s",
 		sdl, peMgr.sdl.SchGetTaskName(ptn))
 
-	// disable peer status indication callback
-	peMgr.Lock4Cb.Lock()
-	log.LogCallerFileLine("peMgrPoweroff: disable peer status indication callback " +
-		"sdl: %s, task will be done, name: %s", sdl, peMgr.sdl.SchGetTaskName(ptn))
-	peMgr.P2pIndHandler = nil
-	peMgr.Lock4Cb.Unlock()
-
-	// send poweroff to kill all peer instance tasks
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
+
 	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
-		log.LogCallerFileLine("peMgrPoweroff: sdl: %s, peer name: %s, task name: %s",
-			sdl, peerInst.name, peMgr.sdl.SchGetTaskName(peerInst.ptnMe))
 		SetP2pkgCallback(nil, peerInst.ptnMe)
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
 		peMgr.sdl.SchSendMessage(&powerOff)
 	}
 
-	// done ourselves
 	if peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
+
 	return PeMgrEnoNone
 }
 
-func (peMgr *PeerManager)peMgrStartReq(msg interface{}) PeMgrErrno {
-	_ = msg
+func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
 
 	// start peer listener if necessary
@@ -902,7 +897,17 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 	}
 
-	return PeMgrEnoNone
+	i := P2pIndPeerActivatedPara {
+		Ptn: inst.ptnMe,
+		PeerInfo: & Handshake {
+			Snid:		inst.snid,
+			Dir:		inst.dir,
+			NodeId:		inst.node.ID,
+			ProtoNum:	inst.protoNum,
+			Protocols:	inst.protocols,
+		},
+	}
+	return peMgr.peMgrIndEnque(&i)
 }
 
 func (peMgr *PeerManager)peMgrPingpongRsp(msg interface{}) PeMgrErrno {
@@ -954,19 +959,13 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 			config.P2pNodeId2HexString(ind.peNode.ID))
 		return PeMgrEnoScheduler
 	}
-	sdl := peMgr.sdl.SchGetP2pCfgName()
-	log.LogCallerFileLine("peMgrConnCloseInd: Lock4Cb.Lock, sdl: %s, name: %s", sdl, peMgr.name)
-	peMgr.Lock4Cb.Lock()
-	if peMgr.P2pIndHandler != nil {
-		para := P2pIndPeerClosedPara {
-			Ptn:		peMgr.ptnMe,
-			Snid:		ind.snid,
-			PeerId:		ind.peNode.ID,
-		}
-		peMgr.P2pIndHandler(P2pIndPeerClosed, &para)
+
+	i := P2pIndPeerClosedPara {
+		Ptn:		peMgr.ptnMe,
+		Snid:		ind.snid,
+		PeerId:		ind.peNode.ID,
 	}
-	peMgr.Lock4Cb.Unlock()
-	log.LogCallerFileLine("peMgrConnCloseInd: Lock4Cb.Unlock, sdl: %s, name: %s", sdl, peMgr.name)
+	peMgr.peMgrIndEnque(&i)
 
 	// drive ourselves to startup outbound
 	var schMsg = sch.SchMessage{}
@@ -1194,7 +1193,13 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-// Dynamic peer task
+func (peMgr *PeerManager)peMgrIndEnque(ind interface{}) PeMgrErrno {
+	return PeMgrEnoNone
+}
+
+//
+// Dynamic peer instance task
+//
 const peInstTaskName = "peInstTsk"
 const (
 	peInstStateNull		= iota				// null
@@ -1402,8 +1407,7 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (inst *peerInstance)piConnOutReq(msg interface{}) PeMgrErrno {
-	_ = msg
+func (inst *peerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 	if inst.dialer == nil ||
 		inst.dir != PeInstDirOutbound  ||
 		inst.state != peInstStateConnOut {
@@ -1441,8 +1445,7 @@ func (inst *peerInstance)piConnOutReq(msg interface{}) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (inst *peerInstance)piHandshakeReq(msg interface{}) PeMgrErrno {
-	_ = msg
+func (inst *peerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 	if inst == nil {
 		log.LogCallerFileLine("piHandshakeReq: invalid instance")
 		return PeMgrEnoParameter
@@ -1496,45 +1499,42 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 		log.LogCallerFileLine("piPingpongReq: connection had been closed")
 		return PeMgrEnoResource
 	}
-
-	log.LogCallerFileLine("piPingpongReq: ppSeq: %d, will be inited to be: %d",
-		inst.ppSeq, msg.(*MsgPingpongReq).seq)
 	inst.ppSeq = msg.(*MsgPingpongReq).seq
 	ping := Pingpong {
 		Seq:	inst.ppSeq,
 		Extra:	nil,
 	}
 	inst.ppSeq++
+
 	upkg := new(P2pPackage)
 	if eno := upkg.ping(inst, &ping); eno != PeMgrEnoNone {
-		sdl := inst.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("piPingpongReq: Lock4Cb.Lock, sdl: %s, name: %s", sdl, inst.name)
-		inst.peMgr.Lock4Cb.Lock()
 		inst.ppEno = eno
-		if inst.peMgr.P2pIndHandler != nil {
-			para := P2pIndConnStatusPara {
-				Ptn:		inst.ptnMe,
-				PeerInfo:	&Handshake {
-					Snid:		inst.snid,
-					NodeId:		inst.node.ID,
-					ProtoNum:	inst.protoNum,
-					Protocols:	inst.protocols,
-				},
-				Status		:	int(eno),
-				Flag		:	false,
-				Description	:"piPingpongReq: upkg.ping failed",
-			}
-			inst.peMgr.P2pIndHandler(P2pIndConnStatus, &para)
+		i := P2pIndConnStatusPara {
+			Ptn:		inst.ptnMe,
+			PeerInfo:	&Handshake{
+				Snid:      inst.snid,
+				NodeId:    inst.node.ID,
+				ProtoNum:  inst.protoNum,
+				Protocols: inst.protocols,
+			},
 		}
-		inst.peMgr.Lock4Cb.Unlock()
-		log.LogCallerFileLine("piPingpongReq: Lock4Cb.Unlock, sdl: %s, name: %s", sdl, inst.name)
+		req := sch.MsgPeCloseReq {
+			Ptn: inst.ptnMe,
+			Snid: inst.snid,
+			Node: inst.node,
+			Dir: inst.dir,
+			Why: &i,
+		}
+		msg := sch.SchMessage{}
+		inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
+		inst.sdl.SchSendMessage(&msg)
 		return eno
 	}
+
 	return PeMgrEnoNone
 }
 
-func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
-	_ = msg
+func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	sdl := inst.sdl.SchGetP2pCfgName()
 	if inst.killing == true {
 		log.LogCallerFileLine("piCloseReq: already in killing, sdl: %s, task: %s",
@@ -1568,35 +1568,18 @@ func (inst *peerInstance)piCloseReq(msg interface{}) PeMgrErrno {
 	close(inst.txDone)
 	close(inst.txExit)
 
-	peMgr := inst.peMgr
-	if inst.sdl.SchGetPoweroffStage() != true {
-		cfm := MsgCloseCfm {
-			result: PeMgrEnoNone,
-			dir:	inst.dir,
-			snid:	inst.snid,
-			peNode:	&node,
-			ptn:	inst.ptnMe,
-		}
-		log.LogCallerFileLine("piCloseReq: Lock4Cb.Lock, sdl: %s, inst: %s", sdl, inst.name)
-		peMgr.Lock4Cb.Lock()
-		if inst.peMgr.P2pIndHandler != nil {
-			para := P2pIndPeerClosedPara {
-				Ptn:		peMgr.ptnMe,
-				Snid:		cfm.snid,
-				PeerId:		cfm.peNode.ID,
-			}
-			peMgr.P2pIndHandler(P2pIndPeerClosed, &para)
-		}
-		peMgr.Lock4Cb.Unlock()
-		log.LogCallerFileLine("piCloseReq: Lock4Cb.Unlock, sdl: %s, inst: %s", sdl, inst.name)
-
-		// drive ourselves to startup outbound
-		schMsg := sch.SchMessage{}
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
-		peMgr.sdl.SchSendMessage(&schMsg)
+	cfm := MsgCloseCfm {
+		result: PeMgrEnoNone,
+		dir:	inst.dir,
+		snid:	inst.snid,
+		peNode:	&node,
+		ptn:	inst.ptnMe,
 	}
-
-	return peMgr.peMgrKillInst(inst.ptnMe, &inst.node, inst.dir)
+	peMgr := inst.peMgr
+	schMsg := sch.SchMessage{}
+	peMgr.sdl.SchMakeMessage(&schMsg, inst.ptnMe, peMgr.ptnMe, sch.EvPeCloseCfm, &cfm)
+	peMgr.sdl.SchSendMessage(&schMsg)
+	return PeMgrEnoNone
 }
 
 func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
@@ -1622,75 +1605,48 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	inst.ppEno = PeMgrEnoNone
 	inst.conn.SetDeadline(time.Time{})
 
-	log.LogCallerFileLine("piEstablishedInd: Lock4Cb.Lock, sdl: %s, name: %s", sdl, inst.name)
-	inst.peMgr.Lock4Cb.Lock()
-	if inst.peMgr.P2pIndHandler != nil {
-		para := P2pIndPeerActivatedPara {
-			Ptn: inst.ptnMe,
-			PeerInfo: & Handshake {
-				Snid:		inst.snid,
-				Dir:		inst.dir,
-				NodeId:		inst.node.ID,
-				ProtoNum:	inst.protoNum,
-				Protocols:	inst.protocols,
-			},
-		}
-		inst.peMgr.P2pIndHandler(P2pIndPeerActivated, &para)
-	}
-	inst.peMgr.Lock4Cb.Unlock()
-	log.LogCallerFileLine("piEstablishedInd: Lock4Cb.Unlock, sdl: %s, name: %s", sdl, inst.name)
-
 	go piTx(inst)
 	go piRx(inst)
+
 	return PeMgrEnoNone
 }
 
 func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
-	schMsg := sch.SchMessage{}
-	if inst.ppTid == sch.SchInvalidTid {
-		log.LogCallerFileLine("piPingpongTimerHandler: no timer, discarded")
-		return PeMgrEnoNone
-	}
+	msg := sch.SchMessage{}
 	if inst.ppCnt++; inst.ppCnt > PeInstMaxPingpongCnt {
-		log.LogCallerFileLine("piPingpongTimerHandler: call P2pIndHandler noping threshold reached, ppCnt: %d",
-			inst.ppCnt)
-
-		sdl := inst.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("piPingpongTimerHandler: Lock4Cb.Lock, sdl: %s, name: %s", sdl, inst.name)
-		inst.peMgr.Lock4Cb.Lock()
-		if inst.peMgr.P2pIndHandler != nil {
-			para := P2pIndConnStatusPara {
-				Ptn:		inst.ptnMe,
-				PeerInfo:	&Handshake {
-					Snid:		inst.snid,
-					NodeId:		inst.node.ID,
-					ProtoNum:	inst.protoNum,
-					Protocols:	inst.protocols,
-				},
-				Status		:	PeMgrEnoPingpongTh,
-				Flag		:	true,
-				Description	:	"piPingpongTimerHandler: threshold reached",
-			}
-			inst.peMgr.P2pIndHandler(P2pIndConnStatus, &para)
+		inst.ppEno = PeMgrEnoPingpongTh
+		i := P2pIndConnStatusPara {
+			Ptn:		inst.ptnMe,
+			PeerInfo:	&Handshake {
+				Snid:		inst.snid,
+				NodeId:		inst.node.ID,
+				ProtoNum:	inst.protoNum,
+				Protocols:	inst.protocols,
+			},
+			Status		:	PeMgrEnoPingpongTh,
+			Flag		:	true,
+			Description	:	"piPingpongTimerHandler: threshold reached",
 		}
-		inst.peMgr.Lock4Cb.Unlock()
-		log.LogCallerFileLine("piPingpongTimerHandler: Lock4Cb.Unlock, sdl: %s, name: %s", sdl, inst.name)
-
-		inst.sdl.SchMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPeCloseReq, nil)
-		inst.sdl.SchSendMessage(&schMsg)
-		return PeMgrEnoNone
+		req := sch.MsgPeCloseReq {
+			Ptn: inst.ptnMe,
+			Snid: inst.snid,
+			Node: inst.node,
+			Dir: inst.dir,
+			Why: &i,
+		}
+		inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
+		inst.sdl.SchSendMessage(&msg)
+		return inst.ppEno
 	}
-
 	pr := MsgPingpongReq {
 		seq: uint64(time.Now().UnixNano()),
 	}
-	inst.sdl.SchMakeMessage(&schMsg, inst.ptnMe, inst.ptnMe, sch.EvPePingpongReq, &pr)
-	inst.sdl.SchSendMessage(&schMsg)
+	inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMe, sch.EvPePingpongReq, &pr)
+	inst.sdl.SchSendMessage(&msg)
 	return PeMgrEnoNone
 }
 
-func (inst *peerInstance)piDataReq(msg interface{}) PeMgrErrno {
-	_ = msg
+func (inst *peerInstance)piDataReq(_ interface{}) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
@@ -1881,29 +1837,30 @@ chkDone:
 			// writing and the connection is closed for some reasons
 			// (for example the user close the peer), in this case,
 			// we would get an error.
-			log.LogCallerFileLine("piTx: call P2pIndHandler for SendPackage failed, " +
-				"sdl: %s, inst: %s, eno: %d", sdl, inst.name, eno)
 			inst.txEno = eno
-			log.LogCallerFileLine("piTx: Lock4Cb.Lock, sdl: %s, name: %s", sdl, inst.name)
-			inst.peMgr.Lock4Cb.Lock()
-			if inst.peMgr.P2pIndHandler != nil {
-				hs := Handshake {
-					Snid:		inst.snid,
-					NodeId:		inst.node.ID,
-					ProtoNum:	inst.protoNum,
-					Protocols:	inst.protocols,
-				}
-				info := P2pIndConnStatusPara{
-					Ptn:		inst.ptnMe,
-					PeerInfo:	&hs,
-					Status:		int(eno),
-					Flag:		false,
-					Description:"piTx: SendPackage failed",
-				}
-				inst.peMgr.P2pIndHandler(P2pIndConnStatus, &info)
+			hs := Handshake {
+				Snid:		inst.snid,
+				NodeId:		inst.node.ID,
+				ProtoNum:	inst.protoNum,
+				Protocols:	inst.protocols,
 			}
-			inst.peMgr.Lock4Cb.Unlock()
-			log.LogCallerFileLine("piTx: Lock4Cb.Unlock, sdl: %s, name: %s", sdl, inst.name)
+			i := P2pIndConnStatusPara{
+				Ptn:		inst.ptnMe,
+				PeerInfo:	&hs,
+				Status:		int(eno),
+				Flag:		false,
+				Description:"piTx: SendPackage failed",
+			}
+			req := sch.MsgPeCloseReq {
+				Ptn: inst.ptnMe,
+				Snid: inst.snid,
+				Node: inst.node,
+				Dir: inst.dir,
+				Why: &i,
+			}
+			msg := sch.SchMessage{}
+			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
+			inst.sdl.SchSendMessage(&msg)
 		}
 	}
 	return done
@@ -1941,31 +1898,30 @@ rxBreak:
 			// reading and the connection is closed for some reasons
 			// (for example the user close the peer), in this case,
 			// we would get an error.
-			log.LogCallerFileLine("piRx: call P2pIndHandler for RecvPackage failed, " +
-				"sdl: %s, inst: %s, eno: %d", sdl, inst.name, eno)
-
-			log.LogCallerFileLine("piRx: Lock4Cb.Lock, sdl: %s, name: %s", sdl, inst.name)
-			inst.peMgr.Lock4Cb.Lock()
 			inst.rxEno = eno
-			if inst.peMgr.P2pIndHandler != nil {
-				hs := Handshake {
-					Snid:		inst.snid,
-					NodeId:		inst.node.ID,
-					ProtoNum:	inst.protoNum,
-					Protocols:	inst.protocols,
-				}
-
-				info := P2pIndConnStatusPara{
-					Ptn:		inst.ptnMe,
-					PeerInfo:	&hs,
-					Status:		int(eno),
-					Flag:		false,
-					Description:"piRx: RecvPackage failed",
-				}
-				inst.peMgr.P2pIndHandler(P2pIndConnStatus, &info)
+			hs := Handshake {
+				Snid:		inst.snid,
+				NodeId:		inst.node.ID,
+				ProtoNum:	inst.protoNum,
+				Protocols:	inst.protocols,
 			}
-			inst.peMgr.Lock4Cb.Unlock()
-			log.LogCallerFileLine("piRx: Lock4Cb.Unlock, sdl: %s, name: %s", sdl, inst.name)
+			i := P2pIndConnStatusPara{
+				Ptn:		inst.ptnMe,
+				PeerInfo:	&hs,
+				Status:		int(eno),
+				Flag:		false,
+				Description:"piRx: RecvPackage failed",
+			}
+			req := sch.MsgPeCloseReq {
+				Ptn: inst.ptnMe,
+				Snid: inst.snid,
+				Node: inst.node,
+				Dir: inst.dir,
+				Why: &i,
+			}
+			msg := sch.SchMessage{}
+			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
+			inst.sdl.SchSendMessage(&msg)
 			continue
 		}
 		// check the package received to filter out those not for p2p internal only
@@ -1993,7 +1949,7 @@ rxBreak:
 			}
 			inst.p2pkgLock.Unlock()
 		} else {
-			// unknown protocol identity
+			// discard unknown protocol identity
 			log.LogCallerFileLine("piRx: package discarded for unknown pid: sdl: %s, inst: %s, %d",
 				 sdl, inst.name, upkg.Pid)
 		}

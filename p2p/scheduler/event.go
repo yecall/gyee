@@ -270,6 +270,7 @@ type MsgPeCloseReq struct {
 	Snid	config.SubNetworkID		// sub network identity
 	Node	config.Node				// peer node
 	Dir		int						// direction
+	Why		interface{}				// cause
 }
 
 //

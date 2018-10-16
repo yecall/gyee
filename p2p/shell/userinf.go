@@ -90,55 +90,6 @@ const (
 )
 
 func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno {
-
-	if what != P2pIndCb && what != P2pPkgCb {
-		log.LogCallerFileLine("P2pRegisterCallback: unknown what is: %d", what)
-		return P2pEnoParameter
-	}
-
-	if what == P2pIndCb {
-
-		sdl := target.(*sch.Scheduler)
-		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
-
-		sdlName := sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("P2pRegisterCallback: Lock4Cb.Lock, sdlName: %s", sdlName)
-		peMgr.Lock4Cb.Lock()
-
-		if peMgr.P2pIndHandler != nil {
-			log.LogCallerFileLine("P2pRegisterCallback: old handler will be overlapped")
-		}
-
-		if cb == nil {
-			log.LogCallerFileLine("P2pRegisterCallback: user registers nil indication handler")
-		}
-
-		peMgr.P2pIndHandler = cb.(peer.P2pIndCallback)
-
-		peMgr.Lock4Cb.Unlock()
-		log.LogCallerFileLine("P2pRegisterCallback: Lock4Cb.Unlock, sdlName: %s", sdlName)
-
-		return P2pEnoNone
-	}
-
-	var peerInst = target
-
-	if peerInst == nil {
-		log.LogCallerFileLine("P2pRegisterCallback: nil task node pointer")
-		return P2pEnoParameter
-	}
-
-	if cb == nil {
-		log.LogCallerFileLine("P2pRegisterCallback: user registers nil package handler")
-	}
-
-	if eno := peer.SetP2pkgCallback(cb, peerInst); eno != peer.PeMgrEnoNone {
-		log.LogCallerFileLine("P2pRegisterCallback: " +
-			"SetP2pkgCallback failed, eno: %d",
-			eno)
-		return P2pEnoInternal
-	}
-
 	return P2pEnoNone
 }
 

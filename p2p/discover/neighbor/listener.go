@@ -299,9 +299,7 @@ func (udpReader *UdpReaderTask)TaskProc4Scheduler(ptn interface{}, msg *sch.SchM
 	return udpReader.tep(ptn, msg)
 }
 
-func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
-	var _ = msg
+func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
 	var eno = sch.SchEnoNone
 	buf := make([]byte, udpMaxMsgSize)
 
