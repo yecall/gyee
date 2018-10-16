@@ -109,7 +109,6 @@ type peMgrConfig struct {
 	maxMsgSize			int							// max tcpmsg package size
 	protoNum			uint32						// local protocol number
 	protocols			[]Protocol					// local protocol table
-
 	networkType			int							// p2p network type
 	staticMaxPeers		int							// max peers would be
 	staticMaxOutbounds	int							// max concurrency outbounds
@@ -145,11 +144,9 @@ type PeerManager struct {
 	accepter		*acceptTskCtrlBlock				// pointer to accepter
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
-	killLock		sync.Mutex						// sync for instance killing
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
 	nodes			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to instance pointer
 	workers			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to pointer of instance in work
-	wrksLock		sync.Mutex						// sync for "workers"
 	wrkNum			map[SubNetworkID]int			// worker peer number
 	ibpNum			map[SubNetworkID]int			// active inbound peer number
 	obpNum			map[SubNetworkID]int			// active outbound peer number
@@ -1058,9 +1055,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 }
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
-	peMgr.killLock.Lock()
-	defer peMgr.killLock.Unlock()
-
 	log.LogCallerFileLine("peMgrKillInst: done task, sdl: %s, task: %s",
 		peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
 
@@ -2065,8 +2059,6 @@ func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {
 }
 
 func (peMgr *PeerManager) getWorkerInst(snid SubNetworkID, idEx *PeerIdEx) *peerInstance {
-	peMgr.wrksLock.Lock()
-	defer peMgr.wrksLock.Unlock()
 	return peMgr.workers[snid][*idEx]
 }
 
