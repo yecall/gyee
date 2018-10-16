@@ -30,9 +30,9 @@ package scheduler
 
 import (
 	"net"
+	"time"
 	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	"time"
 )
 
 //
@@ -270,6 +270,15 @@ type MsgPeCloseReq struct {
 	Snid	config.SubNetworkID		// sub network identity
 	Node	config.Node				// peer node
 	Dir		int						// direction
+}
+
+//
+// EvPeDataReq
+//
+type MsgPeDataReq struct {
+	SubNetId	config.SubNetworkID	// sub network identity
+	PeerId		config.NodeID		// peer node identity
+	Pkg			interface{}			// package pointer
 }
 
 //

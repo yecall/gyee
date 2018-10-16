@@ -101,6 +101,8 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 		sdl := target.(*sch.Scheduler)
 		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
 
+		sdlName := sdl.SchGetP2pCfgName()
+		log.LogCallerFileLine("P2pRegisterCallback: Lock4Cb.Lock, sdlName: %s", sdlName)
 		peMgr.Lock4Cb.Lock()
 
 		if peMgr.P2pIndHandler != nil {
@@ -114,6 +116,7 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 		peMgr.P2pIndHandler = cb.(peer.P2pIndCallback)
 
 		peMgr.Lock4Cb.Unlock()
+		log.LogCallerFileLine("P2pRegisterCallback: Lock4Cb.Unlock, sdlName: %s", sdlName)
 
 		return P2pEnoNone
 	}
@@ -144,14 +147,13 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 //
 func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 
-	if eno, failed := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
+	if eno := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
 
 		log.LogCallerFileLine("P2pSendPackage: " +
 			"SendPackage failed, eno: %d, pkg: %s",
 			eno,
 			fmt.Sprintf("%+v", *pkg))
 
-		_ = failed
 		return P2pEnoInternal
 	}
 

@@ -1244,9 +1244,14 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	// failed if in power off stage
 	//
 
-	if sdl.powerOff == true && msg.Id != EvSchPoweroff && msg.Id != EvSchDone {
-		log.LogCallerFileLine("schSendMsg: in power off stage")
-		return SchEnoPowerOff
+	if sdl.powerOff == true {
+		switch msg.Id {
+		case EvSchPoweroff:
+		case EvSchDone:
+		default:
+			log.LogCallerFileLine("schSendMsg: in power off stage")
+			return SchEnoPowerOff
+		}
 	}
 
 	if msg.sender == nil {
