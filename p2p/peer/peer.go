@@ -24,7 +24,6 @@ import (
 	"net"
 	"time"
 	"fmt"
-	"sync"
 	"math/rand"
 	"container/list"
 	ggio 	"github.com/gogo/protobuf/io"
@@ -230,7 +229,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = peMgr.peMgrConnCloseCfm(msg.Body)
 	case sch.EvPeCloseInd:
 		eno = peMgr.peMgrConnCloseInd(msg.Body)
-	case sch.EvPeDataReq:
+	case sch.EvPeTxDataReq:
 		eno = peMgr.peMgrDataReq(msg.Body)
 	default:
 		log.LogCallerFileLine("PeerMgrProc: invalid message: %d", msg.Id)
@@ -255,12 +254,8 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	peMgr.sdl = sch.SchGetScheduler(ptn)
 	_, peMgr.ptnLsn = peMgr.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
 
-	// fetch configration
 	var cfg *config.Cfg4PeerManager
 	if cfg = config.P2pConfig4PeerManager(peMgr.sdl.SchGetP2pCfgName()); cfg == nil {
-
-		log.LogCallerFileLine("peMgrPoweron: P2pConfig4PeerManager failed")
-
 		peMgr.inited<-PeMgrEnoConfig
 		return PeMgrEnoConfig
 	}
@@ -475,6 +470,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 			log.LogCallerFileLine("peMgrDcvFindNodeRsp: too much, some are truncated")
 			continue
 		}
+
 		peMgr.randoms[snid] = append(peMgr.randoms[snid], n)
 		appended[snid]++
 	}
@@ -1229,7 +1225,6 @@ type peerInstance struct {
 	protocols	[]Protocol					// peer protocol table
 	maxPkgSize	int							// max size of tcpmsg package
 	ppTid		int							// pingpong timer identity
-	p2pkgLock	sync.Mutex					// lock for p2p package tx-sync
 	rxChan		chan *P2pPackageRx			// rx pending channel
 	txPendSig	chan *P2pPackage			// tx pending channel
 	txPendNum	int							// tx pending number
@@ -1255,7 +1250,6 @@ var peerInstDefault = peerInstance {
 	protoNum:	0,
 	protocols:	[]Protocol{{}},
 	ppTid:		sch.SchInvalidTid,
-	p2pkgLock:	sync.Mutex{},
 	ppSeq:		0,
 	ppCnt:		0,
 	rxEno:		PeMgrEnoNone,
@@ -1328,8 +1322,10 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = pi.piEstablishedInd(msg.Body)
 	case sch.EvPePingpongTimer:
 		eno = pi.piPingpongTimerHandler()
-	case sch.EvPeDataReq:
-		eno = pi.piDataReq(msg.Body)
+	case sch.EvPeTxDataReq:
+		eno = pi.piTxDataReq(msg.Body)
+	case sch.EvPeRxDataInd:
+		eno = pi.piRxDataInd(msg.Body)
 	default:
 		log.LogCallerFileLine("PeerInstProc: invalid message: %d", msg.Id)
 		eno = PeMgrEnoParameter
@@ -1614,8 +1610,13 @@ func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (inst *peerInstance)piDataReq(_ interface{}) PeMgrErrno {
-	return PeMgrEnoNone
+func (inst *peerInstance)piTxDataReq(_ interface{}) PeMgrErrno {
+	// not applied
+	return PeMgrEnoMismatched
+}
+
+func (inst *peerInstance)piRxDataInd(msg interface{}) PeMgrErrno {
+	return inst.piP2pPkgProc(msg.(*P2pPackage))
 }
 
 func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
@@ -1723,7 +1724,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 			Pkg: _pkg,
 		}
 		msg := sch.SchMessage{}
-		pkg.P2pInst.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeDataReq, &req)
+		pkg.P2pInst.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeTxDataReq, &req)
 		pkg.P2pInst.SchSendMessage(&msg)
 	}
 	return PeMgrEnoUnknown
@@ -1872,12 +1873,11 @@ rxBreak:
 			inst.sdl.SchSendMessage(&msg)
 			continue
 		}
-		// check the package received to filter out those not for p2p internal only
+
 		if upkg.Pid == uint32(PID_P2P) {
-			if eno := inst.piP2pPkgProc(upkg); eno != PeMgrEnoNone {
-				log.LogCallerFileLine("piRx: piP2pMsgProc failed, sdl: %s, inst: %s, eno: %d",
-					sdl, inst.name, eno)
-			}
+			msg := sch.SchMessage{}
+			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMe, sch.EvPeRxDataInd, &upkg)
+			inst.sdl.SchSendMessage(&msg)
 		} else if upkg.Pid == uint32(PID_EXT) {
 			peerInfo.Protocols	= nil
 			peerInfo.Snid		= inst.snid
@@ -1896,6 +1896,7 @@ rxBreak:
 				 sdl, inst.name, upkg.Pid)
 		}
 	}
+
 	return done
 }
 

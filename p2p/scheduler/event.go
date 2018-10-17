@@ -259,7 +259,8 @@ const (
 	EvPeOutboundReq			= EvPeerEstBase + 10
 	EvPeEstablishedInd		= EvPeerEstBase + 11
 	EvPeMgrStartReq			= EvPeerEstBase + 12
-	EvPeDataReq				= EvPeerEstBase + 13
+	EvPeTxDataReq			= EvPeerEstBase + 13
+	EvPeRxDataInd			= EvPeerEstBase + 14
 )
 
 //
@@ -274,7 +275,7 @@ type MsgPeCloseReq struct {
 }
 
 //
-// EvPeDataReq
+// EvPeTxDataReq
 //
 type MsgPeDataReq struct {
 	SubNetId	config.SubNetworkID	// sub network identity
