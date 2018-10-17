@@ -24,7 +24,6 @@ package shell
 import (
 	"time"
 	"fmt"
-	golog	"log"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
@@ -253,36 +252,59 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 
 	} else {
 
-		golog.Printf("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
+		log.LogCallerFileLine("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}
 
 	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
-			golog.Printf("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
+			log.LogCallerFileLine("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
 			continue
 		}
 
+		log.LogCallerFileLine("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
+			p2pInstName, taskName)
+
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
 
-			golog.Printf("P2pStop: inst: %s, " +
+			log.LogCallerFileLine("P2pStop: inst: %s, " +
 				"SchSendMessageByName failed, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
 		} else {
 
-			golog.Printf("P2pStop: inst: %s, " +
+			log.LogCallerFileLine("P2pStop: inst: %s, " +
 				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
+
+			//
+			// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			// To deal with the dependencies between static tasks in carrying out the power
+			// off procedure, the order of tasks to be sent with EvSchPoweroff is specified
+			// in table taskStaticPoweroffOrder4Chain or taskStaticPoweroffOrder4Dht according
+			// to the application type. Beside of these tables, here we simply wait until
+			// a static done before sending the next EvSchPoweroff to ensure the order is
+			// what we want. And please notice that: while a static task is killing, dynamic
+			// tasks might be done "at the same time".
+			//
+
+			for sdl.SchTaskExist(taskName) {
+				log.LogCallerFileLine("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
+				time.Sleep(time.Millisecond * 500)
+			}
+
+			log.LogCallerFileLine("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
 		}
 	}
 
-	golog.Printf("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
-	golog.Printf("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
+	log.LogCallerFileLine("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	log.LogCallerFileLine("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
-	// just wait all to be done
+	// Notice:
+	// All static tasks had been done when come here, BUT some dynamic tasks might be still
+	// alive, we just wait all to be done.
 	//
 
 	seconds := 0
@@ -296,7 +318,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			golog.Printf("P2pStop: inst: %s, all tasks are done", p2pInstName)
+			log.LogCallerFileLine("P2pStop: inst: %s, all tasks are done", p2pInstName)
 			break
 		}
 
@@ -310,7 +332,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 			}
 		}
 
-		golog.Printf("P2pStop: " +
+		log.LogCallerFileLine("P2pStop: " +
 			"inst: %s, wait seconds: %d, remain tasks: %d, names: %s",
 			p2pInstName, seconds, tasks, strNames)
 	}

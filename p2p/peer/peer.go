@@ -525,7 +525,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.raddr		= ibInd.remoteAddr
 	peInst.dir			= PeInstDirInbound
 
-	peInst.txChan	= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
 	peInst.txExit		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
@@ -563,10 +563,9 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		if !peMgr.cfg.noAccept && !peMgr.acceptPaused {
 			// bugs: we can not pause accepter simply, a duration of delay should
 			// be apply before pausing it.
-
-			//log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, " +
-			//	"cfgName: %s", peMgr.cfg.cfgName)
-			//peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+			log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, " +
+				"cfgName: %s", peMgr.cfg.cfgName)
+			peMgr.acceptPaused = peMgr.accepter.PauseAccept()
 		}
 	}
 
@@ -661,7 +660,7 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		}
 	}
 
-	// If outbounds are not enougth, ask discover for more
+	// If outbounds are not enougth, ask discoverer for more
 	if peMgr.obpNum[snid] < peMgr.cfg.staticMaxOutbounds {
 		if eno := peMgr.peMgrAsk4More(&snid); eno != PeMgrEnoNone {
 			return eno

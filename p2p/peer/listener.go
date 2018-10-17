@@ -86,7 +86,7 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 
 	var eno sch.SchErrno
 	lsnMgr.ptn = ptn
-	lsnMgr.sdl = sch.SchGetScheduler(ptn)
+	lsnMgr.sdl = sdl
 	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetTaskNodeByName(PeerMgrName); eno != sch.SchEnoNone {
 		return eno
 	}
@@ -223,7 +223,7 @@ func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMes
 		return sch.SchEnoInternal
 	}
 
-	accepter.event = sch.EvSchNull
+	accepter.event = sch.SchEnoNone
 	accepter.curError = nil
 	log.LogCallerFileLine("PeerAcceptProc: sdl, %s, inited ok, tring to accept ...", sdl)
 
@@ -232,6 +232,7 @@ acceptLoop:
 	for {
 		// lock to know if we are allowed to accept
 		accepter.lockAccept.Lock()
+		accepter.lockAccept.Unlock()
 		// Check if had been kill by manager: we first obtain the lock then check the listener and
 		// event to see if we hav been killed, if not, we backup the listener for later accept operation
 		// and free the lock. See function lsnMgrStop for more please.
@@ -244,7 +245,6 @@ acceptLoop:
 		}
 		listener := accepter.listener
 		accepter.lockTcb.Unlock()
-		accepter.lockAccept.Unlock()
 
 		// Try to accept. Since we had never set deadline for the listener, we
 		// would work in a blocked mode; and if here the manager had close the
@@ -268,6 +268,8 @@ acceptLoop:
 			break acceptLoop
 		}
 		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, accept one: %s", sdl, conn.RemoteAddr().String())
+		// unlock the control block
+		accepter.lockTcb.Unlock()
 
 		// Connection got, hand it up to peer manager task, notice that we will continue the loop
 		// event when we get errors to make and send the message to peer manager, see bellow.
@@ -279,9 +281,6 @@ acceptLoop:
 		}
 		accepter.sdl.SchMakeMessage(&msg, ptn, accepter.ptnPeMgr, sch.EvPeLsnConnAcceptedInd, &msgBody)
 		accepter.sdl.SchSendMessage(&msg)
-
-		// unlock the control block
-		accepter.lockTcb.Unlock()
 	}
 
 	// Notice: when loop is broken to here, the Lock is still obtained by us,
@@ -293,8 +292,8 @@ acceptLoop:
 		// in this case, the accepter.listener will be closed by manager so we get errors in
 		// accepting, see event sch.EvPeLsnStopReq handler for more pls.
 		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, broken for event: %d", sdl, accepter.event)
-		accepter.sdl.SchTaskDone(ptn, accepter.event)
 		accepter.lockTcb.Unlock()
+		accepter.sdl.SchTaskDone(ptn, accepter.event)
 		return accepter.event
 	}
 
@@ -307,7 +306,6 @@ acceptLoop:
 		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, abnormal exit, event: %d, err: nil",
 			sdl, accepter.event)
 	}
-
 	accepter.lockTcb.Unlock()
 	return accepter.sdl.SchTaskDone(ptn, sch.SchEnoUnknown)
 }

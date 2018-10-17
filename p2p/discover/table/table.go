@@ -750,7 +750,6 @@ func (ndbc *NodeDbCleaner)ndbcProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 		log.LogCallerFileLine("NdbcProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
@@ -1852,9 +1851,6 @@ func (tabMgr *TableManager)tabShouldBoundDbNode(id NodeID) bool {
 	return tabMgr.tabShouldBound(id)
 }
 
-// Upate node for the bucket
-// Notice: inside the table manager task, this function MUST NOT be called,
-// since we had obtain the lock at the entry of the task handler.
 func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
@@ -1866,15 +1862,7 @@ func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQ
 	return mgr.tabBucketAddNode(n, lastQuery, lastPing, lastPong)
 }
 
-// Upate a node for node database.
-// Notice: inside the table manager task, this function MUST NOT be called,
-// since we had obtain the lock at the entry of the task handler.
 func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgrErrno {
-	// We would be called by other task, we need to lock and
-	// defer unlock. Also notice that: calling this function
-	// for a node would append new node or overwrite the exist
-	// one, the FindNode fail counter would be set to zero.
-	// See function tabMgr.nodeDb.updateNode for more please.
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
 		log.LogCallerFileLine("TabUpdateNode: none of manager instance for subnet: %x", snid)
@@ -1904,9 +1892,6 @@ const Closest4Querying	= 1
 const Closest4Queried	= 0
 
 func (tabMgr *TableManager)TabClosest(forWhat int, target NodeID, size int) []*Node {
-	// Fetch closest nodes for target
-	// Notice: inside the table manager task, this function MUST NOT be called,
-	// since we had obtain the lock at the entry of the task handler.
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	return tabMgr.tabClosest(forWhat, target, size)
@@ -1925,16 +1910,12 @@ func TabBuildNode(pn *config.Node) *Node {
 }
 
 func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
-	// Notice: inside the table manager task, this function MUST NOT be called,
-	// since we had obtain the lock at the entry of the task handler.
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	return &tabMgr.snid
 }
 
 func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManager {
-	// Notice: inside the table manager task, this function MUST NOT be called,
-	// since we had obtain the lock at the entry of the task handler.
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	if tabMgr.snid != AnySubNet {

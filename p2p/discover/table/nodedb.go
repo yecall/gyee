@@ -41,7 +41,6 @@ import (
 
 var (
 	nodeDBNodeExpiration = 24 * time.Hour // Time for node to be expired
-	nodeDBCleanupCycle   = time.Hour      // Time period to cleanup
 )
 
 type nodeDB struct {
