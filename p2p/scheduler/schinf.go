@@ -130,7 +130,7 @@ const (
 )
 
 // max mail box size
-const SchMaxMbSize	 = 256
+const SchMaxMbSize = 4096
 type SchTaskDescription struct {
 	Name	string						// user task name
 	MbSize	int							// mailbox size
@@ -149,7 +149,7 @@ const (
 type SchTimerType int
 
 // Timer description
-const SchMaxTaskTimer 	= 128	// max timers can be held by one user task
+const SchMaxTaskTimer 	= 512	// max timers can be held by one user task
 const SchInvalidTid		= -1	// invalid timer identity
 type TimerDescription struct {
 	Name	string				// timer name
@@ -246,16 +246,13 @@ func (sdl *Scheduler)SchGetRecver(msg *SchMessage) interface{} {
 
 // Make scheduling message
 func (sdl *Scheduler)SchMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
-
 	if msg == nil || s == nil || r == nil {
 		return SchEnoParameter
 	}
-
 	msg.sender = s.(*schTaskNode)
 	msg.recver = r.(*schTaskNode)
 	msg.Id = id
 	msg.Body = body
-
 	return SchEnoNone
 }
 

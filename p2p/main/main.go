@@ -1117,7 +1117,7 @@ func testCase5(tc *testCase) {
 
 	log.LogCallerFileLine("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 64
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
