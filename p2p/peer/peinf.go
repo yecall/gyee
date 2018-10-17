@@ -27,7 +27,7 @@ import (
 //
 // Package passed into user's callback
 //
-type P2pPackage4Callback struct {
+type P2pPackageRx struct {
 	Ptn				interface{}		// instance task node pointer
 	PeerInfo		*PeerInfo		// peer information
 	ProtoId			int				// protocol identity
@@ -102,7 +102,7 @@ type P2pIndCallback func(what int, para interface{}) interface{}
 //
 // P2p callback function type for package incoming
 //
-type P2pPkgCallback func(msg *P2pPackage4Callback) interface{}
+type P2pPkgCallback func(msg *P2pPackageRx) interface{}
 
 
 

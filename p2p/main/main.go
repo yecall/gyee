@@ -451,7 +451,7 @@ func p2pIndProc(what int, para interface{}) interface{} {
 //
 // Package handler
 //
-func p2pPkgProc(pkg *peer.P2pPackage4Callback) interface{} {
+func p2pPkgProc(pkg *peer.P2pPackageRx) interface{} {
 
 	p2pInst := sch.SchGetScheduler(pkg.Ptn)
 	snid := pkg.PeerInfo.Snid

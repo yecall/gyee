@@ -380,11 +380,8 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 	}
 
 	//
-	// write package to peer. in practice, we find that two routines can not
-	// share a conection to write without sync.
+	// write package to peer
 	//
-
-	inst.p2pkgLock.Lock()
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
@@ -392,12 +389,8 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 			"Write failed, err: %s",
 			err.Error())
 
-		inst.p2pkgLock.Unlock()
-
 		return PeMgrEnoOs
 	}
-
-	inst.p2pkgLock.Unlock()
 
 	return PeMgrEnoNone
 }
@@ -456,11 +449,8 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 	}
 
 	//
-	// write package to peer. in practice, we find that two routines can not
-	// share a conection to write without sync.
+	// write package to peer
 	//
-
-	inst.p2pkgLock.Lock()
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
@@ -468,12 +458,8 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 			"Write failed, err: %s",
 			err.Error())
 
-		inst.p2pkgLock.Unlock()
-
 		return PeMgrEnoOs
 	}
-
-	inst.p2pkgLock.Unlock()
 
 	return PeMgrEnoNone
 }
