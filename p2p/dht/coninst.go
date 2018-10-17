@@ -61,7 +61,7 @@ type ConInst struct {
 	txPending		*list.List				// pending packages to be sent
 	txWaitRsp		*list.List				// packages had been sent but waiting for response from peer
 	txLock			sync.Mutex				// tx lock
-	txPendSig		chan interface{}		// tx pendings signal
+	txChan		chan interface{}		// tx pendings signal
 	txDone			chan int				// tx-task done signal
 	rxDone			chan int				// rx-task done signal
 	cbRxLock		sync.Mutex				// lock for data plane callback
@@ -619,7 +619,7 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 		dht, conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
 	conInst.txPending.PushBack(pkg)
-	conInst.txPendSig<-pkg
+	conInst.txChan<-pkg
 
 	return DhtEnoNone
 }
@@ -766,11 +766,11 @@ func (conInst *ConInst)txTaskStart() DhtErrno {
 	}
 	conInst.txDone = make(chan int, 1)
 
-	if conInst.txPendSig != nil {
-		log.LogCallerFileLine("txTaskStart: non-nil chan for txPendSig")
+	if conInst.txChan != nil {
+		log.LogCallerFileLine("txTaskStart: non-nil chan for txChan")
 		return DhtEnoMismatched
 	}
-	conInst.txPendSig = make(chan interface{}, ciTxPendingQueueSize)
+	conInst.txChan = make(chan interface{}, ciTxPendingQueueSize)
 
 	go conInst.txProc()
 
@@ -801,8 +801,8 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 		done := <-conInst.txDone
 		close(conInst.txDone)
 		conInst.txDone = nil
-		close(conInst.txPendSig)
-		conInst.txPendSig = nil
+		close(conInst.txChan)
+		conInst.txChan = nil
 
 		return DhtErrno(done)
 	}
@@ -1223,7 +1223,7 @@ _txLoop:
 		// fetch pending signal
 		//
 
-		_, ok = <-conInst.txPendSig
+		_, ok = <-conInst.txChan
 		if !ok {
 			goto _checkDone
 		}

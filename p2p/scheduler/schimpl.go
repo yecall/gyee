@@ -32,7 +32,7 @@ import (
 //
 // scheduler debug flag
 //
-var _debug = false
+var Debug__ = false
 
 //
 // Default task node for scheduler to send event
@@ -1254,7 +1254,9 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		case EvSchPoweroff:
 		case EvSchDone:
 		default:
-			log.LogCallerFileLine("schSendMsg: in power off stage")
+			if Debug__ {
+				log.LogCallerFileLine("schSendMsg: in power off stage")
+			}
 			return SchEnoPowerOff
 		}
 	}
@@ -1273,7 +1275,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	// for debug to back trace
 	//
 
-	if _debug {
+	if Debug__ {
 		_, file, line, _ := runtime.Caller(2)
 		log.LogCallerFileLine("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
 			sdl.p2pCfg.CfgName,

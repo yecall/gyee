@@ -190,9 +190,13 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 }
 
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	if sch.Debug__ && peMgr.sdl != nil {
+		sdl := peMgr.sdl.SchGetP2pCfgName()
+		log.LogCallerFileLine("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
+	}
+
 	var schEno = sch.SchEnoNone
 	var eno PeMgrErrno = PeMgrEnoNone
-
 	switch msg.Id {
 	case sch.EvSchPoweron:
 		eno = peMgr.peMgrPoweron(ptn)
@@ -511,9 +515,10 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.raddr		= ibInd.remoteAddr
 	peInst.dir			= PeInstDirInbound
 
-	peInst.txPendSig	= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.txChan	= make(chan *P2pPackage, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
 	peInst.txExit		= make(chan PeMgrErrno)
+	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
 	peInst.rxExit		= make(chan PeMgrErrno)
 
@@ -957,12 +962,12 @@ func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
 			return PeMgrEnoNotfound
 		}
 	}
-	if inst.txPendNum >= PeInstMaxP2packages {
-		log.LogCallerFileLine("peMgrDataReq: tx buffer full")
+	if len(inst.txChan) >= cap(inst.txChan) {
+		log.LogCallerFileLine("peMgrDataReq: tx queue full, inst: %s", inst.name)
 		return PeMgrEnoResource
 	}
 	_pkg := req.Pkg.(*P2pPackage)
-	inst.txPendSig<-_pkg
+	inst.txChan<-_pkg
 	inst.txPendNum += 1
 	return PeMgrEnoNone
 }
@@ -989,9 +994,10 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.snid			= *snid
 	peInst.node			= *node
 
-	peInst.txPendSig	= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.txChan	= make(chan *P2pPackage, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
 	peInst.txExit		= make(chan PeMgrErrno)
+	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
 	peInst.rxExit		= make(chan PeMgrErrno)
 
@@ -1213,7 +1219,7 @@ type peerInstance struct {
 	maxPkgSize	int							// max size of tcpmsg package
 	ppTid		int							// pingpong timer identity
 	rxChan		chan *P2pPackageRx			// rx pending channel
-	txPendSig	chan *P2pPackage			// tx pending channel
+	txChan		chan *P2pPackage			// tx pending channel
 	txPendNum	int							// tx pending number
 	txDone		chan PeMgrErrno				// TX chan
 	txExit		chan PeMgrErrno				// TX had been done
@@ -1291,6 +1297,11 @@ func (pi *peerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 }
 
 func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	if sch.Debug__ && pi.sdl != nil {
+		sdl := pi.sdl.SchGetP2pCfgName()
+		log.LogCallerFileLine("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, pi.name, msg.Id)
+	}
+
 	var eno PeMgrErrno
 	switch msg.Id {
 	case sch.EvSchPoweroff:
@@ -1315,9 +1326,11 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		log.LogCallerFileLine("PeerInstProc: invalid message: %d", msg.Id)
 		eno = PeMgrEnoParameter
 	}
+
 	if eno != PeMgrEnoNone {
 		return sch.SchEnoUserTask
 	}
+
 	return sch.SchEnoNone
 }
 
@@ -1336,8 +1349,8 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 		sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 
 	if inst.state == peInstStateActivated {
-		if inst.txPendSig != nil {
-			close(inst.txPendSig)
+		if inst.txChan != nil {
+			close(inst.txChan)
 		}
 
 		if inst.txDone != nil {
@@ -1502,8 +1515,8 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	inst.killing = true
 	node := inst.node
 	if inst.state == peInstStateActivated {
-		if inst.txPendSig != nil {
-			close(inst.txPendSig)
+		if inst.txChan != nil {
+			close(inst.txChan)
 		}
 		inst.rxDone <- PeMgrEnoNone
 		<-inst.rxExit
@@ -1756,7 +1769,7 @@ chkDone:
 			continue
 		}
 		// check if some pending, if the signal closed, we check if it's done
-		upkg, ok := <-(inst.txPendSig)
+		upkg, ok := <-(inst.txChan)
 		if !ok {
 			goto chkDone
 		}
@@ -1862,18 +1875,22 @@ rxBreak:
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMe, sch.EvPeRxDataInd, upkg)
 			inst.sdl.SchSendMessage(&msg)
 		} else if upkg.Pid == uint32(PID_EXT) {
-			peerInfo.Protocols	= nil
-			peerInfo.Snid		= inst.snid
-			peerInfo.NodeId		= inst.node.ID
-			peerInfo.ProtoNum	= inst.protoNum
-			peerInfo.Protocols	= append(peerInfo.Protocols, inst.protocols...)
-			pkgCb.Ptn			= inst.ptnMe
-			pkgCb.Payload		= nil
-			pkgCb.PeerInfo		= &peerInfo
-			pkgCb.ProtoId		= int(upkg.Pid)
-			pkgCb.PayloadLength	= int(upkg.PayloadLength)
-			pkgCb.Payload		= append(pkgCb.Payload, upkg.Payload...)
-			inst.rxChan<-&pkgCb
+			if len(inst.rxChan) >= cap(inst.rxChan) {
+				log.LogCallerFileLine("piRx: rx queue full, sdl: %s, inst: %s", sdl, inst.name)
+			} else {
+				peerInfo.Protocols = nil
+				peerInfo.Snid = inst.snid
+				peerInfo.NodeId = inst.node.ID
+				peerInfo.ProtoNum = inst.protoNum
+				peerInfo.Protocols = append(peerInfo.Protocols, inst.protocols...)
+				pkgCb.Ptn = inst.ptnMe
+				pkgCb.Payload = nil
+				pkgCb.PeerInfo = &peerInfo
+				pkgCb.ProtoId = int(upkg.Pid)
+				pkgCb.PayloadLength = int(upkg.PayloadLength)
+				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
+				inst.rxChan <- &pkgCb
+			}
 		} else {
 			log.LogCallerFileLine("piRx: package discarded for unknown pid: sdl: %s, inst: %s, %d",
 				 sdl, inst.name, upkg.Pid)

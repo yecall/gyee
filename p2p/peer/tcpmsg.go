@@ -27,6 +27,7 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	pb		"github.com/yeeco/gyee/p2p/peer/pb"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	log	"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -543,9 +544,11 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
 
-		log.LogCallerFileLine("RecvPackage: " +
-			"ReadMsg faied, err: %s",
-			err.Error())
+		if sch.Debug__ {
+			log.LogCallerFileLine("RecvPackage: "+
+				"ReadMsg faied, err: %s",
+				err.Error())
+		}
 
 		return PeMgrEnoOs
 	}
