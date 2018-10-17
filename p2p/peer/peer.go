@@ -190,13 +190,6 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 }
 
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
-	if peMgr.sdl != nil {
-		sdl := peMgr.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("peerMgrProc: enter, sdl: %s, name: %s, msg.Id: %d, sender: %s",
-			sdl, peMgr.name, msg.Id, peMgr.sdl.SchGetTaskName(peMgr.sdl.SchGetSender(msg)))
-	}
-
 	var schEno = sch.SchEnoNone
 	var eno PeMgrErrno = PeMgrEnoNone
 
@@ -238,12 +231,6 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	if eno != PeMgrEnoNone {
 		schEno = sch.SchEnoUserTask
-	}
-
-	if peMgr.sdl != nil {
-		sdl := peMgr.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("peerMgrProc: exit, sdl: %s, name: %s, msg.Id: %d, sender: %s",
-			sdl, peMgr.name, msg.Id, peMgr.sdl.SchGetTaskName(peMgr.sdl.SchGetSender(msg)))
 	}
 
 	return schEno
@@ -1304,9 +1291,7 @@ func (pi *peerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 }
 
 func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
 	var eno PeMgrErrno
-
 	switch msg.Id {
 	case sch.EvSchPoweroff:
 		eno = pi.piPoweroff(ptn)
@@ -1330,11 +1315,6 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		log.LogCallerFileLine("PeerInstProc: invalid message: %d", msg.Id)
 		eno = PeMgrEnoParameter
 	}
-
-	sdl := pi.sdl.SchGetP2pCfgName()
-	log.LogCallerFileLine("peerInstProc: sdl: %s, pi.name: %s, msg.Id: %d, sender: %s",
-		sdl,  pi.name, msg.Id, pi.sdl.SchGetTaskName(pi.sdl.SchGetSender(msg)))
-
 	if eno != PeMgrEnoNone {
 		return sch.SchEnoUserTask
 	}
@@ -1342,13 +1322,16 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 }
 
 func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
-	sdl := inst.sdl.SchGetP2pCfgName()
 	if inst.killing == true {
-		log.LogCallerFileLine("piPoweroff: task already in killing, sdl: %s, name: %s",
-			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
+		// since the instance is in killing, the tx/rx routines must have been done,
+		// and this is a power off request, we done the instance task directly.
+		if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
+			return PeMgrEnoScheduler
+		}
 		return PeMgrEnoNone
 	}
 
+	sdl := inst.sdl.SchGetP2pCfgName()
 	log.LogCallerFileLine("piPoweroff: task will be done, sdl: %s, name: %s",
 		sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 
@@ -1876,7 +1859,7 @@ rxBreak:
 
 		if upkg.Pid == uint32(PID_P2P) {
 			msg := sch.SchMessage{}
-			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMe, sch.EvPeRxDataInd, &upkg)
+			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMe, sch.EvPeRxDataInd, upkg)
 			inst.sdl.SchSendMessage(&msg)
 		} else if upkg.Pid == uint32(PID_EXT) {
 			peerInfo.Protocols	= nil
@@ -1905,12 +1888,10 @@ func (pi *peerInstance)piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 		log.LogCallerFileLine("piP2pPkgProc: not a p2p package, pid: %d", upkg.Pid)
 		return PeMgrEnoMessage
 	}
-
 	if upkg.PayloadLength <= 0 {
 		log.LogCallerFileLine("piP2pPkgProc: invalid payload length: %d", upkg.PayloadLength)
 		return PeMgrEnoMessage
 	}
-
 	if len(upkg.Payload) != int(upkg.PayloadLength) {
 		log.LogCallerFileLine("piP2pPkgProc: payload length mismatched, PlLen: %d, real: %d",
 			upkg.PayloadLength, len(upkg.Payload))
@@ -1922,7 +1903,6 @@ func (pi *peerInstance)piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 		log.LogCallerFileLine("piP2pPkgProc: GetMessage failed, eno: %d", eno	)
 		return eno
 	}
-
 	// check message identity. we discard any handshake messages received here
 	// since handshake procedure had been passed, and dynamic handshake is not
 	// supported currently.

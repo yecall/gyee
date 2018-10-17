@@ -30,6 +30,11 @@ import (
 )
 
 //
+// scheduler debug flag
+//
+var _debug = false
+
+//
 // Default task node for scheduler to send event
 //
 const rawSchTaskName = "schTsk"
@@ -1264,14 +1269,20 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		return SchEnoParameter
 	}
 
-	_, file, line, _ := runtime.Caller(2)
-	log.LogCallerFileLine("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
-		sdl.p2pCfg.CfgName,
-		sdl.schGetTaskName(msg.sender),
-		sdl.schGetTaskName(msg.recver),
-		msg.Id,
-		file,
-		line)
+	//
+	// for debug to back trace
+	//
+
+	if _debug {
+		_, file, line, _ := runtime.Caller(2)
+		log.LogCallerFileLine("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
+			sdl.p2pCfg.CfgName,
+			sdl.schGetTaskName(msg.sender),
+			sdl.schGetTaskName(msg.recver),
+			msg.Id,
+			file,
+			line)
+	}
 
 	//
 	// put message to receiver mailbox. More work might be needed, such as
