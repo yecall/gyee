@@ -139,8 +139,18 @@ type PeerManager struct {
 	ptnLsn			interface{}						// pointer to peer listener manager task node
 	ptnAcp			interface{}						// pointer to peer acceptor manager task node
 	ptnDcv			interface{}						// pointer to discover task node
+
+	//
+	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// here we backup the pointer of table manger to access it, this is dangerous
+	// for the procedure of "poweroff", we take this into account in the "poweroff"
+	// order of these two tasks, see var taskStaticPoweroffOrder4Chain please. We
+	// should solve this issue later, the "accepter" pointer is the same case.
+	//
+
 	tabMgr			*tab.TableManager				// pointer to table manager
 	accepter		*acceptTskCtrlBlock				// pointer to accepter
+
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
 	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
@@ -896,8 +906,6 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 func (peMgr *PeerManager)peMgrPingpongRsp(msg interface{}) PeMgrErrno {
 	var rsp = msg.(*msgPingpongRsp)
 	if rsp.result != PeMgrEnoNone {
-		log.LogCallerFileLine("peMgrPingpongRsp: result: %d, node: %s",
-			rsp.result, config.P2pNodeId2HexString(rsp.peNode.ID))
 		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, rsp.dir); eno != PeMgrEnoNone {
 			log.LogCallerFileLine("peMgrPingpongRsp: kill instance failed, inst: %s, node: %s",
 				peMgr.sdl.SchGetTaskName(rsp.ptn),
@@ -929,6 +937,20 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
+	var ind = msg.(*MsgCloseCfm)
+	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {
+		return PeMgrEnoScheduler
+	}
+	i := P2pIndPeerClosedPara {
+		Ptn:		peMgr.ptnMe,
+		Snid:		ind.snid,
+		PeerId:		ind.peNode.ID,
+	}
+	peMgr.peMgrIndEnque(&i)
+	// drive ourselves to startup outbound
+	var schMsg = sch.SchMessage{}
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &ind.snid)
+	peMgr.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
 }
 
@@ -1364,6 +1386,10 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 			<-inst.rxExit
 			close(inst.rxDone)
 		}
+
+		if inst.rxChan != nil {
+			close(inst.rxChan)
+		}
 	}
 
 	if inst.conn != nil {
@@ -1520,8 +1546,12 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 		}
 		inst.rxDone <- PeMgrEnoNone
 		<-inst.rxExit
+
 		inst.txDone <- PeMgrEnoNone
 		<-inst.txExit
+		if inst.rxChan != nil {
+			close(inst.rxChan)
+		}
 	}
 	close(inst.rxDone)
 	close(inst.rxExit)
@@ -2053,6 +2083,7 @@ func (peMgr *PeerManager)logPeerStat() {
 	if !doLogPeerStat {
 		return
 	}
+
 	var obpNumSum = 0
 	var ibpNumSum = 0
 	var wrkNumSum = 0

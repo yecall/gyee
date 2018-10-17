@@ -24,6 +24,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"fmt"
 	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
@@ -55,7 +56,15 @@ const (
 // The control block of neighbor task instance
 type neighborInst struct {
 	sdl		*sch.Scheduler		// pointer to scheduler
+
+	//
+	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// we backup the neighbor manager pointer here to access it, this might cause
+	// issues when "poweroff" procedure is carried out.
+	//
+
 	ngbMgr	*NeighborManager	// pointer to neighbor manager
+
 	ptn		interface{}			// task node pointer
 	name	string				// task instance name
 	tep		sch.SchUserTaskEp	// entry
@@ -149,8 +158,7 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 		rsp.FindNode = inst.msgBody.(*um.FindNode)
 		inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		inst.sdl.SchSendMessage(&schMsg)
-		inst.ngbMgr.cleanMap(inst.name)
-		inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
+		inst.cleanMap(inst.name)
 	 	return NgbProtoEnoUdp
 	 }
 
@@ -211,9 +219,7 @@ func (inst *neighborInst) NgbProtoPingRsp(msg *um.Pong) NgbProtoErrno {
 	rsp.Pong = msg
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
-
-	inst.ngbMgr.cleanMap(inst.name)
-	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
+	inst.cleanMap(inst.name)
 	return NgbProtoEnoNone
 }
 
@@ -241,10 +247,7 @@ func (inst *neighborInst) NgbProtoFindNodeRsp(msg *um.Neighbors) NgbProtoErrno {
 	rsp.Neighbors = msg
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
-
-	inst.ngbMgr.cleanMap(inst.name)
-	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
-
+	inst.cleanMap(inst.name)
 	return NgbProtoEnoNone
 }
 
@@ -255,9 +258,7 @@ func (inst *neighborInst) NgbProtoFindNodeTimeout() NgbProtoErrno {
 	rsp.FindNode = inst.msgBody.(*um.FindNode)
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
-
-	inst.ngbMgr.cleanMap(inst.name)
-	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
+	inst.cleanMap(inst.name)
 	return NgbProtoEnoNone
 }
 
@@ -268,13 +269,18 @@ func (inst *neighborInst) NgbProtoPingTimeout() NgbProtoErrno {
 	rsp.Ping = inst.msgBody.(*um.Ping)
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
-
-	inst.ngbMgr.cleanMap(inst.name)
-	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoNone)
+	inst.cleanMap(inst.name)
 	return NgbProtoEnoNone
 }
 
-func (ni *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
+func (inst *neighborInst)cleanMap(name string) NgbMgrErrno {
+	msg := sch.SchMessage{}
+	inst.sdl.SchMakeMessage(&msg, inst.ptn, inst.ngbMgr.ptnMe, sch.EvNblCleanMapReq, name)
+	inst.sdl.SchSendMessage(&msg)
+	return NgbMgrEnoNone
+}
+
+func (ni *neighborInst)NgbProtoDieCb(ptn interface{}) sch.SchErrno {
 	if ni.tidPP != sch.SchInvalidTid {
 		ni.sdl.SchKillTimer(ni.ptn, ni.tidPP)
 		ni.tidPP = sch.SchInvalidTid
@@ -283,7 +289,8 @@ func (ni *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
 		ni.sdl.SchKillTimer(ni.ptn, ni.tidFN)
 		ni.tidFN = sch.SchInvalidTid
 	}
-	ni.ngbMgr.cleanMap(ni.name)
+	ni.cleanMap(ni.name)
+	ni.sdl.SchTaskDone(ni.ptn, sch.SchEnoKilled)
 
 	// any more ...?
 	return sch.SchEnoNone
@@ -303,7 +310,16 @@ type NeighborManager struct {
 	tep			sch.SchUserTaskEp			// entry
 	ptnMe		interface{}					// pointer to task node of myself
 	ptnTab		interface{}					// pointer to task node of table task
+
+	//
+	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// here we backup the pointer of table manger to access it, this is dangerous
+	// for the procedure of "poweroff", we take this into account in the "poweroff"
+	// order of these two tasks, see var taskStaticPoweroffOrder4Chain please. We
+	// should solve this issue later.
+	//
 	tabMgr		*tab.TableManager			// pointer to table manager
+
 	ptnLsn		interface{}					// pointer to task node of listner
 	ngbMap		map[string]*neighborInst	// map neighbor node id to task node pointer
 	fnInstSeq	int							// findnode instance sequence number
@@ -343,6 +359,8 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		eno = ngbMgr.FindNodeReq(msg.Body.(*um.FindNode))
 	case sch.EvNblPingpongReq:
 		eno = ngbMgr.PingpongReq(msg.Body.(*um.Ping))
+	case sch.EvNblCleanMapReq:
+		eno = ngbMgr.CleanMapReq(msg.Body.(string))
 	default:
 		log.LogCallerFileLine("NgbMgrProc:  invalid message id: %d", msg.Id)
 		eno = NgbMgrEnoParameter
@@ -669,7 +687,7 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 		HaveDog:false,
 	}
 	var dc = sch.SchTaskDescription {
-		Name:	ngbInst.name,
+		Name:	fmt.Sprintf("FindNode:%d:%s", ngbMgr.fnInstSeq, strPeerNodeId),
 		MbSize:	ngbProcMailboxSize,
 		Ep:		&ngbInst,
 		Wd:		&noDog,
@@ -743,7 +761,7 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	ngbMgr.ppInstSeq++
 
 	var dc = sch.SchTaskDescription {
-		Name:	strPeerNodeId,
+		Name:	fmt.Sprintf("Ping:%d:%s", ngbMgr.ppInstSeq, strPeerNodeId),
 		MbSize:	ngbProcMailboxSize,
 		Ep:		&ngbInst,
 		Wd:		&noDog,
@@ -776,16 +794,25 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
+func (ngbMgr *NeighborManager)CleanMapReq(name string) NgbMgrErrno {
+	return ngbMgr.cleanMap(name)
+}
+
 func (ngbMgr *NeighborManager) setupMap(name string, inst *neighborInst) {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
 	ngbMgr.ngbMap[name] = inst
 }
 
-func (ngbMgr *NeighborManager) cleanMap(name string) {
+func (ngbMgr *NeighborManager) cleanMap(name string) NgbMgrErrno {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
-	delete(ngbMgr.ngbMap, name)
+	if inst, ok := ngbMgr.ngbMap[name]; ok {
+		ngbMgr.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled)
+		delete(ngbMgr.ngbMap, name)
+		return NgbMgrEnoNone
+	}
+	return NgbMgrEnoNotFound
 }
 
 func (ngbMgr *NeighborManager) checkMap(name string, umt um.UdpMsgType) bool {

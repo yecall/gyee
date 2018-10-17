@@ -26,6 +26,7 @@ import (
 	"container/list"
 	"crypto/sha256"
 	"bytes"
+	"fmt"
 	golog "log"
 	log	"github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
@@ -986,11 +987,12 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 func (rutMgr *RutMgr)showRoute(tag string) {
 	if true {
 		dht := rutMgr.sdl.SchGetP2pCfgName()
-		golog.Printf("showRoute: dht: %s, rutTab: %+v", dht, rutMgr.rutTab)
+		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
 		rt := rutMgr.rutTab
 		for idx := 0; idx < len(rt.bucketTab); idx++ {
-			golog.Printf("showRoute: "+
-				"=============================== tag: %s, dht: %s, bucket: %d ==============================", tag, dht, idx)
+			routInfo = routInfo + fmt.Sprintf("showRoute: "+
+				"=============================== tag: %s, dht: %s, bucket: %d ==============================\n",
+				tag, dht, idx)
 			li := rt.bucketTab[idx]
 			count := 0
 			for el := li.Front(); el != nil; el = el.Next() {
@@ -1000,14 +1002,16 @@ func (rutMgr *RutMgr)showRoute(tag string) {
 					continue
 				}
 				count++
-				golog.Printf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>", dht, count)
-				golog.Printf("dht: %s, showRoute: node: %+v", dht, bn.node)
-				golog.Printf("dht: %s, showRoute: hash: %x", dht, bn.hash)
-				golog.Printf("dht: %s, showRoute: dist: %d", dht, bn.dist)
-				golog.Printf("dht: %s, showRoute: fails: %d", dht, bn.fails)
-				golog.Printf("dht: %s, showRoute: pcs: %d", dht, bn.pcs)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>\n", dht, count)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: node: %+v\n", dht, bn.node)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: hash: %x\n", dht, bn.hash)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: dist: %d\n", dht, bn.dist)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: fails: %d\n", dht, bn.fails)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: pcs: %d\n", dht, bn.pcs)
+				golog.Printf("%s", routInfo)
 			}
 		}
+
 	}
 }
 

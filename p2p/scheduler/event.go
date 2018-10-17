@@ -157,6 +157,7 @@ const (
 	EvNblPingedInd			= EvNblUdpBase	+ 5
 	EvNblPongedInd			= EvNblUdpBase	+ 6
 	EvNblQueriedInd			= EvNblUdpBase	+ 7
+	EvNblCleanMapReq		= EvNblUdpBase	+ 8
 )
 
 //

@@ -61,7 +61,7 @@ type ConInst struct {
 	txPending		*list.List				// pending packages to be sent
 	txWaitRsp		*list.List				// packages had been sent but waiting for response from peer
 	txLock			sync.Mutex				// tx lock
-	txChan		chan interface{}		// tx pendings signal
+	txChan			chan interface{}		// tx pendings signal
 	txDone			chan int				// tx-task done signal
 	rxDone			chan int				// rx-task done signal
 	cbRxLock		sync.Mutex				// lock for data plane callback

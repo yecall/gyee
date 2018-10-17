@@ -201,30 +201,31 @@ func (accepter *acceptTskCtrlBlock)TaskProc4Scheduler(ptn interface{}, msg *sch.
 }
 
 func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
+	sdl := accepter.sdl.SchGetP2pCfgName()
 	_, accepter.ptnLsnMgr = accepter.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
 	if accepter.ptnLsnMgr == nil {
-		log.LogCallerFileLine("PeerAcceptProc: invalid listener manager task pointer")
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, invalid listener manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	_, accepter.ptnPeMgr = accepter.sdl.SchGetTaskNodeByName(PeerMgrName)
 	if accepter.ptnPeMgr == nil {
-		log.LogCallerFileLine("PeerAcceptProc: invalid peer manager task pointer")
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, invalid peer manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.listener = accepter.lsnMgr.listener
 	if accepter.listener == nil {
-		log.LogCallerFileLine("PeerAcceptProc: invalid listener, done accepter")
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, invalid listener, done accepter", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.event = sch.EvSchNull
 	accepter.curError = nil
-	log.LogCallerFileLine("PeerAcceptProc: inited ok, tring to accept ...")
+	log.LogCallerFileLine("PeerAcceptProc: sdl, %s, inited ok, tring to accept ...", sdl)
 
 acceptLoop:
 
@@ -238,7 +239,7 @@ acceptLoop:
 		// do currently.
 		accepter.lockTcb.Lock()
 		if accepter.listener == nil || accepter.event != sch.SchEnoNone {
-			log.LogCallerFileLine("PeerAcceptProc: break the loop, for we might have been killed")
+			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break the loop, for we might have been killed", sdl)
 			break acceptLoop
 		}
 		listener := accepter.listener
@@ -249,23 +250,24 @@ acceptLoop:
 		// would work in a blocked mode; and if here the manager had close the
 		// listener, accept would get errors from underlying network.
 		conn, err := listener.Accept()
-		log.LogCallerFileLine("%s", "PeerAcceptProc: get out from Accept()")
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
 
 		// Lock the control block to access
 		accepter.lockTcb.Lock()
 		if err != nil && !err.(net.Error).Temporary() {
-			log.LogCallerFileLine("PeerAcceptProc: break loop for non-temporary error while accepting," +
-				"err: %s", err.Error())
+			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break loop for non-temporary error while " +
+				"accepting, err: %s", sdl, err.Error())
 			accepter.curError = err
 			break acceptLoop
 		}
 		// Check connection accepted
 		if conn == nil {
-			log.LogCallerFileLine("PeerAcceptProc: break loop for null connection accepted without errors")
+			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break loop for null connection accepted " +
+				"without errors", sdl)
 			accepter.event = sch.EvSchException
 			break acceptLoop
 		}
-		log.LogCallerFileLine("PeerAcceptProc: accept one: %s", conn.RemoteAddr().String())
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, accept one: %s", sdl, conn.RemoteAddr().String())
 
 		// Connection got, hand it up to peer manager task, notice that we will continue the loop
 		// event when we get errors to make and send the message to peer manager, see bellow.
@@ -290,7 +292,7 @@ acceptLoop:
 		// This is the normal case: the loop is broken by manager task killing the accepter,
 		// in this case, the accepter.listener will be closed by manager so we get errors in
 		// accepting, see event sch.EvPeLsnStopReq handler for more pls.
-		log.LogCallerFileLine("PeerAcceptProc: broken for event: %d", accepter.event)
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, broken for event: %d", sdl, accepter.event)
 		accepter.sdl.SchTaskDone(ptn, accepter.event)
 		accepter.lockTcb.Unlock()
 		return accepter.event
@@ -299,16 +301,15 @@ acceptLoop:
 	// Abnormal case, we should never come here, debug out and then done the
 	// accepter task.
 	if accepter.curError != nil {
-		log.LogCallerFileLine("PeerAcceptProc: abnormal exit, event: %d, err: %s",
-			accepter.event, accepter.curError.Error())
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, abnormal exit, event: %d, err: %s",
+			sdl, accepter.event, accepter.curError.Error())
 	} else {
-		log.LogCallerFileLine("PeerAcceptProc: abnormal exit, event: %d, err: nil",
-			accepter.event)
+		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, abnormal exit, event: %d, err: nil",
+			sdl, accepter.event)
 	}
 
 	accepter.lockTcb.Unlock()
-	accepter.sdl.SchTaskDone(ptn, sch.SchEnoUnknown)
-	return sch.SchEnoUnknown
+	return accepter.sdl.SchTaskDone(ptn, sch.SchEnoUnknown)
 }
 
 func (accepter *acceptTskCtrlBlock)PauseAccept() bool {

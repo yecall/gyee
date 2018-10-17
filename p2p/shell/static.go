@@ -87,7 +87,9 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 }
 
 //
-// Poweron order of static user tasks for chain application
+// Poweron order of static user tasks for chain application.
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify the this table if necessary.
 //
 var taskStaticPoweronOrder4Chain = []string {
 	dcv.DcvMgrName,
@@ -100,9 +102,41 @@ var taskStaticPoweronOrder4Chain = []string {
 }
 
 //
+// Poweroff order of static user tasks for chain application.
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify the this table if necessary.
+//
+var taskStaticPoweroffOrder4Chain = []string {
+	dcv.DcvMgrName,
+	tab.NdbcName,
+	peer.PeerMgrName,
+	ngb.LsnMgrName,
+	ngb.NgbMgrName,
+	peer.PeerLsnMgrName,
+	tab.TabMgrName,
+}
+
+//
 // Poweron order of static user tasks for dht application
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify the this table if necessary.
 //
 var taskStaticPoweronOrder4Dht = [] string {
+	dht.DhtMgrName,
+	dht.DsMgrName,
+	dht.ConMgrName,
+	dht.QryMgrName,
+	dht.PrdMgrName,
+	dht.RutMgrName,
+	dht.LsnMgrName,
+}
+
+//
+// Poweroff order of static user tasks for dht application
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify the this table if necessary.
+//
+var taskStaticPoweroffOrder4Dht = [] string {
 	dht.DhtMgrName,
 	dht.DsMgrName,
 	dht.ConMgrName,
@@ -211,11 +245,11 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 
 	if P2pType(appType) == config.P2P_TYPE_CHAIN {
 
-		staticTasks = taskStaticPoweronOrder4Chain
+		staticTasks = taskStaticPoweroffOrder4Chain
 
 	} else if P2pType(appType) == config.P2P_TYPE_DHT {
 
-		staticTasks = taskStaticPoweronOrder4Dht
+		staticTasks = taskStaticPoweroffOrder4Dht
 
 	} else {
 

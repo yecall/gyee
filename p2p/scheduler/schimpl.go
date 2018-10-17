@@ -779,7 +779,9 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 	//
 
 	if sdl.powerOff == true {
-		log.LogCallerFileLine("schSendTimerEvent: in power off stage")
+		if Debug__ {
+			log.LogCallerFileLine("schSendTimerEvent: in power off stage")
+		}
 		return SchEnoPowerOff
 	}
 
@@ -897,9 +899,10 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 
 	} else if _, dup := sdl.tkMap[ptn.task.name]; dup == true {
 
+		_, file, line, _ := runtime.Caller(2)
 		log.LogCallerFileLine("schCreateTask: " +
-			"duplicated task name: %s",
-			ptn.task.name)
+			"sdl: %s, duplicated task: %s, fbt2: %s, lbt2: %d",
+			sdl.p2pCfg.Name, ptn.task.name, file, line)
 
 		sdl.lock.Unlock()
 
