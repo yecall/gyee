@@ -797,6 +797,11 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 		Body:	ptm.tmcb.extra,
 	}
 
+	if len(*task.mailbox.que) >= cap(*task.mailbox.que) {
+		log.LogCallerFileLine("schSendTimerEvent: mailbox of target is full")
+		return SchEnoResource
+	}
+
 	*task.mailbox.que<-msg
 
 	return SchEnoNone
@@ -1296,12 +1301,21 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	// and so on.
 	//
 
-	if msg.recver.task.mailbox.que == nil {
+	target := msg.recver.task
+	target.lock.Lock()
+	defer target.lock.Unlock()
+
+	if target.mailbox.que == nil {
 		log.LogCallerFileLine("schSendMsg: mailbox of target is empty")
 		return SchEnoInternal
 	}
 
-	*msg.recver.task.mailbox.que<-*msg
+	if len(*target.mailbox.que) >= cap(*target.mailbox.que) {
+		log.LogCallerFileLine("schSendMsg: mailbox of target is full")
+		return SchEnoResource
+	}
+
+	*target.mailbox.que<-*msg
 
 	return SchEnoNone
 }

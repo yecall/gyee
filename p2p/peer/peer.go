@@ -1209,7 +1209,7 @@ const PeInstDirInbound		= 0				// inbound connection
 const PeInstOutPos			= 1				// outbound position
 const PeInstInPos			= 0				// inbound position
 
-const PeInstMailboxSize 	= 32				// mailbox size
+const PeInstMailboxSize 	= 256				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
 const PeInstMaxPingpongCnt	= 8					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second * 16	// pingpong period

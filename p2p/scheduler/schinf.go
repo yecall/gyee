@@ -130,7 +130,7 @@ const (
 )
 
 // max mail box size
-const SchMaxMbSize = 4096
+const SchMaxMbSize = 1024 * 8
 type SchTaskDescription struct {
 	Name	string						// user task name
 	MbSize	int							// mailbox size

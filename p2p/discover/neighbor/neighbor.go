@@ -50,7 +50,7 @@ type NgbMgrErrno int
 
 const (
 	NgbProcName = "ngbproto"	// Neighbor task name
-	ngbProcMailboxSize = 64		// Mailbox size of a ngighbor instance
+	ngbProcMailboxSize = 512	// Mailbox size of a ngighbor instance
 )
 
 // The control block of neighbor task instance
