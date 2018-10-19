@@ -67,7 +67,12 @@ func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 }
 
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	var eno DcvMgrErrno = DcvMgrEnoNone
+	if sch.Debug__ {
+		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
+		log.LogCallerFileLine("dcvMgrProc: sdl: %s, msg: %d", sdl, msg.Id)
+	}
+
+	var eno DcvMgrErrno
 	switch msg.Id {
 	case sch.EvSchPoweron:
 		eno = dcvMgr.DcvMgrPoweron(ptn)
@@ -81,6 +86,12 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		log.LogCallerFileLine("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
 	}
+
+	if sch.Debug__ {
+		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
+		log.LogCallerFileLine("dcvMgrProc: get out, sdl: %s, msg: %d", sdl, msg.Id)
+	}
+
 	if eno != DcvMgrEnoNone {
 		log.LogCallerFileLine("DcvMgrProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask

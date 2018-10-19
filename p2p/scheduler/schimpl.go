@@ -22,11 +22,12 @@
 package scheduler
 
 import (
-			"time"
-			"strings"
-			"runtime"
+	"time"
+	"strings"
+	"runtime"
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	"fmt"
 )
 
 //
@@ -138,25 +139,33 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 		return SchEnoParameter
 	}
 
+	task := ptn.task
+	mailbox := ptn.task.mailbox
 	queMsg := ptn.task.mailbox.que
 	done := &ptn.task.done
 	proc := ptn.task.utep.TaskProc4Scheduler
 
 	//
 	// loop to schedule, until done(or something else happened).
-	//
-	// Notice: if the message queue size of one user task is zero, then this means
-	// the user task would be a longlong loop.
+	// notice: if the message queue size of one user task is zero, then this means
+	// the user task would be a longlong loop. We simply start a routine for this
+	// case and wait it's done.
 	//
 
-	if ptn.task.mailbox.size == 0 ||
-		cap(*ptn.task.mailbox.que) == 0 {
+	if cap(*mailbox.que) <= 0 {
 
 		log.LogCallerFileLine("schCommonTask: " +
-			"dead loop user task: %s",
-			ptn.task.name)
+			"longlong loop user task: %s",
+			task.name)
 
 		go proc(ptn, nil)
+
+		why := <-*done
+
+		log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
+			sdl.p2pCfg.CfgName, why, ptn.task.name)
+
+		goto taskDone
 	}
 
 	//
@@ -170,32 +179,36 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 		log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
 			sdl.p2pCfg.CfgName, why, ptn.task.name)
 
-		doneInd := MsgTaskDone {
-			why: why,
-		}
-
-		var msg = schMessage {
-			sender:	&rawSchTsk,
-			recver:	ptn,
-			Id:		EvSchDone,
-			Body:	&doneInd,
-		}
-
 		//
-		// drain possible pending messages
+		// drain possible pending messages and send EvSchDone if the task done
+		// with a mailbox.
 		//
 
-drainLoop:
+		if cap(*mailbox.que) > 0 {
 
-		for {
-			select {
-			case <-*queMsg:
-			default:
-				break drainLoop
+			doneInd := MsgTaskDone{
+				why: why,
 			}
-		}
 
-		sdl.schSendMsg(&msg)
+			var msg = schMessage{
+				sender: &rawSchTsk,
+				recver: ptn,
+				Id:     EvSchDone,
+				Body:   &doneInd,
+			}
+
+drainLoop1:
+
+			for {
+				select {
+				case <-*queMsg:
+				default:
+					break drainLoop1
+				}
+			}
+
+			sdl.schSendMsg(&msg)
+		}
 	}()
 
 	//
@@ -206,10 +219,38 @@ taskLoop:
 
 	for {
 
-		msg := <-*queMsg
+		//
+		// check power off stage
+		//
+
+		var msg schMessage
+
+		if sdl.powerOff == true {
+
+			//
+			// drain until EvSchDone or EvSchPoweroff event met
+			//
+
+drainLoop2:
+
+			for {
+				msg = <-*queMsg
+				if msg.Id == EvSchDone || msg.Id == EvSchPoweroff {
+					break drainLoop2
+				}
+			}
+
+		} else {
+
+			//
+			// get one message
+			//
+
+			msg = <-*queMsg
+		}
 
 		//
-		// handle task "done" in any cases
+		// check "done" to break task loop
 		//
 
 		if msg.Id == EvSchDone {
@@ -223,7 +264,7 @@ taskLoop:
 		}
 
 		//
-		// call handler, but if in power off stage, we discard all except poweroff
+		// call handler, but if in power off stage, we discard all except EvSchPoweroff
 		//
 
 		if (sdl.powerOff == false) || (sdl.powerOff == true && msg.Id == EvSchPoweroff) {
@@ -241,6 +282,8 @@ taskLoop:
 	//
 	// for more pls
 	//
+
+taskDone:
 
 	ptn.task.stopped<-true
 
@@ -740,6 +783,7 @@ func (sdl *scheduler)schTaskBusyDeque(ptn *schTaskNode) SchErrno {
 
 			return SchEnoInternal
 		}
+
 		if sdl.busySize--; sdl.busySize != 0 {
 
 			log.LogCallerFileLine("schTaskBusyDeque: internal errors")
@@ -798,8 +842,7 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 	}
 
 	if len(*task.mailbox.que) >= cap(*task.mailbox.que) {
-		log.LogCallerFileLine("schSendTimerEvent: mailbox of target is full")
-		return SchEnoResource
+			log.LogCallerFileLine("schSendTimerEvent: mailbox of target is full, task: %s", task.name)
 	}
 
 	*task.mailbox.que<-msg
@@ -1302,17 +1345,17 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	//
 
 	target := msg.recver.task
-	target.lock.Lock()
-	defer target.lock.Unlock()
+	//target.lock.Lock()
+	//defer target.lock.Unlock()
 
 	if target.mailbox.que == nil {
-		log.LogCallerFileLine("schSendMsg: mailbox of target is empty")
+		log.LogCallerFileLine("schSendMsg: mailbox of target is empty, task: %s", target.name)
 		return SchEnoInternal
 	}
 
-	if len(*target.mailbox.que) >= cap(*target.mailbox.que) {
-		log.LogCallerFileLine("schSendMsg: mailbox of target is full")
-		return SchEnoResource
+	if len(*target.mailbox.que) + 10 >= cap(*target.mailbox.que) {
+		log.LogCallerFileLine("schSendMsg: mailbox of target is full, task: %s", target.name)
+		panic(fmt.Sprintf("system overload, task: %s", target.name))
 	}
 
 	*target.mailbox.que<-*msg
@@ -1597,8 +1640,8 @@ func (sdl *scheduler)schSetUserDataArea(ptn *schTaskNode, uda interface{}) SchEr
 // Set the power off stage flag to tell the scheduler it's going to be turn off
 //
 func (sdl *scheduler)schSetPoweroffStage() SchErrno {
-	sdl.lock.Lock()
-	defer  sdl.lock.Unlock()
+	//sdl.lock.Lock()
+	//defer sdl.lock.Unlock()
 	sdl.powerOff = true
 	return SchEnoNone
 }
@@ -1607,8 +1650,8 @@ func (sdl *scheduler)schSetPoweroffStage() SchErrno {
 // Get the power off stage flag
 //
 func (sdl *scheduler)schGetPoweroffStage() bool {
-	sdl.lock.Lock()
-	defer  sdl.lock.Unlock()
+	//sdl.lock.Lock()
+	//defer sdl.lock.Unlock()
 	return sdl.powerOff
 }
 

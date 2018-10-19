@@ -202,7 +202,7 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if sch.Debug__ && peMgr.sdl != nil {
 		sdl := peMgr.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
+		log.LogCallerFileLine("peerMgrProc: sdl: %s, name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
 	}
 
 	var schEno = sch.SchEnoNone
@@ -243,10 +243,14 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = PeMgrEnoParameter
 	}
 
+	if sch.Debug__ && peMgr.sdl != nil {
+		sdl := peMgr.sdl.SchGetP2pCfgName()
+		log.LogCallerFileLine("peerMgrProc: get out, sdl: %s, name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
+	}
+
 	if eno != PeMgrEnoNone {
 		schEno = sch.SchEnoUserTask
 	}
-
 	return schEno
 }
 
@@ -1209,7 +1213,7 @@ const PeInstDirInbound		= 0				// inbound connection
 const PeInstOutPos			= 1				// outbound position
 const PeInstInPos			= 0				// inbound position
 
-const PeInstMailboxSize 	= 256				// mailbox size
+const PeInstMailboxSize 	= 512				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
 const PeInstMaxPingpongCnt	= 8					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second * 16	// pingpong period
@@ -1776,7 +1780,7 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 
 func piTx(inst *peerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
-	// inbound or outbound. When use try to close the peer, this routine
+	// inbound or outbound. When user try to close the peer, this routine
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
@@ -1832,9 +1836,16 @@ chkDone:
 				Dir: inst.dir,
 				Why: &i,
 			}
+
+			// BUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
+			// this instance, BUT at this moment, the message queue of peer manager might
+			// be FULL, so the instance would be blocked while sending; AND the peer manager
+			// might had fired inst.txDone and been blocked by inst.txExit.
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
+			// We get a deadlock in this case !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		}
 	}
 	return done
@@ -1842,7 +1853,7 @@ chkDone:
 
 func piRx(inst *peerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
-	// inbound or outbound. When use try to close the peer, this routine
+	// inbound or outbound. When user try to close the peer, this routine
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
@@ -1893,9 +1904,17 @@ rxBreak:
 				Dir: inst.dir,
 				Why: &i,
 			}
+
+			// BUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
+			// this instance, BUT at this moment, the message queue of peer manager might
+			// be FULL, so the instance would be blocked while sending; AND the peer manager
+			// might had fired inst.txDone and been blocked by inst.txExit.
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
+			// We get a deadlock in this case !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 			continue
 		}
 

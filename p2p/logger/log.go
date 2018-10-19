@@ -42,14 +42,14 @@ type P2pLogger struct {
 }
 
 var (
-	globalLogger *logrus.Logger			// the global logger
+	GlobalLogger *logrus.Logger			// the global logger
 )
 
 func init() {
-	globalLogger = logrus.New()
-	globalLogger.Out = os.Stdout
-	globalLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
-	globalLogger.Level = logrus.InfoLevel
+	GlobalLogger = logrus.New()
+	GlobalLogger.Out = os.Stdout
+	GlobalLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
+	GlobalLogger.Level = logrus.InfoLevel
 }
 
 func NewP2pLogger(module string, level uint32, isGlobal bool, isPosition bool) *P2pLogger {
@@ -60,7 +60,7 @@ func NewP2pLogger(module string, level uint32, isGlobal bool, isPosition bool) *
 		LogPosition: isPosition,
 	}
 	if isGlobal {
-		logger.logger = globalLogger
+		logger.logger = GlobalLogger
 	} else {
 		logger.logger = logrus.New()
 		logger.logger.Out = os.Stdout
@@ -80,9 +80,9 @@ func LogCallerFileLine(format string, args ... interface{}) {
 	text := fmt.Sprintf(format, args...)
 	fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
 	textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)
-	// Seems globalLogger.Printf not work with "\n" or "\r\n" to return and get a new line,
+	// Seems GlobalLogger.Printf not work with "\n" or "\r\n" to return and get a new line,
 	// but log.Printf does.
-	// globalLogger.Printf("%s", textAndFileLine)
+	// GlobalLogger.Printf("%s", textAndFileLine)
 	log.Printf("%s", textAndFileLine)
 }
 

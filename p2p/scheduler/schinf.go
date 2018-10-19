@@ -117,9 +117,9 @@ const (
 type SchWatchDog struct {
 	lock			sync.Mutex
 	HaveDog			bool				// if dog would come out
-	Inited			bool				// watching inited
+	Inited			bool				// dog initialized
 	Cycle			time.Duration		// feed cycle expected, must be times of second
-	BiteCounter		int					// counter of user task bited by dog
+	BiteCounter		int					// counter for a user task to be bitten by dog
 	DieThreshold	int					// threshold counter of dog-bited to die
 }
 
@@ -129,8 +129,10 @@ const (
 	SchCreatedSuspend					// suspended
 )
 
-// max mail box size
-const SchMaxMbSize = 1024 * 8
+// Max mail box size: notice that it's the real depth of queue implemented as a channel,
+// when MbSize is set to (-1) for a task. In extreme case when system load is very heavy,
+// the queue might be full so tasks can be blocked in sending messages.
+const SchMaxMbSize = 1024 * (1)
 type SchTaskDescription struct {
 	Name	string						// user task name
 	MbSize	int							// mailbox size
@@ -162,7 +164,8 @@ type TimerDescription struct {
 // Static user task description
 type TaskStaticDescription struct {
 	Name	string								// task name
-	Tep		SchUserTaskInf						// task inteface, it's the user control block which exports its' entry point
+	Tep		SchUserTaskInf						// task inteface, it's the user control block which
+												// exports its' entry point
 	MbSize	int									// mailbox size, if less than zero, default value applied
 	Wd		SchWatchDog							// watchdog
 	DieCb	func(task interface{}) SchErrno		// callbacked when going to die
@@ -175,7 +178,9 @@ func SchSchedulerInit(cfg *config.Config) (*Scheduler, SchErrno) {
 }
 
 // Start scheduler
-func (sdl *Scheduler)SchSchedulerStart(tsd []TaskStaticDescription, tpo []string) (SchErrno, *map[string]interface{}){
+func (sdl *Scheduler)SchSchedulerStart(
+	tsd []TaskStaticDescription,
+	tpo []string) (SchErrno, *map[string]interface{}){
 	return sdl.schSchedulerStart(tsd, tpo)
 }
 
@@ -206,12 +211,18 @@ func (sdl *Scheduler)SchGetTaskNodeByName(name string) (eno SchErrno, task inter
 // Send message to a specific task
 func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
 	eno, src := sdl.SchGetTaskNodeByName(srcTask)
-	if eno != SchEnoNone || src == nil {
+	if eno != SchEnoNone {
 		return eno
 	}
+	if src == nil {
+		return SchEnoInternal
+	}
 	eno, dst := sdl.SchGetTaskNodeByName(dstTask)
-	if eno != SchEnoNone || dst == nil {
+	if eno != SchEnoNone {
 		return eno
+	}
+	if dst == nil {
+		return SchEnoInternal
 	}
 	msg.sender = src.(*schTaskNode)
 	msg.recver = dst.(*schTaskNode)
@@ -297,6 +308,7 @@ func (sdl *Scheduler)SchSetUserDataArea(ptn interface{}, uda interface{}) SchErr
 
 // Set the power off stage flag to tell the scheduler it's going to be turn off
 func (sdl *Scheduler)SchSetPoweroffStage() SchErrno {
+	log.LogCallerFileLine("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
 	return sdl.schSetPoweroffStage()
 }
 
