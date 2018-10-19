@@ -535,6 +535,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
 	peInst.rxExit		= make(chan PeMgrErrno)
+	peInst.rxtxRuning	= false
 
 	// Create peer instance task
 	peMgr.ibInstSeq++
@@ -1019,12 +1020,13 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.snid			= *snid
 	peInst.node			= *node
 
-	peInst.txChan	= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
 	peInst.txExit		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
 	peInst.rxExit		= make(chan PeMgrErrno)
+	peInst.rxtxRuning	= false
 
 	peMgr.obInstSeq++
 	peInst.name = peInst.name + fmt.Sprintf("_Outbound_%s", fmt.Sprintf("%d", peMgr.obInstSeq))
@@ -1250,6 +1252,7 @@ type peerInstance struct {
 	txExit		chan PeMgrErrno				// TX had been done
 	rxDone		chan PeMgrErrno				// RX chan
 	rxExit		chan PeMgrErrno				// RX had been done
+	rxtxRuning	bool						// indicating that rx and tx routines are running
 	ppSeq		uint64						// pingpong sequence no.
 	ppCnt		int							// pingpong counter
 	rxEno		PeMgrErrno					// rx errno
@@ -1360,20 +1363,19 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 }
 
 func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
+	sdl := inst.sdl.SchGetP2pCfgName()
 	if inst.killing == true {
-		// since the instance is in killing, the tx/rx routines must have been done,
-		// and this is a power off request, we done the instance task directly.
+		log.LogCallerFileLine("piPoweroff: already in killing, done at once, sdl: %s, name: %s",
+			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 		if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 			return PeMgrEnoScheduler
 		}
 		return PeMgrEnoNone
 	}
+	log.LogCallerFileLine("piPoweroff: task will be done, sdl: %s, name: %s, state: %d",
+		sdl, inst.sdl.SchGetTaskName(inst.ptnMe), inst.state)
 
-	sdl := inst.sdl.SchGetP2pCfgName()
-	log.LogCallerFileLine("piPoweroff: task will be done, sdl: %s, name: %s",
-		sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
-
-	if inst.state == peInstStateActivated {
+	if inst.rxtxRuning {
 		if inst.txChan != nil {
 			close(inst.txChan)
 		}
@@ -1403,7 +1405,6 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
-
 	return PeMgrEnoNone
 }
 
@@ -1543,7 +1544,7 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	}
 	inst.killing = true
 	node := inst.node
-	if inst.state == peInstStateActivated {
+	if inst.rxtxRuning {
 		if inst.txChan != nil {
 			close(inst.txChan)
 		}
@@ -1600,6 +1601,7 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 
 	go piTx(inst)
 	go piRx(inst)
+	inst.rxtxRuning = true
 
 	return PeMgrEnoNone
 }
@@ -1837,15 +1839,14 @@ chkDone:
 				Why: &i,
 			}
 
-			// BUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
 			// this instance, BUT at this moment, the message queue of peer manager might
 			// be FULL, so the instance would be blocked while sending; AND the peer manager
-			// might had fired inst.txDone and been blocked by inst.txExit.
+			// might had fired inst.txDone and been blocked by inst.txExit. panic is called
+			// for this overload of system, see scheduler please.
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
-			// We get a deadlock in this case !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		}
 	}
 	return done
@@ -1905,16 +1906,14 @@ rxBreak:
 				Why: &i,
 			}
 
-			// BUG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
 			// this instance, BUT at this moment, the message queue of peer manager might
 			// be FULL, so the instance would be blocked while sending; AND the peer manager
-			// might had fired inst.txDone and been blocked by inst.txExit.
+			// might had fired inst.txDone and been blocked by inst.txExit. panic is called
+			// for this overload of system, see scheduler please.
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
-			// We get a deadlock in this case !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 			continue
 		}
 

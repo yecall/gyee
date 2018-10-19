@@ -842,7 +842,8 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 	}
 
 	if len(*task.mailbox.que) >= cap(*task.mailbox.que) {
-			log.LogCallerFileLine("schSendTimerEvent: mailbox of target is full, task: %s", task.name)
+		log.LogCallerFileLine("schSendTimerEvent: mailbox of target is full, task: %s", task.name)
+		panic(fmt.Sprintf("system overload, task: %s", task.name))
 	}
 
 	*task.mailbox.que<-msg
