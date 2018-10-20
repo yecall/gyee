@@ -1340,15 +1340,15 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	}
 
 	//
-	// put message to receiver mailbox. More work might be needed, such as
-	// checking against the sender and receiver name to see if they are in
-	// busy queue; checking go status of both to see if they are matched,
-	// and so on.
+	// put message to receiver mailbox.
+	// notice: here we do not invoke any "lock" to ensure the integrity of the target task
+	// pointer, this require the following conditions fulfilled: 1) after task is created,
+	// the task pointer is always effective until it's done; 2) after task is done, any other
+	// tasks should never reference to this stale pointer, this means that any other tasks
+	// should remove the pointer(if then have)to a task will be done.
 	//
 
 	target := msg.recver.task
-	//target.lock.Lock()
-	//defer target.lock.Unlock()
 
 	if target.mailbox.que == nil {
 		log.LogCallerFileLine("schSendMsg: mailbox of target is empty, task: %s", target.name)
