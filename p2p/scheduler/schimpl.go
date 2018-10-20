@@ -33,13 +33,14 @@ import (
 //
 // scheduler debug flag
 //
-var Debug__ = false
+var Debug__ = true
 
 //
 // Default task node for scheduler to send event
 //
 const rawSchTaskName = "schTsk"
 const RawSchTaskName = rawSchTaskName
+const mbReserved = 10
 
 var rawSchTsk = schTaskNode {
 	task: schTask{name:rawSchTaskName,},
@@ -841,7 +842,7 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 		Body:	ptm.tmcb.extra,
 	}
 
-	if len(*task.mailbox.que) >= cap(*task.mailbox.que) {
+	if len(*task.mailbox.que) + mbReserved >= cap(*task.mailbox.que) {
 		log.LogCallerFileLine("schSendTimerEvent: mailbox of target is full, task: %s", task.name)
 		panic(fmt.Sprintf("system overload, task: %s", task.name))
 	}
@@ -1327,7 +1328,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	// for debug to back trace
 	//
 
-	if Debug__ {
+	if Debug__ && false {
 		_, file, line, _ := runtime.Caller(2)
 		log.LogCallerFileLine("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
 			sdl.p2pCfg.CfgName,
@@ -1354,7 +1355,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		return SchEnoInternal
 	}
 
-	if len(*target.mailbox.que) + 10 >= cap(*target.mailbox.que) {
+	if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
 		log.LogCallerFileLine("schSendMsg: mailbox of target is full, task: %s", target.name)
 		panic(fmt.Sprintf("system overload, task: %s", target.name))
 	}
