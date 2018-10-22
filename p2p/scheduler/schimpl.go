@@ -33,7 +33,7 @@ import (
 //
 // scheduler debug flag
 //
-var Debug__ = true
+var Debug__ = false
 
 //
 // Default task node for scheduler to send event

@@ -27,7 +27,6 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"sync"
 )
 
 const PeerLsnMgrName = sch.PeerLsnMgrName
@@ -116,27 +115,34 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 
 func (lsnMgr *ListenerManager)lsnMgrPoweroff(ptn interface{}) sch.SchErrno {
 	log.LogCallerFileLine("lsnMgrPoweroff: task will be done, name: %s", lsnMgr.sdl.SchGetTaskName(ptn))
-	if _, ptn := lsnMgr.sdl.SchGetTaskNodeByName(PeerAccepterName); ptn != nil {
-		lsnMgr.lsnMgrStop()
-	}
+	lsnMgr.lsnMgrStop()
 	return lsnMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
 func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
-	log.LogCallerFileLine("lsnMgrStart: try to create accept task ...")
+	// we should have remove all reference to the accpeter if we had been requested
+	// to close it, see function lsnMgrStop. BUT in extreme case, the accepter task
+	// might be still alive in the scheduler, so we had to check this by the name of
+	// accepter with the scheduler.
+	if eno, _ := lsnMgr.sdl.SchGetTaskNodeByName(PeerAccepterName); eno == sch.SchEnoNone {
+		log.LogCallerFileLine("lsnMgrStart: old accepter still be alive")
+		return sch.SchEnoDuplicated
+	}
+	if lsnMgr.accepter != nil {
+		log.LogCallerFileLine("lsnMgrStart: accepter had been inited")
+		return sch.SchEnoUserTask
+	}
 	if eno := lsnMgr.lsnMgrSetupListener(); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("lsnMgrStart: setup listener failed, eno: %d", eno)
 		return eno
 	}
-
 	var accepter = acceptTskCtrlBlock {
 		sdl:		lsnMgr.sdl,
 		lsnMgr:		lsnMgr,
-		event:		sch.SchEnoNone,
+		stopCh:		make(chan bool, 1),
 	}
 	accepter.tep = accepter.peerAcceptProc
 	lsnMgr.accepter = &accepter
-
 	var tskDesc = sch.SchTaskDescription{
 		Name:		PeerAccepterName,
 		MbSize:		0,
@@ -144,33 +150,35 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 		Wd:			&sch.SchWatchDog{HaveDog:false,},
 		Flag:		sch.SchCreatedGo,
 	}
-
 	if eno, ptn := lsnMgr.sdl.SchCreateTask(&tskDesc); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("lsnMgrStart: SchCreateTask failed, eno: %d, ptn: %X",
 			eno, ptn.(*interface{}))
 		return sch.SchEnoInternal
 	}
-	peMgr := lsnMgr.sdl.SchGetUserTaskIF(sch.PeerMgrName).(*PeerManager)
-	peMgr.accepter = &accepter
-
 	return sch.SchEnoNone
 }
 
 func (lsnMgr *ListenerManager)lsnMgrStop() sch.SchErrno {
 	log.LogCallerFileLine("lsnMgrStop: listner will be closed")
-	if lsnMgr.accepter != nil {
-		lsnMgr.accepter.lockTcb.Lock()
-		defer lsnMgr.accepter.lockTcb.Unlock()
-		lsnMgr.accepter.event = sch.SchEnoKilled
-		lsnMgr.accepter.listener = nil
+	if lsnMgr.accepter == nil {
+		log.LogCallerFileLine("lsnMgrStop: nil accepter")
+		return sch.SchEnoMismatched
 	}
-
-	if err := lsnMgr.listener.Close(); err != nil {
-		log.LogCallerFileLine("lsnMgrStop: try to close listner fialed, err: %s", err.Error())
-		return sch.SchEnoOS
+	if len(lsnMgr.accepter.stopCh) > 0 {
+		log.LogCallerFileLine("lsnMgrStop: stop channel is not empty")
+		return sch.SchEnoMismatched
 	}
-
-	log.LogCallerFileLine("lsnMgrStop: listner closed ok")
+	if lsnMgr.listener == nil {
+		log.LogCallerFileLine("lsnMgrStop: nil listener")
+		return sch.SchEnoUserTask
+	}
+	// notice: here we fire the channel to ask the accepter to stop and close
+	// the listener for the accepter might be blocked in accepting currently.
+	// BUT when all these done, the accepter task might be still alive in the
+	// scheduler for some time.
+	lsnMgr.accepter.stopCh<-true
+	lsnMgr.accepter = nil
+	lsnMgr.listener.Close()
 	lsnMgr.listener = nil
 	return sch.SchEnoNone
 }
@@ -184,10 +192,7 @@ type acceptTskCtrlBlock struct {
 	ptnPeMgr	interface{}			// pointer to peer manager task node
 	ptnLsnMgr	interface{}			// pointer to listener manager task node
 	listener	net.Listener		// the listener
-	event		sch.SchErrno		// event fired
-	curError	error				// current error fired
-	lockTcb		sync.Mutex			// lock to protect this control block
-	lockAccept	sync.Mutex			// lock to pause/resume acception
+	stopCh		chan bool			// channel to stop accepter
 }
 
 type msgConnAcceptedInd struct {
@@ -222,59 +227,44 @@ func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMes
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
-
-	accepter.event = sch.SchEnoNone
-	accepter.curError = nil
 	log.LogCallerFileLine("PeerAcceptProc: sdl, %s, inited ok, tring to accept ...", sdl)
 
-acceptLoop:
+	stop := false
 
+acceptLoop:
 	for {
-		// lock to know if we are allowed to accept
-		accepter.lockAccept.Lock()
-		accepter.lockAccept.Unlock()
-		// Check if had been kill by manager: we first obtain the lock then check the listener and
-		// event to see if we hav been killed, if not, we backup the listener for later accept operation
-		// and free the lock. See function lsnMgrStop for more please.
-		// Notice: seems we can apply "chan" to implement the "stop" logic moer better than what we
-		// do currently.
-		accepter.lockTcb.Lock()
-		if accepter.listener == nil || accepter.event != sch.SchEnoNone {
-			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break the loop, for we might have been killed", sdl)
+		select {
+			case stop = <-accepter.stopCh:
+				if stop {
+					log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break the loop to stop on command", sdl)
+					break acceptLoop
+				}
+			default:
+		}
+
+		listener := accepter.listener
+		if listener == nil {
+			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break the loop for nil listener", sdl)
 			break acceptLoop
 		}
-		listener := accepter.listener
-		accepter.lockTcb.Unlock()
 
-		// Try to accept. Since we had never set deadline for the listener, we
-		// would work in a blocked mode; and if here the manager had close the
-		// listener, accept would get errors from underlying network.
 		conn, err := listener.Accept()
 		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
 
-		// Lock the control block to access
-		accepter.lockTcb.Lock()
 		if err != nil && !err.(net.Error).Temporary() {
 			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break loop for non-temporary error while " +
 				"accepting, err: %s", sdl, err.Error())
-			accepter.curError = err
 			break acceptLoop
 		}
-		// Check connection accepted
+
 		if conn == nil {
 			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break loop for null connection accepted " +
 				"without errors", sdl)
-			accepter.event = sch.EvSchException
 			break acceptLoop
 		}
-		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, accept one: %s", sdl, conn.RemoteAddr().String())
-		// unlock the control block
-		accepter.lockTcb.Unlock()
 
-		// Connection got, hand it up to peer manager task, notice that we will continue the loop
-		// event when we get errors to make and send the message to peer manager, see bellow.
-		var msg = sch.SchMessage{}
-		var msgBody = msgConnAcceptedInd {
+		msg := sch.SchMessage{}
+		msgBody := msgConnAcceptedInd {
 			conn: 		conn,
 			localAddr:	conn.LocalAddr().(*net.TCPAddr),
 			remoteAddr:	conn.RemoteAddr().(*net.TCPAddr),
@@ -283,41 +273,8 @@ acceptLoop:
 		accepter.sdl.SchSendMessage(&msg)
 	}
 
-	// Notice: when loop is broken to here, the Lock is still obtained by us,
-	// see above pls, do not lock again.
-	// Here we get out! We should check what had happened to break the loop
-	// for accepting above.
-	if accepter.curError != nil && accepter.event != sch.SchEnoNone {
-		// This is the normal case: the loop is broken by manager task killing the accepter,
-		// in this case, the accepter.listener will be closed by manager so we get errors in
-		// accepting, see event sch.EvPeLsnStopReq handler for more pls.
-		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, broken for event: %d", sdl, accepter.event)
-		accepter.lockTcb.Unlock()
-		accepter.sdl.SchTaskDone(ptn, accepter.event)
-		return accepter.event
+	if stop {
+		return accepter.sdl.SchTaskDone(ptn, sch.SchEnoNone)
 	}
-
-	// Abnormal case, we should never come here, debug out and then done the
-	// accepter task.
-	if accepter.curError != nil {
-		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, abnormal exit, event: %d, err: %s",
-			sdl, accepter.event, accepter.curError.Error())
-	} else {
-		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, abnormal exit, event: %d, err: nil",
-			sdl, accepter.event)
-	}
-	accepter.lockTcb.Unlock()
 	return accepter.sdl.SchTaskDone(ptn, sch.SchEnoUnknown)
-}
-
-func (accepter *acceptTskCtrlBlock)PauseAccept() bool {
-	log.LogCallerFileLine("PauseAccept: try to pause inbound")
-	accepter.lockAccept.Lock()
-	return true
-}
-
-func (accepter *acceptTskCtrlBlock)ResumeAccept() bool {
-	log.LogCallerFileLine("ResumeAccept: try to resume inbound")
-	accepter.lockAccept.Unlock()
-	return true
 }

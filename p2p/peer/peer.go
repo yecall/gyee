@@ -149,7 +149,6 @@ type PeerManager struct {
 	//
 
 	tabMgr			*tab.TableManager				// pointer to table manager
-	accepter		*acceptTskCtrlBlock				// pointer to accepter
 
 	ibInstSeq		int								// inbound instance seqence number
 	obInstSeq		int								// outbound instance seqence number
@@ -398,9 +397,7 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
 
 	// start peer listener if necessary
-	if peMgr.cfg.noAccept == true {
-		peMgr.accepter = nil
-	} else {
+	if peMgr.cfg.noAccept == false {
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -566,11 +563,10 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	// Pause inbound peer accepter if necessary
 	if peMgr.ibpTotalNum++; peMgr.ibpTotalNum >= peMgr.cfg.ibpNumTotal {
 		if !peMgr.cfg.noAccept && !peMgr.acceptPaused {
-			// bugs: we can not pause accepter simply, a duration of delay should
-			// be apply before pausing it.
-			log.LogCallerFileLine("peMgrLsnConnAcceptedInd: going to pause accepter, " +
-				"cfgName: %s", peMgr.cfg.cfgName)
-			peMgr.acceptPaused = peMgr.accepter.PauseAccept()
+			// we stop accepter simply, a duration of delay should be apply before pausing it,
+			// this should be improved later.
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
+			peMgr.sdl.SchSendMessage(&schMsg)
 		}
 	}
 
@@ -1122,8 +1118,9 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	if peMgr.cfg.noAccept == false &&
 		peMgr.acceptPaused == true  &&
 		peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
-		log.LogCallerFileLine("peMgrLsnConnAcceptedInd: resume accepter, cfgName: %s", peMgr.cfg.cfgName)
-		peMgr.acceptPaused = !peMgr.accepter.ResumeAccept()
+		schMsg := sch.SchMessage{}
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
+		peMgr.sdl.SchSendMessage(&schMsg)
 	}
 
 	// Stop instance task
