@@ -63,12 +63,12 @@ const (
 //
 const (
 	P2pIndPeerActivated	= iota		// peer activated
-	P2pIndConnStatus				// connection status changed
 	P2pIndPeerClosed				// connection closed
 )
 
 type P2pIndPeerActivatedPara struct {
 	Ptn			interface{}			// task node pointer
+	RxChan		chan *P2pPackageRx	// channel for packages received
 	PeerInfo	*Handshake			// handshake info
 }
 

@@ -25,13 +25,14 @@ import (
 	"time"
 	"fmt"
 	"math/rand"
-	"container/list"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	"sync"
+	"reflect"
 )
 
 // Peer manager errno
@@ -162,9 +163,8 @@ type PeerManager struct {
 	acceptPaused	bool							// if accept task paused
 	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
 	indChan			chan interface{}				// indication signal
-	indQueue		*list.List						// indication queue
-	indQueSize		int								// indication queue max size
-	indDiscarded	int								// number of indication discarded
+	indCbLock		sync.Mutex						// lock for indication callback
+	indCb			P2pIndCallback					// indication callback
 	ssTid			int								// statistics timer identity
 	staticsStatus	map[PeerIdEx]int				// status about static nodes
 }
@@ -183,10 +183,7 @@ func NewPeerMgr() *PeerManager {
 		obpNum:       	map[SubNetworkID]int{},
 		ibpTotalNum:	0,
 		acceptPaused: 	false,
-		indChan:		make(chan interface{}),
-		indQueue:		list.New(),
-		indQueSize:		maxIndicationQueueSize,
-		indDiscarded:	0,
+		indChan:		make(chan interface{}, maxIndicationQueueSize),
 		randoms:      	map[SubNetworkID][]*config.Node{},
 		staticsStatus:	map[PeerIdEx]int{},
 	}
@@ -386,10 +383,11 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&powerOff)
 	}
 
+	close(peMgr.indChan)
+
 	if peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
-
 	return PeMgrEnoNone
 }
 
@@ -892,6 +890,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	i := P2pIndPeerActivatedPara {
 		Ptn: inst.ptnMe,
+		RxChan: inst.rxChan,
 		PeerInfo: & Handshake {
 			Snid:		inst.snid,
 			Dir:		inst.dir,
@@ -1188,6 +1187,10 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrIndEnque(ind interface{}) PeMgrErrno {
+	if len(peMgr.indChan) >= cap(peMgr.indChan) {
+		panic("peMgrIndEnque: system overload")
+	}
+	peMgr.indChan<-ind
 	return PeMgrEnoNone
 }
 
@@ -1808,11 +1811,10 @@ chkDone:
 		inst.txPendNum -= 1
 		// carry out Tx
 		if eno := upkg.SendPackage(inst); eno != PeMgrEnoNone {
-			// 1) if failed, callback to the user, so he can close
-			// this peer seems in troubles, we will be done then.
-			// 2) it is possible that, while we are blocked here in
-			// writing and the connection is closed for some reasons
-			// (for example the user close the peer), in this case,
+			// 1) if failed, callback to the user, so he can close this peer seems in troubles,
+			// we will be done then.
+			// 2) it is possible that, while we are blocked here in writing and the connection
+			// is closed for some reasons(for example the user close the peer), in this case,
 			// we would get an error.
 			inst.txEno = eno
 			hs := Handshake {
@@ -1835,7 +1837,6 @@ chkDone:
 				Dir: inst.dir,
 				Why: &i,
 			}
-
 			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
 			// this instance, BUT at this moment, the message queue of peer manager might
 			// be FULL, so the instance would be blocked while sending; AND the peer manager
@@ -1875,11 +1876,10 @@ rxBreak:
 		}
 		upkg := new(P2pPackage)
 		if eno := upkg.RecvPackage(inst); eno != PeMgrEnoNone {
-			// 1) if failed, callback to the user, so he can close
-			// this peer seems in troubles, we will be done then.
-			// 2) it is possible that, while we are blocked here in
-			// reading and the connection is closed for some reasons
-			// (for example the user close the peer), in this case,
+			// 1) if failed, callback to the user, so he can close this peer seems in troubles,
+			// we will be done then.
+			// 2) it is possible that, while we are blocked here in reading and the connection
+			// is closed for some reasons(for example the user close the peer), in this case,
 			// we would get an error.
 			inst.rxEno = eno
 			hs := Handshake {
@@ -1902,7 +1902,6 @@ rxBreak:
 				Dir: inst.dir,
 				Why: &i,
 			}
-
 			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
 			// this instance, BUT at this moment, the message queue of peer manager might
 			// be FULL, so the instance would be blocked while sending; AND the peer manager
@@ -2088,6 +2087,58 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 		}
 		return PeMgrEnoDuplicated
 	}
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)GetInstIndChannel() chan interface{} {
+	// This function implements the "Channel" schema to hand up the indications
+	// from peer instances to higher module. After this function called, the caller
+	// can then go a routine to pull indications from the channel returned.
+	return peMgr.indChan
+}
+
+func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
+	// This function implements the "Callback" schema to hand up the indications
+	// from peer instances to higher module. In this schema, a routine is started
+	// in this function to pull indications, check what indication type it is and
+	// call the function registered.
+	peMgr.indCbLock.Lock()
+	defer peMgr.indCbLock.Unlock()
+	if peMgr.indCb != nil {
+		log.LogCallerFileLine("RegisterInstIndCallback: callback duplicated")
+		return PeMgrEnoDuplicated
+	}
+	if cb == nil {
+		log.LogCallerFileLine("RegisterInstIndCallback: try to register nil callback")
+		return PeMgrEnoParameter
+	}
+	icb, ok := cb.(P2pIndCallback)
+	if !ok {
+		log.LogCallerFileLine("RegisterInstIndCallback: invalid callback interface")
+		return PeMgrEnoParameter
+	}
+	peMgr.indCb = icb
+
+	go func(indCh chan interface{},  indCb P2pIndCallback) {
+		for {
+			select {
+			case ind, closed := <-indCh:
+				if closed {
+					log.LogCallerFileLine("P2pIndCallback: indication channel closed, done")
+					return
+				}
+				switch indType:=reflect.TypeOf(ind).Name(); indType {
+				case "P2pIndPeerActivatedPara":
+					indCb(P2pIndPeerActivated, ind)
+				case "P2pIndPeerClosedPara":
+					indCb(P2pIndPeerClosed, ind)
+				default:
+					log.LogCallerFileLine("P2pIndCallback: discard unknown indication type: %s", indType)
+				}
+			}
+		}
+	}(peMgr.indChan, peMgr.indCb)
+
 	return PeMgrEnoNone
 }
 

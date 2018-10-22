@@ -188,7 +188,7 @@ func newTcb(name string) *testCaseCtrlBlock {
 // Tx routine
 //
 var dataTxApply = true
-var dataTxTmApply = false
+var dataTxTmApply = true
 func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
 
 
@@ -365,49 +365,6 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		peerId := pap.PeerInfo.NodeId
 
 		go txProc(p2pInst, pap.PeerInfo.Dir, snid, peerId)
-
-	case shell.P2pIndConnStatus:
-
-		//
-		// Peer connection status report. in general, this report is resulted for
-		// errors fired on the connection, one can check the "Flag" field in the
-		// indication to know if p2p underlying would try to close the connection
-		// itself, and one also can check the "Status" field to known what had
-		// happened(the interface for this is not completed yet). Following demo
-		// take a simple method: if connection is not closed by p2p itself, then
-		// request p2p to close it here.
-		//
-
-		psp := para.(*peer.P2pIndConnStatusPara)
-		p2pInst := sch.SchGetScheduler(psp.Ptn)
-
-		log.LogCallerFileLine("p2pIndProc: " +
-			"P2pIndConnStatus, para: %s",
-			fmt.Sprintf("%+v", *psp))
-
-		if psp.Status != 0 {
-
-			log.LogCallerFileLine("p2pIndProc: " +
-				"status: %d, close peer: %s",
-				psp.Status,
-				fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
-
-			if psp.Flag == false {
-
-				log.LogCallerFileLine("p2pIndProc: " +
-					"try to close the instance, peer: %s",
-					fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
-
-				if eno := shell.P2pClosePeer(p2pInst, &psp.PeerInfo.Snid, &psp.PeerInfo.NodeId);
-					eno != shell.P2pEnoNone {
-
-					log.LogCallerFileLine("p2pIndProc: "+
-						"P2pClosePeer failed, eno: %d, peer: %s",
-						eno,
-						fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
-				}
-			}
-		}
 
 	case shell.P2pIndPeerClosed:
 
@@ -1117,7 +1074,7 @@ func testCase5(tc *testCase) {
 
 	log.LogCallerFileLine("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 64
+	var p2pInstNum = 8
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""

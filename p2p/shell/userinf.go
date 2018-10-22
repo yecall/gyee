@@ -85,11 +85,24 @@ const (
 
 const (
 	P2pIndPeerActivated	= peer.P2pIndPeerActivated	// indication for a peer activated to work
-	P2pIndConnStatus	= peer.P2pIndConnStatus		// indication for peer connection status changed
 	P2pIndPeerClosed	= peer.P2pIndPeerClosed		// indication for peer connection closed
 )
 
 func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno {
+	if what != peer.P2pIndCb {
+		log.LogCallerFileLine("P2pRegisterCallback: not supported, what: %d", what)
+		return P2pEnoParameter
+	}
+	pem := target.(*sch.Scheduler).SchGetUserTaskIF(sch.PeerMgrName)
+	if pem == nil {
+		log.LogCallerFileLine("P2pRegisterCallback: get peer manager failed, name: %s", sch.PeerMgrName)
+		return P2pEnoScheduler
+	}
+	peMgr := pem.(*peer.PeerManager)
+	if eno := peMgr.RegisterInstIndCallback(cb); eno != peer.PeMgrEnoNone {
+		log.LogCallerFileLine("P2pRegisterCallback: RegisterInstIndCallback failed, eno: %d", eno)
+		return P2pEnoInternal
+	}
 	return P2pEnoNone
 }
 
@@ -97,17 +110,11 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 // Send message to peer
 //
 func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
-
 	if eno := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
-
-		log.LogCallerFileLine("P2pSendPackage: " +
-			"SendPackage failed, eno: %d, pkg: %s",
-			eno,
-			fmt.Sprintf("%+v", *pkg))
-
+		log.LogCallerFileLine("P2pSendPackage: SendPackage failed, eno: %d, pkg: %s",
+			eno, fmt.Sprintf("%+v", *pkg))
 		return P2pEnoInternal
 	}
-
 	return P2pEnoNone
 }
 
@@ -115,19 +122,12 @@ func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 // Disconnect peer
 //
 func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) P2pErrno {
-
 	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
-
 	if eno := peMgr.ClosePeer(snid, id); eno != peer.PeMgrEnoNone {
-
-		log.LogCallerFileLine("P2pSendPackage: " +
-			"ClosePeer failed, eno: %d, peer: %s",
-			eno,
-			fmt.Sprintf("%+v", *id))
-
+		log.LogCallerFileLine("P2pSendPackage: ClosePeer failed, eno: %d, peer: %s",
+			eno, fmt.Sprintf("%+v", *id))
 		return P2pEnoInternal
 	}
-
 	return P2pEnoNone
 }
 
@@ -135,17 +135,13 @@ func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) 
 // Turn off specific p2p instance
 //
 func P2pPoweroff(p2pInst *sch.Scheduler) P2pErrno {
-
 	stopChain := make(chan bool, 1)
-
 	if eno := P2pStop(p2pInst, stopChain); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("P2pPoweroff: P2pStop failed, eno: %d", eno)
 		close(stopChain)
 		return P2pEnoScheduler
 	}
-
 	<-stopChain
 	close(stopChain)
-
 	return P2pEnoNone
 }

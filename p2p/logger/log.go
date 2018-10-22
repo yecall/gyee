@@ -31,6 +31,7 @@ import (
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
+	gylog "github.com/yeeco/gyee/utils/logging"
 )
 
 type P2pLogger struct {
@@ -42,14 +43,19 @@ type P2pLogger struct {
 }
 
 var (
-	GlobalLogger *logrus.Logger			// the global logger
+	GyeeProject = true					// is playing in github.com/yeeco/gyee project
+	GlobalLogger *logrus.Logger	= nil	// the global logger
 )
 
 func init() {
-	GlobalLogger = logrus.New()
-	GlobalLogger.Out = os.Stdout
-	GlobalLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
-	GlobalLogger.Level = logrus.InfoLevel
+	if GyeeProject {
+		GlobalLogger = gylog.Logger
+	} else {
+		GlobalLogger = logrus.New()
+		GlobalLogger.Out = os.Stdout
+		GlobalLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
+		GlobalLogger.Level = logrus.InfoLevel
+	}
 }
 
 func NewP2pLogger(module string, level uint32, isGlobal bool, isPosition bool) *P2pLogger {
@@ -80,8 +86,8 @@ func LogCallerFileLine(format string, args ... interface{}) {
 	text := fmt.Sprintf(format, args...)
 	fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
 	textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)
-	// Seems GlobalLogger.Printf not work with "\n" or "\r\n" to return and get a new line,
-	// but log.Printf does.
+	// Seems GlobalLogger.Printf does not work with "\n" or "\r\n" to return and
+	// get a new line, but log.Printf does.
 	// GlobalLogger.Printf("%s", textAndFileLine)
 	log.Printf("%s", textAndFileLine)
 }
@@ -109,11 +115,9 @@ func (p2pLog *P2pLogger)newFileRotateHooker(path string, count uint) logrus.Hook
 		rotatelogs.WithRotationTime(time.Duration(24)*time.Hour),
 		rotatelogs.WithRotationCount(count),
 	)
-
 	if err != nil {
 		panic("Failed to create rotate logs. err:" + err.Error())
 	}
-
 	hook := lfshook.NewHook(lfshook.WriterMap{
 		logrus.DebugLevel: writer,
 		logrus.InfoLevel:  writer,
