@@ -208,14 +208,16 @@ func (lsnMgr *ListenerManager) procPoweroff(ptn interface{}) sch.SchErrno {
 }
 
 func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
+	// Notice: in currently implement, event EvNblStart should be sent one time to us,
+	// for no sync logic is applied between the listener and the reader task; if one
+	// wants to support any start-stop sequence, he should append sync logic. Please
+	// see reader task also.
 	var eno = sch.SchEnoUnknown
 	var ptnLoop interface{} = nil
-
 	if eno = lsnMgr.setupUdpConn(); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("procStart：setupUdpConn failed, eno: %d", eno)
 		return eno
 	}
-
 	var udpReader = NewUdpReader()
 	udpReader.lsnMgr = lsnMgr
 	udpReader.sdl = lsnMgr.sdl
@@ -225,23 +227,23 @@ func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 		log.LogCallerFileLine("procStart: SchCreateTask failed, eno: %d, ptn: %p", eno, ptnLoop)
 		return eno
 	}
-
 	lsnMgr.ptnReader = ptnLoop
 	return lsnMgr.nextState(LmsStarted)
 }
 
 func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
+	// To stop the reader task, we check if it's started, and simply close the connection
+	// if it is. Notice that we should not try to "done" the reader here for it's a task
+	// without a mailbox, it's a longlong loop than one scheduled by messages, so it can
+	// be really done by itself to break its' loop.
 	lsnMgr.lock.Lock()
 	defer lsnMgr.lock.Unlock()
-
 	if eno := lsnMgr.canStop(); eno != sch.SchEnoNone {
 		log.LogCallerFileLine("procStop: we can't stop, eno: %d", eno)
 		return eno
 	}
-
 	lsnMgr.conn.Close()
 	lsnMgr.conn = nil
-	lsnMgr.sdl.SchStopTask(lsnMgr.ptnReader)
 	return lsnMgr.nextState(LmsStopped)
 }
 
@@ -302,58 +304,40 @@ func (udpReader *UdpReaderTask)TaskProc4Scheduler(ptn interface{}, msg *sch.SchM
 func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
 	var eno = sch.SchEnoNone
 	buf := make([]byte, udpMaxMsgSize)
-
 	udpReader.ptnMe = ptn
 	_, udpReader.ptnNgbMgr = udpReader.sdl.SchGetTaskNodeByName(NgbMgrName)
-
-	//
 	// We just read until errors fired from udp, for example, when
 	// the mamager is asked to stop the reader, it can close the
 	// connection. See function procStop for details please.
-	//
 	// When a message recevied, the reader decode it to get an UDP
 	// discover protocol message, it than create a protocol task to
 	// deal with the message received.
-	//
-
 _loop:
-
 	for {
-
 		if NgbProtoReadTimeout > 0 {
-			udpReader.conn.SetReadDeadline(time.Now().Add(NgbProtoReadTimeout))
-		}
-		bys, peer, err := udpReader.conn.ReadFromUDP(buf)
-
-		// check error
-		if err != nil {
-			if udpReader.canErrIgnored(err) != true {
-				log.LogCallerFileLine("udpReaderLoop: broken, err: %s", err.Error())
+			if err := udpReader.conn.SetReadDeadline(time.Now().Add(NgbProtoReadTimeout)); err != nil {
 				eno = sch.SchEnoOS
 				break _loop
 			}
-		} else {
-			udpReader.msgHandler(&buf, bys, peer)
 		}
+		bys, peer, err := udpReader.conn.ReadFromUDP(buf)
+		if err != nil && udpReader.canErrIgnored(err) != true {
+			eno = sch.SchEnoOS
+			break _loop
+		}
+		udpReader.msgHandler(&buf, bys, peer)
 	}
-
-	//
-	// here we get out, but this might be caused by abnormal cases than we
+	// Here we get out, but this might be caused by abnormal cases than we
 	// are closed by manager task, we check this: if it is the later, the
 	// connection pointer held by manager must be nil, see lsnMgr.procStop
 	// for details pls.
-	//
-	// if it's an abnormal case that the reader task still in running, we
+	// If it's an abnormal case that the reader task still in running, we
 	// need to make it done.
-	//
-
 	if udpReader.lsnMgr.conn == nil {
-		log.LogCallerFileLine("udpReaderLoop: seems we are closed by manager task")
+		udpReader.sdl.SchTaskDone(udpReader.ptnMe, eno)
 	} else {
-		log.LogCallerFileLine("udpReaderLoop: abnormal case, stop the task")
 		eno = udpReader.lsnMgr.procStop()
 	}
-
 	log.LogCallerFileLine("udpReaderLoop: exit ...")
 	udpReader.conn = nil
 	return eno
@@ -377,24 +361,19 @@ func (rd *UdpReaderTask) canErrIgnored(err error) bool {
 func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch.SchErrno {
 	var msg sch.SchMessage
 	var eno umsg.UdpMsgErrno
-
 	if eno := rd.udpMsg.SetRawMessage(pbuf, len, from); eno != umsg.UdpMsgEnoNone {
 		return sch.SchEnoUserTask
 	}
-
 	if eno = rd.udpMsg.Decode(); eno != umsg.UdpMsgEnoNone {
 		return sch.SchEnoUserTask
 	}
-
 	udpMsgInd := UdpMsgInd {
 		msgType:rd.udpMsg.GetDecodedMsgType(),
 		msgBody:rd.udpMsg.GetDecodedMsg(),
 	}
-
 	if rd.udpMsg.CheckUdpMsgFromPeer(from) != true {
 		return sch.SchEnoUserTask
 	}
-
 	rd.sdl.SchMakeMessage(&msg, rd.ptnMe, rd.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
 	rd.sdl.SchSendMessage(&msg)
 	return sch.SchEnoNone
@@ -405,28 +384,23 @@ func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.Sc
 		log.LogCallerFileLine("sendUdpMsg: invalid UDP connection")
 		return sch.SchEnoInternal
 	}
-
 	if len(buf) == 0 || toAddr == nil {
 		log.LogCallerFileLine("sendUdpMsg: empty to send")
 		return sch.SchEnoParameter
 	}
-
 	if err := lsnMgr.conn.SetWriteDeadline(time.Now().Add(NgbProtoWriteTimeout)); err != nil {
 		log.LogCallerFileLine("sendUdpMsg: SetDeadline failed, err: %s", err.Error())
 		return sch.SchEnoOS
 	}
-
 	sent, err := lsnMgr.conn.WriteToUDP(buf, toAddr)
 	if err != nil {
 		log.LogCallerFileLine("sendUdpMsg: WriteToUDP failed, err: %s", err.Error())
 		return sch.SchEnoOS
 	}
-
 	if sent != len(buf) {
 		log.LogCallerFileLine("sendUdpMsg: WriteToUDP failed, len: %d, sent: %d", len(buf), sent)
 		return sch.SchEnoOS
 	}
-
 	return sch.SchEnoNone
 }
 

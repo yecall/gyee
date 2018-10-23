@@ -2127,7 +2127,7 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
 					log.LogCallerFileLine("P2pIndCallback: indication channel closed, done")
 					return
 				}
-				switch indType:=reflect.TypeOf(ind).Name(); indType {
+				switch indType := reflect.TypeOf(ind).Name(); indType {
 				case "P2pIndPeerActivatedPara":
 					indCb(P2pIndPeerActivated, ind)
 				case "P2pIndPeerClosedPara":
