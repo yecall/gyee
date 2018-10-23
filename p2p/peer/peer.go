@@ -25,14 +25,14 @@ import (
 	"time"
 	"fmt"
 	"math/rand"
+	"sync"
+	"reflect"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"sync"
-	"reflect"
 )
 
 // Peer manager errno
@@ -375,7 +375,6 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
-
 	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
 		SetP2pkgCallback(nil, peerInst.ptnMe)
@@ -384,7 +383,6 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	}
 
 	close(peMgr.indChan)
-
 	if peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
@@ -2148,35 +2146,23 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
 // Print peer statistics, for test only
 const doLogPeerStat  = false
 func (peMgr *PeerManager)logPeerStat() {
-	if !doLogPeerStat {
-		return
-	}
-
-	var obpNumSum = 0
-	var ibpNumSum = 0
-	var wrkNumSum = 0
-	var ibpNumTotal = peMgr.ibpTotalNum
-
-	for _, num := range peMgr.obpNum {
-		obpNumSum += num
-	}
-
-	for _, num := range peMgr.ibpNum {
-		ibpNumSum += num
-	}
-
-	for _, num := range peMgr.wrkNum {
-		wrkNumSum += num
-	}
-
+	var (
+		obpNumSum = 0
+		ibpNumSum = 0
+		wrkNumSum = 0
+		ibpNumTotal = peMgr.ibpTotalNum
+	)
+	if !doLogPeerStat {	return }
+	for _, num := range peMgr.obpNum { obpNumSum += num	}
+	for _, num := range peMgr.ibpNum { ibpNumSum += num	}
+	for _, num := range peMgr.wrkNum { wrkNumSum += num	}
 	var dbgMsg = ""
+	var subNetIdList = make([]SubNetworkID, 0)
 	strSum := fmt.Sprintf("================================= logPeerStat: =================================\n" +
 		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d, accepting: %t\n",
 		peMgr.cfg.cfgName,
 		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum, !peMgr.acceptPaused)
 	dbgMsg += strSum
-
-	var subNetIdList = make([]SubNetworkID, 0)
 	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		subNetIdList = append(subNetIdList, peMgr.cfg.subNetIdList...)
 		if len(peMgr.cfg.staticNodes) > 0 {
@@ -2187,7 +2173,6 @@ func (peMgr *PeerManager)logPeerStat() {
 			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
 		}
 	}
-
 	for _, snid := range subNetIdList {
 		strSubnet := fmt.Sprintf("logPeerStat: p2pInst: %s, subnet: %x, obpNum: %d, ibpNum: %d, wrkNum: %d\n",
 			peMgr.cfg.cfgName,
