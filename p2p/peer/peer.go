@@ -1737,7 +1737,12 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 		log.LogCallerFileLine("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
-	peMgr := pkg.P2pInst.SchGetUserTaskIF(sch.PeerMgrName).(*PeerManager)
+	pem := pkg.P2pInst.SchGetUserTaskIF(sch.PeerMgrName)
+	if pem == nil {
+		log.LogCallerFileLine("SendPackage: nil peer manager, might be in power off stage")
+		return PeMgrEnoNotfound
+	}
+	peMgr := pem.(*PeerManager)
 	for _, pid := range pkg.IdList {
 		_pkg := new(P2pPackage)
 		_pkg.Pid = uint32(pkg.ProtoId)
