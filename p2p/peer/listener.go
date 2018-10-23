@@ -249,7 +249,9 @@ acceptLoop:
 		}
 
 		conn, err := listener.Accept()
-		log.LogCallerFileLine("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
+		if sch.Debug__ {
+			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
+		}
 
 		if err != nil && !err.(net.Error).Temporary() {
 			log.LogCallerFileLine("PeerAcceptProc: sdl: %s, break loop for non-temporary error while " +

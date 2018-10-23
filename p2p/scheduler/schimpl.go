@@ -155,16 +155,19 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 
 	if cap(*mailbox.que) <= 0 {
 
-		log.LogCallerFileLine("schCommonTask: " +
-			"longlong loop user task: %s",
-			task.name)
+		if Debug__ {
+			log.LogCallerFileLine("schCommonTask: longlong loop user task: %s",
+				task.name)
+		}
 
 		go proc(ptn, nil)
 
 		why := <-*done
 
-		log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
-			sdl.p2pCfg.CfgName, why, ptn.task.name)
+		if Debug__ {
+			log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
+				sdl.p2pCfg.CfgName, why, ptn.task.name)
+		}
 
 		goto taskDone
 	}
@@ -177,8 +180,10 @@ func (sdl *scheduler)schCommonTask(ptn *schTaskNode) SchErrno {
 
 		why := <-*done
 
-		log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
-			sdl.p2pCfg.CfgName, why, ptn.task.name)
+		if Debug__ {
+			log.LogCallerFileLine("schCommonTask: sdl: %s, done with: %d, task: %s",
+				sdl.p2pCfg.CfgName, why, ptn.task.name)
+		}
 
 		//
 		// drain possible pending messages and send EvSchDone if the task done
@@ -235,7 +240,9 @@ taskLoop:
 drainLoop2:
 
 			for {
+
 				msg = <-*queMsg
+
 				if msg.Id == EvSchDone || msg.Id == EvSchPoweroff {
 					break drainLoop2
 				}
@@ -257,9 +264,11 @@ drainLoop2:
 		if msg.Id == EvSchDone {
 
 			doneInd := msg.Body.(*MsgTaskDone)
-			log.LogCallerFileLine("schCommonTask: " +
-				"sdl: %s, done with eno: %d, task: %s",
-				sdl.p2pCfg.CfgName, doneInd.why, ptn.task.name)
+
+			if Debug__ {
+				log.LogCallerFileLine("schCommonTask: sdl: %s, done with eno: %d, task: %s",
+					sdl.p2pCfg.CfgName, doneInd.why, ptn.task.name)
+			}
 
 			break taskLoop
 		}
@@ -410,7 +419,7 @@ timerLoop:
 
 				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone {
 
-					log.LogCallerFileLine("schTimerCommonTask: "+
+					log.LogCallerFileLine("schTimerCommonTask: " +
 						"send timer event failed, eno: %d, task: %s",
 						eno,
 						ptm.tmcb.taskNode.task.name)
@@ -420,8 +429,7 @@ timerLoop:
 				continue
 			}
 
-			log.LogCallerFileLine("schTimerCommonTask: " +
-				"internal errors, event: %d", event)
+			panic(fmt.Sprint("schTimerCommonTask: internal errors, event: %d", event))
 		}
 
 	} else if ptm.tmcb.tmt == schTmTypeAbsolute {
@@ -503,8 +511,7 @@ absTimerLoop:
 				break absTimerLoop
 			}
 
-			log.LogCallerFileLine("schTimerCommonTask: " +
-				"internal errors, event: %d", event)
+			panic(fmt.Sprintf("schTimerCommonTask: internal errors, event: %d", event))
 		}
 
 	} else {
@@ -541,9 +548,7 @@ absTimerLoop:
 
 	if eno := sdl.schRetTimerNode(ptm); eno != SchEnoNone {
 
-		log.LogCallerFileLine("schTimerCommonTask: " +
-			"schRetTimerNode failed, eno: %d",
-			eno)
+		panic(fmt.Sprintf("schTimerCommonTask: schRetTimerNode failed, eno: %d", eno))
 
 		return eno
 	}
@@ -1134,8 +1139,8 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 	var eno SchErrno
 
 	if ptn == nil {
-		log.LogCallerFileLine("schStopTaskEx: invalid task node pointer")
-		return SchEnoParameter
+		panic("schStopTaskEx: invalid task node pointer")
+		return SchEnoInternal
 	}
 
 	//
@@ -1165,9 +1170,9 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 
 	if eno = sdl.schKillTaskTimers(&ptn.task); eno != SchEnoNone {
 
-		log.LogCallerFileLine("schStopTaskEx: " +
+		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schKillTaskTimers faild, eno: %d， task: %s",
-			eno, ptn.task.name)
+			eno, ptn.task.name))
 
 		return eno
 	}
@@ -1178,9 +1183,9 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 
 	if eno := sdl.schTaskBusyDeque(ptn); eno != SchEnoNone {
 
-		log.LogCallerFileLine("schStopTaskEx: " +
+		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schTaskBusyDeque failed, eno: %d, task: %s",
-			eno, ptn.task.name)
+			eno, ptn.task.name))
 
 		return eno
 	}
@@ -1205,9 +1210,9 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 
 	if eno = sdl.schTcbClean(&ptn.task); eno != SchEnoNone {
 
-		log.LogCallerFileLine("schStopTaskEx: " +
+		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schTcbClean faild, eno: %d, task: %s",
-			eno, ptn.task.name)
+			eno, ptn.task.name))
 
 		return eno
 	}
@@ -1218,9 +1223,9 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 
 	if eno = sdl.schRetTaskNode(ptn); eno != SchEnoNone {
 
-		log.LogCallerFileLine("schStopTaskEx: " +
+		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schRetTimerNode failed, eno: %d, task: %s",
-			eno, string(taskName))
+			eno, string(taskName)))
 
 		return  eno
 	}

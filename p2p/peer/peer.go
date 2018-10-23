@@ -1053,12 +1053,9 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 }
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
-	log.LogCallerFileLine("peMgrKillInst: done task, sdl: %s, task: %s",
-		peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
-
-	if ptn == nil && node == nil {
-		log.LogCallerFileLine("peMgrKillInst: invalid parameters")
-		return PeMgrEnoParameter
+	if sch.Debug__ {
+		log.LogCallerFileLine("peMgrKillInst: done task, sdl: %s, task: %s",
+			peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
 	}
 
 	var peInst = peMgr.peers[ptn]
@@ -1132,14 +1129,6 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	var timerName = ""
 	var eno sch.SchErrno
 	var tid int
-	log.LogCallerFileLine("peMgrAsk4More: " +
-		"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d",
-		peMgr.cfg.cfgName,
-		*snid,
-		peMgr.obpNum[*snid],
-		peMgr.ibpNum[*snid],
-		peMgr.ibpTotalNum,
-		peMgr.wrkNum[*snid])
 
 	dur := durStaticRetryTimer
 	if *snid != peMgr.cfg.staticSubNetId {
@@ -1151,7 +1140,6 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 				peMgr.cfg.subNetMaxOutbounds[*snid])
 			return PeMgrEnoNone
 		}
-
 		var schMsg= sch.SchMessage{}
 		var req = sch.MsgDcvFindNodeReq{
 			Snid:	*snid,
@@ -1162,6 +1150,17 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvFindNodeReq, &req)
 		peMgr.sdl.SchSendMessage(&schMsg)
 		timerName = PeerMgrName + "_DcvFindNode"
+
+		log.LogCallerFileLine("peMgrAsk4More: " +
+			"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
+			peMgr.cfg.cfgName,
+			*snid,
+			peMgr.obpNum[*snid],
+			peMgr.ibpNum[*snid],
+			peMgr.ibpTotalNum,
+			peMgr.wrkNum[*snid],
+			more)
+
 	} else {
 		timerName = PeerMgrName + "_static"
 	}
@@ -1793,7 +1792,9 @@ txBreak:
 chkDone:
 		select {
 		case done = <-inst.txDone:
-			log.LogCallerFileLine("piTx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
+			if sch.Debug__ {
+				log.LogCallerFileLine("piTx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
+			}
 			inst.txExit<-done
 			break txBreak
 		default:
@@ -1864,7 +1865,9 @@ rxBreak:
 		// check if we are done
 		select {
 		case done = <-inst.rxDone:
-			log.LogCallerFileLine("piRx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
+			if sch.Debug__ {
+				log.LogCallerFileLine("piRx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
+			}
 			inst.rxExit<-done
 			break rxBreak
 		default:
@@ -2143,7 +2146,7 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
 }
 
 // Print peer statistics, for test only
-const doLogPeerStat  = true
+const doLogPeerStat  = false
 func (peMgr *PeerManager)logPeerStat() {
 	if !doLogPeerStat {
 		return
