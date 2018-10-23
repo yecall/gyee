@@ -1077,7 +1077,6 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 
 	if peInst.conn != nil {
 		peInst.conn.Close()
-		peInst.conn = nil
 	}
 
 	// Remove maps for the node: we must check the instance state and connection
@@ -1592,7 +1591,20 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	inst.txEno = PeMgrEnoNone
 	inst.rxEno = PeMgrEnoNone
 	inst.ppEno = PeMgrEnoNone
-	inst.conn.SetDeadline(time.Time{})
+	if err := inst.conn.SetDeadline(time.Time{}); err != nil {
+		log.LogCallerFileLine("piEstablishedInd: SetDeadline failed, error: %s", err.Error())
+		msg := sch.SchMessage{}
+		req := sch.MsgPeCloseReq{
+			Snid: inst.snid,
+			Node: config.Node {
+				ID: inst.node.ID,
+			},
+			Dir: inst.dir,
+		}
+		inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
+		inst.sdl.SchSendMessage(&msg)
+		return PeMgrEnoOs
+	}
 
 	go piTx(inst)
 	go piRx(inst)
