@@ -81,7 +81,7 @@ const (
 
 	durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
 
-	maxIndicationQueueSize = 256					// max indication queue size
+	maxIndicationQueueSize = 512					// max indication queue size
 )
 
 const (
@@ -524,10 +524,8 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
-	peInst.txExit		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
-	peInst.rxExit		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
 
 	// Create peer instance task
@@ -921,7 +919,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 	if inst == nil {
 		return PeMgrEnoNotfound
 	}
-	if inst.killing == true {
+	if inst.state == peInstStateKilling {
 		return PeMgrEnoDuplicated
 	}
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
@@ -981,6 +979,12 @@ func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
 			return PeMgrEnoNotfound
 		}
 	}
+	// Notice: when we are requested to send data with the specific instance, it's
+	// possible that the instance is in killing, we had to check the state of it to
+	// discard the request if it is the case.
+	if inst.state != peInstStateActivated {
+		return PeMgrEnoNotfound
+	}
 	if len(inst.txChan) >= cap(inst.txChan) {
 		log.LogCallerFileLine("peMgrDataReq: tx queue full, inst: %s", inst.name)
 		return PeMgrEnoResource
@@ -1015,10 +1019,8 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
 	peInst.txDone		= make(chan PeMgrErrno, 1)
-	peInst.txExit		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno, 1)
-	peInst.rxExit		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
 
 	peMgr.obInstSeq++
@@ -1118,6 +1120,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	}
 
 	// Stop instance task
+	peInst.state = peInstStateKilled
 	peMgr.sdl.SchStopTask(ptn)
 
 	return PeMgrEnoNone
@@ -1202,6 +1205,8 @@ const (
 	peInstStateConnected					// outbound connected, need handshake
 	peInstStateHandshook					// handshook
 	peInstStateActivated					// actived in working
+	peInstStateKilling						// in killing
+	peInstStateKilled						// killed
 )
 
 type peerInstState int	// instance state type
@@ -1225,7 +1230,6 @@ type peerInstance struct {
 	ptnMe		interface{}					// the instance task node pointer
 	ptnMgr		interface{}					// the peer manager task node pointer
 	state		peerInstState				// state
-	killing		bool						// is instance in killing
 	cto			time.Duration				// connect timeout value
 	hto			time.Duration				// handshake timeout value
 	ato			time.Duration				// active peer connection read/write timeout value
@@ -1246,9 +1250,7 @@ type peerInstance struct {
 	txChan		chan *P2pPackage			// tx pending channel
 	txPendNum	int							// tx pending number
 	txDone		chan PeMgrErrno				// TX chan
-	txExit		chan PeMgrErrno				// TX had been done
 	rxDone		chan PeMgrErrno				// RX chan
-	rxExit		chan PeMgrErrno				// RX had been done
 	rxtxRuning	bool						// indicating that rx and tx routines are running
 	ppSeq		uint64						// pingpong sequence no.
 	ppCnt		int							// pingpong counter
@@ -1361,7 +1363,7 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 
 func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	sdl := inst.sdl.SchGetP2pCfgName()
-	if inst.killing == true {
+	if inst.state == peInstStateKilling {
 		log.LogCallerFileLine("piPoweroff: already in killing, done at once, sdl: %s, name: %s",
 			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 		if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
@@ -1375,22 +1377,20 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	if inst.rxtxRuning {
 		if inst.txChan != nil {
 			close(inst.txChan)
+			inst.txChan = nil
 		}
 
 		if inst.txDone != nil {
 			inst.txDone <- PeMgrEnoNone
-			<-inst.txExit
-			close(inst.txDone)
 		}
 
 		if inst.rxDone != nil {
 			inst.rxDone <- PeMgrEnoNone
-			<-inst.rxExit
-			close(inst.rxDone)
 		}
 
 		if inst.rxChan != nil {
 			close(inst.rxChan)
+			inst.rxChan = nil
 		}
 	}
 
@@ -1399,6 +1399,8 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 		inst.conn = nil
 	}
 
+	inst.state = peInstStateKilled
+	inst.rxtxRuning = false
 	if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
@@ -1534,30 +1536,26 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 
 func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	sdl := inst.sdl.SchGetP2pCfgName()
-	if inst.killing == true {
+	if inst.state == peInstStateKilling {
 		log.LogCallerFileLine("piCloseReq: already in killing, sdl: %s, task: %s",
 			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
 		return PeMgrEnoDuplicated
 	}
-	inst.killing = true
+	inst.state = peInstStateKilling
 	node := inst.node
 	if inst.rxtxRuning {
 		if inst.txChan != nil {
 			close(inst.txChan)
+			inst.txChan = nil
 		}
 		inst.rxDone <- PeMgrEnoNone
-		<-inst.rxExit
-
 		inst.txDone <- PeMgrEnoNone
-		<-inst.txExit
 		if inst.rxChan != nil {
 			close(inst.rxChan)
+			inst.rxChan = nil
 		}
+		inst.rxtxRuning = false
 	}
-	close(inst.rxDone)
-	close(inst.rxExit)
-	close(inst.txDone)
-	close(inst.txExit)
 
 	cfm := MsgCloseCfm {
 		result: PeMgrEnoNone,
@@ -1783,17 +1781,20 @@ func piTx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
+	var ok bool = true
 
 txBreak:
 	for {
 		// check if we are done
 chkDone:
 		select {
-		case done = <-inst.txDone:
+		case done, ok = <-inst.txDone:
 			if sch.Debug__ {
 				log.LogCallerFileLine("piTx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
 			}
-			inst.txExit<-done
+			if ok {
+				close(inst.txDone)
+			}
 			break txBreak
 		default:
 		}
@@ -1855,6 +1856,7 @@ func piRx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
+	var ok bool = true
 	var peerInfo = PeerInfo{}
 	var pkgCb = P2pPackageRx{}
 
@@ -1862,11 +1864,13 @@ rxBreak:
 	for {
 		// check if we are done
 		select {
-		case done = <-inst.rxDone:
+		case done, ok = <-inst.rxDone:
 			if sch.Debug__ {
 				log.LogCallerFileLine("piRx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
 			}
-			inst.rxExit<-done
+			if ok {
+				close(inst.rxDone)
+			}
 			break rxBreak
 		default:
 		}
@@ -2120,25 +2124,26 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
 	}
 	peMgr.indCb = icb
 
-	go func(indCh chan interface{},  indCb P2pIndCallback) {
+	go func() {
 		for {
 			select {
-			case ind, closed := <-indCh:
-				if closed {
+			case ind, ok := <-peMgr.indChan:
+				if !ok  {
 					log.LogCallerFileLine("P2pIndCallback: indication channel closed, done")
 					return
 				}
-				switch indType := reflect.TypeOf(ind).Name(); indType {
+				indType := reflect.TypeOf(ind).Elem().Name()
+				switch indType {
 				case "P2pIndPeerActivatedPara":
-					indCb(P2pIndPeerActivated, ind)
+					peMgr.indCb(P2pIndPeerActivated, ind)
 				case "P2pIndPeerClosedPara":
-					indCb(P2pIndPeerClosed, ind)
+					peMgr.indCb(P2pIndPeerClosed, ind)
 				default:
 					log.LogCallerFileLine("P2pIndCallback: discard unknown indication type: %s", indType)
 				}
 			}
 		}
-	}(peMgr.indChan, peMgr.indCb)
+	}()
 
 	return PeMgrEnoNone
 }

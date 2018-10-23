@@ -324,6 +324,22 @@ txLoop:
 		fmt.Sprintf("%X", id))
 }
 
+func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, snid peer.SubNetworkID, id peer.PeerId) {
+	sdl := p2pInst.SchGetP2pCfgName()
+rxloop:
+	for {
+		select {
+		case pkg, ok := <-rxChan:
+			if !ok {
+				log.LogCallerFileLine("rxProc: rxChan closed, break")
+				break rxloop
+			}
+			log.LogCallerFileLine("rxProc: length: %d, sdl: %s, snid: %x, peer: %x",
+				pkg.PayloadLength, sdl, snid, id)
+		}
+	}
+	log.LogCallerFileLine("rxProc: it's done")
+}
 
 //
 // Indication handler
@@ -352,19 +368,12 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			"P2pIndPeerActivated, para: %s",
 			fmt.Sprintf("%+v", *pap.PeerInfo))
 
-		if eno := shell.P2pRegisterCallback(shell.P2pPkgCb, p2pPkgHandler, pap.Ptn);
-		eno != shell.P2pEnoNone {
-
-			log.LogCallerFileLine("p2pIndProc: " +
-				"P2pRegisterCallback failed, eno: %d",
-				eno)
-		}
-
 		p2pInst := sch.SchGetScheduler(pap.Ptn)
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
 
 		go txProc(p2pInst, pap.PeerInfo.Dir, snid, peerId)
+		go rxProc(p2pInst, pap.RxChan, pap.PeerInfo.Dir, snid, peerId)
 
 	case shell.P2pIndPeerClosed:
 
@@ -393,7 +402,6 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			"done failed, subnet: %s, id: %s",
 			fmt.Sprintf("%x", pcp.Snid),
 			fmt.Sprintf("%X", pcp.PeerId))
-
 
 	default:
 
@@ -1074,7 +1082,7 @@ func testCase5(tc *testCase) {
 
 	log.LogCallerFileLine("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 32
+	var p2pInstNum = 64
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
