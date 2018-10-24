@@ -160,7 +160,6 @@ type PeerManager struct {
 	ibpNum			map[SubNetworkID]int			// active inbound peer number
 	obpNum			map[SubNetworkID]int			// active outbound peer number
 	ibpTotalNum		int								// total active inbound peer number
-	acceptPaused	bool							// if accept task paused
 	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
 	indChan			chan interface{}				// indication signal
 	indCbLock		sync.Mutex						// lock for indication callback
@@ -182,7 +181,6 @@ func NewPeerMgr() *PeerManager {
 		ibpNum:       	map[SubNetworkID]int{},
 		obpNum:       	map[SubNetworkID]int{},
 		ibpTotalNum:	0,
-		acceptPaused: 	false,
 		indChan:		make(chan interface{}, maxIndicationQueueSize),
 		randoms:      	map[SubNetworkID][]*config.Node{},
 		staticsStatus:	map[PeerIdEx]int{},
@@ -203,6 +201,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	var schEno = sch.SchEnoNone
 	var eno PeMgrErrno = PeMgrEnoNone
+
 	switch msg.Id {
 	case sch.EvSchPoweron:
 		eno = peMgr.peMgrPoweron(ptn)
@@ -303,9 +302,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	}
 
 	for _, p := range cfg.Protocols {
-		peMgr.cfg.protocols = append(peMgr.cfg.protocols,
-			Protocol{ Pid:p.Pid, Ver:p.Ver,},
-		)
+		peMgr.cfg.protocols = append(peMgr.cfg.protocols, Protocol{ Pid:p.Pid, Ver:p.Ver,})
 	}
 
 	for _, sn := range peMgr.cfg.staticNodes {
@@ -556,7 +553,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	// Pause inbound peer accepter if necessary
 	if peMgr.ibpTotalNum++; peMgr.ibpTotalNum >= peMgr.cfg.ibpNumTotal {
-		if !peMgr.cfg.noAccept && !peMgr.acceptPaused {
+		if !peMgr.cfg.noAccept {
 			// we stop accepter simply, a duration of delay should be apply before pausing it,
 			// this should be improved later.
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
@@ -1111,7 +1108,6 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 
 	// resume accepter if necessary
 	if peMgr.cfg.noAccept == false &&
-		peMgr.acceptPaused == true  &&
 		peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
 		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
@@ -2181,9 +2177,9 @@ func (peMgr *PeerManager)logPeerStat() {
 	var dbgMsg = ""
 	var subNetIdList = make([]SubNetworkID, 0)
 	strSum := fmt.Sprintf("================================= logPeerStat: =================================\n" +
-		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d, accepting: %t\n",
+		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d\n",
 		peMgr.cfg.cfgName,
-		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum, !peMgr.acceptPaused)
+		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum)
 	dbgMsg += strSum
 	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		subNetIdList = append(subNetIdList, peMgr.cfg.subNetIdList...)
