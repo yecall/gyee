@@ -62,7 +62,7 @@ type FileDatastore struct {
 func NewFileDatastore(cfg *FileDatastoreConfig) *FileDatastore {
 
 	if cfg == nil {
-		log.LogCallerFileLine("NewFileDatastore: nil configuration")
+		log.Debug("NewFileDatastore: nil configuration")
 		return nil
 	}
 
@@ -70,7 +70,7 @@ func NewFileDatastore(cfg *FileDatastoreConfig) *FileDatastore {
 	ffs, err := ipfsfs.CreateOrOpen(cfg.path, sidv1, cfg.sync)
 
 	if err != nil {
-		log.LogCallerFileLine("NewFileDatastore: CreateOrOpen faialed, err: %s", err.Error())
+		log.Debug("NewFileDatastore: CreateOrOpen faialed, err: %s", err.Error())
 		return nil
 	}
 
@@ -87,10 +87,10 @@ func (fds *FileDatastore)Put(k *DsKey, v DsValue) DhtErrno {
 
 	strKey := fmt.Sprintf("%x", *k)
 	dsk := ipfsds.NewKey(strKey)
-	log.LogCallerFileLine("Put: key: %s", dsk)
+	log.Debug("Put: key: %s", dsk)
 
 	if err := fds.ffs.Put(dsk, v.([]byte)); err != nil {
-		log.LogCallerFileLine("Put: Put failed, err: %s", err.Error())
+		log.Debug("Put: Put failed, err: %s", err.Error())
 		return DhtEnoDatastore
 	}
 
@@ -104,18 +104,18 @@ func (fds *FileDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
 
 	strKey := fmt.Sprintf("%x", *k)
 	dsk := ipfsds.NewKey(strKey)
-	log.LogCallerFileLine("Get: key: %s", dsk)
+	log.Debug("Get: key: %s", dsk)
 
 	val, err := fds.ffs.Get(dsk)
 
 	if err != nil {
 
 		if err == ipfsds.ErrNotFound {
-			log.LogCallerFileLine("Get: not found")
+			log.Debug("Get: not found")
 			return DhtEnoNotFound, nil
 		}
 
-		log.LogCallerFileLine("Get: Get failed, err: %s", err.Error())
+		log.Debug("Get: Get failed, err: %s", err.Error())
 		return DhtEnoDatastore, nil
 	}
 
@@ -129,10 +129,10 @@ func (fds *FileDatastore)Delete(k *DsKey) DhtErrno {
 
 	strKey := fmt.Sprintf("%x", *k)
 	dsk := ipfsds.NewKey(strKey)
-	log.LogCallerFileLine("Delete: key: %s", dsk)
+	log.Debug("Delete: key: %s", dsk)
 
 	if err := fds.ffs.Delete(dsk); err != nil {
-		log.LogCallerFileLine("Delete: Delete failed, err: %s", err.Error())
+		log.Debug("Delete: Delete failed, err: %s", err.Error())
 		return DhtEnoDatastore
 	}
 

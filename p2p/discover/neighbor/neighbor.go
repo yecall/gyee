@@ -106,7 +106,7 @@ func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.
 
 	if sch.Debug__ && inst.sdl != nil {
 		sdl := inst.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("ngbProtoProc: sdl: %s, inst.name: %s, msg.Id: %d", sdl, inst.name, msg.Id)
+		log.Debug("ngbProtoProc: sdl: %s, inst.name: %s, msg.Id: %d", sdl, inst.name, msg.Id)
 	}
 
 	var protoEno NgbProtoErrno
@@ -126,7 +126,7 @@ func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.
 	case sch.EvNblPingpongTimer:
 		protoEno = inst.NgbProtoPingTimeout()
 	default:
-		log.LogCallerFileLine("NgbProtoProc: invalid message, msg.Id: %d", msg.Id)
+		log.Debug("NgbProtoProc: invalid message, msg.Id: %d", msg.Id)
 		protoEno = NgbProtoEnoParameter
 	}
 
@@ -137,7 +137,7 @@ func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.
 }
 
 func (inst *neighborInst) NgbProtoPoweroff(ptn interface{}) NgbProtoErrno {
-	log.LogCallerFileLine("NgbProtoPoweroff: task will be done, name: %s", inst.sdl.SchGetTaskName(inst.ptn))
+	log.Debug("NgbProtoPoweroff: task will be done, name: %s", inst.sdl.SchGetTaskName(inst.ptn))
 	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled)
 	return NgbProtoEnoNone
 }
@@ -344,7 +344,7 @@ func (ngbMgr *NeighborManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if sch.Debug__ && ngbMgr.sdl != nil{
 		sdl := ngbMgr.sdl.SchGetP2pCfgName()
-		log.LogCallerFileLine("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, ngbMgr.name, msg.Id)
+		log.Debug("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, ngbMgr.name, msg.Id)
 	}
 
 	var eno NgbMgrErrno
@@ -362,7 +362,7 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	case sch.EvNblCleanMapReq:
 		eno = ngbMgr.CleanMapReq(msg.Body.(string))
 	default:
-		log.LogCallerFileLine("NgbMgrProc:  invalid message id: %d", msg.Id)
+		log.Debug("NgbMgrProc:  invalid message id: %d", msg.Id)
 		eno = NgbMgrEnoParameter
 	}
 
@@ -380,12 +380,12 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 	ngbMgr.ptnMe = ptn
 	ngbMgr.sdl = sch.SchGetScheduler(ptn)
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("PoweronHandler: setupConfig failed, eno: %d", eno)
+		log.Debug("PoweronHandler: setupConfig failed, eno: %d", eno)
 		return eno
 	}
 
 	if ngbMgr.cfg.NetworkType == config.P2pNetworkTypeStatic {
-		log.LogCallerFileLine("tabMgrPoweron: static subnet, tabMgr is not needed, done it ...")
+		log.Debug("tabMgrPoweron: static subnet, tabMgr is not needed, done it ...")
 		ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return sch.SchEnoNone
 	}
@@ -401,7 +401,7 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 }
 
 func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("PoweroffHandler: task will be done, name: %s", ngbMgr.sdl.SchGetTaskName(ptn))
+	log.Debug("PoweroffHandler: task will be done, name: %s", ngbMgr.sdl.SchGetTaskName(ptn))
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
@@ -430,7 +430,7 @@ func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 	case um.UdpMsgTypeNeighbors:
 		eno = ngbMgr.NeighborsHandler(msg.msgBody.(*um.Neighbors))
 	default:
-		log.LogCallerFileLine("NgbMgrUdpMsgHandler: invalid udp message type: %d", msg.msgType)
+		log.Debug("NgbMgrUdpMsgHandler: invalid udp message type: %d", msg.msgType)
 		eno = NgbMgrEnoParameter
 	}
 	return eno
@@ -453,7 +453,7 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	}
 
 	if !matched {
-		log.LogCallerFileLine("PingHandler: subnet mismatched")
+		log.Debug("PingHandler: subnet mismatched")
 		return NgbMgrEnoMismatched
 	}
 
@@ -639,7 +639,7 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	strSubNetId := config.P2pSubNetId2HexString(nbs.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeFindNode) == false {
-		log.LogCallerFileLine("NeighborsHandler: not found, id: %s", strPeerNodeId)
+		log.Debug("NeighborsHandler: not found, id: %s", strPeerNodeId)
 		return NgbMgrEnoNotFound
 	}
 
@@ -856,7 +856,7 @@ func expired(ts uint64) bool {
 func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 	var ptCfg *config.Cfg4UdpNgbManager = nil
 	if ptCfg = config.P2pConfig4UdpNgbManager(ngbMgr.sdl.SchGetP2pCfgName()); ptCfg == nil {
-		log.LogCallerFileLine("setupConfig: P2pConfig4UdpNgbManager failed")
+		log.Debug("setupConfig: P2pConfig4UdpNgbManager failed")
 		return sch.SchEnoConfig
 	}
 	ngbMgr.cfg.IP			= ptCfg.IP

@@ -166,7 +166,7 @@ func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
 	}
 	node := new(Node)
 	if err := DecodeBytes(blob, node, nil); err != nil {
-		log.LogCallerFileLine("node: DecodeBytes failed")
+		log.Debug("node: DecodeBytes failed")
 		return nil
 	}
 	node.sha = sha256.Sum256(id[:])
@@ -344,7 +344,7 @@ func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 		var n Node
 		var snid = AnySubNet
 		if err := DecodeBytes(it.Value(), &n, &snid); err != nil {
-			log.LogCallerFileLine("nextNode: DecodeBytes failed")
+			log.Debug("nextNode: DecodeBytes failed")
 			continue
 		}
 		return &n, &snid

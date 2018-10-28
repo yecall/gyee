@@ -182,7 +182,7 @@ func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.
 func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.LogCallerFileLine("dsMgrProc: invalid parameters")
+		log.Debug("dsMgrProc: invalid parameters")
 		return sch.SchEnoParameter
 	}
 
@@ -216,7 +216,7 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 
 	default:
 		eno = sch.SchEnoParameter
-		log.LogCallerFileLine("dsMgrProc: unknown message: %d", msg.Id)
+		log.Debug("dsMgrProc: unknown message: %d", msg.Id)
 	}
 
 	return eno
@@ -228,14 +228,14 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	if ptn == nil {
-		log.LogCallerFileLine("poweron: invalid ptn")
+		log.Debug("poweron: invalid ptn")
 		return sch.SchEnoInternal
 	}
 
 	sdl := sch.SchGetScheduler(ptn)
 	dsMgr.sdl = sdl
 	if sdl == nil {
-		log.LogCallerFileLine("poweron: invalid sdl")
+		log.Debug("poweron: invalid sdl")
 		return sch.SchEnoInternal
 	}
 
@@ -247,7 +247,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 	if dsMgr.ptnDhtMgr == nil ||
 		dsMgr.ptnQryMgr == nil ||
 		dsMgr.ptnRutMgr == nil {
-		log.LogCallerFileLine("poweron: invalid ptn")
+		log.Debug("poweron: invalid ptn")
 		return sch.SchEnoInternal
 	}
 
@@ -259,7 +259,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 		fdc := FileDatastoreConfig{}
 		if eno := dsMgr.getFileDatastoreConfig(&fdc); eno != DhtEnoNone {
-			log.LogCallerFileLine("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			log.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -267,7 +267,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 	}
 
 	if dsMgr.ds == nil {
-		log.LogCallerFileLine("poweron: invalid ds")
+		log.Debug("poweron: invalid ds")
 		return sch.SchEnoUserTask
 	}
 
@@ -278,7 +278,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 // poweroff handler
 //
 func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("poweroff: task will be done ...")
+	log.Debug("poweroff: task will be done ...")
 	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
 }
 
@@ -288,7 +288,7 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		log.LogCallerFileLine("localAddValReq: invalid key length")
+		log.Debug("localAddValReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -300,7 +300,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	//
 
 	if eno := dsMgr.store(&k, msg.Val); eno != DhtEnoNone {
-		log.LogCallerFileLine("localAddValReq: store failed, eno: %d", eno)
+		log.Debug("localAddValReq: store failed, eno: %d", eno)
 		dsMgr.localAddValRsp(k[0:], nil, eno)
 		return sch.SchEnoUserTask
 	}
@@ -327,7 +327,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		log.LogCallerFileLine("localGetValueReq: invalid key length")
+		log.Debug("localGetValueReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -372,7 +372,7 @@ func (dsMgr *DsMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch
 		return dsMgr.localGetValRsp(msg.Target[0:], msg.Val, DhtErrno(msg.Eno))
 
 	} else {
-		log.LogCallerFileLine("qryMgrQueryResultInd: unknown what's for")
+		log.Debug("qryMgrQueryResultInd: unknown what's for")
 	}
 
 	return sch.SchEnoMismatched
@@ -395,7 +395,7 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 		copy(dsk[0:], v.Key)
 
 		if eno := dsMgr.ds.Put(&dsk, v.Val); eno != DhtEnoNone {
-			log.LogCallerFileLine("putValReq: put failed, eno: %d", eno)
+			log.Debug("putValReq: put failed, eno: %d", eno)
 		}
 	}
 
@@ -435,7 +435,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 		dhtPkg := DhtPackage{}
 		if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-			log.LogCallerFileLine("getValReq: GetPackage failed, eno: %d", eno)
+			log.Debug("getValReq: GetPackage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -470,7 +470,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	prdMgr, ok := dsMgr.sdl.SchGetUserTaskIF(PrdMgrName).(*PrdMgr)
 	if !ok || prdMgr == nil {
-		log.LogCallerFileLine("getValReq: get provider manager failed")
+		log.Debug("getValReq: get provider manager failed")
 		return sch.SchEnoInternal
 	}
 
@@ -511,7 +511,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	//
 
 	if msg == nil {
-		log.LogCallerFileLine("rutMgrNearestRsp: invalid message")
+		log.Debug("rutMgrNearestRsp: invalid message")
 		return sch.SchEnoParameter
 	}
 
@@ -541,7 +541,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 
 	dhtPkg := DhtPackage{}
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		log.LogCallerFileLine("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		log.Debug("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -580,7 +580,7 @@ func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 	}
 
 	if eno := ddsr.DecDsRecord(&dsr); eno != DhtEnoNone {
-		log.LogCallerFileLine("fromStore: DecDsRecord failed, eno: %d", eno)
+		log.Debug("fromStore: DecDsRecord failed, eno: %d", eno)
 		return nil
 	}
 
@@ -600,7 +600,7 @@ func (dsMgr *DsMgr)store(k *DsKey, v DsValue) DhtErrno {
 
 	dsr := new(DsRecord)
 	if eno := ddsr.EncDsRecord(dsr); eno != DhtEnoNone {
-		log.LogCallerFileLine("store: EncDsRecord failed, eno: %d", eno)
+		log.Debug("store: EncDsRecord failed, eno: %d", eno)
 		return eno
 	}
 

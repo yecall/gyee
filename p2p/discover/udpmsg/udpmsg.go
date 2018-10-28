@@ -154,7 +154,7 @@ func NewUdpMsg() *UdpMsg {
 func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) UdpMsgErrno {
 
 	if pbuf == nil || bytes == 0 || from == nil {
-		log.LogCallerFileLine("SetRawMessage: invalid parameter(s)")
+		log.Debug("SetRawMessage: invalid parameter(s)")
 		return UdpMsgEnoParameter
 	}
 
@@ -175,7 +175,7 @@ func (pum *UdpMsg) Decode() UdpMsgErrno {
 
 	if err := (pum.Msg).Unmarshal((*pum.Pbuf)[0:pum.Len]); err != nil {
 
-		log.LogCallerFileLine("Decode: " +
+		log.Debug("Decode: " +
 			"Unmarshal failed, err: %s",
 			err.Error())
 
@@ -205,7 +205,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	if mt == UdpMsgTypeUnknown {
 
-		log.LogCallerFileLine("GetDecodedMsg: " +
+		log.Debug("GetDecodedMsg: " +
 			"GetDecodedMsgType failed, mt: %d",
 			mt)
 
@@ -229,7 +229,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	if f, ok = funcMap[mt]; !ok {
 
-		log.LogCallerFileLine("GetDecodedMsg: " +
+		log.Debug("GetDecodedMsg: " +
 			"invalid message type: %d",
 			mt)
 
@@ -260,7 +260,7 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 
 	if val, ok = pbMap[key]; !ok {
 
-		log.LogCallerFileLine("GetDecodedMsgType: invalid message type")
+		log.Debug("GetDecodedMsgType: invalid message type")
 		return UdpMsgTypeUnknown
 	}
 
@@ -458,7 +458,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 
 	if *pum.Pbuf, err = pum.Msg.Marshal(); err != nil {
 
-		log.LogCallerFileLine("Encode: " +
+		log.Debug("Encode: " +
 			"Marshal failed, err: %s",
 			err.Error())
 
@@ -500,7 +500,7 @@ func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 	}
 
 	if eno != UdpMsgEnoNone {
-		log.LogCallerFileLine("Encode: failed, type: %d", t)
+		log.Debug("Encode: failed, type: %d", t)
 	}
 
 	pum.Eno = eno
@@ -566,7 +566,7 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		log.LogCallerFileLine("EncodePing: fialed, err: %s", err.Error())
+		log.Debug("EncodePing: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -635,7 +635,7 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		log.LogCallerFileLine("EncodePong: fialed, err: %s", err.Error())
+		log.Debug("EncodePong: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -723,7 +723,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		log.LogCallerFileLine("EncodeFindNode: fialed, err: %s", err.Error())
+		log.Debug("EncodeFindNode: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -807,7 +807,7 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 
 	if buf, err = pbm.Marshal(); err != nil {
 
-		log.LogCallerFileLine("EncodeNeighbors: failed, err: %s", err.Error())
+		log.Debug("EncodeNeighbors: failed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 

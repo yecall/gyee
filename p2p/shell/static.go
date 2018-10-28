@@ -80,7 +80,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 		}
 	}
 
-	log.LogCallerFileLine("P2pCreateStaticTaskTab: invalid type: %d", what)
+	log.Debug("P2pCreateStaticTaskTab: invalid type: %d", what)
 
 	return nil
 }
@@ -174,16 +174,16 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Dht)
 
 	case config.P2P_TYPE_ALL:
-		log.LogCallerFileLine("P2pStart: not supported type: %d", what)
+		log.Debug("P2pStart: not supported type: %d", what)
 		return sch.SchEnoNotImpl
 
 	default:
-		log.LogCallerFileLine("P2pStart: invalid application type: %d", what)
+		log.Debug("P2pStart: invalid application type: %d", what)
 		return sch.SchEnoParameter
 	}
 
 	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("P2pStart: failed, eno: %d", eno)
+		log.Debug("P2pStart: failed, eno: %d", eno)
 		return eno
 	}
 
@@ -200,7 +200,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		pmEno = peMgr.PeMgrInited()
 
 		if pmEno != peer.PeMgrEnoNone {
-			log.LogCallerFileLine("P2pStart: pmEno: %d", pmEno)
+			log.Debug("P2pStart: pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 
@@ -211,7 +211,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		pmEno = peMgr.PeMgrStart()
 
 		if pmEno != peer.PeMgrEnoNone {
-			log.LogCallerFileLine("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
+			log.Debug("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -252,29 +252,29 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 
 	} else {
 
-		log.LogCallerFileLine("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
+		log.Debug("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}
 
 	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
-			log.LogCallerFileLine("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
+			log.Debug("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
 			continue
 		}
 
-		log.LogCallerFileLine("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
+		log.Debug("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
 			p2pInstName, taskName)
 
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
 
-			log.LogCallerFileLine("P2pStop: inst: %s, " +
+			log.Debug("P2pStop: inst: %s, " +
 				"SchSendMessageByName failed, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
 		} else {
 
-			log.LogCallerFileLine("P2pStop: inst: %s, " +
+			log.Debug("P2pStop: inst: %s, " +
 				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
@@ -290,16 +290,16 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 			//
 
 			for sdl.SchTaskExist(taskName) {
-				log.LogCallerFileLine("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
+				log.Debug("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
 				time.Sleep(time.Millisecond * 500)
 			}
 
-			log.LogCallerFileLine("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
+			log.Debug("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
 		}
 	}
 
-	log.LogCallerFileLine("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
-	log.LogCallerFileLine("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
+	log.Debug("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	log.Debug("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
 	// Notice:
@@ -318,7 +318,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			log.LogCallerFileLine("P2pStop: inst: %s, all tasks are done", p2pInstName)
+			log.Debug("P2pStop: inst: %s, all tasks are done", p2pInstName)
 			break
 		}
 
@@ -332,7 +332,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 			}
 		}
 
-		log.LogCallerFileLine("P2pStop: " +
+		log.Debug("P2pStop: " +
 			"inst: %s, wait seconds: %d, remain tasks: %d, names: %s",
 			p2pInstName, seconds, tasks, strNames)
 	}

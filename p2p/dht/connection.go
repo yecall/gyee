@@ -114,7 +114,7 @@ func (conMgr *ConMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.LogCallerFileLine("conMgrProc: " +
+		log.Debug("conMgrProc: " +
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -158,7 +158,7 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = conMgr.rutPeerRemoveInd(msg.Body.(*sch.MsgDhtRutPeerRemovedInd))
 
 	default:
-		log.LogCallerFileLine("conMgrProc: unknown event: %d", msg.Id)
+		log.Debug("conMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -182,12 +182,12 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil ||
 		conMgr.ptnLsnMgr == nil || conMgr.ptnDhtMgr == nil {
-		log.LogCallerFileLine("poweron: internal errors")
+		log.Debug("poweron: internal errors")
 		return sch.SchEnoInternal
 	}
 
 	if dhtEno := conMgr.getConfig(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: getConfig failed, dhtEno: %d", dhtEno)
+		log.Debug("poweron: getConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -199,7 +199,7 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 
-	log.LogCallerFileLine("poweroff: task will be done ...")
+	log.Debug("poweroff: task will be done ...")
 
 	po := sch.SchMessage{}
 
@@ -246,7 +246,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		log.LogCallerFileLine("acceptInd: SchCreateTask failed, eno: %d", eno)
+		log.Debug("acceptInd: SchCreateTask failed, eno: %d", eno)
 		return eno
 	}
 
@@ -288,11 +288,11 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		//
 
 		if ci = msg.Inst.(*ConInst); ci == nil {
-			log.LogCallerFileLine("handshakeRsp: nil connection instance, dht: %s", dht)
+			log.Debug("handshakeRsp: nil connection instance, dht: %s", dht)
 			return sch.SchEnoInternal
 		}
 
-		log.LogCallerFileLine("handshakeRsp: handshake failed, dht: %s, inst: %s", dht, ci.name)
+		log.Debug("handshakeRsp: handshake failed, dht: %s, inst: %s", dht, ci.name)
 
 		if ci.isBlind && ci.dir == ConInstDirOutbound {
 			rsp := sch.MsgDhtBlindConnectRsp {
@@ -356,7 +356,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		return conMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	log.LogCallerFileLine("handshakeRsp: ok responsed, dht: %s, msg: %+v", dht, *msg)
+	log.Debug("handshakeRsp: ok responsed, dht: %s, msg: %+v", dht, *msg)
 
 	cid := conInstIdentity{
 		nid: msg.Peer.ID,
@@ -365,7 +365,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
 
-		log.LogCallerFileLine("handshakeRsp: invalid direction, dht: %s, dir: %d", msg.Dir)
+		log.Debug("handshakeRsp: invalid direction, dht: %s, dir: %d", msg.Dir)
 		return sch.SchEnoUserTask
 
 	} else if msg.Dir == ConInstDirInbound {
@@ -381,7 +381,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	} else {
 
 		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
-			log.LogCallerFileLine("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
+			log.Debug("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
 			return sch.SchEnoUserTask
 		}
 
@@ -445,7 +445,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	// we need to update the route manager
 	//
 
-	log.LogCallerFileLine("handshakeRsp: all ok, try to update route manager, " +
+	log.Debug("handshakeRsp: all ok, try to update route manager, " +
 		"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
 		dht, ci.name, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
@@ -469,7 +469,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 // Listener manager status indication handler
 //
 func (conMgr *ConMgr)lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrno {
-	log.LogCallerFileLine("lsnMgrStatusInd: listener manager status reported: %d", msg.Status)
+	log.Debug("lsnMgrStatusInd: listener manager status reported: %d", msg.Status)
 	if msg.Status == lmsNull || msg.Status == lmsStopped {
 		schMsg := sch.SchMessage{}
 		conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrStartReq, nil)
@@ -519,12 +519,12 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	if conMgr.lookupOutboundConInst(&msg.Peer.ID) != nil {
-		log.LogCallerFileLine("connctReq: outbound instance duplicated, id: %x", msg.Peer.ID)
+		log.Debug("connctReq: outbound instance duplicated, id: %x", msg.Peer.ID)
 		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
 	}
 
 	if conMgr.lookupInboundConInst(&msg.Peer.ID) != nil {
-		log.LogCallerFileLine("connctReq: inbound instance duplicated, id: %x", msg.Peer.ID)
+		log.Debug("connctReq: inbound instance duplicated, id: %x", msg.Peer.ID)
 		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
 	}
 
@@ -544,7 +544,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		log.LogCallerFileLine("connctReq: SchCreateTask failed, eno: %d", eno)
+		log.Debug("connctReq: SchCreateTask failed, eno: %d", eno)
 		return rsp2Sender(DhtErrno(DhtEnoScheduler))
 	}
 
@@ -590,7 +590,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno{
 		if sender == nil {
-			log.LogCallerFileLine("closeReq: rsp2Sender: nil sender")
+			log.Debug("closeReq: rsp2Sender: nil sender")
 			return sch.SchEnoMismatched
 		}
 		rsp := sch.MsgDhtConMgrCloseRsp{
@@ -650,7 +650,7 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	//
 
 	if msg == nil {
-		log.LogCallerFileLine("sendReq: invalid parameter")
+		log.Debug("sendReq: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
@@ -662,7 +662,7 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 	if ci != nil {
 
-		log.LogCallerFileLine("sendReq: connection instance found: %+v", *ci)
+		log.Debug("sendReq: connection instance found: %+v", *ci)
 
 		pkg := conInstTxPkg {
 			task:		msg.Task,
@@ -678,14 +678,14 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		}
 
 		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
-			log.LogCallerFileLine("sendReq: txPutPending failed, eno: %d", eno)
+			log.Debug("sendReq: txPutPending failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
 		return sch.SchEnoNone
 	}
 
-	log.LogCallerFileLine("sendReq: connection instance not found, tell connection manager to build it ...")
+	log.Debug("sendReq: connection instance not found, tell connection manager to build it ...")
 
 	schMsg := sch.SchMessage{}
 	req := sch.MsgDhtConMgrConnectReq {
@@ -719,11 +719,11 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
 
 	if msg == nil {
-		log.LogCallerFileLine("instStatusInd: invalid parameter")
+		log.Debug("instStatusInd: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
-	log.LogCallerFileLine("instStatusInd: " +
+	log.Debug("instStatusInd: " +
 		"instance status reported: %d, id: %x",
 		msg.Status, msg.Peer)
 
@@ -733,7 +733,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	}
 	cis := conMgr.lookupConInst(&cid)
 	if len(cis) == 0 {
-		log.LogCallerFileLine("instStatusInd: none of instances found")
+		log.Debug("instStatusInd: none of instances found")
 		return sch.SchEnoNotFound
 	}
 
@@ -753,7 +753,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	case CisHandshaked:
 	case CisInService:
 	default:
-		log.LogCallerFileLine("instStatusInd: invalid status: %d", msg.Status)
+		log.Debug("instStatusInd: invalid status: %d", msg.Status)
 		return sch.SchEnoMismatched
 	}
 
@@ -812,12 +812,12 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 			found = true
 
 			if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
-				log.LogCallerFileLine("instCloseRsp: rsp2Sender failed, eno: %d", eno)
+				log.Debug("instCloseRsp: rsp2Sender failed, eno: %d", eno)
 				err = true
 			}
 
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-				log.LogCallerFileLine("instCloseRsp: rutUpdate failed, eno: %d", eno)
+				log.Debug("instCloseRsp: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
 
@@ -826,11 +826,11 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 	}
 
 	if !found {
-		log.LogCallerFileLine("instCloseRsp: none is found, id: %x", msg.Peer)
+		log.Debug("instCloseRsp: none is found, id: %x", msg.Peer)
 	}
 
 	if err {
-		log.LogCallerFileLine("instCloseRsp: seems some errors")
+		log.Debug("instCloseRsp: seems some errors")
 		return sch.SchEnoUserTask
 	}
 
@@ -878,11 +878,11 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	}
 
 	if !found {
-		log.LogCallerFileLine("rutPeerRemoveInd: not found, id: %x", msg.Peer)
+		log.Debug("rutPeerRemoveInd: not found, id: %x", msg.Peer)
 	}
 
 	if err {
-		log.LogCallerFileLine("rutPeerRemoveInd: seems some errors")
+		log.Debug("rutPeerRemoveInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
 
@@ -974,7 +974,7 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 		ci.ptnRutMgr == nil ||
 		ci.ptnDsMgr == nil ||
 		ci.ptnPrdMgr == nil {
-		log.LogCallerFileLine("setupConInst: internal errors")
+		log.Debug("setupConInst: internal errors")
 		return DhtEnoInternal
 	}
 
@@ -1047,7 +1047,7 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		if ci != nil {
 			found = true
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-				log.LogCallerFileLine("instClosedInd: rutUpdate failed, eno: %d", eno)
+				log.Debug("instClosedInd: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
 			delete(conMgr.ciTab, cid)
@@ -1055,11 +1055,11 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	}
 
 	if !found {
-		log.LogCallerFileLine("instClosedInd: none is found, id: %x", msg.Peer)
+		log.Debug("instClosedInd: none is found, id: %x", msg.Peer)
 	}
 
 	if err {
-		log.LogCallerFileLine("instClosedInd: seems some errors")
+		log.Debug("instClosedInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
 

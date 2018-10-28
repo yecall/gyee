@@ -69,7 +69,7 @@ func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if sch.Debug__ {
 		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
-		log.LogCallerFileLine("dcvMgrProc: sdl: %s, msg: %d", sdl, msg.Id)
+		log.Debug("dcvMgrProc: sdl: %s, msg: %d", sdl, msg.Id)
 	}
 
 	var eno DcvMgrErrno
@@ -83,17 +83,17 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	case sch.EvTabRefreshRsp:
 		eno = dcvMgr.DcvMgrTabRefreshRsp(msg.Body.(*sch.MsgTabRefreshRsp))
 	default:
-		log.LogCallerFileLine("DcvMgrProc: invalid message: %d", msg.Id)
+		log.Debug("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
 	}
 
 	if sch.Debug__ {
 		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
-		log.LogCallerFileLine("dcvMgrProc: get out, sdl: %s, msg: %d", sdl, msg.Id)
+		log.Debug("dcvMgrProc: get out, sdl: %s, msg: %d", sdl, msg.Id)
 	}
 
 	if eno != DcvMgrEnoNone {
-		log.LogCallerFileLine("DcvMgrProc: errors, eno: %d", eno)
+		log.Debug("DcvMgrProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -107,23 +107,23 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 
 	// if it's a static type, no discover manager needed
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
-		log.LogCallerFileLine("DcvMgrPoweron: static type, dcvMgr is not needed")
+		log.Debug("DcvMgrPoweron: static type, dcvMgr is not needed")
 		sdl.SchTaskDone(ptn, sch.SchEnoNone)
 		return DcvMgrEnoNone
 	}
 
 	if eno, dcvMgr.ptnTab = sdl.SchGetTaskNodeByName(sch.TabMgrName); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
+		log.Debug("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
 		return DcvMgrEnoScheduler
 	}
 
 	if eno, dcvMgr.ptnPeMgr = dcvMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
+		log.Debug("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
 		return DcvMgrEnoScheduler
 	}
 
 	if dcvMgr.ptnMe == nil || dcvMgr.ptnTab == nil || dcvMgr.ptnPeMgr == nil {
-		log.LogCallerFileLine("DcvMgrPoweron: internal errors, invalid task node pointers")
+		log.Debug("DcvMgrPoweron: internal errors, invalid task node pointers")
 		return DcvMgrEnoScheduler
 	}
 
@@ -131,7 +131,7 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 }
 
 func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
-	log.LogCallerFileLine("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.name)
+	log.Debug("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.name)
 	if dcvMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return DcvMgrEnoScheduler
 	}
@@ -142,7 +142,7 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 	var schMsg = sch.SchMessage{}
 	var reqRefresh = sch.MsgTabRefreshReq{req.Snid,nil,nil}
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
-		log.LogCallerFileLine("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
+		log.Debug("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
 			reqRefresh.Snid, dcvMgr.more)
 		return DcvMgrEnoNone
 	}

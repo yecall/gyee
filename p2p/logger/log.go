@@ -43,14 +43,23 @@ type P2pLogger struct {
 }
 
 var (
+	Debug__ = true						// debug stage flag
 	GyeeProject = true					// is playing in github.com/yeeco/gyee project
 	GlobalLogger *logrus.Logger	= nil	// the global logger
 )
 
 func init() {
 	if GyeeProject {
+		// Notice: in the debug stage, the global debug level is forced to be DebugLevel
+		// to output messages as most as possible. This might be conflicted with other
+		// module preference.
 		GlobalLogger = gylog.Logger
+		if Debug__ {
+			GlobalLogger.Level = logrus.DebugLevel
+		}
 	} else {
+		// If it's not playing in the gyee project, we create a new global logger than
+		// that created in gyee logger package, see it please.
 		GlobalLogger = logrus.New()
 		GlobalLogger.Out = os.Stdout
 		GlobalLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
@@ -81,15 +90,19 @@ func (p2pLog *P2pLogger)getCallerFileLine() (string, int) {
 	return file, line
 }
 
-func LogCallerFileLine(format string, args ... interface{}) {
-	_, file, line, _ := runtime.Caller(1)
-	text := fmt.Sprintf(format, args...)
-	fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
-	textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)
-	// Seems GlobalLogger.Printf does not work with "\n" or "\r\n" to return and
-	// get a new line, but log.Printf does.
-	// GlobalLogger.Printf("%s", textAndFileLine)
-	log.Printf("%s", textAndFileLine)
+func Debug(format string, args ... interface{}) {
+	// Notice: only applied in project DEBUG stage to output the caller file and line.
+	// Use the real logger debug interface in normal cases please.
+	if Debug__ {
+		_, file, line, _ := runtime.Caller(1)
+		text := fmt.Sprintf(format, args...)
+		fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
+		textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)
+		// Seems GlobalLogger.Printf does not work with "\n" or "\r\n" to return and
+		// get a new line, but log.Printf does.
+		// GlobalLogger.Printf("%s", textAndFileLine)
+		log.Printf("%s", textAndFileLine)
+	}
 }
 
 func (p2pLog *P2pLogger)SetFileRotationHooker(path string, count uint) {
