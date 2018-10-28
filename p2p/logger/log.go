@@ -51,8 +51,8 @@ var (
 func init() {
 	if GyeeProject {
 		// Notice: in the debug stage, the global debug level is forced to be DebugLevel
-		// to output messages as most as possible. This might be conflicted with other
-		// module preference.
+		// to output messages as most as possible(the default level is InfoLevel). This
+		// might be conflicted with other module preference.
 		GlobalLogger = gylog.Logger
 		if Debug__ {
 			GlobalLogger.Level = logrus.DebugLevel
@@ -93,7 +93,10 @@ func (p2pLog *P2pLogger)getCallerFileLine() (string, int) {
 func Debug(format string, args ... interface{}) {
 	// Notice: only applied in project DEBUG stage to output the caller file and line.
 	// Use the real logger debug interface in normal cases please.
-	if Debug__ {
+	if !Debug__ {
+		msg := fmt.Sprintf(format, args...)
+		GlobalLogger.Info(msg)
+	} else {
 		_, file, line, _ := runtime.Caller(1)
 		text := fmt.Sprintf(format, args...)
 		fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
