@@ -203,6 +203,7 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 	// This demo simply apply timer with 1s cycle and then sends a string
 	// again and again; The "done" signal is also checked to determine if
 	// task is done. See bellow pls.
+	sdl := p2pInst.SchGetP2pCfgName()
 	idEx := peerIdEx {
 		subNetId:	snid,
 		nodeId:		id,
@@ -233,7 +234,8 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 	}
 
 	log.Debug("txProc: " +
-		"entered, dir: %d, subnet: %s, id: %s",
+		"entered, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl,
 		dir,
 		fmt.Sprintf("%x", snid),
 		fmt.Sprintf("%X", id))
@@ -294,14 +296,19 @@ txLoop:
 
 	doneMapLock.Lock()
 	if doneOk { close(tcb.done) }
-	delete(doneMap[p2pInst], idEx)
-	if len(doneMap[p2pInst]) == 0 {
-		delete(doneMap, p2pInst)
+	if _, exist := doneMap[p2pInst]; exist {
+		if _, exist := doneMap[p2pInst][idEx]; exist {
+			delete(doneMap[p2pInst], idEx)
+			if len(doneMap[p2pInst]) == 0 {
+				delete(doneMap, p2pInst)
+			}
+		}
 	}
 	doneMapLock.Unlock()
 
 	log.Debug("txProc: " +
-		"exit, dir: %d, subnet: %s, id: %s",
+		"exit, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl,
 		dir,
 		fmt.Sprintf("%x", snid),
 		fmt.Sprintf("%X", id))
@@ -326,6 +333,7 @@ func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, sni
 
 	doneOk := true
 	isDone := false
+	break4RxChan := false
 
 rxloop:
 	for {
@@ -333,6 +341,7 @@ rxloop:
 		case pkg, ok := <-rxChan:
 			if !ok {
 				log.Debug("rxProc: sdl: %s, rxChan closed, break", sdl)
+				break4RxChan = true
 				break rxloop
 			}
 			log.Debug("rxProc: length: %d, sdl: %s, snid: %x, peer: %x",
@@ -344,7 +353,17 @@ rxloop:
 		}
 	}
 	doneMapLock.Lock()
-	if doneOk { close(tcb.done) }
+	if doneOk && !break4RxChan {
+		close(tcb.done)
+	}
+	if _, exist := doneMap[p2pInst]; exist {
+		if _, exist := doneMap[p2pInst][idEx]; exist {
+			delete(doneMap[p2pInst], idEx)
+			if len(doneMap[p2pInst]) == 0 {
+				delete(doneMap, p2pInst)
+			}
+		}
+	}
 	doneMapLock.Unlock()
 	log.Debug("rxProc: sdl: %s, it's done", sdl)
 }
@@ -1033,7 +1052,7 @@ func testCase5(tc *testCase) {
 
 	log.Debug("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 16
+	var p2pInstNum = 32
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
@@ -1226,7 +1245,7 @@ func testCase5(tc *testCase) {
 	// Sleep and then stop p2p instance
 	//
 
-	time.Sleep(time.Second * 8)
+	time.Sleep(time.Second * 64)
 	golog.Printf("testCase5: going to stop p2p instances ...")
 
 	stopCount := len(p2pInst2Cfg)

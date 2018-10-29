@@ -32,6 +32,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	"bytes"
 )
 
 
@@ -53,6 +54,7 @@ const (
 	TabMgrEnoUdp
 	TabMgrEnoResource
 	TabMgrEnoRemove
+	TabMgrEnoBootstrap
 )
 
 type TabMgrErrno int
@@ -1755,7 +1757,9 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 				NodeId:	pn.ID,
 			}
 			if eno := tabMgr.tabDiscoverResp(&umNode); eno != TabMgrEnoNone {
-				log.Debug("tabActiveBoundInst: tabDiscoverResp failed, eno: %d", eno)
+				if sch.Debug__ {
+					log.Debug("tabActiveBoundInst: tabDiscoverResp failed, eno: %d", eno)
+				}
 			}
 			continue
 		}
@@ -1816,7 +1820,19 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 	return TabMgrEnoNone
 }
 
+func (tabMgr *TableManager)tabIsBootstrapNode(nodeId *config.NodeID) bool {
+	for _, bn := range tabMgr.cfg.bootstrapNodes {
+		if bytes.Compare(bn.ID[:], nodeId[:]) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (tabMgr *TableManager)tabDiscoverResp(node *um.Node) TabMgrErrno {
+	if tabMgr.tabIsBootstrapNode(&node.NodeId) {
+		return TabMgrEnoBootstrap
+	}
 	var rsp = sch.MsgTabRefreshRsp {
 		Snid:	tabMgr.snid,
 		Nodes: []*config.Node {

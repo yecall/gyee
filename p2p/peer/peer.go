@@ -1147,15 +1147,17 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&schMsg)
 		timerName = PeerMgrName + "_DcvFindNode"
 
-		log.Debug("peMgrAsk4More: " +
-			"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
-			peMgr.cfg.cfgName,
-			*snid,
-			peMgr.obpNum[*snid],
-			peMgr.ibpNum[*snid],
-			peMgr.ibpTotalNum,
-			peMgr.wrkNum[*snid],
-			more)
+		if sch.Debug__ {
+			log.Debug("peMgrAsk4More: "+
+				"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
+				peMgr.cfg.cfgName,
+				*snid,
+				peMgr.obpNum[*snid],
+				peMgr.ibpNum[*snid],
+				peMgr.ibpTotalNum,
+				peMgr.wrkNum[*snid],
+				more)
+		}
 
 	} else {
 		timerName = PeerMgrName + "_static"
@@ -1200,17 +1202,17 @@ const (
 	peInstStateConnected					// outbound connected, need handshake
 	peInstStateHandshook					// handshook
 	peInstStateActivated					// actived in working
-	peInstStateKilling						// in killing
-	peInstStateKilled						// killed
+	peInstStateKilling	= -1				// in killing
+	peInstStateKilled	= -2				// killed
 )
 
 type peerInstState int	// instance state type
 
 const PeInstDirNull			= -1			// null, so connection should be nil
-const PeInstDirOutbound		= 1				// outbound connection
 const PeInstDirInbound		= 0				// inbound connection
-const PeInstOutPos			= 1				// outbound position
+const PeInstDirOutbound		= 1				// outbound connection
 const PeInstInPos			= 0				// inbound position
+const PeInstOutPos			= 1				// outbound position
 
 const PeInstMailboxSize 	= 512				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
@@ -1765,7 +1767,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 		pkg.P2pInst.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeTxDataReq, &req)
 		pkg.P2pInst.SchSendMessage(&msg)
 	}
-	return PeMgrEnoUnknown
+	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
@@ -2027,6 +2029,9 @@ func (pi *peerInstance)piP2pPongProc(pong *Pingpong) PeMgrErrno {
 
 func (pis peerInstState) compare(s peerInstState) int {
 	// See definition about peerInstState pls.
+	if (pis < 0) {
+		panic(fmt.Sprintf("compare: exception, pis: %d", pis))
+	}
 	return int(pis - s)
 }
 
@@ -2072,30 +2077,42 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 	if _, dup := peMgr.nodes[snid][idEx]; dup {
 		var ptn2Kill interface{} = nil
 		var node2Kill *config.Node = nil
+		var inst2Killed *peerInstance = nil
 		dupInst := peMgr.nodes[snid][idEx]
 		cmp := inst.state.compare(dupInst.state)
 		obKilled := false
 		if cmp < 0 {
 			ptn2Kill = ptn
+			inst2Killed = inst
 			node2Kill = node
+			obKilled = inst.dir == PeInstDirOutbound
 		} else if cmp > 0 {
 			ptn2Kill = dupInst.ptnMe
+			inst2Killed = dupInst
 			node2Kill = &dupInst.node
 			obKilled = dupInst.dir == PeInstDirOutbound
 		} else {
-			if rand.Int()&0x01 == 0 {
+			if rand.Int() & 0x01 == 0 {
 				ptn2Kill = ptn
+				inst2Killed = inst
 				node2Kill = node
+				obKilled = inst.dir == PeInstDirOutbound
 			} else {
 				ptn2Kill = dupInst.ptnMe
+				inst2Killed = dupInst
 				node2Kill = &dupInst.node
 				obKilled = dupInst.dir == PeInstDirOutbound
 			}
 		}
+
+		log.Debug("instStateCmpKill: dir: %d, snid: %x, id: %x",
+			inst2Killed.dir, inst2Killed.snid, inst2Killed.node.ID)
+
 		_ = node2Kill
-		peMgr.peMgrKillInst(ptn, node, inst.dir)
-		if ptn2Kill == ptn {
-			return PeMgrEnoDuplicated
+		if obKilled {
+			peMgr.peMgrKillInst(ptn2Kill, node2Kill, PeInstDirOutbound)
+		} else {
+			peMgr.peMgrKillInst(ptn2Kill, node2Kill, PeInstDirInbound)
 		}
 		if obKilled {
 			var schMsg = sch.SchMessage{}
