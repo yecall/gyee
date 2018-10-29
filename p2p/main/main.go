@@ -182,6 +182,23 @@ func newTcb(name string) *testCaseCtrlBlock {
 //
 var dataTxApply = true
 var dataTxTmApply = true
+
+func txStopAll() {
+	doneMapLock.Lock()
+	defer doneMapLock.Unlock()
+	for _, txList := range doneMap {
+		for _, tx := range txList {
+			tx.done<-true
+		}
+	}
+}
+
+func isAllDone() bool {
+	doneMapLock.Lock()
+	defer doneMapLock.Unlock()
+	return len(doneMap) == 0
+}
+
 func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
 	// This demo simply apply timer with 1s cycle and then sends a string
 	// again and again; The "done" signal is also checked to determine if
@@ -197,10 +214,8 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 		doneMap[p2pInst] = make(map[peerIdEx] *testCaseCtrlBlock, 0)
 	}
 	if _, dup := doneMap[p2pInst][idEx]; dup == true {
-		log.Debug("txProc: " +
-			"duplicated, subnet: %s, id: %s",
-			fmt.Sprintf("%x", snid),
-			fmt.Sprintf("%X", id))
+		log.Debug("txProc: duplicated, subnet: %s, id: %s",
+			fmt.Sprintf("%x", snid), 	fmt.Sprintf("%X", id))
 		doneMapLock.Unlock()
 		return
 	}
@@ -218,7 +233,8 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 	}
 
 	log.Debug("txProc: " +
-		"entered, subnet: %s, id: %s",
+		"entered, dir: %d, subnet: %s, id: %s",
+		dir,
 		fmt.Sprintf("%x", snid),
 		fmt.Sprintf("%X", id))
 
@@ -252,11 +268,14 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 	tm := time.NewTicker(time.Second * 1)
 	defer tm.Stop()
 
+	doneOk := true
+	isDone := false
+
 txLoop:
 	for {
 		select {
-		case isDone := <-tcb.done:
-			if isDone {
+		case isDone, doneOk = <-tcb.done:
+			if isDone || !doneOk {
 				log.Debug("txProc: "+
 					"it's done, isDone: %s, subnet: %s, id: %s",
 					fmt.Sprintf("%t", isDone),
@@ -274,7 +293,7 @@ txLoop:
 	}
 
 	doneMapLock.Lock()
-	close(tcb.done)
+	if doneOk { close(tcb.done) }
 	delete(doneMap[p2pInst], idEx)
 	if len(doneMap[p2pInst]) == 0 {
 		delete(doneMap, p2pInst)
@@ -282,26 +301,52 @@ txLoop:
 	doneMapLock.Unlock()
 
 	log.Debug("txProc: " +
-		"exit, subnet: %s, id: %s",
+		"exit, dir: %d, subnet: %s, id: %s",
+		dir,
 		fmt.Sprintf("%x", snid),
 		fmt.Sprintf("%X", id))
 }
 
 func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, snid peer.SubNetworkID, id peer.PeerId) {
 	sdl := p2pInst.SchGetP2pCfgName()
+	idEx := peerIdEx {
+		subNetId: snid,
+		nodeId: id,
+		dir: dir,
+	}
+
+	doneMapLock.Lock()
+	tcb, ok := doneMap[p2pInst][idEx]
+	if !ok {
+		log.Debug("rxProc: test case control block not exist")
+		doneMapLock.Unlock()
+		return;
+	}
+	doneMapLock.Unlock()
+
+	doneOk := true
+	isDone := false
+
 rxloop:
 	for {
 		select {
 		case pkg, ok := <-rxChan:
 			if !ok {
-				log.Debug("rxProc: rxChan closed, break")
+				log.Debug("rxProc: sdl: %s, rxChan closed, break", sdl)
 				break rxloop
 			}
 			log.Debug("rxProc: length: %d, sdl: %s, snid: %x, peer: %x",
 				pkg.PayloadLength, sdl, snid, id)
+		case isDone, doneOk = <-tcb.done:
+			if isDone || !doneOk {
+				break rxloop
+			}
 		}
 	}
-	log.Debug("rxProc: it's done")
+	doneMapLock.Lock()
+	if doneOk { close(tcb.done) }
+	doneMapLock.Unlock()
+	log.Debug("rxProc: sdl: %s, it's done", sdl)
 }
 
 //
@@ -988,7 +1033,7 @@ func testCase5(tc *testCase) {
 
 	log.Debug("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
@@ -1186,7 +1231,6 @@ func testCase5(tc *testCase) {
 
 	stopCount := len(p2pInst2Cfg)
 	stopChain := make(chan bool, stopCount)
-
 	for p2pInst := range p2pInst2Cfg {
 		go shell.P2pStop(p2pInst, stopChain)
 	}
@@ -1199,6 +1243,11 @@ _waitStop:
 		}
 	}
 
+	txStopAll()
+	for !isAllDone() {
+		log.Debug("testCase5: wait all tx/rx instances to be done...")
+		time.Sleep(time.Second * 1)
+	}
 	golog.Printf("testCase5: it's the end")
 
 	waitInterrupt()

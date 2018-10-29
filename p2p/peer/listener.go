@@ -125,11 +125,9 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 	// might be still alive in the scheduler, so we had to check this by the name of
 	// accepter with the scheduler.
 	if eno, _ := lsnMgr.sdl.SchGetTaskNodeByName(PeerAccepterName); eno == sch.SchEnoNone {
-		log.Debug("lsnMgrStart: old accepter still be alive")
 		return sch.SchEnoDuplicated
 	}
 	if lsnMgr.accepter != nil {
-		log.Debug("lsnMgrStart: accepter had been inited")
 		return sch.SchEnoUserTask
 	}
 	if eno := lsnMgr.lsnMgrSetupListener(); eno != sch.SchEnoNone {

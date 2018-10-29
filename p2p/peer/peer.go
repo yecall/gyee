@@ -1756,7 +1756,6 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 		_pkg.Pid = uint32(pkg.ProtoId)
 		_pkg.PayloadLength = uint32(pkg.PayloadLength)
 		_pkg.Payload = append(_pkg.Payload, pkg.Payload...)
-
 		req := sch.MsgPeDataReq {
 			SubNetId: pkg.SubNetId,
 			PeerId: pid,

@@ -40,6 +40,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	log "github.com/yeeco/gyee/p2p/logger"
+	"bytes"
 )
 
 
@@ -559,6 +560,12 @@ func P2pDefaultDataDir(flag bool) string {
 
 // Get local ip address
 func P2pGetLocalIpAddr() net.IP {
+	// Filter for debug only
+	filter := func (ip net.IP) bool {
+		ipWithNetworkId := [3]byte{192, 168, 1,}
+		return bytes.Compare(ip[0:3], ipWithNetworkId[:]) == 0
+	}
+
 	dftIp := net.IPv4(127, 0, 0, 1)
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -568,7 +575,7 @@ func P2pGetLocalIpAddr() net.IP {
 	for idx := 0; idx < len(addrs); idx++ {
 		addr := addrs[idx]
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipv4 := ipnet.IP.To4(); ipv4 != nil {
+			if ipv4 := ipnet.IP.To4(); ipv4 != nil && filter(ipv4) {
 				return ipv4
 			}
 		}
