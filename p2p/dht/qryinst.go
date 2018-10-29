@@ -259,7 +259,7 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 	schMsg := sch.SchMessage{}
 
 	if msg.Target != icb.target || msg.Peer != icb.to.ID {
-		log.Debug("")
+		log.Debug("stopReq: mismatched")
 		return sch.SchEnoMismatched
 	}
 

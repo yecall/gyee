@@ -209,20 +209,7 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 		nodeId:		id,
 		dir:		dir,
 	}
-
-	doneMapLock.Lock()
-	if _, exist := doneMap[p2pInst]; exist == false {
-		doneMap[p2pInst] = make(map[peerIdEx] *testCaseCtrlBlock, 0)
-	}
-	if _, dup := doneMap[p2pInst][idEx]; dup == true {
-		log.Debug("txProc: duplicated, subnet: %s, id: %s",
-			fmt.Sprintf("%x", snid), 	fmt.Sprintf("%X", id))
-		doneMapLock.Unlock()
-		return
-	}
-	tcb := newTcb(tgtCase)
-	doneMap[p2pInst][idEx] = tcb
-	doneMapLock.Unlock()
+	tcb := doneMap[p2pInst][idEx]
 
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,
@@ -386,8 +373,30 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		p2pInst := sch.SchGetScheduler(pap.Ptn)
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
-		go txProc(p2pInst, pap.PeerInfo.Dir, snid, peerId)
-		go rxProc(p2pInst, pap.RxChan, pap.PeerInfo.Dir, snid, peerId)
+		dir := pap.PeerInfo.Dir
+		idEx := peerIdEx {
+			subNetId:	snid,
+			nodeId:		peerId,
+			dir:		dir,
+		}
+
+		doneMapLock.Lock()
+		if _, exist := doneMap[p2pInst]; exist == false {
+			doneMap[p2pInst] = make(map[peerIdEx] *testCaseCtrlBlock, 0)
+		}
+		if _, dup := doneMap[p2pInst][idEx]; dup == true {
+			log.Debug("p2pIndProc: duplicated, subnet: %s, id: %s",
+				fmt.Sprintf("%x", snid), 	fmt.Sprintf("%x", peerId))
+			doneMapLock.Unlock()
+			return nil
+		}
+		tcb := newTcb(tgtCase)
+		doneMap[p2pInst][idEx] = tcb
+		doneMapLock.Unlock()
+
+		go txProc(p2pInst, dir, snid, peerId)
+		go rxProc(p2pInst, pap.RxChan, dir, snid, peerId)
+
 	case shell.P2pIndPeerClosed:
 		// Peer connection had been closed, one can clean his working context, see
 		// bellow statements please.
@@ -1052,7 +1061,7 @@ func testCase5(tc *testCase) {
 
 	log.Debug("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 32
+	var p2pInstNum = 8
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
@@ -1089,6 +1098,7 @@ func testCase5(tc *testCase) {
 			cfgName, myCfg.Local.ID)
 
 		n := config.Node{
+			IP:		dftCfg.Local.IP,
 			UDP:	uint16(portBase4P2p + loop),
 			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,

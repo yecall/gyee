@@ -671,19 +671,14 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	}
 
 	var candidates = make([]*config.Node, 0)
-	var rdCnt = 0
 	var idEx = PeerIdEx{Dir:PeInstOutPos}
 	for _, n := range peMgr.randoms[*snid] {
 		idEx.Id = n.ID
 		if _, ok := peMgr.nodes[*snid][idEx]; !ok {
 			candidates = append(candidates, n)
 		}
-		rdCnt++
 	}
-
-	if rdCnt > 0 {
-		peMgr.randoms[*snid] = append(peMgr.randoms[*snid][:0], peMgr.randoms[*snid][rdCnt:]...)
-	}
+	peMgr.randoms[*snid] = make([]*config.Node, 0)
 
 	// Create outbound instances for candidates if any
 	var failed = 0
@@ -1221,7 +1216,13 @@ const PeInstPingpongCycle	= time.Second * 16	// pingpong period
 
 type peerInstance struct {
 	sdl			*sch.Scheduler				// pointer to scheduler
+
+	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// We backup the pointer to peer manager here to access it while an instance
+	// is running, this might bring us those problems in "SYNC" between instances
+	// and the peer manager.
 	peMgr		*PeerManager				// pointer to peer manager
+
 	name		string						// name
 	tep			sch.SchUserTaskEp			// entry
 	ptnMe		interface{}					// the instance task node pointer
@@ -1418,16 +1419,23 @@ func (inst *peerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 	var eno PeMgrErrno = PeMgrEnoNone
 	inst.dialer.Timeout = inst.cto
 	if conn, err = inst.dialer.Dial("tcp", addr.String()); err != nil {
-		log.Debug("piConnOutReq: dial failed, to: %s, err: %s", addr.String(), err.Error())
+		if sch.Debug__ {
+			// Notice "local" not the address used to connect to peer but the address listened in local
+			log.Debug("piConnOutReq: dial failed, local: %s, to: %s, err: %s",
+				fmt.Sprintf("%s:%d", inst.peMgr.cfg.ip.String(), inst.peMgr.cfg.port),
+				addr.String(), err.Error())
+		}
 		eno = PeMgrEnoOs
 	} else {
 		inst.conn = conn
 		inst.laddr = conn.LocalAddr().(*net.TCPAddr)
 		inst.raddr = conn.RemoteAddr().(*net.TCPAddr)
 		inst.state = peInstStateConnected
-		log.Debug("piConnOutReq: dial ok, laddr: %s, raddr: %s",
-			inst.laddr.String(),
-			inst.raddr.String())
+		if sch.Debug__ {
+			log.Debug("piConnOutReq: dial ok, laddr: %s, raddr: %s",
+				inst.laddr.String(),
+				inst.raddr.String())
+		}
 	}
 
 	var schMsg = sch.SchMessage{}
@@ -1467,12 +1475,14 @@ func (inst *peerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 		eno = PeMgrEnoInternal
 	}
 
-	log.Debug("piHandshakeReq: handshake result: %d, dir: %d, laddr: %s, raddr: %s, peer: %s",
-			eno,
-			inst.dir,
-			inst.laddr.String(),
-			inst.raddr.String(),
-			fmt.Sprintf("%+v", inst.node)	)
+	if sch.Debug__ {
+		log.Debug("piHandshakeReq: handshake result: %d, dir: %d, laddr: %s, raddr: %s, peer: %s",
+					eno,
+					inst.dir,
+					inst.laddr.String(),
+					inst.raddr.String(),
+					fmt.Sprintf("%+v", inst.node))
+	}
 
 	var rsp = msgHandshakeRsp {
 		result:	eno,
@@ -1749,7 +1759,9 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 	}
 	pem := pkg.P2pInst.SchGetUserTaskIF(sch.PeerMgrName)
 	if pem == nil {
-		log.Debug("SendPackage: nil peer manager, might be in power off stage")
+		if sch.Debug__ {
+			log.Debug("SendPackage: nil peer manager, might be in power off stage")
+		}
 		return PeMgrEnoNotfound
 	}
 	peMgr := pem.(*PeerManager)
@@ -1938,7 +1950,7 @@ rxBreak:
 			inst.sdl.SchSendMessage(&msg)
 		} else if upkg.Pid == uint32(PID_EXT) {
 			if len(inst.rxChan) >= cap(inst.rxChan) {
-				log.Debug("piRx: rx queue full, sdl: %s, inst: %s", sdl, inst.name)
+				log.Debug("piRx: rx queue full, sdl: %s, inst: %s, peer: %x", sdl, inst.name, inst.node.ID)
 			} else {
 				peerInfo.Protocols = nil
 				peerInfo.Snid = inst.snid
@@ -1952,6 +1964,7 @@ rxBreak:
 				pkgCb.PayloadLength = int(upkg.PayloadLength)
 				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
 				inst.rxChan <- &pkgCb
+				log.Debug("piRx: package queued, sdl: %s, inst: %s, peer: %x", sdl, inst.name, inst.node.ID)
 			}
 		} else {
 			log.Debug("piRx: package discarded for unknown pid: sdl: %s, inst: %s, %d",
@@ -2105,8 +2118,10 @@ func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, 
 			}
 		}
 
-		log.Debug("instStateCmpKill: dir: %d, snid: %x, id: %x",
-			inst2Killed.dir, inst2Killed.snid, inst2Killed.node.ID)
+		if sch.Debug__ {
+			log.Debug("instStateCmpKill: dir: %d, snid: %x, id: %x",
+				inst2Killed.dir, inst2Killed.snid, inst2Killed.node.ID)
+		}
 
 		_ = node2Kill
 		if obKilled {
