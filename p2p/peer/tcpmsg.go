@@ -506,7 +506,7 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		log.Debug("SendPackage:" +
+		log.Debug("SendPackage: " +
 			"Write failed, err: %s",
 			err.Error())
 

@@ -72,7 +72,9 @@ type peerIdEx struct {
 // test statistics
 //
 type testCaseCtrlBlock struct {
+	peerId	peerIdEx
 	done 	chan bool
+	killing	bool
 	txSeq	int64
 	rxSeq	int64
 }
@@ -155,8 +157,9 @@ const (
 //
 // create test case control block by name
 //
-func newTcb(name string) *testCaseCtrlBlock {
+func newTcb(name string, idEx peerIdEx) *testCaseCtrlBlock {
 	tcb := testCaseCtrlBlock {
+		peerId: idEx,
 		done:	make(chan bool, 1),
 		txSeq:	0,
 		rxSeq:	0,
@@ -186,9 +189,12 @@ var dataTxTmApply = true
 func txStopAll() {
 	doneMapLock.Lock()
 	defer doneMapLock.Unlock()
-	for _, txList := range doneMap {
-		for _, tx := range txList {
-			tx.done<-true
+	for _, tcbList := range doneMap {
+		for _, tcb := range tcbList {
+			if !tcb.killing {
+				tcb.done <- true
+				tcb.killing = true
+			}
 		}
 	}
 }
@@ -209,7 +215,15 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 		nodeId:		id,
 		dir:		dir,
 	}
-	tcb := doneMap[p2pInst][idEx]
+	doneMapLock.Lock()
+	tcb, exist := doneMap[p2pInst][idEx]
+	if !exist {
+		log.Debug("txProc: no exist, sdl: %s, dir: %d, subnet: %s, id: %s",
+			sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
+		doneMapLock.Unlock()
+		return
+	}
+	doneMapLock.Unlock()
 
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,
@@ -220,12 +234,8 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 		Extra:			nil,
 	}
 
-	log.Debug("txProc: " +
-		"entered, sdl: %s, dir: %d, subnet: %s, id: %s",
-		sdl,
-		dir,
-		fmt.Sprintf("%x", snid),
-		fmt.Sprintf("%X", id))
+	log.Debug("txProc: entered, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
 
 	var tmHandler = func() {
 		doneMapLock.Lock()
@@ -237,7 +247,7 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 					"to: subnet: %s\n, id: %s\n",
 					tcb.txSeq,
 					fmt.Sprintf("%x", snid),
-					fmt.Sprintf("%X", id))
+					fmt.Sprintf("%x", id))
 				pkg.SubNetId = id.subNetId
 				pkg.IdList[0] = id.nodeId
 				pkg.Payload = []byte(txString)
@@ -247,7 +257,7 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 						"send package failed, eno: %d, subnet: %s, id: %s",
 						eno,
 						fmt.Sprintf("%x", snid),
-						fmt.Sprintf("%X", id))
+						fmt.Sprintf("%x", id))
 				}
 			}
 		}
@@ -265,11 +275,10 @@ txLoop:
 		select {
 		case isDone, doneOk = <-tcb.done:
 			if isDone || !doneOk {
-				log.Debug("txProc: "+
-					"it's done, isDone: %s, subnet: %s, id: %s",
+				log.Debug("txProc: it's done, isDone: %s, subnet: %s, id: %s",
 					fmt.Sprintf("%t", isDone),
 					fmt.Sprintf("%x", snid),
-					fmt.Sprintf("%X", id))
+					fmt.Sprintf("%x", id))
 				break txLoop
 			}
 		case <-tm.C:
@@ -293,12 +302,8 @@ txLoop:
 	}
 	doneMapLock.Unlock()
 
-	log.Debug("txProc: " +
-		"exit, sdl: %s, dir: %d, subnet: %s, id: %s",
-		sdl,
-		dir,
-		fmt.Sprintf("%x", snid),
-		fmt.Sprintf("%X", id))
+	log.Debug("txProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
 }
 
 func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, snid peer.SubNetworkID, id peer.PeerId) {
@@ -308,13 +313,13 @@ func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, sni
 		nodeId: id,
 		dir: dir,
 	}
-
 	doneMapLock.Lock()
-	tcb, ok := doneMap[p2pInst][idEx]
-	if !ok {
-		log.Debug("rxProc: test case control block not exist")
+	tcb, exist := doneMap[p2pInst][idEx]
+	if !exist {
+		log.Debug("rxProc: not exist, sdl: %s, dir: %d, subnet: %s, id: %s",
+			sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
 		doneMapLock.Unlock()
-		return;
+		return
 	}
 	doneMapLock.Unlock()
 
@@ -322,23 +327,26 @@ func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, sni
 	isDone := false
 	break4RxChan := false
 
+	log.Debug("rxProc: entered, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
+
 rxloop:
 	for {
 		select {
-		case pkg, ok := <-rxChan:
+		case _, ok := <-rxChan:
 			if !ok {
 				log.Debug("rxProc: sdl: %s, rxChan closed, break", sdl)
 				break4RxChan = true
 				break rxloop
 			}
-			log.Debug("rxProc: length: %d, sdl: %s, snid: %x, peer: %x",
-				pkg.PayloadLength, sdl, snid, id)
+			tcb.rxSeq += 1
 		case isDone, doneOk = <-tcb.done:
 			if isDone || !doneOk {
 				break rxloop
 			}
 		}
 	}
+
 	doneMapLock.Lock()
 	if doneOk && !break4RxChan {
 		close(tcb.done)
@@ -352,7 +360,9 @@ rxloop:
 		}
 	}
 	doneMapLock.Unlock()
-	log.Debug("rxProc: sdl: %s, it's done", sdl)
+
+	log.Debug("rxProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
 }
 
 //
@@ -367,9 +377,6 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		// a peer is activated to work, so one can install the incoming packages
 		// handler.
 		pap := para.(*peer.P2pIndPeerActivatedPara)
-		log.Debug("p2pIndProc: " +
-			"P2pIndPeerActivated, para: %s",
-			fmt.Sprintf("%+v", *pap.PeerInfo))
 		p2pInst := sch.SchGetScheduler(pap.Ptn)
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
@@ -379,7 +386,6 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			nodeId:		peerId,
 			dir:		dir,
 		}
-
 		doneMapLock.Lock()
 		if _, exist := doneMap[p2pInst]; exist == false {
 			doneMap[p2pInst] = make(map[peerIdEx] *testCaseCtrlBlock, 0)
@@ -390,10 +396,11 @@ func p2pIndProc(what int, para interface{}) interface{} {
 			doneMapLock.Unlock()
 			return nil
 		}
-		tcb := newTcb(tgtCase)
+		tcb := newTcb(tgtCase, idEx)
 		doneMap[p2pInst][idEx] = tcb
 		doneMapLock.Unlock()
 
+		log.Debug("p2pIndProc: start tx/rx, dir: %d, snid: %x, peer: %x", dir, snid, peerId)
 		go txProc(p2pInst, dir, snid, peerId)
 		go rxProc(p2pInst, pap.RxChan, dir, snid, peerId)
 
@@ -402,26 +409,26 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		// bellow statements please.
 		pcp := para.(*peer.P2pIndPeerClosedPara)
 		p2pInst := sch.SchGetScheduler(pcp.Ptn)
-		log.Debug("p2pIndProc: " +
-			"P2pIndPeerClosed, para: %s",
-			fmt.Sprintf("%+v", *pcp))
-
 		doneMapLock.Lock()
 		defer doneMapLock.Unlock()
 
 		idEx := peerIdEx{subNetId:pcp.Snid, nodeId:pcp.PeerId}
-		if tcb, ok := doneMap[p2pInst][idEx]; ok && tcb != nil {
-			tcb.done<-true
-			break
+		if tcb, ok := doneMap[p2pInst][idEx]; ok {
+			if !tcb.killing {
+				log.Debug("p2pIndProc: try to kill, subnet: %s, id: %s",
+					fmt.Sprintf("%x", pcp.Snid),
+					fmt.Sprintf("%X", pcp.PeerId))
+				tcb.done <- true
+				tcb.killing = true
+				break
+			} else {
+				log.Debug("p2pIndProc: in killing, subnet: %s, id: %s",
+					fmt.Sprintf("%x", pcp.Snid),
+					fmt.Sprintf("%X", pcp.PeerId))
+			}
 		}
-		log.Debug("p2pIndProc: " +
-			"done failed, subnet: %s, id: %s",
-			fmt.Sprintf("%x", pcp.Snid),
-			fmt.Sprintf("%X", pcp.PeerId))
 	default:
-		log.Debug("p2pIndProc: " +
-			"inknown indication: %d",
-			what)
+		log.Debug("p2pIndProc: inknown indication: %d", what)
 	}
 	return para
 }
@@ -1061,7 +1068,7 @@ func testCase5(tc *testCase) {
 
 	log.Debug("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""

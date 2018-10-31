@@ -417,7 +417,7 @@ timerLoop:
 
 				task.lock.Lock()
 
-				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone {
+				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone  && eno != SchEnoPowerOff {
 
 					log.Debug("schTimerCommonTask: " +
 						"send timer event failed, eno: %d, task: %s",

@@ -636,9 +636,11 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	}
 
 	// response to the discover manager task
-	if eno := mgr.tabDiscoverResp(&msg.Pong.From); eno != TabMgrEnoNone {
-		log.Debug("tabMgrPingpongRsp: tabDiscoverResp failed, eno: %d, subnet: %x", eno, snid)
-		return eno
+	if tabMgr.tabIsBootstrapNode(&n.ID) == false {
+		if eno := mgr.tabDiscoverResp(&msg.Pong.From); eno != TabMgrEnoNone {
+			log.Debug("tabMgrPingpongRsp: tabDiscoverResp failed, eno: %d, subnet: %x", eno, snid)
+			return eno
+		}
 	}
 
 	return TabMgrEnoNone

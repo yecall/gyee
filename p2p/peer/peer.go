@@ -855,6 +855,10 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.wrkNum[snid]++
 	if inst.dir == PeInstDirInbound  &&
 		inst.peMgr.cfg.networkType != config.P2pNetworkTypeStatic {
+		// Notice: even the network type is not static, the "snid" can be a static subnet
+		// in a configuration where "dynamic" and "static" are exist both. So, calling functions
+		// TabBucketAddNode or TabUpdateNode might be failed since these functions would not
+		// work for a static case.
 		lastQuery := time.Time{}
 		lastPing := time.Now()
 		lastPong := time.Now()
@@ -866,13 +870,17 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
-			log.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, eno: %d, node: %s",
-				tabEno, fmt.Sprintf("%+v", *rsp.peNode))
+			if sch.Debug__ {
+				log.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, eno: %d, snid: %x, node: %s",
+					tabEno, snid, fmt.Sprintf("%+v", *rsp.peNode))
+			}
 		}
 		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
-			log.Debug("peMgrHandshakeRsp: TabUpdateNode failed, eno: %d, node: %s",
-				tabEno, fmt.Sprintf("%+v", *rsp.peNode))
+			if sch.Debug__ {
+				log.Debug("peMgrHandshakeRsp: TabUpdateNode failed, eno: %d, snid: %x, node: %s",
+					tabEno, snid, fmt.Sprintf("%+v", *rsp.peNode))
+			}
 		}
 	}
 
@@ -1670,7 +1678,9 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	var pkg = new(P2pPackage)
 	var hs *Handshake
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
-		log.Debug("piHandshakeInbound: read inbound Handshake message failed, eno: %d", eno)
+		if sch.Debug__ {
+			log.Debug("piHandshakeInbound: read inbound Handshake message failed, eno: %d", eno)
+		}
 		return eno
 	}
 	if inst.peMgr.dynamicSubNetIdExist(&hs.Snid) == false &&
@@ -1697,7 +1707,9 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	hs.ProtoNum = pi.peMgr.cfg.protoNum
 	hs.Protocols = pi.peMgr.cfg.protocols
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
-		log.Debug("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
+		if sch.Debug__ {
+			log.Debug("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
+		}
 		return eno
 	}
 	inst.state = peInstStateHandshook
@@ -1717,12 +1729,16 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 	hs.ProtoNum = pi.peMgr.cfg.protoNum
 	hs.Protocols = append(hs.Protocols, pi.peMgr.cfg.protocols ...)
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
-		log.Debug("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
+		if sch.Debug__ {
+			log.Debug("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
+		}
 		return eno
 	}
 	// read inbound handshake from remote peer
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
-		log.Debug("piHandshakeOutbound: read inbound Handshake message failed, eno: %d", eno)
+		if sch.Debug__ {
+			log.Debug("piHandshakeOutbound: read inbound Handshake message failed, eno: %d", eno)
+		}
 		return eno
 	}
 	// check sub network identity
@@ -1964,7 +1980,6 @@ rxBreak:
 				pkgCb.PayloadLength = int(upkg.PayloadLength)
 				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
 				inst.rxChan <- &pkgCb
-				log.Debug("piRx: package queued, sdl: %s, inst: %s, peer: %x", sdl, inst.name, inst.node.ID)
 			}
 		} else {
 			log.Debug("piRx: package discarded for unknown pid: sdl: %s, inst: %s, %d",
