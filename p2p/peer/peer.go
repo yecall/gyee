@@ -1611,6 +1611,7 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 		log.Debug("piEstablishedInd: SetDeadline failed, error: %s", err.Error())
 		msg := sch.SchMessage{}
 		req := sch.MsgPeCloseReq{
+			Ptn: inst.ptnMe,
 			Snid: inst.snid,
 			Node: config.Node {
 				ID: inst.node.ID,
@@ -1804,6 +1805,7 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	idExList := []PeerIdEx{idExOut, idExIn}
 	for _, idEx := range idExList {
 		var req = sch.MsgPeCloseReq{
+			Ptn: nil,
 			Snid: *snid,
 			Node: config.Node {
 				ID: *id,

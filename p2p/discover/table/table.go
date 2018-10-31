@@ -1872,7 +1872,9 @@ func (tabMgr *TableManager)tabShouldBoundDbNode(id NodeID) bool {
 func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
-		log.Debug("TabBucketAddNode: none of manager instance for subnet: %x", snid)
+		if sch.Debug__ {
+			log.Debug("TabBucketAddNode: none of manager instance for subnet: %x", snid)
+		}
 		return TabMgrEnoNotFound
 	}
 	mgr.lock.Lock()
@@ -1883,7 +1885,9 @@ func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQ
 func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgrErrno {
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !ok {
-		log.Debug("TabUpdateNode: none of manager instance for subnet: %x", snid)
+		if sch.Debug__ {
+			log.Debug("TabUpdateNode: none of manager instance for subnet: %x", snid)
+		}
 		return TabMgrEnoNotFound
 	}
 

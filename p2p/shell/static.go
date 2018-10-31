@@ -231,13 +231,8 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 	// they might be done when they receive the poweron message.
 	//
 
-	sdl.SchSetPoweroffStage()
 	p2pInstName := sdl.SchGetP2pCfgName()
-
-	powerOff := sch.SchMessage {
-		Id:		sch.EvSchPoweroff,
-		Body:	nil,
-	}
+	log.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
 
 	var staticTasks = []string{}
 	appType := sdl.SchGetAppType()
@@ -255,6 +250,13 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 		log.Debug("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}
+
+	powerOff := sch.SchMessage {
+		Id:		sch.EvSchPoweroff,
+		Body:	nil,
+	}
+
+	sdl.SchSetPoweroffStage()
 
 	for _, taskName := range staticTasks {
 
