@@ -234,7 +234,7 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 		Extra:			nil,
 	}
 
-	log.Debug("txProc: entered, sdl: %s, dir: %d, subnet: %s, id: %s",
+	log.Debug("txProc: enter, sdl: %s, dir: %d, subnet: %s, id: %s",
 		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
 
 	var tmHandler = func() {
@@ -327,7 +327,7 @@ func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, sni
 	isDone := false
 	break4RxChan := false
 
-	log.Debug("rxProc: entered, sdl: %s, dir: %d, subnet: %s, id: %s",
+	log.Debug("rxProc: enter, sdl: %s, dir: %d, subnet: %s, id: %s",
 		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
 
 rxloop:

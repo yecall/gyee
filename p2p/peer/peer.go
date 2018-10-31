@@ -1083,7 +1083,7 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	// direction to step ahead.
 	snid := peInst.snid
 	idEx := PeerIdEx{Id:peInst.node.ID, Dir:peInst.dir}
-	if peInst.state == peInstStateActivated {
+	if _, exist := peMgr.workers[snid][idEx]; exist {
 		delete(peMgr.workers[snid], idEx)
 		peMgr.wrkNum[snid]--
 	}
@@ -1091,18 +1091,14 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	if peInst.dir == PeInstDirOutbound {
 		delete(peMgr.nodes[snid], idEx)
 		delete(peMgr.peers, ptn)
-	} else if peInst.dir == PeInstDirInbound {
-		delete(peMgr.peers, ptn)
-		if peInst.state == peInstStateActivated {
-			delete(peMgr.nodes[snid], idEx)
-		}
-	}
-
-	if peInst.dir == PeInstDirOutbound {
 		peMgr.obpNum[snid]--
 	} else if peInst.dir == PeInstDirInbound {
+		delete(peMgr.peers, ptn)
+		if _, exist := peMgr.nodes[snid][idEx]; exist {
+			delete(peMgr.nodes[snid], idEx)
+		}
 		peMgr.ibpTotalNum--
-		if peInst.state == peInstStateActivated {
+		if peInst.state == peInstStateActivated || peInst.state == peInstStateKilling {
 			peMgr.ibpNum[snid]--
 		}
 	}
