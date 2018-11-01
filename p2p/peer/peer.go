@@ -25,15 +25,14 @@ import (
 	"time"
 	"fmt"
 	"math/rand"
-	"sync"
 	"reflect"
+	"runtime"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"runtime"
 )
 
 // Peer manager errno
@@ -163,7 +162,6 @@ type PeerManager struct {
 	ibpTotalNum		int								// total active inbound peer number
 	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
 	indChan			chan interface{}				// indication signal
-	indCbLock		sync.Mutex						// lock for indication callback
 	indCb			P2pIndCallback					// indication callback
 	indCbUserData	interface{}						// user data pointer for callback
 	ssTid			int								// statistics timer identity
@@ -308,9 +306,9 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	}
 
 	for _, sn := range peMgr.cfg.staticNodes {
-		idEx := PeerIdEx{Id:sn.ID, Dir:PeInstOutPos}
+		idEx := PeerIdEx{Id:sn.ID, Dir:PeInstDirOutbound}
 		peMgr.staticsStatus[idEx] = peerIdle
-		idEx.Dir = PeInstInPos
+		idEx.Dir = PeInstDirInbound
 		peMgr.staticsStatus[idEx] = peerIdle
 	}
 
@@ -436,7 +434,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	var dup bool
 	var idEx = PeerIdEx {
 			Id:		config.NodeID{},
-			Dir:	PeInstOutPos,
+			Dir:	PeInstDirOutbound,
 		}
 
 	for _, n := range rsp.Nodes {
@@ -619,7 +617,7 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 	var count = 0
 	var idEx = PeerIdEx {
 		Id:		config.NodeID{},
-		Dir:	PeInstOutPos,
+		Dir:	PeInstDirOutbound,
 	}
 
 	for _, n := range peMgr.cfg.staticNodes {
@@ -634,7 +632,7 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 	// Create outbound instances for candidates if any.
 	var failed = 0
 	var ok = 0
-	idEx = PeerIdEx{Id:config.NodeID{}, Dir:PeInstOutPos}
+	idEx = PeerIdEx{Id:config.NodeID{}, Dir:PeInstDirOutbound}
 	for cdNum := len(candidates); cdNum > 0; cdNum-- {
 		idx := rand.Intn(cdNum)
 		n := candidates[idx]
@@ -673,7 +671,7 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	}
 
 	var candidates = make([]*config.Node, 0)
-	var idEx = PeerIdEx{Dir:PeInstOutPos}
+	var idEx = PeerIdEx{Dir:PeInstDirOutbound}
 	for _, n := range peMgr.randoms[*snid] {
 		idEx.Id = n.ID
 		if _, ok := peMgr.nodes[*snid][idEx]; !ok {
@@ -794,12 +792,12 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if peMgr.wrkNum[snid] >= maxPeers {
 		peMgr.updateStaticStatus(snid, idEx, peerKilling)
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, rsp.dir)
 		return PeMgrEnoResource
 	}
 
 	if inst.dir == PeInstDirInbound {
-		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstInPos}
+		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstDirInbound}
 		if peMgr.isStaticSubNetId(snid) {
 			if _, dup := peMgr.workers[snid][idEx]; dup {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
@@ -815,17 +813,17 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoDuplicated
 			}
-			idEx.Dir = PeInstOutPos
+			idEx.Dir = PeInstDirOutbound
 			if peMgr.instStateCmpKill(inst, rsp.ptn, snid, rsp.peNode, idEx) == PeMgrEnoDuplicated {
 				return PeMgrEnoDuplicated
 			}
 		}
-		idEx.Dir = PeInstInPos
+		idEx.Dir = PeInstDirInbound
 		peMgr.nodes[snid][idEx] = inst
 		peMgr.workers[snid][idEx] = inst
 		peMgr.ibpNum[snid]++
 	} else if inst.dir == PeInstDirOutbound {
-		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstOutPos}
+		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstDirOutbound}
 		if peMgr.isStaticSubNetId(snid) {
 			if _, dup := peMgr.workers[snid][idEx]; dup {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
@@ -841,7 +839,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoDuplicated
 			}
-			idEx.Dir = PeInstInPos
+			idEx.Dir = PeInstDirInbound
 			if peMgr.instStateCmpKill(inst, rsp.ptn, snid, rsp.peNode, idEx) == PeMgrEnoDuplicated {
 				return PeMgrEnoDuplicated
 			}
@@ -977,9 +975,9 @@ func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
 	var idEx = PeerIdEx{}
 	var req = msg.(*sch.MsgPeDataReq)
 	idEx.Id = req.PeerId
-	idEx.Dir = PeInstOutPos
+	idEx.Dir = PeInstDirOutbound
 	if inst = peMgr.getWorkerInst(req.SubNetId, &idEx); inst == nil {
-		idEx.Dir = PeInstInPos
+		idEx.Dir = PeInstDirInbound
 		if inst = peMgr.getWorkerInst(req.SubNetId, &idEx); inst == nil {
 			return PeMgrEnoNotfound
 		}
@@ -1221,8 +1219,6 @@ type peerInstState int	// instance state type
 const PeInstDirNull			= -1			// null, so connection should be nil
 const PeInstDirInbound		= 0				// inbound connection
 const PeInstDirOutbound		= 1				// outbound connection
-const PeInstInPos			= 0				// inbound position
-const PeInstOutPos			= 1				// outbound position
 
 const PeInstMailboxSize 	= 512				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
@@ -1807,8 +1803,8 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 }
 
 func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
-	idExOut := PeerIdEx{Id: *id, Dir: PeInstOutPos}
-	idExIn := PeerIdEx{Id: *id, Dir: PeInstInPos}
+	idExOut := PeerIdEx{Id: *id, Dir: PeInstDirOutbound}
+	idExIn := PeerIdEx{Id: *id, Dir: PeInstDirInbound}
 	idExList := []PeerIdEx{idExOut, idExIn}
 	for _, idEx := range idExList {
 		var req = sch.MsgPeCloseReq{
@@ -2067,7 +2063,7 @@ func (pi *peerInstance)piP2pPongProc(pong *Pingpong) PeMgrErrno {
 
 func (pis peerInstState) compare(s peerInstState) int {
 	// See definition about peerInstState pls.
-	if (pis < 0) {
+	if pis < 0 {
 		panic(fmt.Sprintf("compare: exception, pis: %d", pis))
 	}
 	return int(pis - s)
@@ -2176,8 +2172,6 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}, userData interf
 	// from peer instances to higher module. In this schema, a routine is started
 	// in this function to pull indications, check what indication type it is and
 	// call the function registered.
-	peMgr.indCbLock.Lock()
-	defer peMgr.indCbLock.Unlock()
 	if peMgr.indCb != nil {
 		log.Debug("RegisterInstIndCallback: callback duplicated")
 		return PeMgrEnoDuplicated
@@ -2192,6 +2186,7 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}, userData interf
 		return PeMgrEnoParameter
 	}
 	peMgr.indCb = icb
+	peMgr.indCbUserData = userData
 
 	go func() {
 		for {

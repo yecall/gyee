@@ -1357,7 +1357,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	if target.mailbox.que == nil {
 		log.Debug("schSendMsg: mailbox of target is empty, task: %s", target.name)
-		return SchEnoInternal
+		panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
 	}
 
 	if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {

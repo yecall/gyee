@@ -72,12 +72,23 @@ type peerIdEx struct {
 // test statistics
 //
 type testCaseCtrlBlock struct {
-	peerId	peerIdEx			// peer extend identity
-	done 	chan bool			// done channel
-	indCh	chan interface{}	// indication channel
-	txSeq	int64				// tx sequence number
-	rxSeq	int64				// rx sequence number
-	killing	bool				// is currently in killing
+	lock		sync.Mutex							// lock to sync action on tcbList
+	tcbList		map[peerIdEx]*testCaseCtrlBlock		// test case control block list
+	peerId		peerIdEx							// peer extend identity
+	done 		chan bool							// done channel
+	peerActInd	chan interface{}					// indication channel for peer activation
+	peerClsInd	chan interface{}					// indication channel for peer closed
+	txSeq		int64								// tx sequence number
+	rxSeq		int64								// rx sequence number
+	killing		bool								// is currently in killing
+}
+
+//
+// Callback user data
+//
+type cbUserData struct {
+	lock		sync.Mutex							// lock to sync action on tcbList
+	tcbList		map[peerIdEx]*testCaseCtrlBlock		// test case control block list
 }
 
 //
@@ -85,6 +96,7 @@ type testCaseCtrlBlock struct {
 //
 var tcbListsLock sync.Mutex
 var tcbLists map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock
+var tcbLocks map[*sch.Scheduler]sync.Mutex
 
 //
 // test case
@@ -154,13 +166,14 @@ const (
 	portBase4Dht = 40404
 )
 
-//
-// create test case control block by name
-//
-func newTcb(name string, idEx peerIdEx) *testCaseCtrlBlock {
+func newTcb(name string, idEx peerIdEx, tcbList map[peerIdEx]*testCaseCtrlBlock, lock sync.Mutex) *testCaseCtrlBlock {
 	tcb := testCaseCtrlBlock {
+		lock: lock,
+		tcbList: tcbList,
 		peerId: idEx,
 		done: make(chan bool),
+		peerActInd: make(chan interface{}, 32),
+		peerClsInd: make(chan interface{}, 32),
 		txSeq:	0,
 		rxSeq:	0,
 	}
@@ -180,6 +193,35 @@ func newTcb(name string, idEx peerIdEx) *testCaseCtrlBlock {
 	return &tcb
 }
 
+func injectActPeer(tcbList map[peerIdEx]*testCaseCtrlBlock, acter *peerIdEx, lock sync.Mutex) {
+	lock.Lock()
+	defer lock.Unlock()
+	for id, tcb := range tcbList {
+		if id == *acter {
+			log.Debug("injectActPeer: duplicated")
+		}
+		tcb.peerActInd<-acter
+	}
+}
+
+func injectActPeers2Tcb(tcbList map[peerIdEx]*testCaseCtrlBlock, target *testCaseCtrlBlock) {
+	target.lock.Lock()
+	defer target.lock.Unlock()
+	for id, _ := range tcbList {
+		target.peerActInd<-&id
+	}
+}
+
+func injectClsPeer(tcbList map[peerIdEx]*testCaseCtrlBlock, clser *peerIdEx, lock sync.Mutex) {
+	lock.Lock()
+	defer lock.Unlock()
+	for id, tcb := range tcbList {
+		if id != *clser {
+			tcb.peerClsInd<-clser
+		}
+	}
+}
+
 //
 // Tx routine
 //
@@ -194,9 +236,12 @@ func txStopAll() {
 		instKeys = append(instKeys, ik)
 		tcbKeys := make([]peerIdEx, 0)
 		for tk, tcb := range tl {
-			tcb.done<-true
-			<-tcb.done
-			tcbKeys = append(tcbKeys, tk)
+			if !tcb.killing {
+				tcb.killing = true
+				tcb.done <- true
+				<-tcb.done
+				tcbKeys = append(tcbKeys, tk)
+			}
 		}
 		for _, tk := range tcbKeys {
 			delete(tl, tk)
@@ -219,14 +264,17 @@ func createTcbLists(instList []*sch.Scheduler) {
 		return
 	}
 	tcbLists = make(map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock, len(instList))
+	tcbLocks = make(map[*sch.Scheduler]sync.Mutex, len(instList))
 	for _, inst := range instList {
-		(tcbLists)[inst] = make(map[peerIdEx]*testCaseCtrlBlock, 0)
+		tcbLists[inst] = make(map[peerIdEx]*testCaseCtrlBlock, 0)
+		tcbLocks[inst] = sync.Mutex{}
 	}
 }
 
 func appendTcb2List(instList []*sch.Scheduler) {
 	if tcbLists == nil {
 		tcbLists = make(map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock, len(instList))
+		tcbLocks = make(map[*sch.Scheduler]sync.Mutex, len(instList))
 	}
 	for _, inst := range instList {
 		if tcbLists[inst] != nil {
@@ -234,6 +282,7 @@ func appendTcb2List(instList []*sch.Scheduler) {
 			continue
 		}
 		tcbLists[inst] = make(map[peerIdEx]*testCaseCtrlBlock, 0)
+		tcbLocks[inst] = sync.Mutex{}
 	}
 }
 
@@ -247,7 +296,7 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 		Payload:		make([]byte, 0, 512),
 		Extra:			nil,
 	}
-	var peerList = make([]peerIdEx, 0)
+	var peerList = make(map[peerIdEx]interface{}, 0)
 
 	var setupPkg = func(id *peerIdEx) {
 		txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
@@ -265,7 +314,7 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 	var tmHandler = func() {
 		tcb.txSeq++
 		if dataTxApply {
-			for _, id := range peerList {
+			for id := range peerList {
 				setupPkg(&id)
 				if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
 					log.Debug("txrxProc: P2pSendPackage failed, eno: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
@@ -280,46 +329,54 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 	tm := time.NewTicker(time.Second * 1)
 	defer tm.Stop()
 
-	doneOk := true
+	doneOk := false
+	done4Done := false
 	done4RxChan := false
 
-txLoop:
+txrxLoop:
 	for {
 		select {
-		case ind := <-tcb.indCh:
+		case ind := <-tcb.peerActInd:
 			if peerActivated, ok := ind.(*peerIdEx); ok {
-				peerList = append(peerList, *peerActivated)
+				peerList[*peerActivated] = nil
+			}
+		case ind := <-tcb.peerClsInd:
+			if peerClosed, ok := ind.(*peerIdEx); ok {
+				delete(peerList, *peerClosed)
 			}
 		case _, doneOk = <-tcb.done:
 			log.Debug("txrxProc: it's done, sdl: %s, dir: %d, subnet: %s, id: %s",
 				sdl, tcb.peerId.dir,
 				fmt.Sprintf("%x", tcb.peerId.subNetId),
 				fmt.Sprintf("%x", tcb.peerId.nodeId))
-			break txLoop
+			done4Done = true
+			break txrxLoop
 		case <-tm.C:
 			if dataTxTmApply {
 				tmHandler()
 			}
 		case _, ok := <-rxChan:
 			if !ok {
-				log.Debug("rxProc: rxChan closed, break loop, sdl: %s, dir: %d, subnet: %s, id: %s",
+				log.Debug("txrxProc: rxChan closed, break loop, sdl: %s, dir: %d, subnet: %s, id: %s",
 					sdl, tcb.peerId.dir,
 					fmt.Sprintf("%x", tcb.peerId.subNetId),
 					fmt.Sprintf("%x", tcb.peerId.nodeId))
 				done4RxChan = true
-				break txLoop
+				break txrxLoop
 			}
 			tcb.rxSeq += 1
 		}
 	}
 
-	if doneOk {
+	if done4Done && doneOk {
 		close(tcb.done)
 	} else if done4RxChan {
 		_, doneOk := <-tcb.done
 		if doneOk {
 			close(tcb.done)
 		}
+	} else {
+		log.Debug("txrxProc: impossible loop broken")
 	}
 
 	log.Debug("txrxProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
@@ -344,18 +401,22 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 			dir:		dir,
 		}
 
-		tcbList, ok := userData.(map[peerIdEx]*testCaseCtrlBlock)
+		cud, ok := userData.(*cbUserData)
 		if !ok {
 			log.Debug("p2pIndProc: invalid user data, sdl: %s, dir: %d, snid: %x, peer: %x",
 				sdl, dir, snid, peerId)
 			return nil
 		}
+		tcbList := cud.tcbList
 		if _, dup := tcbList[idEx]; dup {
 			log.Debug("p2pIndProc: duplicated, sdl: %s, dir: %d, snid: %x, peer: %x",
 				sdl, dir, snid, peerId)
 			return nil
 		}
-		tcb := newTcb(tgtCase, idEx)
+
+		injectActPeer(tcbList, &idEx, cud.lock)
+		tcb := newTcb(tgtCase, idEx, tcbList, cud.lock)
+		injectActPeers2Tcb(tcbList, tcb)
 		tcbList[idEx] = tcb
 
 		log.Debug("p2pIndProc: start tx/rx, sdl: %s, dir: %d, snid: %x, peer: %x",
@@ -374,14 +435,15 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 			dir: pcp.Dir,
 		}
 
-		tcbList, ok := userData.(map[peerIdEx]*testCaseCtrlBlock)
+		cud, ok := userData.(*cbUserData)
 		if !ok {
 			log.Debug("p2pIndProc: invalid user data, sdl: %s, dir: %d, snid: %x, peer: %x",
 				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
 			return nil
 		}
+		tcbList := cud.tcbList
+		injectClsPeer(tcbList, &idEx, cud.lock)
 
-		log.Debug("p2pIndProc: try to kill, sdl: %s", sdl)
 		tcbListsLock.Lock()
 		need2Kill := false
 		tcb, exist := tcbList[idEx]
@@ -398,7 +460,7 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 		} else {
 			log.Debug("p2pIndProc: try to kill, sdl: %s, dir: %d, snid: %x, peer: %x",
 				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
-			tcb.done <- true
+			tcb.done<-true
 			<-tcb.done
 			tcbListsLock.Lock()
 			delete(tcbList, idEx)
@@ -486,7 +548,11 @@ func testCase0(tc *testCase) {
 	// handler is owned by every peer, and it can be installed while activation of
 	// a peer is indicated. See demo indication handler p2pIndHandler and incoming
 	// package handler p2pPkgHandler for more please.
-	if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, tcbLists[p2pInst], p2pInst);
+	cud := cbUserData{
+		lock: tcbLocks[p2pInst],
+		tcbList: tcbLists[p2pInst],
+	}
+	if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 	eno != shell.P2pEnoNone {
 		log.Debug("testCase0: P2pRegisterCallback failed, eno: %d", eno)
 		return
@@ -567,7 +633,11 @@ func testCase1(tc *testCase) {
 			return
 		}
 
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, tcbLists[p2pInst], p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
 			log.Debug("testCase1: P2pRegisterCallback failed, eno: %d", eno)
 			return
@@ -680,14 +750,18 @@ func testCase2(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.Debug("testCase2: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		appendTcb2List([]*sch.Scheduler{p2pInst})
-
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, tcbLists[p2pInst], p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
 			log.Debug("testCase2: P2pRegisterCallback failed, eno: %d", eno)
 			return
@@ -806,14 +880,18 @@ func testCase3(tc *testCase) {
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.Debug("testCase3: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		appendTcb2List([]*sch.Scheduler{p2pInst})
-
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, tcbLists[p2pInst], p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
 			log.Debug("testCase3: P2pRegisterCallback failed, eno: %d", eno)
 			return
@@ -1006,14 +1084,18 @@ func testCase4(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.Debug("testCase4: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		appendTcb2List([]*sch.Scheduler{p2pInst})
-
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, tcbLists[p2pInst], p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
 			log.Debug("testCase4: P2pRegisterCallback failed, eno: %d", eno)
 			return
@@ -1208,14 +1290,18 @@ func testCase5(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
 			log.Debug("testCase5: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		appendTcb2List([]*sch.Scheduler{p2pInst})
-
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, tcbLists[p2pInst], p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
 			log.Debug("testCase5: P2pRegisterCallback failed, eno: %d", eno)
 			return
