@@ -1884,11 +1884,11 @@ chkDone:
 				Dir: inst.dir,
 				Why: &i,
 			}
-			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
+			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning of
 			// this instance, BUT at this moment, the message queue of peer manager might
 			// be FULL, so the instance would be blocked while sending; AND the peer manager
 			// might had fired inst.txDone and been blocked by inst.txExit. panic is called
-			// for this overload of system, see scheduler please.
+			// for such a overload system, see scheduler please.
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
@@ -1958,7 +1958,7 @@ rxBreak:
 			// this instance, BUT at this moment, the message queue of peer manager might
 			// be FULL, so the instance would be blocked while sending; AND the peer manager
 			// might had fired inst.txDone and been blocked by inst.txExit. panic is called
-			// for this overload of system, see scheduler please.
+			// for such a overload system, see scheduler please.
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
