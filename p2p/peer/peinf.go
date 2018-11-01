@@ -95,6 +95,7 @@ type P2pIndPeerClosedPara struct {
 									// closed.
 	Snid		SubNetworkID		// sub network identity
 	PeerId		PeerId				// peer identity
+	Dir			int					// direction
 }
 
 type P2pIndCallback func(what int, para interface{}) interface{}

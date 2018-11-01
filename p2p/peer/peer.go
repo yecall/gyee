@@ -940,6 +940,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		Ptn:		peMgr.ptnMe,
 		Snid:		ind.snid,
 		PeerId:		ind.peNode.ID,
+		Dir:		ind.dir,
 	}
 	peMgr.peMgrIndEnque(&i)
 	// drive ourselves to startup outbound
@@ -958,6 +959,7 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 		Ptn:		peMgr.ptnMe,
 		Snid:		ind.snid,
 		PeerId:		ind.peNode.ID,
+		Dir:		ind.dir,
 	}
 	peMgr.peMgrIndEnque(&i)
 	// drive ourselves to startup outbound
