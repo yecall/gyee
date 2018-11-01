@@ -429,7 +429,7 @@ timerLoop:
 				continue
 			}
 
-			panic(fmt.Sprint("schTimerCommonTask: internal errors, event: %d", event))
+			panic(fmt.Sprintf("schTimerCommonTask: internal errors, event: %d", event))
 		}
 
 	} else if ptm.tmcb.tmt == schTmTypeAbsolute {
@@ -1365,7 +1365,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		panic(fmt.Sprintf("system overload, task: %s", target.name))
 	}
 
-	target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1);
+	target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
 	target.evHistory[target.evhIndex] = *msg
 
 	*target.mailbox.que<-*msg

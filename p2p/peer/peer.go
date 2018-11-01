@@ -33,6 +33,7 @@ import (
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	"runtime"
 )
 
 // Peer manager errno
@@ -164,6 +165,7 @@ type PeerManager struct {
 	indChan			chan interface{}				// indication signal
 	indCbLock		sync.Mutex						// lock for indication callback
 	indCb			P2pIndCallback					// indication callback
+	indCbUserData	interface{}						// user data pointer for callback
 	ssTid			int								// statistics timer identity
 	staticsStatus	map[PeerIdEx]int				// status about static nodes
 }
@@ -741,7 +743,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	var inst *peerInstance
 	var lived bool
 	if inst, lived = peMgr.peers[rsp.ptn]; inst == nil || !lived {
-		log.Debug("peMgrHandshakeRsp: instance not found, rsp: %s",
+		log.Debug("peMgrHandshakeRsp: instance not found, sdl: %s, rsp: %s",
+			peMgr.sdl.SchGetP2pCfgName(),
 			fmt.Sprintf("%+v", *rsp))
 		return PeMgrEnoNotfound
 	}
@@ -1055,6 +1058,12 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 }
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
+
+	_, file, line, _ := runtime.Caller(1)
+	log.Debug("peMgrKillInst: sdl: %s, task: %s, file: %s, line: %d",
+		peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn), file, line)
+
+
 	if sch.Debug__ {
 		log.Debug("peMgrKillInst: sdl: %s, task: %s",
 			peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
@@ -1823,7 +1832,7 @@ func piTx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
-	var ok bool = true
+	var ok = true
 
 txBreak:
 	for {
@@ -1898,7 +1907,7 @@ func piRx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
-	var ok bool = true
+	var ok = true
 	var peerInfo = PeerInfo{}
 	var pkgCb = P2pPackageRx{}
 
@@ -2162,7 +2171,7 @@ func (peMgr *PeerManager)GetInstIndChannel() chan interface{} {
 	return peMgr.indChan
 }
 
-func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
+func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}, userData interface{}) PeMgrErrno {
 	// This function implements the "Callback" schema to hand up the indications
 	// from peer instances to higher module. In this schema, a routine is started
 	// in this function to pull indications, check what indication type it is and
@@ -2195,9 +2204,9 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}) PeMgrErrno {
 				indType := reflect.TypeOf(ind).Elem().Name()
 				switch indType {
 				case "P2pIndPeerActivatedPara":
-					peMgr.indCb(P2pIndPeerActivated, ind)
+					peMgr.indCb(P2pIndPeerActivated, ind, peMgr.indCbUserData)
 				case "P2pIndPeerClosedPara":
-					peMgr.indCb(P2pIndPeerClosed, ind)
+					peMgr.indCb(P2pIndPeerClosed, ind, peMgr.indCbUserData)
 				default:
 					log.Debug("P2pIndCallback: discard unknown indication type: %s", indType)
 				}

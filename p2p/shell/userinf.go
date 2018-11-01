@@ -88,7 +88,7 @@ const (
 	P2pIndPeerClosed	= peer.P2pIndPeerClosed		// indication for peer connection closed
 )
 
-func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno {
+func P2pRegisterCallback(what int, cb interface{}, userData interface{}, target interface{}) P2pErrno {
 	if what != peer.P2pIndCb {
 		log.Debug("P2pRegisterCallback: not supported, what: %d", what)
 		return P2pEnoParameter
@@ -99,7 +99,7 @@ func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno 
 		return P2pEnoScheduler
 	}
 	peMgr := pem.(*peer.PeerManager)
-	if eno := peMgr.RegisterInstIndCallback(cb); eno != peer.PeMgrEnoNone {
+	if eno := peMgr.RegisterInstIndCallback(cb, userData); eno != peer.PeMgrEnoNone {
 		log.Debug("P2pRegisterCallback: RegisterInstIndCallback failed, eno: %d", eno)
 		return P2pEnoInternal
 	}

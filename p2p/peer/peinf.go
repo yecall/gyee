@@ -98,12 +98,12 @@ type P2pIndPeerClosedPara struct {
 	Dir			int					// direction
 }
 
-type P2pIndCallback func(what int, para interface{}) interface{}
+type P2pIndCallback func(what int, para interface{}, userData interface{}) interface{}
 
 //
 // P2p callback function type for package incoming
 //
-type P2pPkgCallback func(msg *P2pPackageRx) interface{}
+type P2pPkgCallback func(msg *P2pPackageRx, userData interface{}) interface{}
 
 
 
