@@ -1964,7 +1964,8 @@ rxBreak:
 			inst.sdl.SchSendMessage(&msg)
 		} else if upkg.Pid == uint32(PID_EXT) {
 			if len(inst.rxChan) >= cap(inst.rxChan) {
-				log.Debug("piRx: rx queue full, sdl: %s, inst: %s, peer: %x", sdl, inst.name, inst.node.ID)
+				log.Debug("piRx: rx queue full, sdl: %s, dir: %d, inst: %s, peer: %x",
+					sdl, inst.dir, inst.name, inst.node.ID)
 			} else {
 				peerInfo.Protocols = nil
 				peerInfo.Snid = inst.snid

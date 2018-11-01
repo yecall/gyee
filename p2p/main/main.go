@@ -73,7 +73,8 @@ type peerIdEx struct {
 //
 type testCaseCtrlBlock struct {
 	peerId	peerIdEx
-	done 	chan bool
+	doneTx 	chan bool
+	doneRx	chan bool
 	killing	bool
 	txSeq	int64
 	rxSeq	int64
@@ -160,7 +161,8 @@ const (
 func newTcb(name string, idEx peerIdEx) *testCaseCtrlBlock {
 	tcb := testCaseCtrlBlock {
 		peerId: idEx,
-		done:	make(chan bool, 1),
+		doneTx: make(chan bool),
+		doneRx:	make(chan bool),
 		txSeq:	0,
 		rxSeq:	0,
 	}
@@ -189,13 +191,26 @@ var dataTxTmApply = true
 func txStopAll() {
 	doneMapLock.Lock()
 	defer doneMapLock.Unlock()
-	for _, tcbList := range doneMap {
-		for _, tcb := range tcbList {
+	instKeys := make([]*sch.Scheduler, 0)
+	for ik, tcbList := range doneMap {
+		instKeys = append(instKeys, ik)
+		tcbKeys := make([]peerIdEx, 0)
+		for tk, tcb := range tcbList {
 			if !tcb.killing {
-				tcb.done <- true
 				tcb.killing = true
+				tcb.doneTx<-true
+				<-tcb.doneTx
+				tcb.doneRx<-true
+				<-tcb.doneRx
+				tcbKeys = append(tcbKeys, tk)
 			}
 		}
+		for _, tk := range tcbKeys {
+			delete(tcbList, tk)
+		}
+	}
+	for _, ik := range instKeys {
+		delete(doneMap, ik)
 	}
 }
 
@@ -268,19 +283,15 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 	defer tm.Stop()
 
 	doneOk := true
-	isDone := false
 
 txLoop:
 	for {
 		select {
-		case isDone, doneOk = <-tcb.done:
-			if isDone || !doneOk {
-				log.Debug("txProc: it's done, isDone: %s, subnet: %s, id: %s",
-					fmt.Sprintf("%t", isDone),
-					fmt.Sprintf("%x", snid),
-					fmt.Sprintf("%x", id))
-				break txLoop
-			}
+		case _, doneOk = <-tcb.doneTx:
+			log.Debug("txProc: it's done, subnet: %s, id: %s",
+				fmt.Sprintf("%x", snid),
+				fmt.Sprintf("%x", id))
+			break txLoop
 		case <-tm.C:
 			indCbLock.Lock()
 			if dataTxTmApply {
@@ -290,17 +301,9 @@ txLoop:
 		}
 	}
 
-	doneMapLock.Lock()
-	if doneOk { close(tcb.done) }
-	if _, exist := doneMap[p2pInst]; exist {
-		if _, exist := doneMap[p2pInst][idEx]; exist {
-			delete(doneMap[p2pInst], idEx)
-			if len(doneMap[p2pInst]) == 0 {
-				delete(doneMap, p2pInst)
-			}
-		}
+	if doneOk {
+		close(tcb.doneTx)
 	}
-	doneMapLock.Unlock()
 
 	log.Debug("txProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
 		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
@@ -324,8 +327,6 @@ func rxProc(p2pInst *sch.Scheduler, rxChan chan *peer.P2pPackageRx, dir int, sni
 	doneMapLock.Unlock()
 
 	doneOk := true
-	isDone := false
-	break4RxChan := false
 
 	log.Debug("rxProc: enter, sdl: %s, dir: %d, subnet: %s, id: %s",
 		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
@@ -336,30 +337,17 @@ rxloop:
 		case _, ok := <-rxChan:
 			if !ok {
 				log.Debug("rxProc: sdl: %s, rxChan closed, break", sdl)
-				break4RxChan = true
 				break rxloop
 			}
 			tcb.rxSeq += 1
-		case isDone, doneOk = <-tcb.done:
-			if isDone || !doneOk {
-				break rxloop
-			}
+		case _, doneOk = <-tcb.doneRx:
+			break rxloop
 		}
 	}
 
-	doneMapLock.Lock()
-	if doneOk && !break4RxChan {
-		close(tcb.done)
+	if doneOk {
+		close(tcb.doneRx)
 	}
-	if _, exist := doneMap[p2pInst]; exist {
-		if _, exist := doneMap[p2pInst][idEx]; exist {
-			delete(doneMap[p2pInst], idEx)
-			if len(doneMap[p2pInst]) == 0 {
-				delete(doneMap, p2pInst)
-			}
-		}
-	}
-	doneMapLock.Unlock()
 
 	log.Debug("rxProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
 		sdl, dir, fmt.Sprintf("%x", snid), fmt.Sprintf("%x", id))
@@ -413,13 +401,17 @@ func p2pIndProc(what int, para interface{}) interface{} {
 		defer doneMapLock.Unlock()
 
 		idEx := peerIdEx{subNetId:pcp.Snid, nodeId:pcp.PeerId}
-		if tcb, ok := doneMap[p2pInst][idEx]; ok {
+		if tcb, exist := doneMap[p2pInst][idEx]; exist {
 			if !tcb.killing {
 				log.Debug("p2pIndProc: try to kill, subnet: %s, id: %s",
 					fmt.Sprintf("%x", pcp.Snid),
 					fmt.Sprintf("%X", pcp.PeerId))
-				tcb.done <- true
 				tcb.killing = true
+				tcb.doneTx<-true
+				<-tcb.doneTx
+				tcb.doneRx<-true
+				<-tcb.doneRx
+				delete(doneMap[p2pInst], idEx)
 				break
 			} else {
 				log.Debug("p2pIndProc: in killing, subnet: %s, id: %s",
