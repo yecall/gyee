@@ -105,7 +105,7 @@ var schTimerNodePool [schTimerNodePoolSize]schTmcbNode	// timer node pool
 //
 const schMaxTaskTimer	= SchMaxTaskTimer		// max timers can be held by one user task
 const schInvalidTid		= SchInvalidTid			// invalid timer identity
-
+const evHistorySize		= 64					// round buffer size fo event history
 type schTask struct {
 	lock		sync.Mutex						// lock to protect task control block
 	sdl			*scheduler						// pointer to scheduler
@@ -119,6 +119,8 @@ type schTask struct {
 	dog			schWatchDog						// wathch dog
 	dieCb		func(interface{}) SchErrno		// callbacked when going to die
 	goStatus	int								// in going or suspended
+	evHistory	[evHistorySize]schMessage		// event history
+	evhIndex	int								// event history index
 	userData	interface{}						// data area pointer of user task
 }
 

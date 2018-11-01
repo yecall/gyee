@@ -386,29 +386,35 @@ func p2pIndProc(what int, para interface{}) interface{} {
 
 		log.Debug("p2pIndProc: try to kill, sdl: %s", sdl)
 		doneMapLock.Lock()
-		if tcb, exist := doneMap[p2pInst][idEx]; exist {
-			if !tcb.killing {
-				log.Debug("p2pIndProc: try to kill, sdl: %s, dir: %d, subnet: %s, id: %s",
-					sdl, idEx.dir,
-					fmt.Sprintf("%x", pcp.Snid),
-					fmt.Sprintf("%x", pcp.PeerId))
-				tcb.killing = true
-				tcb.doneTx<-true
-				<-tcb.doneTx
-				tcb.doneRx<-true
-				<-tcb.doneRx
-				delete(doneMap[p2pInst], idEx)
-				doneMapLock.Unlock()
-				break
-			} else {
-				log.Debug("p2pIndProc: in killing, sdl: %s, dir: %d, subnet: %s, id: %s",
-					sdl, idEx.dir,
-					fmt.Sprintf("%x", pcp.Snid),
-					fmt.Sprintf("%x", pcp.PeerId))
-			}
+		need2Kill := false
+		tcb, exist := doneMap[p2pInst][idEx];
+		if exist {
+			need2Kill = !tcb.killing
+		}
+		if need2Kill {
+			tcb.killing = true
 		}
 		doneMapLock.Unlock()
-		log.Debug("p2pIndProc: end of kill, sdl: %s", sdl)
+
+		if !need2Kill {
+			log.Debug("p2pIndProc: already in killing, sdl: %s, dir: %d, subnet: %s, id: %s",
+				sdl, idEx.dir,
+				fmt.Sprintf("%x", pcp.Snid),
+				fmt.Sprintf("%x", pcp.PeerId))
+		} else {
+			log.Debug("p2pIndProc: try to kill, sdl: %s, dir: %d, subnet: %s, id: %s",
+				sdl, idEx.dir,
+				fmt.Sprintf("%x", pcp.Snid),
+				fmt.Sprintf("%x", pcp.PeerId))
+			tcb.killing = true
+			tcb.doneTx <- true
+			<-tcb.doneTx
+			tcb.doneRx <- true
+			<-tcb.doneRx
+			doneMapLock.Lock()
+			delete(doneMap[p2pInst], idEx)
+			doneMapLock.Unlock()
+		}
 
 	default:
 		log.Debug("p2pIndProc: inknown indication: %d", what)

@@ -124,9 +124,11 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
 
-		log.Debug("getHandshakeInbound: " +
-			"ReadMsg faied, err: %s",
-			err.Error())
+		if sch.Debug__ {
+			log.Debug("getHandshakeInbound: "+
+				"ReadMsg faied, err: %s",
+				err.Error())
+		}
 
 		return nil, PeMgrEnoOs
 	}
@@ -317,9 +319,11 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		log.Debug("putHandshakeOutbound:" +
-			"Write failed, err: %s",
-			err.Error())
+		if sch.Debug__ {
+			log.Debug("putHandshakeOutbound: "+
+				"Write failed, err: %s",
+				err.Error())
+		}
 
 		return PeMgrEnoOs
 	}
@@ -386,9 +390,11 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		log.Debug("ping:" +
-			"Write failed, err: %s",
-			err.Error())
+		if sch.Debug__ {
+			log.Debug("ping:"+
+				"Write failed, err: %s",
+				err.Error())
+		}
 
 		return PeMgrEnoOs
 	}
@@ -455,9 +461,11 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		log.Debug("pong:" +
-			"Write failed, err: %s",
-			err.Error())
+		if sch.Debug__ {
+			log.Debug("pong:"+
+				"Write failed, err: %s",
+				err.Error())
+		}
 
 		return PeMgrEnoOs
 	}
@@ -506,9 +514,11 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		log.Debug("SendPackage: " +
-			"Write failed, err: %s",
-			err.Error())
+		if sch.Debug__ {
+			log.Debug("SendPackage: "+
+				"Write failed, err: %s",
+				err.Error())
+		}
 
 		return PeMgrEnoOs
 	}

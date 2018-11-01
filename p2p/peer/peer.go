@@ -1056,7 +1056,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
 	if sch.Debug__ {
-		log.Debug("peMgrKillInst: done task, sdl: %s, task: %s",
+		log.Debug("peMgrKillInst: sdl: %s, task: %s",
 			peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
 	}
 
@@ -1415,7 +1415,7 @@ func (inst *peerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 	if inst.dialer == nil ||
 		inst.dir != PeInstDirOutbound  ||
 		inst.state != peInstStateConnOut {
-		log.Debug("piConnOutReq: instance mismatched")
+		log.Debug("piConnOutReq: instance mismatched, sdl: %s, inst: %s", inst.sdl.SchGetP2pCfgName(), inst.name)
 		return PeMgrEnoInternal
 	}
 

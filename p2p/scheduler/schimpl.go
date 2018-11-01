@@ -1365,6 +1365,9 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		panic(fmt.Sprintf("system overload, task: %s", target.name))
 	}
 
+	target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1);
+	target.evHistory[target.evhIndex] = *msg
+
 	*target.mailbox.que<-*msg
 
 	return SchEnoNone
