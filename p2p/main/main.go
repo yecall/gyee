@@ -362,6 +362,12 @@ txrxLoop:
 				break txrxLoop
 			}
 			tcb.rxSeq += 1
+			if tcb.rxSeq & 0x0f == 0 {
+				log.Debug("txrxProc: rxSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
+					tcb.rxSeq, sdl, tcb.peerId.dir,
+					fmt.Sprintf("%x", tcb.peerId.subNetId),
+					fmt.Sprintf("%x", tcb.peerId.nodeId))
+			}
 		}
 	}
 
@@ -470,22 +476,18 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 	return para
 }
 
-//
-// Package handler
-//
 func p2pPkgProc(pkg *peer.P2pPackageRx, userData interface{}) interface{} {
 	return nil
 }
 
-//
-// hook a system interrupt signal and wait on it
-//
 func waitInterrupt() {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt)
 	defer signal.Stop(sigc)
 	<-sigc
 }
+
+
 
 //
 // run target case

@@ -82,8 +82,8 @@ const (
 
 	maxIndicationQueueSize = 512					// max indication queue size
 
-	minDuration4FindNodeReq = time.Second * 4			// min duration to send find-node-request again
-	minDuration4OutboundConnectReq = time.Second * 4	// min duration to try oubound connect for a specific
+	minDuration4FindNodeReq = time.Second * 2			// min duration to send find-node-request again
+	minDuration4OutboundConnectReq = time.Second * 2	// min duration to try oubound connect for a specific
 														// sub-network and peer
 )
 
@@ -191,9 +191,11 @@ func NewPeerMgr() *PeerManager {
 		ibpTotalNum:	0,
 		indChan:		make(chan interface{}, maxIndicationQueueSize),
 		randoms:      	map[SubNetworkID][]*config.Node{},
+		ssTid:			sch.SchInvalidTid,
 		staticsStatus:	map[PeerIdEx]int{},
-		tmLastFNR:		make(map[SubNetworkID]time.Time, 0),
+		ocrTid:			sch.SchInvalidTid,
 		tmLastOCR:		make(map[SubNetworkID]map[PeerId]time.Time, 0),
+		tmLastFNR:		make(map[SubNetworkID]time.Time, 0),
 	}
 	peMgr.tep = peMgr.peerMgrProc
 	return &peMgr
@@ -445,6 +447,21 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)ocrTimestampCleanup() {
+	now := time.Now()
+	for _, tmPeers := range peMgr.tmLastOCR {
+		idList := make([]PeerId, 0)
+		for id, t := range tmPeers {
+			if now.Sub(t) >= minDuration4OutboundConnectReq {
+				idList = append(idList, id)
+			}
+		}
+		for _, id := range idList {
+			delete(tmPeers, id)
+		}
+	}
 }
 
 func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
@@ -715,9 +732,8 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
 					continue
 				}
-			} else {
-				tmPeers[n.ID] = time.Now()
 			}
+			tmPeers[n.ID] = time.Now()
 		} else {
 			tmPeers := make(map[PeerId]time.Time, 0)
 			tmPeers[n.ID] = time.Now()
@@ -1172,9 +1188,8 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		if time.Now().Sub(t) <= minDuration4FindNodeReq {
 			return PeMgrEnoNone
 		}
-	} else {
-		peMgr.tmLastFNR[*snid] = time.Now()
 	}
+	peMgr.tmLastFNR[*snid] = time.Now()
 
 	dur := durStaticRetryTimer
 	if *snid != peMgr.cfg.staticSubNetId {
@@ -1237,7 +1252,9 @@ func (peMgr *PeerManager)peMgrIndEnque(ind interface{}) PeMgrErrno {
 	if len(peMgr.indChan) >= cap(peMgr.indChan) {
 		panic("peMgrIndEnque: system overload")
 	}
-	log.Debug("peMgrIndEnque: sdl: %s", peMgr.sdl.SchGetP2pCfgName())
+	if sch.Debug__ {
+		log.Debug("peMgrIndEnque: sdl: %s", peMgr.sdl.SchGetP2pCfgName())
+	}
 	peMgr.indChan<-ind
 	return PeMgrEnoNone
 }

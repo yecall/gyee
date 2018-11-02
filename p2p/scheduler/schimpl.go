@@ -852,6 +852,9 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 		panic(fmt.Sprintf("system overload, task: %s", task.name))
 	}
 
+	task.evhIndex = (task.evhIndex + 1) & (evHistorySize - 1)
+	task.evHistory[task.evhIndex] = msg
+
 	*task.mailbox.que<-msg
 
 	return SchEnoNone
