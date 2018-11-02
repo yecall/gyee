@@ -172,8 +172,8 @@ func newTcb(name string, idEx peerIdEx, tcbList map[peerIdEx]*testCaseCtrlBlock,
 		tcbList: tcbList,
 		peerId: idEx,
 		done: make(chan bool),
-		peerActInd: make(chan interface{}, 32),
-		peerClsInd: make(chan interface{}, 32),
+		peerActInd: make(chan interface{}, 128),
+		peerClsInd: make(chan interface{}, 128),
 		txSeq:	0,
 		rxSeq:	0,
 	}
@@ -204,9 +204,9 @@ func injectActPeer(tcbList map[peerIdEx]*testCaseCtrlBlock, acter *peerIdEx, loc
 	}
 }
 
-func injectActPeers2Tcb(tcbList map[peerIdEx]*testCaseCtrlBlock, target *testCaseCtrlBlock) {
-	target.lock.Lock()
-	defer target.lock.Unlock()
+func injectActPeers2Tcb(tcbList map[peerIdEx]*testCaseCtrlBlock, target *testCaseCtrlBlock, lock sync.Mutex) {
+	lock.Lock()
+	defer lock.Unlock()
 	for id, _ := range tcbList {
 		target.peerActInd<-&id
 	}
@@ -222,13 +222,10 @@ func injectClsPeer(tcbList map[peerIdEx]*testCaseCtrlBlock, clser *peerIdEx, loc
 	}
 }
 
-//
-// Tx routine
-//
 var dataTxApply = true
 var dataTxTmApply = true
 
-func txStopAll() {
+func txrxStopAll() {
 	tcbListsLock.Lock()
 	defer tcbListsLock.Unlock()
 	instKeys := make([]*sch.Scheduler, 0)
@@ -252,7 +249,7 @@ func txStopAll() {
 	}
 }
 
-func isAllDone() bool {
+func isTxRxAllDone() bool {
 	tcbListsLock.Lock()
 	defer tcbListsLock.Unlock()
 	return len(tcbLists) == 0
@@ -416,7 +413,7 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 
 		injectActPeer(tcbList, &idEx, cud.lock)
 		tcb := newTcb(tgtCase, idEx, tcbList, cud.lock)
-		injectActPeers2Tcb(tcbList, tcb)
+		injectActPeers2Tcb(tcbList, tcb, cud.lock)
 		tcbList[idEx] = tcb
 
 		log.Debug("p2pIndProc: start tx/rx, sdl: %s, dir: %d, snid: %x, peer: %x",
@@ -1332,8 +1329,10 @@ _waitStop:
 		}
 	}
 
-	txStopAll()
-	for !isAllDone() {
+	log.Debug("testCase5: wait all tx/rx instances to be done...")
+
+	txrxStopAll()
+	for !isTxRxAllDone() {
 		log.Debug("testCase5: wait all tx/rx instances to be done...")
 		time.Sleep(time.Second * 1)
 	}

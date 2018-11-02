@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
-	"runtime"
 	ggio 	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
@@ -82,6 +81,10 @@ const (
 	durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
 
 	maxIndicationQueueSize = 512					// max indication queue size
+
+	minDuration4FindNodeReq = time.Second * 4			// min duration to send find-node-request again
+	minDuration4OutboundConnectReq = time.Second * 4	// min duration to try oubound connect for a specific
+														// sub-network and peer
 )
 
 const (
@@ -151,21 +154,26 @@ type PeerManager struct {
 
 	tabMgr			*tab.TableManager				// pointer to table manager
 
-	ibInstSeq		int								// inbound instance seqence number
-	obInstSeq		int								// outbound instance seqence number
-	peers			map[interface{}]*peerInstance	// map peer instance's task node pointer to instance pointer
+	ibInstSeq		int											// inbound instance sequence number
+	obInstSeq		int											// outbound instance sequence number
+	peers			map[interface{}]*peerInstance				// map peer instance's task node pointer to instance pointer
 	nodes			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to instance pointer
 	workers			map[SubNetworkID]map[PeerIdEx]*peerInstance	// map peer node identity to pointer of instance in work
-	wrkNum			map[SubNetworkID]int			// worker peer number
-	ibpNum			map[SubNetworkID]int			// active inbound peer number
-	obpNum			map[SubNetworkID]int			// active outbound peer number
-	ibpTotalNum		int								// total active inbound peer number
-	randoms			map[SubNetworkID][]*config.Node	// random nodes found by discover
-	indChan			chan interface{}				// indication signal
-	indCb			P2pIndCallback					// indication callback
-	indCbUserData	interface{}						// user data pointer for callback
-	ssTid			int								// statistics timer identity
-	staticsStatus	map[PeerIdEx]int				// status about static nodes
+	wrkNum			map[SubNetworkID]int						// worker peer number
+	ibpNum			map[SubNetworkID]int						// active inbound peer number
+	obpNum			map[SubNetworkID]int						// active outbound peer number
+	ibpTotalNum		int											// total active inbound peer number
+	randoms			map[SubNetworkID][]*config.Node				// random nodes found by discover
+	indChan			chan interface{}							// indication signal
+	indCb			P2pIndCallback								// indication callback
+	indCbUserData	interface{}									// user data pointer for callback
+	ssTid			int											// statistics timer identity
+	staticsStatus	map[PeerIdEx]int							// status about static nodes
+
+	ocrTid			int											// OCR timestamp cleanup timer
+	tmLastOCR		map[SubNetworkID]map[PeerId]time.Time		// time of last outbound connect request for sub-netowerk
+																// and peer-identity
+	tmLastFNR		map[SubNetworkID]time.Time					// time of last find node request sent for sub network
 }
 
 func NewPeerMgr() *PeerManager {
@@ -184,6 +192,8 @@ func NewPeerMgr() *PeerManager {
 		indChan:		make(chan interface{}, maxIndicationQueueSize),
 		randoms:      	map[SubNetworkID][]*config.Node{},
 		staticsStatus:	map[PeerIdEx]int{},
+		tmLastFNR:		make(map[SubNetworkID]time.Time, 0),
+		tmLastOCR:		make(map[SubNetworkID]map[PeerId]time.Time, 0),
 	}
 	peMgr.tep = peMgr.peerMgrProc
 	return &peMgr
@@ -209,6 +219,8 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = peMgr.peMgrPoweroff(ptn)
 	case sch.EvPeTestStatTimer:
 		peMgr.logPeerStat()
+	case sch.EvPeOcrCleanupTimer:
+		peMgr.ocrTimestampCleanup()
 	case sch.EvPeMgrStartReq:
 		eno = peMgr.peMgrStartReq(msg.Body)
 	case sch.EvDcvFindNodeRsp:
@@ -400,8 +412,22 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
 
+	var tdOcr = sch.TimerDescription {
+		Name:	"_pocrTimer",
+		Utid:	sch.PeMinOcrCleanupTimerId,
+		Tmt:	sch.SchTmTypePeriod,
+		Dur:	minDuration4OutboundConnectReq,
+		Extra:	nil,
+	}
+	var eno sch.SchErrno
+	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
+	if eno != sch.SchEnoNone || peMgr.ssTid == sch.SchInvalidTid {
+		log.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
+		return PeMgrEnoScheduler
+	}
+
 	// set timer to debug print statistics about peer managers for test cases
-	var td = sch.TimerDescription {
+	var tdStat = sch.TimerDescription {
 		Name:	"_ptsTimer",
 		Utid:	sch.PeTestStatTimerId,
 		Tmt:	sch.SchTmTypePeriod,
@@ -413,8 +439,7 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 		peMgr.ssTid = sch.SchInvalidTid
 	}
 
-	var eno sch.SchErrno
-	eno, peMgr.ssTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td)
+	eno, peMgr.ssTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdStat)
 	if eno != sch.SchEnoNone || peMgr.ssTid == sch.SchInvalidTid {
 		log.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
@@ -685,6 +710,20 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	var ok = 0
 	maxOutbound := peMgr.cfg.subNetMaxOutbounds[*snid]
 	for _, n := range candidates {
+		if tmPeers, ok := peMgr.tmLastOCR[*snid]; ok {
+			if t, ok := tmPeers[n.ID]; ok {
+				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
+					continue
+				}
+			} else {
+				tmPeers[n.ID] = time.Now()
+			}
+		} else {
+			tmPeers := make(map[PeerId]time.Time, 0)
+			tmPeers[n.ID] = time.Now()
+			peMgr.tmLastOCR[*snid] = tmPeers
+		}
+
 		if eno := peMgr.peMgrCreateOutboundInst(snid, n); eno != PeMgrEnoNone {
 			failed++
 			continue
@@ -813,8 +852,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoDuplicated
 			}
-			idEx.Dir = PeInstDirOutbound
-			if peMgr.instStateCmpKill(inst, rsp.ptn, snid, rsp.peNode, idEx) == PeMgrEnoDuplicated {
+			if _, dup := peMgr.nodes[snid][idEx]; dup {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -839,8 +878,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoDuplicated
 			}
-			idEx.Dir = PeInstDirInbound
-			if peMgr.instStateCmpKill(inst, rsp.ptn, snid, rsp.peNode, idEx) == PeMgrEnoDuplicated {
+			if _, dup := peMgr.nodes[snid][idEx]; dup {
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -1057,11 +1096,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
 
-	_, file, line, _ := runtime.Caller(1)
-	log.Debug("peMgrKillInst: sdl: %s, task: %s, file: %s, line: %d",
-		peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn), file, line)
-
-
 	if sch.Debug__ {
 		log.Debug("peMgrKillInst: sdl: %s, task: %s",
 			peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
@@ -1134,6 +1168,14 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	var eno sch.SchErrno
 	var tid int
 
+	if t, ok := peMgr.tmLastFNR[*snid]; ok {
+		if time.Now().Sub(t) <= minDuration4FindNodeReq {
+			return PeMgrEnoNone
+		}
+	} else {
+		peMgr.tmLastFNR[*snid] = time.Now()
+	}
+
 	dur := durStaticRetryTimer
 	if *snid != peMgr.cfg.staticSubNetId {
 		dur = durDcvFindNodeTimer
@@ -1195,6 +1237,7 @@ func (peMgr *PeerManager)peMgrIndEnque(ind interface{}) PeMgrErrno {
 	if len(peMgr.indChan) >= cap(peMgr.indChan) {
 		panic("peMgrIndEnque: system overload")
 	}
+	log.Debug("peMgrIndEnque: sdl: %s", peMgr.sdl.SchGetP2pCfgName())
 	peMgr.indChan<-ind
 	return PeMgrEnoNone
 }
@@ -2105,59 +2148,6 @@ func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {
 
 func (peMgr *PeerManager) getWorkerInst(snid SubNetworkID, idEx *PeerIdEx) *peerInstance {
 	return peMgr.workers[snid][*idEx]
-}
-
-func (peMgr *PeerManager) instStateCmpKill(inst *peerInstance, ptn interface{}, snid SubNetworkID, node *config.Node, idEx PeerIdEx) PeMgrErrno {
-	if _, dup := peMgr.nodes[snid][idEx]; dup {
-		var ptn2Kill interface{} = nil
-		var node2Kill *config.Node = nil
-		var inst2Killed *peerInstance = nil
-		dupInst := peMgr.nodes[snid][idEx]
-		cmp := inst.state.compare(dupInst.state)
-		obKilled := false
-		if cmp < 0 {
-			ptn2Kill = ptn
-			inst2Killed = inst
-			node2Kill = node
-			obKilled = inst.dir == PeInstDirOutbound
-		} else if cmp > 0 {
-			ptn2Kill = dupInst.ptnMe
-			inst2Killed = dupInst
-			node2Kill = &dupInst.node
-			obKilled = dupInst.dir == PeInstDirOutbound
-		} else {
-			if rand.Int() & 0x01 == 0 {
-				ptn2Kill = ptn
-				inst2Killed = inst
-				node2Kill = node
-				obKilled = inst.dir == PeInstDirOutbound
-			} else {
-				ptn2Kill = dupInst.ptnMe
-				inst2Killed = dupInst
-				node2Kill = &dupInst.node
-				obKilled = dupInst.dir == PeInstDirOutbound
-			}
-		}
-
-		if sch.Debug__ {
-			log.Debug("instStateCmpKill: dir: %d, snid: %x, id: %x",
-				inst2Killed.dir, inst2Killed.snid, inst2Killed.node.ID)
-		}
-
-		_ = node2Kill
-		if obKilled {
-			peMgr.peMgrKillInst(ptn2Kill, node2Kill, PeInstDirOutbound)
-		} else {
-			peMgr.peMgrKillInst(ptn2Kill, node2Kill, PeInstDirInbound)
-		}
-		if obKilled {
-			var schMsg = sch.SchMessage{}
-			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
-			peMgr.sdl.SchSendMessage(&schMsg)
-		}
-		return PeMgrEnoDuplicated
-	}
-	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager)GetInstIndChannel() chan interface{} {

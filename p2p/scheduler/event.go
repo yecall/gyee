@@ -239,15 +239,19 @@ const (
 //
 // Peer connection establishment event
 //
-const PePingpongTimerId		= 0
-const PeDcvFindNodeTimerId	= 1
-const PeTestStatTimerId		= 2
+const (
+	PePingpongTimerId		= 0
+	PeDcvFindNodeTimerId	= 1
+	PeTestStatTimerId		= 2
+	PeMinOcrCleanupTimerId	= 3
+)
 
 const (
 	EvPeerEstBase			= 1800
 	EvPePingpongTimer		= EvTimerBase	+ PePingpongTimerId
 	EvPeDcvFindNodeTimer	= EvTimerBase	+ PeDcvFindNodeTimerId
 	EvPeTestStatTimer		= EvTimerBase	+ PeTestStatTimerId
+	EvPeOcrCleanupTimer		= EvTimerBase	+ PeMinOcrCleanupTimerId
 	EvPeConnOutReq			= EvPeerEstBase + 1
 	EvPeConnOutRsp			= EvPeerEstBase + 2
 	EvPeHandshakeReq		= EvPeerEstBase + 3
