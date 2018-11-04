@@ -121,6 +121,7 @@ type schTask struct {
 	goStatus	int								// in going or suspended
 	evHistory	[evHistorySize]schMessage		// event history
 	evhIndex	int								// event history index
+	evTotal		int64							// total event number
 	userData	interface{}						// data area pointer of user task
 }
 

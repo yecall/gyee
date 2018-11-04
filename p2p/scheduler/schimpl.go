@@ -852,8 +852,9 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 		panic(fmt.Sprintf("system overload, task: %s", task.name))
 	}
 
-	task.evhIndex = (task.evhIndex + 1) & (evHistorySize - 1)
+	task.evTotal += 1
 	task.evHistory[task.evhIndex] = msg
+	task.evhIndex = (task.evhIndex + 1) & (evHistorySize - 1)
 
 	*task.mailbox.que<-msg
 
@@ -1357,6 +1358,8 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	//
 
 	target := msg.recver.task
+	target.lock.Lock()
+	defer target.lock.Unlock()
 
 	if target.mailbox.que == nil {
 		log.Debug("schSendMsg: mailbox of target is empty, task: %s", target.name)
@@ -1368,8 +1371,9 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		panic(fmt.Sprintf("system overload, task: %s", target.name))
 	}
 
-	target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
+	target.evTotal += 1
 	target.evHistory[target.evhIndex] = *msg
+	target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
 
 	*target.mailbox.que<-*msg
 
