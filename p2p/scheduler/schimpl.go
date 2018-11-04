@@ -62,7 +62,7 @@ var rawTmTsk = schTaskNode {
 }
 
 //
-// Scheduler initilization
+// Scheduler initialization
 //
 func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 
@@ -1723,7 +1723,8 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 
 	var tkd  = schTaskDescription {
 		MbSize:	schMaxMbSize,
-		Wd:		&SchWatchDog {Cycle:SchDefaultDogCycle, DieThreshold:SchDefaultDogDieThresold},
+		// watch dog is not implemented, configuration about it is ignored.
+		Wd:		&SchWatchDog {HaveDog: false},
 		Flag:	SchCreatedGo,
 	}
 
@@ -1784,8 +1785,9 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 
 		//
 		// send poweron event to task created aboved if it is required to be shceduled
-		// at once; if the flag is SchCreatedSuspend, here JUST no poweron sending, BUT
-		// the routine is going! see aboved pls.
+		// at once; if the flag is SchCreatedSuspend, NO poweron sending, for this task
+		// routine is not sleeping on the mailbox, BUT those who had set SchCreatedGo
+		// do sleeping on their mailboxes.
 		//
 
 		if tsd[loop].Flag == SchCreatedGo {
@@ -1805,8 +1807,9 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	}
 
 	//
-	// send poweron event for those taskes registed in table "tpo" passed in
-	//
+	// send poweron event for those taskes registed in table "tpo" passed in, notice
+	// that, if one task had set the SchCreatedGo flag, it then should not be present
+	// in this "tpo" table, see above pls.
 
 	for _, name := range tpo {
 

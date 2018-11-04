@@ -24,7 +24,7 @@ package peer
 import (
 	"net"
 	"fmt"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
@@ -86,7 +86,7 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	lsnMgr.ptn = ptn
 	lsnMgr.sdl = sdl
-	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetTaskNodeByName(PeerMgrName); eno != sch.SchEnoNone {
+	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName); eno != sch.SchEnoNone {
 		return eno
 	}
 	if lsnMgr.ptnPeerMgr == nil {
@@ -212,7 +212,7 @@ func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMes
 		return sch.SchEnoInternal
 	}
 
-	_, accepter.ptnPeMgr = accepter.sdl.SchGetTaskNodeByName(PeerMgrName)
+	_, accepter.ptnPeMgr = accepter.sdl.SchGetTaskNodeByName(sch.PeerMgrName)
 	if accepter.ptnPeMgr == nil {
 		log.Debug("PeerAcceptProc: sdl: %s, invalid peer manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)

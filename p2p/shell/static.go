@@ -24,13 +24,13 @@ package shell
 import (
 	"time"
 	"fmt"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
-	peer	"github.com/yeeco/gyee/p2p/peer"
-	dht		"github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/dht"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -64,7 +64,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 			{Name: ngb.NgbMgrName,		Tep: ngb.NewNgbMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: peer.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
 	} else if what == config.P2P_TYPE_DHT {
@@ -88,7 +88,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 //
 // Poweron order of static user tasks for chain application.
 // Notice: there are some dependencies between the tasks, one should check them
-// to modify the this table if necessary.
+// to modify this table if necessary.
 //
 var taskStaticPoweronOrder4Chain = []string {
 	dcv.DcvMgrName,
@@ -96,19 +96,19 @@ var taskStaticPoweronOrder4Chain = []string {
 	ngb.LsnMgrName,
 	ngb.NgbMgrName,
 	tab.TabMgrName,
-	peer.PeerMgrName,
+	sch.PeerMgrName,
 	peer.PeerLsnMgrName,
 }
 
 //
 // Poweroff order of static user tasks for chain application.
 // Notice: there are some dependencies between the tasks, one should check them
-// to modify the this table if necessary.
+// to modify this table if necessary.
 //
 var taskStaticPoweroffOrder4Chain = []string {
 	dcv.DcvMgrName,
 	tab.NdbcName,
-	peer.PeerMgrName,
+	sch.PeerMgrName,
 	ngb.LsnMgrName,
 	ngb.NgbMgrName,
 	peer.PeerLsnMgrName,
@@ -118,7 +118,7 @@ var taskStaticPoweroffOrder4Chain = []string {
 //
 // Poweron order of static user tasks for dht application
 // Notice: there are some dependencies between the tasks, one should check them
-// to modify the this table if necessary.
+// to modify this table if necessary.
 //
 var taskStaticPoweronOrder4Dht = [] string {
 	dht.DhtMgrName,
@@ -133,7 +133,7 @@ var taskStaticPoweronOrder4Dht = [] string {
 //
 // Poweroff order of static user tasks for dht application
 // Notice: there are some dependencies between the tasks, one should check them
-// to modify the this table if necessary.
+// to modify this table if necessary.
 //
 var taskStaticPoweroffOrder4Dht = [] string {
 	dht.DhtMgrName,

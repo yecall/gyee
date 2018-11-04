@@ -27,7 +27,7 @@ import (
 	"math/rand"
 	"reflect"
 	ggio 	"github.com/gogo/protobuf/io"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
@@ -125,8 +125,6 @@ type peMgrConfig struct {
 	ibpNumTotal			int							// total number of concurrency inbound peers
 }
 
-// peer manager
-const PeerMgrName = sch.PeerMgrName
 type PeerIdEx struct {
 	Id				config.NodeID					// node identity
 	Dir				int								// direction
@@ -135,6 +133,7 @@ type PeerManager struct {
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// name
 	inited			chan PeMgrErrno					// result of initialization
+	isInited		bool							// is manager initialized ok
 	tep				sch.SchUserTaskEp				// entry
 	cfg				peMgrConfig						// configuration
 	tidFindNode		map[SubNetworkID]int			// find node timer identity
@@ -178,19 +177,19 @@ type PeerManager struct {
 
 func NewPeerMgr() *PeerManager {
 	var peMgr = PeerManager{
-		name:         	PeerMgrName,
-		inited:       	make(chan PeMgrErrno),
-		cfg:          	peMgrConfig{},
-		tidFindNode:  	map[SubNetworkID]int{},
-		peers:        	map[interface{}]*peerInstance{},
-		nodes:        	map[SubNetworkID]map[PeerIdEx]*peerInstance{},
-		workers:      	map[SubNetworkID]map[PeerIdEx]*peerInstance{},
-		wrkNum:       	map[SubNetworkID]int{},
-		ibpNum:       	map[SubNetworkID]int{},
-		obpNum:       	map[SubNetworkID]int{},
-		ibpTotalNum:	0,
-		indChan:		make(chan interface{}, maxIndicationQueueSize),
-		randoms:      	map[SubNetworkID][]*config.Node{},
+		name:        sch.PeerMgrName,
+		inited:      make(chan PeMgrErrno, 1),
+		cfg:         peMgrConfig{},
+		tidFindNode: map[SubNetworkID]int{},
+		peers:       map[interface{}]*peerInstance{},
+		nodes:       map[SubNetworkID]map[PeerIdEx]*peerInstance{},
+		workers:     map[SubNetworkID]map[PeerIdEx]*peerInstance{},
+		wrkNum:      map[SubNetworkID]int{},
+		ibpNum:      map[SubNetworkID]int{},
+		obpNum:      map[SubNetworkID]int{},
+		ibpTotalNum: 0,
+		indChan:     make(chan interface{}, maxIndicationQueueSize),
+		randoms:     map[SubNetworkID][]*config.Node{},
 		ssTid:			sch.SchInvalidTid,
 		staticsStatus:	map[PeerIdEx]int{},
 		ocrTid:			sch.SchInvalidTid,
@@ -209,6 +208,15 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 	if sch.Debug__ && peMgr.sdl != nil {
 		sdl := peMgr.sdl.SchGetP2pCfgName()
 		log.Debug("peerMgrProc: sdl: %s, name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
+	}
+
+	if !peMgr.isInited {
+		if msg.Id != sch.EvSchPoweron {
+			sdl := peMgr.sdl.SchGetP2pCfgName()
+			log.Debug("peerMgrProc: not be initialized, message discarded, "+
+				"sdl: %s, name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
+			return PeMgrEnoMismatched
+		}
 	}
 
 	var schEno = sch.SchEnoNone
@@ -360,6 +368,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	// tell initialization result, and EvPeMgrStartReq would be sent to us
 	// some moment later.
+	peMgr.isInited = true
 	peMgr.inited<-PeMgrEnoNone
 	return PeMgrEnoNone
 }
@@ -369,9 +378,9 @@ func (peMgr *PeerManager)PeMgrInited() PeMgrErrno {
 }
 
 func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
-	log.Debug("PeMgrStart: EvPeMgrStartReq will be sent, target: %s",
-		peMgr.sdl.SchGetTaskName(peMgr.ptnMe))
-	var msg = sch.SchMessage{}
+	log.Debug("PeMgrStart: EvPeMgrStartReq will be sent, sdl: %s, target: %s",
+		peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(peMgr.ptnMe))
+	msg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
 	peMgr.sdl.SchSendMessage(&msg)
 	return PeMgrEnoNone
@@ -409,11 +418,7 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	// drive ourself to startup outbound
-	time.Sleep(time.Microsecond * 100)
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
-	peMgr.sdl.SchSendMessage(&schMsg)
-
+	// setup outbound timestamp cleaner timer
 	var tdOcr = sch.TimerDescription {
 		Name:	"_pocrTimer",
 		Utid:	sch.PeMinOcrCleanupTimerId,
@@ -446,6 +451,11 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 		log.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
+
+	// drive ourself to startup outbound
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
+	peMgr.sdl.SchSendMessage(&schMsg)
+
 	return PeMgrEnoNone
 }
 
@@ -1210,7 +1220,7 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvFindNodeReq, &req)
 		peMgr.sdl.SchSendMessage(&schMsg)
-		timerName = PeerMgrName + "_DcvFindNode"
+		timerName = sch.PeerMgrName + "_DcvFindNode"
 
 		if sch.Debug__ {
 			log.Debug("peMgrAsk4More: "+
@@ -1225,7 +1235,7 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		}
 
 	} else {
-		timerName = PeerMgrName + "_static"
+		timerName = sch.PeerMgrName + "_static"
 	}
 
 	// set a ABS timer
@@ -1654,11 +1664,11 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 	var schEno sch.SchErrno
 	var tid int
 	var tmDesc = sch.TimerDescription {
-		Name:	PeerMgrName + "_PePingpong",
-		Utid:	sch.PePingpongTimerId,
-		Tmt:	sch.SchTmTypePeriod,
-		Dur:	PeInstPingpongCycle,
-		Extra:	nil,
+		Name:  sch.PeerMgrName + "_PePingpong",
+		Utid:  sch.PePingpongTimerId,
+		Tmt:   sch.SchTmTypePeriod,
+		Dur:   PeInstPingpongCycle,
+		Extra: nil,
 	}
 	if schEno, tid = inst.sdl.SchSetTimer(inst.ptnMe, &tmDesc);
 		schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
