@@ -75,7 +75,7 @@ const (
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-	durDcvFindNodeTimer = time.Second * 20			// duration to wait for find node response from discover task,
+	durDcvFindNodeTimer = time.Second * 4			// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 
 	durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
@@ -428,7 +428,7 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 	}
 	var eno sch.SchErrno
 	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
-	if eno != sch.SchEnoNone || peMgr.ssTid == sch.SchInvalidTid {
+	if eno != sch.SchEnoNone || peMgr.ocrTid == sch.SchInvalidTid {
 		log.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
@@ -452,7 +452,7 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 
-	// drive ourself to startup outbound
+	// drive ourselves to startup outbound
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
 
@@ -522,7 +522,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		appended[snid]++
 	}
 
-	// drive ourself to startup outbound for nodes appended
+	// drive ourselves to startup outbound for nodes appended
 	for snid := range appended {
 		var schMsg sch.SchMessage
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
@@ -704,7 +704,7 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		}
 	}
 
-	// If outbounds are not enougth, ask discoverer for more
+	// If outbounds are not enough, ask discoverer for more
 	if peMgr.obpNum[snid] < peMgr.cfg.staticMaxOutbounds {
 		if eno := peMgr.peMgrAsk4More(&snid); eno != PeMgrEnoNone {
 			return eno
@@ -760,7 +760,7 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 		}
 	}
 
-	// If outbounds are not enougth, ask discover to find more
+	// If outbounds are not enough, ask discover to find more
 	if peMgr.obpNum[*snid] < maxOutbound {
 		if eno := peMgr.peMgrAsk4More(snid); eno != PeMgrEnoNone {
 			return eno
@@ -784,7 +784,7 @@ func (peMgr *PeerManager)peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 				log.Debug("peMgrConnOutRsp: peMgrKillInst failed, eno: %d", eno)
 				return eno
 			}
-			// drive ourself to startup outbound
+			// drive ourselves to startup outbound
 			var schMsg = sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &rsp.snid)
 			peMgr.sdl.SchSendMessage(&schMsg)

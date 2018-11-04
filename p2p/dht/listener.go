@@ -307,7 +307,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 
 	//
 	// we might be block for a duration lmAcceptTimeout, but we also provide
-	// interface to force ourself to get out from accept action, see function
+	// interface to force ourselves to get out from accept action, see function
 	// ForceAcceptOut.
 	//
 

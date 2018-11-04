@@ -1535,7 +1535,7 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	var instNum int
 	if instNum = len(p2pInstList); instNum <= minInstNum {
 		log.Debug("dhtTestBuildConnMatrix: " +
-			"instance not enougth, instNum: %d, should more than: %d",
+			"instance not enough, instNum: %d, should more than: %d",
 			instNum, minInstNum)
 		return nil
 	}
