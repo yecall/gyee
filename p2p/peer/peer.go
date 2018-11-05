@@ -955,6 +955,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	i := P2pIndPeerActivatedPara {
+		PeMgr: peMgr,
 		Ptn: inst.ptnMe,
 		RxChan: inst.rxChan,
 		PeerInfo: & Handshake {
@@ -1643,7 +1644,7 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 			inst.txChan = nil
 		}
 		inst.rxDone <- PeMgrEnoNone
-		<-inst.rxChan
+		<-inst.rxDone
 		inst.txDone <- PeMgrEnoNone
 		<-inst.txDone
 		if inst.rxChan != nil {
@@ -1906,10 +1907,12 @@ func piTx(inst *peerInstance) PeMgrErrno {
 	// would then exit.
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var done PeMgrErrno = PeMgrEnoNone
-	var ok = true
+	var ok bool
+	var upkg *P2pPackage
 
 txBreak:
 	for {
+
 		// check if we are done
 chkDone:
 		select {
@@ -1923,16 +1926,24 @@ chkDone:
 			break txBreak
 		default:
 		}
+
 		// if errors, we wait and then continue
 		if inst.txEno != PeMgrEnoNone {
-			time.Sleep(time.Microsecond * 100)
-			continue
-		}
-		// check if some pending, if the signal closed, we check if it's done
-		upkg, ok := <-(inst.txChan)
-		if !ok {
 			goto chkDone
 		}
+
+		// check if some pending, if the signal closed, we check if it's done
+chkPending:
+		select {
+		case upkg, ok = <-(inst.txChan):
+			if !ok {
+				goto chkDone
+			}
+			break chkPending
+		default:
+			continue
+		}
+
 		inst.txPendNum -= 1
 		// carry out Tx
 		if eno := upkg.SendPackage(inst); eno != PeMgrEnoNone {
@@ -2280,3 +2291,9 @@ func (peMgr *PeerManager)logPeerStat() {
 }
 
 
+//
+// debug only
+//
+func (peMgr *PeerManager)GetWorkers() map[SubNetworkID]map[PeerIdEx]*peerInstance {
+	return peMgr.workers
+}

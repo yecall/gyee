@@ -67,6 +67,7 @@ const (
 )
 
 type P2pIndPeerActivatedPara struct {
+	PeMgr		*PeerManager		// peer manager pointer
 	Ptn			interface{}			// task node pointer
 	RxChan		chan *P2pPackageRx	// channel for packages received
 	PeerInfo	*Handshake			// handshake info
