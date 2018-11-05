@@ -410,6 +410,10 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
+
+	sdl := peMgr.sdl.SchGetP2pCfgName()
+	log.Debug("peMgrStartReq: sdl: %s, task: %s", sdl, peMgr.name)
+
 	var schMsg = sch.SchMessage{}
 
 	// start peer listener if necessary
@@ -572,9 +576,9 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.dir			= PeInstDirInbound
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.txDone		= make(chan PeMgrErrno, 1)
+	peInst.txDone		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
-	peInst.rxDone		= make(chan PeMgrErrno, 1)
+	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
 
 	// Create peer instance task
@@ -1086,9 +1090,9 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.node			= *node
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.txDone		= make(chan PeMgrErrno, 1)
+	peInst.txDone		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
-	peInst.rxDone		= make(chan PeMgrErrno, 1)
+	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
 
 	peMgr.obInstSeq++
@@ -1461,10 +1465,12 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 
 		if inst.txDone != nil {
 			inst.txDone <- PeMgrEnoNone
+			<-inst.txDone
 		}
 
 		if inst.rxDone != nil {
 			inst.rxDone <- PeMgrEnoNone
+			<-inst.rxDone
 		}
 
 		if inst.rxChan != nil {
@@ -1637,7 +1643,9 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 			inst.txChan = nil
 		}
 		inst.rxDone <- PeMgrEnoNone
+		<-inst.rxChan
 		inst.txDone <- PeMgrEnoNone
+		<-inst.txDone
 		if inst.rxChan != nil {
 			close(inst.rxChan)
 			inst.rxChan = nil

@@ -936,8 +936,10 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 
 	if nodes = mgr.tabClosest(Closest4Querying, target, TabInstQPendingMax); len(nodes) == 0 {
 
-		log.Debug("tabRefresh: seems all buckets are empty, " +
-			"set local as target and try seeds from database and bootstrap nodes ...")
+		sdl := tabMgr.sdl.SchGetP2pCfgName()
+		log.Debug("tabRefresh: sdl: %s, snid: %x, seems all buckets are empty, " +
+			"set local as target and try seeds from database and bootstrap nodes ...",
+			sdl, *snid)
 
 		target = NodeID(mgr.cfg.local.ID)
 		seeds := mgr.tabSeedsFromDb(TabInstQPendingMax, seedMaxAge)
