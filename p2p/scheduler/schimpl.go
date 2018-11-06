@@ -848,7 +848,7 @@ func (sdl *scheduler)schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 	}
 
 	if len(*task.mailbox.que) + mbReserved >= cap(*task.mailbox.que) {
-		log.Debug("schSendTimerEvent: mailbox of target is full, task: %s", task.name)
+		log.Debug("schSendTimerEvent: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name)
 		panic(fmt.Sprintf("system overload, task: %s", task.name))
 	}
 
@@ -1362,12 +1362,12 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	defer target.lock.Unlock()
 
 	if target.mailbox.que == nil {
-		log.Debug("schSendMsg: mailbox of target is empty, task: %s", target.name)
+		log.Debug("schSendMsg: mailbox of target is empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
 		panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
 	}
 
 	if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
-		log.Debug("schSendMsg: mailbox of target is full, task: %s", target.name)
+		log.Debug("schSendMsg: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
 		panic(fmt.Sprintf("system overload, task: %s", target.name))
 	}
 

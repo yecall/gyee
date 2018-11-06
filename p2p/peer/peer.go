@@ -918,8 +918,14 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	var schMsg = sch.SchMessage{}
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, nil)
+	cfmCh := make(chan int)
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, &cfmCh)
 	peMgr.sdl.SchSendMessage(&schMsg)
+	if eno, ok := <-cfmCh; eno != PeMgrEnoNone || !ok {
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		return PeMgrErrno(eno)
+	}
+
 	inst.state = peInstStateActivated
 	peMgr.wrkNum[snid]++
 	if inst.dir == PeInstDirInbound  &&
@@ -1331,6 +1337,9 @@ type peerInstance struct {
 	rxChan		chan *P2pPackageRx			// rx pending channel
 	txChan		chan *P2pPackage			// tx pending channel
 	txPendNum	int							// tx pending number
+	txSeq		int64						// statistics sequence number
+	txOkCnt		int64						// tx ok counter
+	txFailedCnt	int64						// tx failed counter
 	rxDone		chan PeMgrErrno				// RX chan
 	rxtxRuning	bool						// indicating that rx and tx routines are running
 	ppSeq		uint64						// pingpong sequence no.
@@ -1654,7 +1663,8 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
+func (inst *peerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
+	cfmCh := *msg.(*chan int)
 	sdl := inst.sdl.SchGetP2pCfgName()
 	var schEno sch.SchErrno
 	var tid int
@@ -1669,6 +1679,7 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 		schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 		log.Debug("piEstablishedInd: SchSetTimer failed, sdl: %s, inst: %s, eno: %d",
 			sdl, inst.name, schEno)
+		cfmCh<-PeMgrEnoScheduler
 		return PeMgrEnoScheduler
 	}
 	inst.ppTid = tid
@@ -1688,13 +1699,14 @@ func (inst *peerInstance)piEstablishedInd( msg interface{}) PeMgrErrno {
 		}
 		inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 		inst.sdl.SchSendMessage(&msg)
+		cfmCh<-PeMgrEnoOs
 		return PeMgrEnoOs
 	}
 
 	go piTx(inst)
 	go piRx(inst)
 	inst.rxtxRuning = true
-
+	cfmCh<-PeMgrEnoNone
 	return PeMgrEnoNone
 }
 
@@ -1891,6 +1903,8 @@ func piTx(inst *peerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
 	// would then exit for "txChan" closed.
+	sdl := inst.sdl.SchGetP2pCfgName()
+
 txLoop:
 	for {
 		upkg, ok := <-(inst.txChan)
@@ -1898,13 +1912,17 @@ txLoop:
 			break txLoop
 		}
 		inst.txPendNum -= 1
+		inst.txSeq += 1
 		// carry out Tx
-		if eno := upkg.SendPackage(inst); eno != PeMgrEnoNone {
+		if eno := upkg.SendPackage(inst); eno == PeMgrEnoNone {
+			inst.txOkCnt += 1
+		} else {
 			// 1) if failed, callback to the user, so he can close this peer seems in troubles,
 			// we will be done then.
 			// 2) it is possible that, while we are blocked here in writing and the connection
 			// is closed for some reasons(for example the user close the peer), in this case,
 			// we would get an error.
+			inst.txFailedCnt += 1
 			inst.txEno = eno
 			hs := Handshake {
 				Snid:		inst.snid,
@@ -1934,6 +1952,14 @@ txLoop:
 			msg := sch.SchMessage{}
 			inst.sdl.SchMakeMessage(&msg, inst.ptnMe, inst.ptnMgr, sch.EvPeCloseReq, &req)
 			inst.sdl.SchSendMessage(&msg)
+
+			log.Debug("piTx: failed, EvPeCloseReq sent. sdl: %s, snid: %x, dir: %d, peer: %x",
+				sdl, inst.snid, inst.dir, inst.node.ID)
+		}
+
+		if inst.txSeq & 0x0f == 0 {
+			log.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. sdl: %s, snid: %x, dir: %d, peer: %x",
+				inst.txSeq, inst.txOkCnt, inst.txFailedCnt, sdl, inst.snid, inst.dir, inst.node.ID)
 		}
 	}
 	return PeMgrEnoNone

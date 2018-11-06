@@ -309,7 +309,6 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 	}
 
 	var tmHandler = func() {
-		tcb.txSeq++
 		if dataTxApply {
 			for id := range peerList {
 				setupPkg(&id)
@@ -319,6 +318,13 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 						fmt.Sprintf("%x", id.subNetId),
 						fmt.Sprintf("%x", id.nodeId))
 				}
+				tcb.txSeq++
+			}
+			if tcb.txSeq & 0x0f == 0 {
+				log.Debug("txrxProc: txSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
+					tcb.rxSeq, sdl, tcb.peerId.dir,
+					fmt.Sprintf("%x", tcb.peerId.subNetId),
+					fmt.Sprintf("%x", tcb.peerId.nodeId))
 			}
 		}
 	}
@@ -1114,7 +1120,7 @@ func testCase5(tc *testCase) {
 
 	log.Debug("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
 	var bootstrapId = ""
