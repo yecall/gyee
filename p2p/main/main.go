@@ -412,13 +412,6 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 		}
 		tcbList := cud.tcbList
 		if _, dup := tcbList[idEx]; dup {
-
-
-			workers := pap.PeMgr.GetWorkers()
-			wrkNum := len(workers)
-			wrkNum = wrkNum
-
-
 			log.Debug("p2pIndProc: duplicated, sdl: %s, dir: %d, snid: %x, peer: %x",
 				sdl, dir, snid, peerId)
 			return nil

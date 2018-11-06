@@ -576,7 +576,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.dir			= PeInstDirInbound
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.txDone		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
@@ -1091,7 +1090,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.node			= *node
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.txDone		= make(chan PeMgrErrno)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
@@ -1333,7 +1331,6 @@ type peerInstance struct {
 	rxChan		chan *P2pPackageRx			// rx pending channel
 	txChan		chan *P2pPackage			// tx pending channel
 	txPendNum	int							// tx pending number
-	txDone		chan PeMgrErrno				// TX chan
 	rxDone		chan PeMgrErrno				// RX chan
 	rxtxRuning	bool						// indicating that rx and tx routines are running
 	ppSeq		uint64						// pingpong sequence no.
@@ -1461,12 +1458,6 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	if inst.rxtxRuning {
 		if inst.txChan != nil {
 			close(inst.txChan)
-			inst.txChan = nil
-		}
-
-		if inst.txDone != nil {
-			inst.txDone <- PeMgrEnoNone
-			<-inst.txDone
 		}
 
 		if inst.rxDone != nil {
@@ -1476,7 +1467,6 @@ func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 
 		if inst.rxChan != nil {
 			close(inst.rxChan)
-			inst.rxChan = nil
 		}
 	}
 
@@ -1641,15 +1631,11 @@ func (inst *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	if inst.rxtxRuning {
 		if inst.txChan != nil {
 			close(inst.txChan)
-			inst.txChan = nil
 		}
 		inst.rxDone <- PeMgrEnoNone
 		<-inst.rxDone
-		inst.txDone <- PeMgrEnoNone
-		<-inst.txDone
 		if inst.rxChan != nil {
 			close(inst.rxChan)
-			inst.rxChan = nil
 		}
 		inst.rxtxRuning = false
 	}
@@ -1904,46 +1890,13 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 func piTx(inst *peerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
-	// would then exit.
-	sdl := inst.sdl.SchGetP2pCfgName()
-	var done PeMgrErrno = PeMgrEnoNone
-	var ok bool
-	var upkg *P2pPackage
-
-txBreak:
+	// would then exit for "txChan" closed.
+txLoop:
 	for {
-
-		// check if we are done
-chkDone:
-		select {
-		case done, ok = <-inst.txDone:
-			if sch.Debug__ {
-				log.Debug("piTx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
-			}
-			if ok {
-				close(inst.txDone)
-			}
-			break txBreak
-		default:
+		upkg, ok := <-(inst.txChan)
+		if !ok {
+			break txLoop
 		}
-
-		// if errors, we wait and then continue
-		if inst.txEno != PeMgrEnoNone {
-			goto chkDone
-		}
-
-		// check if some pending, if the signal closed, we check if it's done
-chkPending:
-		select {
-		case upkg, ok = <-(inst.txChan):
-			if !ok {
-				goto chkDone
-			}
-			break chkPending
-		default:
-			continue
-		}
-
 		inst.txPendNum -= 1
 		// carry out Tx
 		if eno := upkg.SendPackage(inst); eno != PeMgrEnoNone {
@@ -1983,7 +1936,7 @@ chkPending:
 			inst.sdl.SchSendMessage(&msg)
 		}
 	}
-	return done
+	return PeMgrEnoNone
 }
 
 func piRx(inst *peerInstance) PeMgrErrno {
@@ -1996,7 +1949,7 @@ func piRx(inst *peerInstance) PeMgrErrno {
 	var peerInfo = PeerInfo{}
 	var pkgCb = P2pPackageRx{}
 
-rxBreak:
+rxLoop:
 	for {
 		// check if we are done
 		select {
@@ -2007,7 +1960,7 @@ rxBreak:
 			if ok {
 				close(inst.rxDone)
 			}
-			break rxBreak
+			break rxLoop
 		default:
 		}
 		// try reading the peer
@@ -2060,8 +2013,8 @@ rxBreak:
 			inst.sdl.SchSendMessage(&msg)
 		} else if upkg.Pid == uint32(PID_EXT) {
 			if len(inst.rxChan) >= cap(inst.rxChan) {
-				log.Debug("piRx: rx queue full, sdl: %s, dir: %d, inst: %s, peer: %x",
-					sdl, inst.dir, inst.name, inst.node.ID)
+				log.Debug("piRx: rx queue full, sdl: %s, snid: %x, dir: %d, inst: %s, peer: %x",
+					sdl, inst.snid, inst.dir, inst.name, inst.node.ID)
 			} else {
 				peerInfo.Protocols = nil
 				peerInfo.Snid = inst.snid

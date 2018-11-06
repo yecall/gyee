@@ -25,9 +25,9 @@ import (
 	"time"
 	"strings"
 	"runtime"
+	"fmt"
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"fmt"
 )
 
 //
@@ -1357,7 +1357,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	// should remove the pointer(if then have)to a task will be done.
 	//
 
-	target := msg.recver.task
+	target := &msg.recver.task
 	target.lock.Lock()
 	defer target.lock.Unlock()
 
