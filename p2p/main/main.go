@@ -72,12 +72,8 @@ type peerIdEx struct {
 // test statistics
 //
 type testCaseCtrlBlock struct {
-	lock		sync.Mutex							// lock to sync action on tcbList
-	tcbList		map[peerIdEx]*testCaseCtrlBlock		// test case control block list
 	peerId		peerIdEx							// peer extend identity
 	done 		chan bool							// done channel
-	peerActInd	chan interface{}					// indication channel for peer activation
-	peerClsInd	chan interface{}					// indication channel for peer closed
 	txSeq		int64								// tx sequence number
 	rxSeq		int64								// rx sequence number
 	killing		bool								// is currently in killing
@@ -168,14 +164,11 @@ const (
 
 func newTcb(name string, idEx peerIdEx, tcbList map[peerIdEx]*testCaseCtrlBlock, lock sync.Mutex) *testCaseCtrlBlock {
 	tcb := testCaseCtrlBlock {
-		lock: lock,
-		tcbList: tcbList,
 		peerId: idEx,
 		done: make(chan bool),
-		peerActInd: make(chan interface{}, 128),
-		peerClsInd: make(chan interface{}, 128),
-		txSeq:	0,
-		rxSeq:	0,
+		txSeq: 0,
+		rxSeq: 0,
+		killing: false,
 	}
 	switch name {
 	case "testCase0":
@@ -191,35 +184,6 @@ func newTcb(name string, idEx peerIdEx, tcbList map[peerIdEx]*testCaseCtrlBlock,
 		return nil
 	}
 	return &tcb
-}
-
-func injectActPeer(tcbList map[peerIdEx]*testCaseCtrlBlock, acter *peerIdEx, lock sync.Mutex) {
-	lock.Lock()
-	defer lock.Unlock()
-	for id, tcb := range tcbList {
-		if id == *acter {
-			log.Debug("injectActPeer: duplicated")
-		}
-		tcb.peerActInd<-acter
-	}
-}
-
-func injectActPeers2Tcb(tcbList map[peerIdEx]*testCaseCtrlBlock, target *testCaseCtrlBlock, lock sync.Mutex) {
-	lock.Lock()
-	defer lock.Unlock()
-	for id, _ := range tcbList {
-		target.peerActInd<-&id
-	}
-}
-
-func injectClsPeer(tcbList map[peerIdEx]*testCaseCtrlBlock, clser *peerIdEx, lock sync.Mutex) {
-	lock.Lock()
-	defer lock.Unlock()
-	for id, tcb := range tcbList {
-		if id != *clser {
-			tcb.peerClsInd<-clser
-		}
-	}
 }
 
 var dataTxApply = true
@@ -293,7 +257,6 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 		Payload:		make([]byte, 0, 512),
 		Extra:			nil,
 	}
-	var peerList = make(map[peerIdEx]interface{}, 0)
 
 	var setupPkg = func(id *peerIdEx) {
 		txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
@@ -310,26 +273,24 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 
 	var tmHandler = func() {
 		if dataTxApply {
-			for id := range peerList {
-				setupPkg(&id)
-				if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
-					log.Debug("txrxProc: P2pSendPackage failed, eno: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
-						eno, sdl, id.dir,
-						fmt.Sprintf("%x", id.subNetId),
-						fmt.Sprintf("%x", id.nodeId))
-				}
-				tcb.txSeq++
+			id := &tcb.peerId
+			setupPkg(id)
+			if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
+				log.Debug("txrxProc: P2pSendPackage failed, eno: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
+					eno, sdl, id.dir,
+					fmt.Sprintf("%x", id.subNetId),
+					fmt.Sprintf("%x", id.nodeId))
 			}
-			if tcb.txSeq & 0x0f == 0 {
+			if tcb.txSeq++; tcb.txSeq & 0x0f == 0 {
 				log.Debug("txrxProc: txSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
-					tcb.rxSeq, sdl, tcb.peerId.dir,
-					fmt.Sprintf("%x", tcb.peerId.subNetId),
-					fmt.Sprintf("%x", tcb.peerId.nodeId))
+					tcb.rxSeq, sdl, id.dir,
+					fmt.Sprintf("%x", id.subNetId),
+					fmt.Sprintf("%x", id.nodeId))
 			}
 		}
 	}
 
-	tm := time.NewTicker(time.Second * 1)
+	tm := time.NewTicker(time.Millisecond * 1000)
 	defer tm.Stop()
 
 	doneOk := false
@@ -339,14 +300,6 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 txrxLoop:
 	for {
 		select {
-		case ind := <-tcb.peerActInd:
-			if peerActivated, ok := ind.(*peerIdEx); ok {
-				peerList[*peerActivated] = nil
-			}
-		case ind := <-tcb.peerClsInd:
-			if peerClosed, ok := ind.(*peerIdEx); ok {
-				delete(peerList, *peerClosed)
-			}
 		case _, doneOk = <-tcb.done:
 			log.Debug("txrxProc: it's done, sdl: %s, dir: %d, subnet: %s, id: %s",
 				sdl, tcb.peerId.dir,
@@ -423,9 +376,7 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 			return nil
 		}
 
-		injectActPeer(tcbList, &idEx, cud.lock)
 		tcb := newTcb(tgtCase, idEx, tcbList, cud.lock)
-		injectActPeers2Tcb(tcbList, tcb, cud.lock)
 		tcbList[idEx] = tcb
 
 		log.Debug("p2pIndProc: start tx/rx, sdl: %s, dir: %d, snid: %x, peer: %x",
@@ -451,7 +402,6 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 			return nil
 		}
 		tcbList := cud.tcbList
-		injectClsPeer(tcbList, &idEx, cud.lock)
 
 		tcbListsLock.Lock()
 		need2Kill := false
