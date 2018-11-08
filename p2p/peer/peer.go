@@ -245,7 +245,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 	case sch.EvPePingpongRsp:
 		eno = peMgr.peMgrPingpongRsp(msg.Body)
 	case sch.EvPeCloseReq:
-		eno = peMgr.peMgrCloseReq(msg.Body)
+		eno = peMgr.peMgrCloseReq(msg)
 	case sch.EvPeCloseCfm:
 		eno = peMgr.peMgrConnCloseCfm(msg.Body)
 	case sch.EvPeCloseInd:
@@ -974,23 +974,49 @@ func (peMgr *PeerManager)peMgrPingpongRsp(msg interface{}) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
-	var req = msg.(*sch.MsgPeCloseReq)
+func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
+	// here it's asked to close a peer instance, this might happen in following cases:
+	// 1) the shell task ask to do this;
+	// 2) a peer instance gone into bad status so it asks to be closed;
+	// 3) function ClosePeer called from outside modules
+	// with 2), if shell task is present, we should not send EvPeCloseReq to peer instance
+	// since the shell might access to the peer (we had tell it with EvShellPeerActiveInd),
+	// instead we should inform the shell task, so it should send us EvPeCloseReq, and then
+	// we can send EvPeCloseReq to the peer instance.
+	var schMsg = sch.SchMessage{}
+	var req = msg.Body.(*sch.MsgPeCloseReq)
 	var snid = req.Snid
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
+
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {
 		return PeMgrEnoNotfound
 	}
+
 	if inst.state == peInstStateKilling {
 		return PeMgrEnoDuplicated
 	}
+
+	if ptnSender := peMgr.sdl.SchGetSender(msg); ptnSender != peMgr.ptnShell {
+		if req.Ptn != nil {
+			ind := sch.MsgShellPeerAskToCloseInd {
+				Snid: snid,
+				PeerId: idEx.Id,
+				Dir: idEx.Dir,
+				Why: req.Why,
+			}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
+			peMgr.sdl.SchSendMessage(&schMsg)
+			return PeMgrEnoNone
+		}
+	}
+
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
-	schMsg := sch.SchMessage{}
 	req.Node = inst.node
 	req.Ptn = inst.ptnMe
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
 	peMgr.sdl.SchSendMessage(&schMsg)
+
 	return PeMgrEnoNone
 }
 
@@ -1620,6 +1646,9 @@ func (inst *peerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 				ProtoNum:  inst.protoNum,
 				Protocols: inst.protocols,
 			},
+			Status		:	int(eno),
+			Flag		:	false,
+			Description	:	"piPingpongReq: failed",
 		}
 		req := sch.MsgPeCloseReq {
 			Ptn: inst.ptnMe,
@@ -1732,7 +1761,7 @@ func (inst *peerInstance)piPingpongTimerHandler() PeMgrErrno {
 				Protocols:	inst.protocols,
 			},
 			Status		:	PeMgrEnoPingpongTh,
-			Flag		:	true,
+			Flag		:	false,
 			Description	:	"piPingpongTimerHandler: threshold reached",
 		}
 		req := sch.MsgPeCloseReq {

@@ -74,10 +74,11 @@ const EvTimerBase = 1000
 // Shell manager event
 //
 const (
-	EvShellBase 			= 1100
-	EvShellPeerActiveInd	= EvShellBase + 1
-	EvShellPeerCloseCfm		= EvShellBase + 2
-	EvShellPeerCloseInd		= EvShellBase + 3
+	EvShellBase 				= 1100
+	EvShellPeerActiveInd		= EvShellBase + 1
+	EvShellPeerCloseCfm			= EvShellBase + 2
+	EvShellPeerCloseInd			= EvShellBase + 3
+	EvShellPeerAskToCloseInd	= EvShellBase + 4
 )
 
 //
@@ -107,6 +108,16 @@ type MsgShellPeerCloseInd struct {
 	Dir		int						// direction
 	Snid	config.SubNetworkID		// sub network identity
 	PeerId 	config.NodeID			// target node
+}
+
+//
+// EvShellPeerAskToCloseInd
+//
+type MsgShellPeerAskToCloseInd struct {
+	Snid	config.SubNetworkID		// sub network identity
+	PeerId 	config.NodeID			// target node
+	Dir		int						// direction
+	Why		interface{}				// tell why it's closed
 }
 
 //

@@ -33,7 +33,6 @@ type ShellManager struct {
 	tep			sch.SchUserTaskEp	// task entry
 	ptnMe		interface{}			// pointer to task node of myself
 	ptnPeMgr	interface{}			// pointer to task node of peer manager
-	ptnDhtMgr	interface{}			// pointer to task node dht manager
 }
 
 //
@@ -70,6 +69,8 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = shMgr.peerCloseCfm(msg.Body.(*sch.MsgShellPeerCloseCfm))
 	case sch.EvShellPeerCloseInd:
 		eno = shMgr.peerCloseInd(msg.Body.(*sch.MsgShellPeerCloseInd))
+	case sch.EvShellPeerAskToCloseInd:
+		eno = shMgr.peerAskToCloseInd(msg.Body.(*sch.MsgShellPeerAskToCloseInd))
 	default:
 		log.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -96,3 +97,8 @@ func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
 	return sch.SchEnoNone
 }
+
+func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
