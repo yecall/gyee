@@ -67,8 +67,7 @@ const (
 )
 
 type P2pIndPeerActivatedPara struct {
-	PeMgr		*PeerManager		// peer manager pointer
-	Ptn			interface{}			// task node pointer
+	P2pInst		*sch.Scheduler		// p2p instance pointer
 	RxChan		chan *P2pPackageRx	// channel for packages received
 	PeerInfo	*Handshake			// handshake info
 }
@@ -91,9 +90,7 @@ type P2pIndConnStatusPara struct {
 }
 
 type P2pIndPeerClosedPara struct {
-	Ptn			interface{}			// task node pointer, notice: it points to the peer manager
-									// task node than peer instance, since the instance had been
-									// closed.
+	P2pInst		*sch.Scheduler		// p2p instance pointer
 	Snid		SubNetworkID		// sub network identity
 	PeerId		PeerId				// peer identity
 	Dir			int					// direction

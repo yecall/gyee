@@ -398,7 +398,7 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 	switch what {
 	case shell.P2pIndPeerActivated:
 		pap := para.(*peer.P2pIndPeerActivatedPara)
-		p2pInst := sch.SchGetScheduler(pap.Ptn)
+		p2pInst := pap.P2pInst
 		sdl := p2pInst.SchGetP2pCfgName()
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
@@ -435,7 +435,7 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 
 	case shell.P2pIndPeerClosed:
 		pcp := para.(*peer.P2pIndPeerClosedPara)
-		p2pInst := sch.SchGetScheduler(pcp.Ptn)
+		p2pInst := pcp.P2pInst
 		sdl := p2pInst.SchGetP2pCfgName()
 
 		idEx := peerIdEx {

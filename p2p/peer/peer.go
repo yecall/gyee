@@ -166,7 +166,6 @@ type PeerManager struct {
 	indChan			chan interface{}							// indication signal
 	indCb			P2pIndCallback								// indication callback
 	indCbUserData	interface{}									// user data pointer for callback
-	ssTid			int											// statistics timer identity
 	staticsStatus	map[PeerIdEx]int							// status about static nodes
 
 	ocrTid			int											// OCR timestamp cleanup timer
@@ -190,7 +189,6 @@ func NewPeerMgr() *PeerManager {
 		ibpTotalNum: 0,
 		indChan:     make(chan interface{}, maxIndicationQueueSize),
 		randoms:     map[SubNetworkID][]*config.Node{},
-		ssTid:			sch.SchInvalidTid,
 		staticsStatus:	map[PeerIdEx]int{},
 		ocrTid:			sch.SchInvalidTid,
 		tmLastOCR:		make(map[SubNetworkID]map[PeerId]time.Time, 0),
@@ -430,25 +428,6 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 	var eno sch.SchErrno
 	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
 	if eno != sch.SchEnoNone || peMgr.ocrTid == sch.SchInvalidTid {
-		log.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
-		return PeMgrEnoScheduler
-	}
-
-	// set timer to debug print statistics about peer managers for test cases
-	var tdStat = sch.TimerDescription {
-		Name:	"_ptsTimer",
-		Utid:	sch.PeTestStatTimerId,
-		Tmt:	sch.SchTmTypePeriod,
-		Dur:	time.Second * 2,
-		Extra:	nil,
-	}
-	if peMgr.ssTid != sch.SchInvalidTid {
-		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.ssTid)
-		peMgr.ssTid = sch.SchInvalidTid
-	}
-
-	eno, peMgr.ssTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdStat)
-	if eno != sch.SchEnoNone || peMgr.ssTid == sch.SchInvalidTid {
 		log.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
@@ -957,8 +936,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	i := P2pIndPeerActivatedPara {
-		PeMgr: peMgr,
-		Ptn: inst.ptnMe,
+		P2pInst: peMgr.sdl,
 		RxChan: inst.rxChan,
 		PeerInfo: & Handshake {
 			Snid:		inst.snid,
@@ -1010,7 +988,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 	i := P2pIndPeerClosedPara {
-		Ptn:		peMgr.ptnMe,
+		P2pInst:	peMgr.sdl,
 		Snid:		ind.snid,
 		PeerId:		ind.peNode.ID,
 		Dir:		ind.dir,
@@ -1029,7 +1007,7 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 	i := P2pIndPeerClosedPara {
-		Ptn:		peMgr.ptnMe,
+		P2pInst:	peMgr.sdl,
 		Snid:		ind.snid,
 		PeerId:		ind.peNode.ID,
 		Dir:		ind.dir,

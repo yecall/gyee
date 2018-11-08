@@ -222,7 +222,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 //
 // Stop p2p instance
 //
-func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
+func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
 	//
 	// Set power off stage first, and after that, we send poweroff message
@@ -333,7 +333,7 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 			p2pInstName, seconds, tasks, strNames)
 	}
 
-	c<-true
+	ch<-true
 
 	return sch.SchEnoNone
 }
