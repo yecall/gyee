@@ -77,7 +77,6 @@ func (eno P2pErrno) Error() string {
 //
 // Register user callback function to p2p
 //
-
 const (
 	P2pIndCb = peer.P2pIndCb	// callback type for indication
 	P2pPkgCb = peer.P2pPkgCb	// callback type for incoming packages
@@ -107,7 +106,7 @@ func P2pRegisterCallback(what int, cb interface{}, userData interface{}, target 
 }
 
 //
-// Send message to peer
+// Send package to peer
 //
 func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 	if eno := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
@@ -119,7 +118,7 @@ func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 }
 
 //
-// Disconnect peer
+// Close peer
 //
 func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) P2pErrno {
 	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)

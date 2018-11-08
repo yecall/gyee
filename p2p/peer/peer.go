@@ -227,8 +227,6 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = peMgr.peMgrPoweron(ptn)
 	case sch.EvSchPoweroff:
 		eno = peMgr.peMgrPoweroff(ptn)
-	case sch.EvPeTestStatTimer:
-		peMgr.logPeerStat()
 	case sch.EvPeOcrCleanupTimer:
 		peMgr.ocrTimestampCleanup()
 	case sch.EvPeMgrStartReq:
@@ -397,7 +395,6 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	}
 	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
-		SetP2pkgCallback(nil, peerInst.ptnMe)
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
 		peMgr.sdl.SchSendMessage(&powerOff)
 	}
@@ -1845,10 +1842,6 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func SetP2pkgCallback(cb interface{}, ptn interface{}) PeMgrErrno {
-	return PeMgrEnoNone
-}
-
 func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 	if len(pkg.IdList) == 0 {
 		log.Debug("SendPackage: invalid parameter")
@@ -2225,54 +2218,4 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}, userData interf
 	}()
 
 	return PeMgrEnoNone
-}
-
-// Print peer statistics, for test only
-const doLogPeerStat  = false
-func (peMgr *PeerManager)logPeerStat() {
-	var (
-		obpNumSum = 0
-		ibpNumSum = 0
-		wrkNumSum = 0
-		ibpNumTotal = peMgr.ibpTotalNum
-	)
-	if !doLogPeerStat {	return }
-	for _, num := range peMgr.obpNum { obpNumSum += num	}
-	for _, num := range peMgr.ibpNum { ibpNumSum += num	}
-	for _, num := range peMgr.wrkNum { wrkNumSum += num	}
-	var dbgMsg = ""
-	var subNetIdList = make([]SubNetworkID, 0)
-	strSum := fmt.Sprintf("================================= logPeerStat: =================================\n" +
-		"logPeerStat: p2pInst: %s, obpNumSum: %d, ibpNumSum: %d, ibpNumTotal: %d, wrkNumSum: %d\n",
-		peMgr.cfg.cfgName,
-		obpNumSum, ibpNumSum, ibpNumTotal, wrkNumSum)
-	dbgMsg += strSum
-	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
-		subNetIdList = append(subNetIdList, peMgr.cfg.subNetIdList...)
-		if len(peMgr.cfg.staticNodes) > 0 {
-			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
-		}
-	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
-		if len(peMgr.cfg.staticNodes) > 0 {
-			subNetIdList = append(subNetIdList, peMgr.cfg.staticSubNetId)
-		}
-	}
-	for _, snid := range subNetIdList {
-		strSubnet := fmt.Sprintf("logPeerStat: p2pInst: %s, subnet: %x, obpNum: %d, ibpNum: %d, wrkNum: %d\n",
-			peMgr.cfg.cfgName,
-			snid,
-			peMgr.obpNum[snid],
-			peMgr.ibpNum[snid],
-			peMgr.wrkNum[snid])
-		dbgMsg += strSubnet
-	}
-	fmt.Printf("%s", dbgMsg)
-}
-
-
-//
-// debug only
-//
-func (peMgr *PeerManager)GetWorkers() map[SubNetworkID]map[PeerIdEx]*peerInstance {
-	return peMgr.workers
 }

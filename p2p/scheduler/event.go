@@ -242,15 +242,13 @@ const (
 const (
 	PePingpongTimerId		= 0
 	PeDcvFindNodeTimerId	= 1
-	PeTestStatTimerId		= 2
-	PeMinOcrCleanupTimerId	= 3
+	PeMinOcrCleanupTimerId	= 2
 )
 
 const (
 	EvPeerEstBase			= 1800
 	EvPePingpongTimer		= EvTimerBase	+ PePingpongTimerId
 	EvPeDcvFindNodeTimer	= EvTimerBase	+ PeDcvFindNodeTimerId
-	EvPeTestStatTimer		= EvTimerBase	+ PeTestStatTimerId
 	EvPeOcrCleanupTimer		= EvTimerBase	+ PeMinOcrCleanupTimerId
 	EvPeConnOutReq			= EvPeerEstBase + 1
 	EvPeConnOutRsp			= EvPeerEstBase + 2

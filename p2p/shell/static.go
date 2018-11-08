@@ -64,19 +64,19 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 			{Name: ngb.NgbMgrName,		Tep: ngb.NewNgbMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: sch.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.PeerMgrName,		Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
 	} else if what == config.P2P_TYPE_DHT {
 
 		return []sch.TaskStaticDescription{
-			{Name: dht.DhtMgrName,	Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.DsMgrName,	Tep: dht.NewDsMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.LsnMgrName,	Tep: dht.NewLsnMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.PrdMgrName,	Tep: dht.NewPrdMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.QryMgrName,	Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.RutMgrName,	Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.ConMgrName,	Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DhtMgrName,		Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DsMgrName,		Tep: dht.NewDsMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.LsnMgrName,		Tep: dht.NewLsnMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.PrdMgrName,		Tep: dht.NewPrdMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.QryMgrName,		Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.RutMgrName,		Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.ConMgrName,		Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 	}
 
@@ -281,14 +281,8 @@ func P2pStop(sdl *sch.Scheduler, c chan bool) sch.SchErrno {
 				p2pInstName, eno, taskName)
 
 			//
-			// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			// To deal with the dependencies between static tasks in carrying out the power
-			// off procedure, the order of tasks to be sent with EvSchPoweroff is specified
-			// in table taskStaticPoweroffOrder4Chain or taskStaticPoweroffOrder4Dht according
-			// to the application type. Beside of these tables, here we simply wait until
-			// a static done before sending the next EvSchPoweroff to ensure the order is
-			// what we want. And please notice that: while a static task is killing, dynamic
-			// tasks might be done "at the same time".
+			// Wait current static task to be done, to ensure the poweroff order specified
+			// in table taskStaticPoweroffOrder4Chain or taskStaticPoweroffOrder4Dht.
 			//
 
 			for sdl.SchTaskExist(taskName) {
