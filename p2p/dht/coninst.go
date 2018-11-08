@@ -96,7 +96,7 @@ const (
 	CisHandshaked					// handshaked
 	CisInService					// in service
 	CisClosed						// closed
-	CisOutOfService				// out of service but is not closed
+	CisOutOfService					// out of service but is not closed
 )
 
 type conInstStatus int
@@ -147,7 +147,7 @@ const (
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
-	ciTxMaxWaitResponseSize = 32				// tx max wait peer response queue size
+	ciTxMaxWaitResponseSize = 32			// tx max wait peer response queue size
 )
 
 //

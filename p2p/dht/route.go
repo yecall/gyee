@@ -411,9 +411,7 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
 
 	if tskSender == nil || req == nil {
-		log.Debug("nearestReq: " +
-			"invalid parameters, tskSender: %p, req: %p",
-			tskSender, req)
+		log.Debug("nearestReq: invalid parameters, tskSender: %p, req: %p", tskSender, req)
 		return sch.SchEnoParameter
 	}
 

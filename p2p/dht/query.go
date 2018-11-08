@@ -197,9 +197,7 @@ func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.Debug("qryMgrProc: " +
-			"invalid parameters, ptn: %p, msg: %p",
-			ptn, msg)
+		log.Debug("qryMgrProc: invalid parameters, ptn: %p, msg: %p", ptn, msg)
 		return sch.SchEnoParameter
 	}
 
@@ -328,7 +326,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 
 	//
 	// set "NtfReq" to be true to tell route manager that we need notifications,
-	// see handler about this event handler in route.go pls.
+	// see handler about this event in route.go pls.
 	//
 
 	var nearestReq = sch.MsgDhtRutMgrNearestReq{
@@ -1157,7 +1155,7 @@ func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.NodeID, peer *config.N
 }
 
 //
-// Update query result info of query control block
+// Update query result of query control block
 //
 func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 

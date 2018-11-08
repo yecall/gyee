@@ -177,7 +177,7 @@ func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.
 }
 
 //
-// Provider manager entry
+// Datastore manager entry
 //
 func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
