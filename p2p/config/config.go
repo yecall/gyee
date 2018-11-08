@@ -146,7 +146,7 @@ type Config struct {
 	NoDial				bool					// outboundless flag
 	NoAccept			bool					// inboundless flag
 	BootstrapNode		bool					// bootstrap node flag
-	Local				Node					// myself
+	Local				Node					// local node struct
 	ProtoNum			uint32					// local protocol number
 	Protocols			[]Protocol				// local protocol table
 	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be

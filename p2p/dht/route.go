@@ -547,7 +547,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
 
 		//
-		// this case the latency about an specific individual peer shoud be update,
+		// this case the latency about a specific individual peer should be update,
 		// should be only one peer in "req.Seens".
 		//
 
@@ -1020,7 +1020,7 @@ func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
 
 	//
 	// notice: this function called recursively, this would make the buckets
-	// int the bucket table must be continued from "0" to "tail".
+	// in the bucket table must be continued from "0" to "tail".
 	//
 
 	rt := &rutMgr.rutTab

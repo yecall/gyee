@@ -723,9 +723,8 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		return sch.SchEnoParameter
 	}
 
-	log.Debug("instStatusInd: " +
-		"instance status reported: %d, id: %x",
-		msg.Status, msg.Peer)
+	log.Debug("instStatusInd: instance status reported: %d, id: %x",
+		msg.Status, *msg.Peer)
 
 	cid := conInstIdentity {
 		nid:	*msg.Peer,
