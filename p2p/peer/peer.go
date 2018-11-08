@@ -142,6 +142,7 @@ type PeerManager struct {
 	ptnLsn			interface{}						// pointer to peer listener manager task node
 	ptnAcp			interface{}						// pointer to peer acceptor manager task node
 	ptnDcv			interface{}						// pointer to discover task node
+	ptnShell		interface{}						// pointer to shell task node
 
 	//
 	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -284,6 +285,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 		_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
 	}
+	_, peMgr.ptnShell = peMgr.sdl.SchGetTaskNodeByName(sch.ShMgrName)
 
 	peMgr.cfg = peMgrConfig {
 		cfgName:			cfg.CfgName,
@@ -946,6 +948,16 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			Protocols:	inst.protocols,
 		},
 	}
+	if peMgr.ptnShell != nil {
+		ind2Sh := sch.MsgShellPeerActiveInd{
+			TxChan: inst.txChan,
+			RxChan: inst.rxChan,
+			PeerInfo: &i.PeerInfo,
+		}
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerActiveInd, &ind2Sh)
+		peMgr.sdl.SchSendMessage(&schMsg)
+		return PeMgrEnoNone
+	}
 	return peMgr.peMgrIndEnque(&i)
 }
 
@@ -983,6 +995,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
+	var schMsg = sch.SchMessage{}
 	var ind = msg.(*MsgCloseCfm)
 	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {
 		return PeMgrEnoScheduler
@@ -993,15 +1006,26 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		PeerId:		ind.peNode.ID,
 		Dir:		ind.dir,
 	}
-	peMgr.peMgrIndEnque(&i)
+	if peMgr.ptnShell != nil {
+		ind2Sh := sch.MsgShellPeerCloseCfm{
+			Result: int(ind.result),
+			Dir: ind.dir,
+			Snid: ind.snid,
+			PeerId: ind.peNode.ID,
+		}
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerCloseCfm, &ind2Sh)
+		peMgr.sdl.SchSendMessage(&schMsg)
+	} else {
+		peMgr.peMgrIndEnque(&i)
+	}
 	// drive ourselves to startup outbound
-	var schMsg = sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &ind.snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
+	var schMsg = sch.SchMessage{}
 	var ind = msg.(*MsgCloseInd)
 	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {
 		return PeMgrEnoScheduler
@@ -1012,9 +1036,19 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 		PeerId:		ind.peNode.ID,
 		Dir:		ind.dir,
 	}
-	peMgr.peMgrIndEnque(&i)
+	if peMgr.ptnShell != nil {
+		ind2Sh := sch.MsgShellPeerCloseInd{
+			Cause: int(ind.cause),
+			Dir: ind.dir,
+			Snid: ind.snid,
+			PeerId: ind.peNode.ID,
+		}
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerCloseInd, &ind2Sh)
+		peMgr.sdl.SchSendMessage(&schMsg)
+	} else {
+		peMgr.peMgrIndEnque(&i)
+	}
 	// drive ourselves to startup outbound
-	var schMsg = sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &ind.snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
@@ -2158,6 +2192,10 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}, userData interf
 	// from peer instances to higher module. In this schema, a routine is started
 	// in this function to pull indications, check what indication type it is and
 	// call the function registered.
+	if peMgr.ptnShell != nil {
+		log.Debug("RegisterInstIndCallback: register failed for shell task in running")
+		return PeMgrEnoMismatched
+	}
 	if peMgr.indCb != nil {
 		log.Debug("RegisterInstIndCallback: callback duplicated")
 		return PeMgrEnoDuplicated

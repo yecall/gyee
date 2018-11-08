@@ -83,27 +83,15 @@ type DhtCallback func(mgr interface{}, mid int, msg interface{})int
 // Create DHT manager
 //
 func NewDhtMgr() *DhtMgr {
-
 	dhtMgr := DhtMgr{
-		sdl:		nil,
 		name:		DhtMgrName,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnQryMgr:	nil,
-		ptnConMgr:	nil,
-		ptnRutMgr:	nil,
-		ptnPrdMgr:	nil,
-		ptnDsMgr:	nil,
-		cbf:		nil,
 	}
-
 	dhtMgr.tep = dhtMgr.dhtMgrProc
-
 	return &dhtMgr
 }
 
 //
-// Entry point exported to shceduler
+// Entry point exported to scheduler
 //
 func (dhtMgr *DhtMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return dhtMgr.tep(ptn, msg)

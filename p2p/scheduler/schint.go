@@ -172,6 +172,12 @@ type scheduler struct {
 const (
 
 	//
+	// shell manager name
+	//
+
+	ShMgrName			= "ShMgr"			// shell manager
+
+	//
 	// followings are for chain application
 	//
 

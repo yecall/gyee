@@ -71,9 +71,43 @@ const (
 const EvTimerBase = 1000
 
 //
-// Shell event
+// Shell manager event
 //
-const EvShellBase = 1100
+const (
+	EvShellBase 			= 1100
+	EvShellPeerActiveInd	= EvShellBase + 1
+	EvShellPeerCloseCfm		= EvShellBase + 2
+	EvShellPeerCloseInd		= EvShellBase + 3
+)
+
+//
+// EvShellPeerActiveInd
+//
+type MsgShellPeerActiveInd struct {
+	TxChan		interface{}			// channel for packages sending
+	RxChan		interface{}			// channel for packages received
+	PeerInfo	interface{}			// handshake info about peer
+}
+
+//
+// EvShellPeerCloseCfm
+//
+type MsgShellPeerCloseCfm struct {
+	Result	int						// result of pingpong action
+	Dir		int						// direction
+	Snid	config.SubNetworkID		// sub network identity
+	PeerId 	config.NodeID			// target node
+}
+
+//
+// EvShellPeerCloseInd
+//
+type MsgShellPeerCloseInd struct {
+	Cause	int						// tell why it's closed
+	Dir		int						// direction
+	Snid	config.SubNetworkID		// sub network identity
+	PeerId 	config.NodeID			// target node
+}
 
 //
 // Table manager event
