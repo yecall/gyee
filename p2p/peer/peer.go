@@ -1051,6 +1051,10 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
+	// this would never happen since a peer instance would never kill himself in
+	// current implement.
+	panic("peMgrConnCloseInd: should never be called!!!")
+
 	var schMsg = sch.SchMessage{}
 	var ind = msg.(*MsgCloseInd)
 	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {

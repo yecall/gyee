@@ -95,6 +95,10 @@ func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 }
 
 func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
+	// this would never happen since a peer instance would never kill himself in
+	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
+	// to us to do this.
+	panic("peerCloseInd: should never be called!!!")
 	return sch.SchEnoNone
 }
 
