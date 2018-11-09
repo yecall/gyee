@@ -1022,22 +1022,22 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 
 func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
-	var ind = msg.(*MsgCloseCfm)
-	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {
+	var cfm = msg.(*MsgCloseCfm)
+	if eno := peMgr.peMgrKillInst(cfm.ptn, cfm.peNode, cfm.dir); eno != PeMgrEnoNone {
 		return PeMgrEnoScheduler
 	}
 	i := P2pIndPeerClosedPara {
 		P2pInst:	peMgr.sdl,
-		Snid:		ind.snid,
-		PeerId:		ind.peNode.ID,
-		Dir:		ind.dir,
+		Snid:		cfm.snid,
+		PeerId:		cfm.peNode.ID,
+		Dir:		cfm.dir,
 	}
 	if peMgr.ptnShell != nil {
 		ind2Sh := sch.MsgShellPeerCloseCfm{
-			Result: int(ind.result),
-			Dir: ind.dir,
-			Snid: ind.snid,
-			PeerId: ind.peNode.ID,
+			Result: int(cfm.result),
+			Dir: cfm.dir,
+			Snid: cfm.snid,
+			PeerId: cfm.peNode.ID,
 		}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerCloseCfm, &ind2Sh)
 		peMgr.sdl.SchSendMessage(&schMsg)
@@ -1045,7 +1045,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		peMgr.peMgrIndEnque(&i)
 	}
 	// drive ourselves to startup outbound
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &ind.snid)
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
 }

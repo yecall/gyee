@@ -94,7 +94,7 @@ type MsgShellPeerActiveInd struct {
 // EvShellPeerCloseCfm
 //
 type MsgShellPeerCloseCfm struct {
-	Result	int						// result of pingpong action
+	Result	int						// result
 	Dir		int						// direction
 	Snid	config.SubNetworkID		// sub network identity
 	PeerId 	config.NodeID			// target node

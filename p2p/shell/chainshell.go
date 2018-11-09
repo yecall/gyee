@@ -22,17 +22,39 @@ package shell
 
 import (
 	log "github.com/ethereum/go-ethereum/log"
+	config "github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	peer "github.com/yeeco/gyee/p2p/peer"
 )
 
 const ShMgrName = sch.ShMgrName
 
+type ShellPeerID struct {
+	Snid		config.SubNetworkID // sub network identity
+	Dir    		int         	  	// direct
+	NodeId		config.NodeID		// node identity
+}
+
+type ShellPeerInst struct {
+	ShellPeerID									// shell peer identity
+	TxChan		chan *peer.P2pPackage			// tx channel of peer instance
+	RxChan		chan *peer.P2pPackageRx			// rx channel of peer instance
+	HsInfo		*peer.Handshake					// handshake info about peer
+	status			int							// active peer instance status
+}
+
+const (
+	pisActive	= iota		// active status
+	pisClosing				// in-closing status
+)
+
 type ShellManager struct {
-	sdl			*sch.Scheduler		// pointer to scheduler
-	name		string				// my name
-	tep			sch.SchUserTaskEp	// task entry
-	ptnMe		interface{}			// pointer to task node of myself
-	ptnPeMgr	interface{}			// pointer to task node of peer manager
+	sdl				*sch.Scheduler					// pointer to scheduler
+	name			string							// my name
+	tep				sch.SchUserTaskEp				// task entry
+	ptnMe			interface{}						// pointer to task node of myself
+	ptnPeMgr		interface{}						// pointer to task node of peer manager
+	peerActived		map[ShellPeerID]ShellPeerInst	// active peers
 }
 
 //
@@ -41,6 +63,7 @@ type ShellManager struct {
 func NewShellMgr() *ShellManager  {
 	shMgr := ShellManager {
 		name: ShMgrName,
+		peerActived: make(map[ShellPeerID]ShellPeerInst, 0),
 	}
 	shMgr.tep = shMgr.shMgrProc
 	return &shMgr
@@ -79,18 +102,56 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 }
 
 func (shMgr *ShellManager)powerOn(ptn interface{}) sch.SchErrno {
+	shMgr.ptnMe = ptn
+	shMgr.sdl = sch.SchGetScheduler(ptn)
+	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName)
 	return sch.SchEnoNone
 }
 
 func (shMgr *ShellManager)powerOff(ptn interface{}) sch.SchErrno {
-	return sch.SchEnoNone
+	log.Debug("powerOff: task will be done ...")
+	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
 }
 
 func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchErrno {
+	txChan, _ := ind.TxChan.(chan *peer.P2pPackage)
+	rxChan, _ := ind.RxChan.(chan *peer.P2pPackageRx)
+	peerInfo, _ := ind.PeerInfo.(*peer.Handshake)
+	peerId := ShellPeerID {
+		Snid: peerInfo.Snid,
+		NodeId: peerInfo.NodeId,
+		Dir: peerInfo.Dir,
+	}
+	peer := ShellPeerInst {
+		ShellPeerID: peerId,
+		TxChan: txChan,
+		RxChan: rxChan,
+		HsInfo: peerInfo,
+		status: pisActive,
+	}
+	if _, dup := shMgr.peerActived[peerId]; dup {
+		log.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
+		return sch.SchEnoUserTask
+	}
+	shMgr.peerActived[peerId] = peer
 	return sch.SchEnoNone
 }
 
 func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErrno {
+	peerId := ShellPeerID {
+		Snid: cfm.Snid,
+		NodeId: cfm.PeerId,
+		Dir: cfm.Dir,
+	}
+	if peer, ok := shMgr.peerActived[peerId]; !ok {
+		log.Debug("peerCloseCfm: peer not found, peerId: %+v", peerId)
+		return sch.SchEnoNotFound
+	} else if peer.status != pisClosing {
+		log.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peer.status, peerId)
+		return sch.SchEnoMismatched
+	}
+	log.Debug("peerCloseCfm: peerId: %+v", peerId)
+	delete(shMgr.peerActived, peerId)
 	return sch.SchEnoNone
 }
 
