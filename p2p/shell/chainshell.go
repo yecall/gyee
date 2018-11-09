@@ -29,17 +29,17 @@ import (
 
 const ShMgrName = sch.ShMgrName
 
-type ShellPeerID struct {
-	Snid		config.SubNetworkID // sub network identity
-	Dir    		int         	  	// direct
-	NodeId		config.NodeID		// node identity
+type shellPeerID struct {
+	snid		config.SubNetworkID // sub network identity
+	dir    		int         	  	// direct
+	nodeId		config.NodeID		// node identity
 }
 
-type ShellPeerInst struct {
-	ShellPeerID									// shell peer identity
-	TxChan		chan *peer.P2pPackage			// tx channel of peer instance
-	RxChan		chan *peer.P2pPackageRx			// rx channel of peer instance
-	HsInfo		*peer.Handshake					// handshake info about peer
+type shellPeerInst struct {
+	shellPeerID									// shell peer identity
+	txChan		chan *peer.P2pPackage			// tx channel of peer instance
+	rxChan		chan *peer.P2pPackageRx			// rx channel of peer instance
+	hsInfo		*peer.Handshake					// handshake info about peer
 	status			int							// active peer instance status
 }
 
@@ -48,22 +48,22 @@ const (
 	pisClosing				// in-closing status
 )
 
-type ShellManager struct {
+type shellManager struct {
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// my name
 	tep				sch.SchUserTaskEp				// task entry
 	ptnMe			interface{}						// pointer to task node of myself
 	ptnPeMgr		interface{}						// pointer to task node of peer manager
-	peerActived		map[ShellPeerID]ShellPeerInst	// active peers
+	peerActived		map[shellPeerID]shellPeerInst	// active peers
 }
 
 //
 // Create shell manager
 //
-func NewShellMgr() *ShellManager  {
-	shMgr := ShellManager {
+func NewShellMgr() *shellManager  {
+	shMgr := shellManager {
 		name: ShMgrName,
-		peerActived: make(map[ShellPeerID]ShellPeerInst, 0),
+		peerActived: make(map[shellPeerID]shellPeerInst, 0),
 	}
 	shMgr.tep = shMgr.shMgrProc
 	return &shMgr
@@ -72,14 +72,14 @@ func NewShellMgr() *ShellManager  {
 //
 // Entry point exported to scheduler
 //
-func (shMgr *ShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (shMgr *shellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return shMgr.tep(ptn, msg)
 }
 
 //
 // Shell manager entry
 //
-func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (shMgr *shellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
 	case sch.EvSchPoweron:
@@ -101,53 +101,53 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	return eno
 }
 
-func (shMgr *ShellManager)powerOn(ptn interface{}) sch.SchErrno {
+func (shMgr *shellManager)powerOn(ptn interface{}) sch.SchErrno {
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
 	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName)
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager)powerOff(ptn interface{}) sch.SchErrno {
+func (shMgr *shellManager)powerOff(ptn interface{}) sch.SchErrno {
 	log.Debug("powerOff: task will be done ...")
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
 }
 
-func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchErrno {
+func (shMgr *shellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchErrno {
 	txChan, _ := ind.TxChan.(chan *peer.P2pPackage)
 	rxChan, _ := ind.RxChan.(chan *peer.P2pPackageRx)
 	peerInfo, _ := ind.PeerInfo.(*peer.Handshake)
-	peerId := ShellPeerID {
-		Snid: peerInfo.Snid,
-		NodeId: peerInfo.NodeId,
-		Dir: peerInfo.Dir,
+	peerId := shellPeerID {
+		snid: peerInfo.Snid,
+		nodeId: peerInfo.NodeId,
+		dir: peerInfo.Dir,
 	}
-	peer := ShellPeerInst {
-		ShellPeerID: peerId,
-		TxChan: txChan,
-		RxChan: rxChan,
-		HsInfo: peerInfo,
+	peerInst := shellPeerInst {
+		shellPeerID: peerId,
+		txChan: txChan,
+		rxChan: rxChan,
+		hsInfo: peerInfo,
 		status: pisActive,
 	}
 	if _, dup := shMgr.peerActived[peerId]; dup {
 		log.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
 		return sch.SchEnoUserTask
 	}
-	shMgr.peerActived[peerId] = peer
+	shMgr.peerActived[peerId] = peerInst
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErrno {
-	peerId := ShellPeerID {
-		Snid: cfm.Snid,
-		NodeId: cfm.PeerId,
-		Dir: cfm.Dir,
+func (shMgr *shellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErrno {
+	peerId := shellPeerID {
+		snid: cfm.Snid,
+		nodeId: cfm.PeerId,
+		dir: cfm.Dir,
 	}
-	if peer, ok := shMgr.peerActived[peerId]; !ok {
+	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
 		log.Debug("peerCloseCfm: peer not found, peerId: %+v", peerId)
 		return sch.SchEnoNotFound
-	} else if peer.status != pisClosing {
-		log.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peer.status, peerId)
+	} else if peerInst.status != pisClosing {
+		log.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	}
 	log.Debug("peerCloseCfm: peerId: %+v", peerId)
@@ -155,7 +155,7 @@ func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
+func (shMgr *shellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
 	// this would never happen since a peer instance would never kill himself in
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
@@ -163,7 +163,33 @@ func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErr
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
-	return sch.SchEnoNone
+func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
+	peerId := shellPeerID {
+		snid: ind.Snid,
+		nodeId: ind.PeerId,
+		dir: ind.Dir,
+	}
+	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
+		log.Debug("peerAskToCloseInd: peer not found, peerId: %+v", peerId)
+		return sch.SchEnoNotFound
+	} else if peerInst.status != pisActive {
+		log.Debug("peerAskToCloseInd : status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		return sch.SchEnoMismatched
+	} else {
+		log.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager...")
+		var req = sch.MsgPeCloseReq {
+			Ptn: nil,
+			Snid: peerId.snid,
+			Node: config.Node{
+				ID: peerId.nodeId,
+			},
+			Dir: peerId.dir,
+		}
+		msg := sch.SchMessage{}
+		shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnPeMgr, sch.EvPeCloseReq, &req)
+		shMgr.sdl.SchSendMessage(&msg)
+		peerInst.status = pisClosing
+		return sch.SchEnoNone
+	}
 }
 
