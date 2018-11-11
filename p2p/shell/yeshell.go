@@ -27,8 +27,6 @@ import (
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-type yeService = yep2p.Service
-
 type yeShellManager struct {
 	chainInst			*sch.Scheduler
 	ptnChainShell		interface{}
@@ -38,12 +36,12 @@ type yeShellManager struct {
 	ptDhtShMgr			*dhtShellManager
 }
 
-func NewYeshellManager(chainCfg *config.Config, dhtCfg *config.Config) *yeShellManager {
+func NewYeshellManager(cfg *config.Config) *yeShellManager {
 	yeShMgr := yeShellManager{}
 	var eno sch.SchErrno
 	var ok bool
 
-	yeShMgr.chainInst, eno = P2pCreateInstance(chainCfg)
+	yeShMgr.chainInst, eno = P2pCreateInstance(cfg)
 	if eno != sch.SchEnoNone || yeShMgr.chainInst == nil {
 		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
@@ -61,7 +59,7 @@ func NewYeshellManager(chainCfg *config.Config, dhtCfg *config.Config) *yeShellM
 		return nil
 	}
 
-	yeShMgr.dhtInst, eno = P2pCreateInstance(dhtCfg)
+	yeShMgr.dhtInst, eno = P2pCreateInstance(cfg)
 	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
 		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil

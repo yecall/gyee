@@ -36,6 +36,15 @@ import (
 var Debug__ = false
 
 //
+// Pseudo task node for external module to send event
+//
+var pseudoSchTsk = schTaskNode {
+	task: schTask{name:"pseudoSchTsk"},
+	last: nil,
+	next: nil,
+}
+
+//
 // Default task node for scheduler to send event
 //
 const rawSchTaskName = "schTsk"
