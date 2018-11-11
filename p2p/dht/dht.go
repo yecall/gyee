@@ -263,8 +263,8 @@ func (dhtMgr *DhtMgr)blindConnectReq(msg *sch.MsgDhtBlindConnectReq) sch.SchErrn
 func (dhtMgr *DhtMgr)blindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd {
-			evt: sch.EvDhtBlindConnectRsp,
-			ind: msg,
+			Evt: sch.EvDhtBlindConnectRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -302,8 +302,8 @@ func (dhtMgr *DhtMgr)findPeerReq(msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrn
 func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtMgrFindPeerRsp,
-			ind: msg,
+			Evt: sch.EvDhtMgrFindPeerRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -321,8 +321,8 @@ func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErr
 func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtQryMgrQueryStartRsp,
-			ind: msg,
+			Evt: sch.EvDhtQryMgrQueryStartRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -347,8 +347,8 @@ func (dhtMgr *DhtMgr)qryMgrqueryStopReq(msg *sch.MsgDhtQryMgrQueryStopReq) sch.S
 func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtQryMgrQueryStopRsp,
-			ind: msg,
+			Evt: sch.EvDhtQryMgrQueryStopRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -373,8 +373,8 @@ func (dhtMgr *DhtMgr)conMgrSendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 func (dhtMgr *DhtMgr)conMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtConMgrSendCfm,
-			ind: msg,
+			Evt: sch.EvDhtConMgrSendCfm,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -399,8 +399,8 @@ func (dhtMgr *DhtMgr)putProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.Sch
 func (dhtMgr *DhtMgr)putProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtMgrPutProviderRsp,
-			ind: msg,
+			Evt: sch.EvDhtMgrPutProviderRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -425,8 +425,8 @@ func (dhtMgr *DhtMgr)getProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErr
 func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtMgrGetProviderRsp,
-			ind: msg,
+			Evt: sch.EvDhtMgrGetProviderRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -451,8 +451,8 @@ func (dhtMgr *DhtMgr)putValueReq(msg *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
 func (dhtMgr *DhtMgr)putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtMgrPutValueRsp,
-			ind: msg,
+			Evt: sch.EvDhtMgrPutValueRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -477,8 +477,8 @@ func (dhtMgr *DhtMgr)getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 func (dhtMgr *DhtMgr)getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtMgrGetValueRsp,
-			ind: msg,
+			Evt: sch.EvDhtMgrGetValueRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -503,8 +503,8 @@ func (dhtMgr *DhtMgr)conMgrCloseReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno 
 func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtConMgrCloseRsp,
-			ind: msg,
+			Evt: sch.EvDhtConMgrCloseRsp,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
@@ -522,8 +522,8 @@ func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno 
 func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
 	if dhtMgr.ptnShMgr != nil {
 		ind := sch.MsgDhtShEventInd{
-			evt: sch.EvDhtConInstStatusInd,
-			ind: msg,
+			Evt: sch.EvDhtConInstStatusInd,
+			Msg: msg,
 		}
 		schMsg := sch.SchMessage{}
 		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)

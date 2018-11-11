@@ -20,10 +20,10 @@
 
 package shell
 
-
 import (
 	log "github.com/ethereum/go-ethereum/log"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	dht "github.com/yeeco/gyee/p2p/dht"
 )
 
 
@@ -58,15 +58,156 @@ func (shMgr *dhtShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMes
 // Shell manager entry
 //
 func (shMgr *dhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
 	eno := sch.SchEnoUnknown
+
 	switch msg.Id {
 	case sch.EvSchPoweron:
+		eno = shMgr.poweron(ptn)
+
 	case sch.EvSchPoweroff:
+		eno = shMgr.poweroff(ptn)
+
+	case sch.EvDhtShEventInd:
+		eno = shMgr.dhtShEventInd(msg.Body.(*sch.MsgDhtShEventInd))
+
 	default:
 		log.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
+
 	return eno
 }
 
+func (shMgr *dhtShellManager)poweron(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)poweroff(ptn interface{}) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {
+
+	evt := ind.Evt
+	msg := ind.Msg
+	eno := sch.SchEnoUnknown
+
+	switch evt {
+
+	case  sch.EvDhtBlindConnectRsp:
+		eno = shMgr.dhtBlindConnectRsp(msg.(*sch.MsgDhtBlindConnectRsp))
+
+	case  sch.EvDhtMgrFindPeerRsp:
+		eno = shMgr.dhtMgrFindPeerRsp(msg.(*sch.MsgDhtQryMgrQueryResultInd))
+
+	case  sch.EvDhtQryMgrQueryStartRsp:
+		eno = shMgr.dhtQryMgrQueryStartRsp(msg.(*sch.MsgDhtQryMgrQueryStartRsp))
+
+	case  sch.EvDhtQryMgrQueryStopRsp:
+		eno = shMgr.dhtQryMgrQueryStopRsp(msg.(*sch.MsgDhtQryMgrQueryStopRsp))
+
+	case  sch.EvDhtConMgrSendCfm:
+		eno = shMgr.dhtConMgrSendCfm(msg.(*sch.MsgDhtConMgrSendCfm))
+
+	case  sch.EvDhtMgrPutProviderRsp:
+		eno = shMgr.dhtMgrPutProviderRsp(msg.(*sch.MsgDhtPrdMgrAddProviderRsp))
+
+	case  sch.EvDhtMgrGetProviderRsp:
+		eno = shMgr.dhtMgrGetProviderRsp(msg.(*sch.MsgDhtMgrGetProviderRsp))
+
+	case  sch.EvDhtMgrPutValueRsp:
+		eno = shMgr.dhtMgrPutValueRsp(msg.(*sch.MsgDhtMgrPutValueRsp))
+
+	case  sch.EvDhtMgrGetValueRsp:
+		eno = shMgr.dhtMgrGetValueRsp(msg.(*sch.MsgDhtMgrGetValueRsp))
+
+	case  sch.EvDhtConMgrCloseRsp:
+		eno = shMgr.dhtConMgrCloseRsp(msg.(*sch.MsgDhtConMgrCloseRsp))
+
+	case  sch.EvDhtConInstStatusInd:
+		eno = shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
+
+	default:
+		log.Debug("dhtTestEventCallback: unknown event type: %d", evt)
+		eno = sch.SchEnoParameter
+	}
+
+	return eno
+}
+
+func (shMgr *dhtShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *dhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+
+	switch msg.Status {
+
+	case dht.CisNull:
+		log.Debug("dhtConInstStatusInd: CisNull")
+
+	case dht.CisConnecting:
+		log.Debug("dhtConInstStatusInd: CisConnecting")
+
+	case dht.CisConnected:
+		log.Debug("dhtConInstStatusInd: CisConnected")
+
+	case dht.CisAccepted:
+		log.Debug("dhtTestConInstStatusInd: CisAccepted")
+
+	case dht.CisInHandshaking:
+		log.Debug("dhtTestConInstStatusInd: CisInHandshaking")
+
+	case dht.CisHandshaked:
+		log.Debug("dhtTestConInstStatusInd: CisHandshaked")
+
+	case dht.CisInService:
+		log.Debug("dhtTestConInstStatusInd: CisInService")
+
+	case dht.CisClosed:
+		log.Debug("dhtTestConInstStatusInd: CisClosed")
+
+	default:
+		log.Debug("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
+	}
+
+	return sch.SchEnoNone
+}
 

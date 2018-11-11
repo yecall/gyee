@@ -937,6 +937,6 @@ const (
 // EvDhtShEventInd
 //
 type MsgDhtShEventInd struct {
-	evt		int					// event indication type
-	msg		interface{}			// event body pointer
+	Evt		int					// event indication type
+	Msg		interface{}			// event body pointer
 }
