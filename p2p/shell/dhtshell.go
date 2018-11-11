@@ -20,3 +20,53 @@
 
 package shell
 
+
+import (
+	log "github.com/ethereum/go-ethereum/log"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
+
+
+const dhtShMgrName = sch.DhtShMgrName
+
+type dhtShellManager struct {
+	sdl				*sch.Scheduler					// pointer to scheduler
+	name			string							// my name
+	tep				sch.SchUserTaskEp				// task entry
+	ptnMe			interface{}						// pointer to task node of myself
+}
+
+//
+// Create dht shell manager
+//
+func NewDhtShellMgr() *dhtShellManager {
+	shMgr := dhtShellManager {
+		name: dhtShMgrName,
+	}
+	shMgr.tep = nil
+	return &shMgr
+}
+
+//
+// Entry point exported to scheduler
+//
+func (shMgr *dhtShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	return shMgr.tep(ptn, msg)
+}
+
+//
+// Shell manager entry
+//
+func (shMgr *dhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	eno := sch.SchEnoUnknown
+	switch msg.Id {
+	case sch.EvSchPoweron:
+	case sch.EvSchPoweroff:
+	default:
+		log.Debug("shMgrProc: unknown event: %d", msg.Id)
+		eno = sch.SchEnoParameter
+	}
+	return eno
+}
+
+

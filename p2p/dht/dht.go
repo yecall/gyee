@@ -29,6 +29,11 @@ import (
 
 
 //
+// stand alone for TEST when it's true
+//
+const _TEST_ = false
+
+//
 // Dht manager name registered in scheduler
 //
 const DhtMgrName = sch.DhtMgrName
@@ -70,6 +75,7 @@ type DhtMgr struct {
 	ptnRutMgr	interface{}			// pointer to task node of route manager
 	ptnPrdMgr	interface{}			// pointer to task node of provider manager
 	ptnDsMgr	interface{}			// pointer to task node of data store manager
+	ptnShMgr	interface{}			// pointer to task node of dht shell manager
 	cbLock		sync.Mutex			// lock for callback to be installed/removed
 	cbf			DhtCallback			// callback entry
 }
@@ -203,6 +209,15 @@ func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
 	_, dhtMgr.ptnPrdMgr = sdl.SchGetTaskNodeByName(PrdMgrName)
 	_, dhtMgr.ptnDsMgr = sdl.SchGetTaskNodeByName(DsMgrName)
 
+	if _TEST_ == false {
+		var eno sch.SchErrno
+		eno, dhtMgr.ptnShMgr = sdl.SchGetTaskNodeByName(sch.DhtShMgrName)
+		if eno != sch.SchEnoNone || dhtMgr.ptnShMgr == nil {
+			log.Debug("poweron: shell not found")
+			return sch.SchEnoNotFound
+		}
+	}
+
 	if dhtMgr.ptnQryMgr == nil ||
 		dhtMgr.ptnConMgr == nil ||
 		dhtMgr.ptnRutMgr == nil ||
@@ -246,7 +261,15 @@ func (dhtMgr *DhtMgr)blindConnectReq(msg *sch.MsgDhtBlindConnectReq) sch.SchErrn
 // blind connect response
 //
 func (dhtMgr *DhtMgr)blindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd {
+			evt: sch.EvDhtBlindConnectRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtBlindConnectRsp, msg)
 		log.Debug("blindConnectRsp: callback return: %d", rc)
 	}
@@ -277,7 +300,15 @@ func (dhtMgr *DhtMgr)findPeerReq(msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrn
 // find peer response handler
 //
 func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtMgrFindPeerRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtMgrFindPeerRsp, msg)
 		log.Debug("qryMgrQueryStartRsp: callback return: %d", rc)
 	}
@@ -288,7 +319,15 @@ func (dhtMgr *DhtMgr)findPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErr
 // qryMgr query start response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtQryMgrQueryStartRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtQryMgrQueryStartRsp, msg)
 		log.Debug("qryMgrQueryStartRsp: callback return: %d", rc)
 	}
@@ -306,7 +345,15 @@ func (dhtMgr *DhtMgr)qryMgrqueryStopReq(msg *sch.MsgDhtQryMgrQueryStopReq) sch.S
 // qryMgr query stop response handler
 //
 func (dhtMgr *DhtMgr)qryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtQryMgrQueryStopRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtQryMgrQueryStopRsp, msg)
 		log.Debug("qryMgrQueryStopRsp: callback return: %d", rc)
 	}
@@ -324,7 +371,15 @@ func (dhtMgr *DhtMgr)conMgrSendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 // conMgr send confirm handler
 //
 func (dhtMgr *DhtMgr)conMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtConMgrSendCfm,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtConMgrSendCfm, msg)
 		log.Debug("conMgrSendCfm: callback return: %d", rc)
 	}
@@ -342,7 +397,15 @@ func (dhtMgr *DhtMgr)putProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.Sch
 // put provider response handler
 //
 func (dhtMgr *DhtMgr)putProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtMgrPutProviderRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtMgrPutProviderRsp, msg)
 		log.Debug("putProviderRsp: callback return: %d", rc)
 	}
@@ -360,7 +423,15 @@ func (dhtMgr *DhtMgr)getProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErr
 // get provider response handler
 //
 func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtMgrGetProviderRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtMgrGetProviderRsp, msg)
 		log.Debug("getProviderRsp: callback return: %d", rc)
 	}
@@ -378,7 +449,15 @@ func (dhtMgr *DhtMgr)putValueReq(msg *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
 // put value response handler
 //
 func (dhtMgr *DhtMgr)putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtMgrPutValueRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtMgrPutValueRsp, msg)
 		log.Debug("putValueRsp: callback return: %d", rc)
 	}
@@ -396,7 +475,15 @@ func (dhtMgr *DhtMgr)getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 // get value response handler
 //
 func (dhtMgr *DhtMgr)getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtMgrGetValueRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtMgrGetValueRsp, msg)
 		log.Debug("getValueRsp: callback return: %d", rc)
 	}
@@ -414,7 +501,15 @@ func (dhtMgr *DhtMgr)conMgrCloseReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno 
 // conMgr connection close response handler
 //
 func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtConMgrCloseRsp,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtConMgrCloseRsp, msg)
 		log.Debug("conMgrCloseRsp: callback return: %d", rc)
 	}
@@ -425,7 +520,15 @@ func (dhtMgr *DhtMgr)conMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno 
 // conInst status indication handler
 //
 func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
-	if dhtMgr.cbf != nil {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			evt: sch.EvDhtConInstStatusInd,
+			ind: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtConInstStatusInd, msg)
 		log.Debug("conInstStatusInd: callback return: %d", rc)
 	}
@@ -436,6 +539,11 @@ func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchEr
 // install callback
 //
 func (dhtMgr *DhtMgr)InstallEventCallback(cbf DhtCallback) DhtErrno {
+
+	if dhtMgr.ptnShMgr != nil {
+		log.Debug("DhtInstallCallback: failed for shell presented")
+		return DhtEnoMismatched
+	}
 
 	dhtMgr.cbLock.Lock()
 	defer dhtMgr.cbLock.Unlock()

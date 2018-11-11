@@ -175,7 +175,8 @@ const (
 	// shell manager name
 	//
 
-	ShMgrName			= "ShMgr"			// shell manager
+	ShMgrName			= "ShMgr"			// chain shell manager
+	DhtShMgrName		= "DhtShMgr"		// dht shell manager
 
 	//
 	// followings are for chain application

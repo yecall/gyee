@@ -34,6 +34,12 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
+//
+// stand alone for TEST when it's true
+//
+const _TEST_ = false
+
+
 // Peer manager errno
 const (
 	PeMgrEnoNone	= iota
@@ -285,7 +291,15 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 		_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
 	}
-	_, peMgr.ptnShell = peMgr.sdl.SchGetTaskNodeByName(sch.ShMgrName)
+
+	if _TEST_ == false {
+		var ok sch.SchErrno
+		ok, peMgr.ptnShell = peMgr.sdl.SchGetTaskNodeByName(sch.ShMgrName)
+		if ok != sch.SchEnoNone || peMgr.ptnShell == nil {
+			log.Debug("peMgrPoweron: shell not found")
+			return PeMgrEnoScheduler
+		}
+	}
 
 	peMgr.cfg = peMgrConfig {
 		cfgName:			cfg.CfgName,

@@ -18,9 +18,11 @@
  *
  */
 
-
+//
+// Notice: the test cases can work only those _TEST_ in peer manager and dht
+// manager are set to "true", check them please.
+//
 package main
-
 
 import (
 	"os"

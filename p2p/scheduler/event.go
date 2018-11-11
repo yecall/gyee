@@ -71,7 +71,7 @@ const (
 const EvTimerBase = 1000
 
 //
-// Shell manager event
+// Chain shell manager event
 //
 const (
 	EvShellBase 				= 1100
@@ -925,3 +925,18 @@ type MsgDhtDsMgrGetValReq struct {
 	Msg			interface{}		// the message pointer
 }
 
+//
+// DHT shell manager event
+//
+const (
+	EvDhtShellBase 				= 2800
+	EvDhtShEventInd				= EvDhtShellBase + 1
+)
+
+//
+// EvDhtShEventInd
+//
+type MsgDhtShEventInd struct {
+	evt		int					// event indication type
+	msg		interface{}			// event body pointer
+}
