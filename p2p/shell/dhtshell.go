@@ -34,6 +34,7 @@ type dhtShellManager struct {
 	name			string							// my name
 	tep				sch.SchUserTaskEp				// task entry
 	ptnMe			interface{}						// pointer to task node of myself
+	ptnDhtMgr		interface{}						// pointer to dht manager task node
 }
 
 //
@@ -70,6 +71,18 @@ func (shMgr *dhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 
 	case sch.EvDhtShEventInd:
 		eno = shMgr.dhtShEventInd(msg.Body.(*sch.MsgDhtShEventInd))
+
+	case sch.EvDhtMgrFindPeerReq:
+		eno = shMgr.dhtShFindPeerReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
+
+	case sch.EvDhtBlindConnectReq:
+		eno = shMgr.dhtShBlindConnectReq(msg.Body.(*sch.MsgDhtBlindConnectReq))
+
+	case sch.EvDhtMgrGetProviderReq:
+		eno = shMgr.dhtShGetProviderReq(msg.Body.(*sch.MsgDhtMgrGetProviderReq))
+
+	case sch.EvDhtMgrPutProviderReq:
+		eno = shMgr.dhtShPutProviderReq(msg.Body.(*sch.MsgDhtPrdMgrAddProviderReq))
 
 	default:
 		log.Debug("shMgrProc: unknown event: %d", msg.Id)
@@ -210,4 +223,29 @@ func (shMgr *dhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 
 	return sch.SchEnoNone
 }
+
+func (shMgr *dhtShellManager)dhtShFindPeerReq(req *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrFindPeerReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *dhtShellManager)dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtBlindConnectReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *dhtShellManager)dhtShGetProviderReq(req *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetProviderReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *dhtShellManager)dhtShPutProviderReq(req *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrPutProviderReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
 

@@ -21,19 +21,87 @@
 package shell
 
 import (
+	log "github.com/yeeco/gyee/p2p/logger"
+	config "github.com/yeeco/gyee/p2p/config"
 	yep2p "github.com/yeeco/gyee/p2p"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
 type yeService = yep2p.Service
 
-type yeShellManager struct {}
+type yeShellManager struct {
+	chainInst			*sch.Scheduler
+	ptnChainShell		interface{}
+	ptChainShMgr		*shellManager
+	dhtInst				*sch.Scheduler
+	ptnDhtShell			interface{}
+	ptDhtShMgr			*dhtShellManager
+}
+
+func NewYeshellManager(chainCfg *config.Config, dhtCfg *config.Config) *yeShellManager {
+	yeShMgr := yeShellManager{}
+	var eno sch.SchErrno
+	var ok bool
+
+	yeShMgr.chainInst, eno = P2pCreateInstance(chainCfg)
+	if eno != sch.SchEnoNone || yeShMgr.chainInst == nil {
+		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetTaskNodeByName(sch.ShMgrName)
+	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
+		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetUserTaskIF(sch.ShMgrName).(*shellManager)
+	if !ok || yeShMgr.ptChainShMgr == nil {
+		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	yeShMgr.dhtInst, eno = P2pCreateInstance(dhtCfg)
+	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
+		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetTaskNodeByName(sch.DhtShMgrName)
+	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
+		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetUserTaskIF(sch.DhtShMgrName).(*dhtShellManager)
+	if !ok || yeShMgr.ptDhtShMgr == nil {
+		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	return &yeShMgr
+}
 
 func (yeShMgr *yeShellManager)Start() error {
+	if eno := P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		return eno
+	}
+
+	if eno := P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
+		stopCh := make(chan bool, 0)
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		P2pStop(yeShMgr.dhtInst, stopCh)
+		return eno
+	}
+
 	return nil
 }
 
 func (yeShMgr *yeShellManager)Stop() {
-	return
+	stopCh := make(chan bool, 0)
+	P2pStop(yeShMgr.dhtInst, stopCh)
+	P2pStop(yeShMgr.chainInst, stopCh)
 }
 
 func (yeShMgr *yeShellManager)BroadcastMessage(message yep2p.Message) error {
@@ -57,5 +125,21 @@ func (yeShMgr *yeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 }
 
 func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)DhtFindNode() error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)DhtBlindConnect() error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)DhtGetProvider(key []byte) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)DhtSetProvider(key []byte) error {
 	return nil
 }
