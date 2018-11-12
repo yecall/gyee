@@ -355,8 +355,8 @@ func (yeShMgr *yeShellManager)dhtEvProc() {
 		case  sch.EvDhtMgrPutValueRsp:
 		case  sch.EvDhtMgrGetValueRsp:
 		case  sch.EvDhtConMgrCloseRsp:
-		case  sch.EvDhtConInstStatusInd:
 		default:
+			log.Debug("evHandler: invalid event: %d", evi.Evt)
 		}
 	}
 
@@ -388,6 +388,7 @@ func (yeShMgr *yeShellManager)dhtCsProc() {
 		case dht.CisInService:
 		case dht.CisClosed:
 		default:
+			log.Debug("csHandler: invalid connection status: %d", csi.Status)
 		}
 	}
 
