@@ -35,7 +35,7 @@ func DhtGetManager(sdl *sch.Scheduler) *dht.DhtMgr {
 		log.Debug("DhtGetManager: nil scheduler pointer")
 		return nil
 	}
-	dhtMgr, ok := sdl.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+	dhtMgr, ok := sdl.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 	if !ok {
 		log.Debug("DhtGetManager: dht manager task not exist")
 		return nil

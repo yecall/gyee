@@ -92,7 +92,7 @@ func P2pRegisterCallback(what int, cb interface{}, userData interface{}, target 
 		log.Debug("P2pRegisterCallback: not supported, what: %d", what)
 		return P2pEnoParameter
 	}
-	pem := target.(*sch.Scheduler).SchGetUserTaskIF(sch.PeerMgrName)
+	pem := target.(*sch.Scheduler).SchGetTaskObject(sch.PeerMgrName)
 	if pem == nil {
 		log.Debug("P2pRegisterCallback: get peer manager failed, name: %s", sch.PeerMgrName)
 		return P2pEnoScheduler
@@ -121,7 +121,7 @@ func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
 // Close peer
 //
 func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) P2pErrno {
-	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+	peMgr := sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
 	if eno := peMgr.ClosePeer(snid, id); eno != peer.PeMgrEnoNone {
 		log.Debug("P2pSendPackage: ClosePeer failed, eno: %d, peer: %s",
 			eno, fmt.Sprintf("%+v", *id))

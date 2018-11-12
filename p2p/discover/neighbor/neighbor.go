@@ -390,7 +390,7 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoNone
 	}
 
-	ngbMgr.tabMgr = ngbMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
+	ngbMgr.tabMgr = ngbMgr.sdl.SchGetTaskObject(sch.TabMgrName).(*tab.TableManager)
 	eno, ptnTab = ngbMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 	eno, ptnLsn = ngbMgr.sdl.SchGetTaskNodeByName(sch.NgbLsnName)
 	ngbMgr.ptnMe = ptn

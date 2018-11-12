@@ -468,7 +468,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	// check provier manager
 	//
 
-	prdMgr, ok := dsMgr.sdl.SchGetUserTaskIF(PrdMgrName).(*PrdMgr)
+	prdMgr, ok := dsMgr.sdl.SchGetTaskObject(PrdMgrName).(*PrdMgr)
 	if !ok || prdMgr == nil {
 		log.Debug("getValReq: get provider manager failed")
 		return sch.SchEnoInternal

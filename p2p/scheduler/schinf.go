@@ -288,7 +288,7 @@ func SchGetScheduler(ptn interface{}) *Scheduler {
 }
 
 // Get user task interface exported to scheduler
-func (sdl *Scheduler)SchGetUserTaskIF(tn string) interface{} {
+func (sdl *Scheduler)SchGetTaskObject(tn string) interface{} {
 	eno, ptn := sdl.SchGetTaskNodeByName(tn)
 	if eno != SchEnoNone {
 		return nil

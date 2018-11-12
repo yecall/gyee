@@ -30,11 +30,13 @@ import (
 const dhtShMgrName = sch.DhtShMgrName
 
 type dhtShellManager struct {
-	sdl				*sch.Scheduler					// pointer to scheduler
-	name			string							// my name
-	tep				sch.SchUserTaskEp				// task entry
-	ptnMe			interface{}						// pointer to task node of myself
-	ptnDhtMgr		interface{}						// pointer to dht manager task node
+	sdl				*sch.Scheduler						// pointer to scheduler
+	name			string								// my name
+	tep				sch.SchUserTaskEp					// task entry
+	ptnMe			interface{}							// pointer to task node of myself
+	ptnDhtMgr		interface{}							// pointer to dht manager task node
+	evChan			chan *sch.MsgDhtShEventInd			// event indication channel
+	csChan			chan *sch.MsgDhtConInstStatusInd	// connection status indication channel
 }
 
 //
@@ -248,4 +250,10 @@ func (shMgr *dhtShellManager)dhtShPutProviderReq(req *sch.MsgDhtPrdMgrAddProvide
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
+func (schMgr *dhtShellManager)GetEventChan() chan *sch.MsgDhtShEventInd {
+	return schMgr.evChan
+}
 
+func (schMgr *dhtShellManager)GetConnStatusChan() chan *sch.MsgDhtConInstStatusInd {
+	return schMgr.csChan
+}

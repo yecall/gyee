@@ -196,7 +196,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 
 		var pmEno peer.PeMgrErrno
 
-		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+		peMgr := sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
 		pmEno = peMgr.PeMgrInited()
 
 		if pmEno != peer.PeMgrEnoNone {

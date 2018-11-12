@@ -287,7 +287,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	// with static network type that tabMgr and dcvMgr would be done while power on
 	if cfg.NetworkType == config.P2pNetworkTypeDynamic {
-		peMgr.tabMgr = peMgr.sdl.SchGetUserTaskIF(sch.TabMgrName).(*tab.TableManager)
+		peMgr.tabMgr = peMgr.sdl.SchGetTaskObject(sch.TabMgrName).(*tab.TableManager)
 		_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
 		_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
 	}
@@ -1906,7 +1906,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 		log.Debug("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
-	pem := pkg.P2pInst.SchGetUserTaskIF(sch.PeerMgrName)
+	pem := pkg.P2pInst.SchGetTaskObject(sch.PeerMgrName)
 	if pem == nil {
 		if sch.Debug__ {
 			log.Debug("SendPackage: nil peer manager, might be in power off stage")

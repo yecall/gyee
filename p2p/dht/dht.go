@@ -581,7 +581,7 @@ func (dhtMgr *DhtMgr)InstallRxDataCallback(cbf ConInstRxDataCallback, peer *conf
 	// for event sch.EvDhtConInstStatusInd, for example, when "CisConnected" is reported.
 	//
 
-	conMgr, ok := dhtMgr.sdl.SchGetUserTaskIF(ConMgrName).(*ConMgr)
+	conMgr, ok := dhtMgr.sdl.SchGetTaskObject(ConMgrName).(*ConMgr)
 	if !ok {
 		log.Debug("InstallRxDataCallback: connection manager not found")
 		return DhtEnoMismatched

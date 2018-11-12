@@ -739,7 +739,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	var qpiList = []*qryPendingInfo{}
 	var hashList = []*Hash{}
 	var distList = []int{}
-	var rutMgr = qryMgr.sdl.SchGetUserTaskIF(RutMgrName).(*RutMgr)
+	var rutMgr = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
 
 	if len(msg.Peers) != len(msg.Pcs) {
 		log.Debug("instResultInd: mismatched Peers and Pcs")

@@ -1350,7 +1350,7 @@ func testCase6(tc *testCase) {
 			log.Debug("testCase6: P2pStart failed, eno: %d", eno)
 			return
 		}
-		dhtMgr := dhtInst.SchGetUserTaskIF(sch.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(sch.DhtMgrName).(*dht.DhtMgr)
 		if eno := dhtMgr.InstallEventCallback(dhtTestEventCallback); eno != dht.DhtEnoNone {
 			log.Debug("testCase6: InstallEventCallback failed, eno: %d", eno)
 			return
@@ -1431,7 +1431,7 @@ func testCase7(tc *testCase) {
 			log.Debug("testCase7: P2pStart failed, eno: %d", eno)
 			return
 		}
-		dhtMgr := dhtInst.SchGetUserTaskIF(sch.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(sch.DhtMgrName).(*dht.DhtMgr)
 		if eno := dhtMgr.InstallEventCallback(dhtTestEventCallback); eno != dht.DhtEnoNone {
 			log.Debug("testCase7: InstallEventCallback failed, eno: %d", eno)
 			return
@@ -1642,7 +1642,7 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 	for idx, row := range cmBackup {
 		for n, connFlag := range row {
 			if connFlag {
-				dhtMgr := p2pInstList[idx].SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+				dhtMgr := p2pInstList[idx].SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 				local := dhtInst2Cfg[p2pInstList[idx]].Local
 				peerCfg := dhtInst2Cfg[p2pInstList[n]]
 				req := sch.MsgDhtBlindConnectReq {
@@ -1670,7 +1670,7 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 //
 func dhtTestBootstrapStart(dhtInstList []*sch.Scheduler) int {
 	for _, dhtInst := range dhtInstList {
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtRutRefreshReq, nil)
 	}
 	return dht.DhtEnoNone
@@ -1695,7 +1695,7 @@ func dhtTestFindNode(dhtInstList []*sch.Scheduler) int {
 		}
 		req.Target = dhtInstList[targetIdx].SchGetP2pConfig().Local.ID
 		req.Seq = time.Now().Unix()
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrFindPeerReq, &req)
 	}
 	return dht.DhtEnoNone
@@ -1721,7 +1721,7 @@ func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 		req.Val = []byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val))
 		key := sha256.Sum256(req.Val)
 		req.Key = key[0:]
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrPutValueReq, &req)
 		kv := DhtTestKV {
 			Key:	req.Key,
@@ -1744,7 +1744,7 @@ func dhtTestGetValue(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 	}
 	for idx, dhtInst := range dhtInstList {
 		req.Key = keys[idx]
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrGetValueReq, &req)
 	}
 	return dht.DhtEnoNone
@@ -1770,7 +1770,7 @@ func dhtTestPutProvider(dhtInstList []*sch.Scheduler) (int, []*DhtTestPrd) {
 		key := sha256.Sum256([]byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val)))
 		req.Key = key[0:]
 		req.Prd = dhtInst.SchGetP2pConfig().Local
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrPutProviderReq, &req)
 		prd := DhtTestPrd {
 			Key:	req.Key,
@@ -1793,7 +1793,7 @@ func dhtTestGetProvider(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 	}
 	for idx, dhtInst := range dhtInstList {
 		req.Key = keys[idx]
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrGetProviderReq, &req)
 	}
 	return dht.DhtEnoNone

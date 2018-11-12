@@ -768,7 +768,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 	}
 
 	ndbc.sdl = sdl
-	ndbc.tabMgr = ndbc.sdl.SchGetUserTaskIF(TabMgrName).(*TableManager)
+	ndbc.tabMgr = ndbc.sdl.SchGetTaskObject(TabMgrName).(*TableManager)
 	var tmd  = sch.TimerDescription {
 		Name:	NdbcName + "_autoclean",
 		Utid:	0,
