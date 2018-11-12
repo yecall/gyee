@@ -21,12 +21,14 @@
 package shell
 
 import (
+	"sync"
 	"time"
 	log "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 	yep2p "github.com/yeeco/gyee/p2p"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	dht "github.com/yeeco/gyee/p2p/dht"
+	"errors"
 )
 
 const (
@@ -45,11 +47,14 @@ type yeShellManager struct {
 	dhtInst				*sch.Scheduler							// dht scheduler pointer
 	ptnDhtShell			interface{}								// dht shell manager task node pointer
 	ptDhtShMgr			*dhtShellManager						// dht shell manager object
+	getValChan			chan []byte								// get value channel
+	putValChan			chan bool								// put value channel
 	findNodeMap			map[config.NodeID]chan interface{}		// find node command map to channel
 	getProviderMap		map[yesKey]chan interface{}				// find node command map to channel
 	putProviderMap		map[yesKey]chan interface{}				// find node command map to channel
 	dhtEvChan			chan *sch.MsgDhtShEventInd				// dht event indication channel
 	dhtCsChan			chan *sch.MsgDhtConInstStatusInd		// dht connection status indication channel
+	subscribers      	*sync.Map								// subscribers for incoming messages
 }
 
 func NewYeshellManager(cfg *config.Config) *yeShellManager {
@@ -98,11 +103,14 @@ func NewYeshellManager(cfg *config.Config) *yeShellManager {
 		return nil
 	}
 
+	yeShMgr.getValChan = make(chan []byte, 0)
+	yeShMgr.putValChan = make(chan bool, 0)
 	yeShMgr.findNodeMap = make(map[config.NodeID]chan interface{}, yesMaxFindNode)
 	yeShMgr.getProviderMap = make(map[yesKey]chan interface{}, yesMaxGetProvider)
 	yeShMgr.putProviderMap = make(map[yesKey]chan interface{}, yesMaxPutProvider)
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
+	yeShMgr.subscribers = new(sync.Map);
 
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
@@ -141,18 +149,66 @@ func (yeShMgr *yeShellManager)BroadcastMessageOsn(message yep2p.Message) error {
 }
 
 func (yeShMgr *yeShellManager)Register(subscriber *yep2p.Subscriber) {
-	return
+	t := subscriber.MsgType
+	m, _ := yeShMgr.subscribers.LoadOrStore(t, new(sync.Map))
+	m.(*sync.Map).Store(subscriber, true)
 }
 
 func (yeShMgr *yeShellManager)UnRegister(subscriber *yep2p.Subscriber) {
-	return
+	t := subscriber.MsgType
+	m, _ := yeShMgr.subscribers.Load(t)
+	if m == nil {
+		return
+	}
+	m.(*sync.Map).Delete(subscriber)
 }
 
 func (yeShMgr *yeShellManager)DhtGetValue(key []byte) ([]byte, error) {
-	return nil, nil
+	if len(key) != yesKeyBytes {
+		log.Debug("DhtGetValue: invalid key: %x", key)
+		return nil, sch.SchEnoParameter
+	}
+
+	req := sch.MsgDhtMgrGetValueReq{
+		Key: key,
+	}
+	msg := sch.SchMessage{}
+	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
+	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Debug("DhtGetValue: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil, eno
+	}
+
+	if val, ok := <-yeShMgr.getValChan; ok {
+		return val, nil
+	}
+	return nil, errors.New("DhtGetValue: failed, channel closed")
 }
 
 func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
+	if len(key) != yesKeyBytes || len(value) == 0 {
+		log.Debug("DhtSetValue: invalid (key, value) pair, key: %x, length of value: %d", key, len(value))
+		return sch.SchEnoParameter
+	}
+
+	req := sch.MsgDhtMgrPutValueReq {
+		Key: key,
+		Val: value,
+	}
+	msg := sch.SchMessage{}
+	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
+	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Debug("DhtSetValue: failed, eno: %d, error: %s", eno, eno.Error())
+		return eno
+	}
+
+	result, ok := <-yeShMgr.putValChan
+	if !ok {
+		return errors.New("DhtSetValue: failed, channel closed")
+	}
+	if result == false {
+		return errors.New("DhtSetValue: failed")
+	}
 	return nil
 }
 
