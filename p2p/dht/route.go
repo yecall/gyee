@@ -244,13 +244,13 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 	rutMgr.ptnMe = ptn
 	rutMgr.sdl = sch.SchGetScheduler(ptn)
 
-	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetTaskNodeByName(QryMgrName)
+	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetUserTaskNode(QryMgrName)
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
 		log.Debug("poweron: nil task node pointer, task: %s", QryMgrName)
 		return eno
 	}
 
-	eno, rutMgr.ptnConMgr = rutMgr.sdl.SchGetTaskNodeByName(ConMgrName)
+	eno, rutMgr.ptnConMgr = rutMgr.sdl.SchGetUserTaskNode(ConMgrName)
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
 		log.Debug("poweron: nil task node pointer, task: %s", ConMgrName)
 		return eno

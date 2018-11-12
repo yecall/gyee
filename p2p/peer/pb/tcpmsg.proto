@@ -54,6 +54,11 @@ enum MessageId {
     //
     // PID_EXT section
     //
+
+    MID_TX          = 3;
+    MID_EVENT       = 4;
+    MID_BLOCKHEADER = 5;
+    MID_BLOCK       = 6;
 }
 
 //
@@ -62,8 +67,9 @@ enum MessageId {
 
 message P2PPackage {
     required ProtocolId Pid         = 1;    // protocol identity
-    required uint32 PayloadLength   = 2;    // payload length
-    optional bytes Payload          = 3;    // payload
+    optional MessageId ExtMid       = 2;    // required for "Pid" whch is not PID_P2P
+    required uint32 PayloadLength   = 3;    // payload length
+    optional bytes Payload          = 4;    // payload
 }
 
 //

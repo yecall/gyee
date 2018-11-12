@@ -175,10 +175,10 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 	conMgr.sdl = sdl
 	conMgr.ptnMe = ptn
 
-	_, conMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
-	_, conMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
-	_, conMgr.ptnLsnMgr = sdl.SchGetTaskNodeByName(LsnMgrName)
-	_, conMgr.ptnDhtMgr = sdl.SchGetTaskNodeByName(DhtMgrName)
+	_, conMgr.ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName)
+	_, conMgr.ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName)
+	_, conMgr.ptnLsnMgr = sdl.SchGetUserTaskNode(LsnMgrName)
+	_, conMgr.ptnDhtMgr = sdl.SchGetUserTaskNode(DhtMgrName)
 
 	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil ||
 		conMgr.ptnLsnMgr == nil || conMgr.ptnDhtMgr == nil {
@@ -586,7 +586,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
-	_, sender := sdl.SchGetTaskNodeByName(msg.Task)
+	_, sender := sdl.SchGetUserTaskNode(msg.Task)
 
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno{
 		if sender == nil {
@@ -962,10 +962,10 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 	ci.local = conMgr.cfg.local
 	ci.ptnSrcTsk = srcTask
 	ci.ptnConMgr = conMgr.ptnMe
-	_, ci.ptnDhtMgr = conMgr.sdl.SchGetTaskNodeByName(DhtMgrName)
-	_, ci.ptnRutMgr = conMgr.sdl.SchGetTaskNodeByName(RutMgrName)
-	_, ci.ptnDsMgr = conMgr.sdl.SchGetTaskNodeByName(DsMgrName)
-	_, ci.ptnPrdMgr = conMgr.sdl.SchGetTaskNodeByName(PrdMgrName)
+	_, ci.ptnDhtMgr = conMgr.sdl.SchGetUserTaskNode(DhtMgrName)
+	_, ci.ptnRutMgr = conMgr.sdl.SchGetUserTaskNode(RutMgrName)
+	_, ci.ptnDsMgr = conMgr.sdl.SchGetUserTaskNode(DsMgrName)
+	_, ci.ptnPrdMgr = conMgr.sdl.SchGetUserTaskNode(PrdMgrName)
 
 	if ci.ptnSrcTsk == nil ||
 		ci.ptnConMgr == nil ||

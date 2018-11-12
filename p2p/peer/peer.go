@@ -277,7 +277,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	peMgr.ptnMe	= ptn
 	peMgr.sdl = sch.SchGetScheduler(ptn)
-	_, peMgr.ptnLsn = peMgr.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
+	_, peMgr.ptnLsn = peMgr.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 
 	var cfg *config.Cfg4PeerManager
 	if cfg = config.P2pConfig4PeerManager(peMgr.sdl.SchGetP2pCfgName()); cfg == nil {
@@ -288,13 +288,13 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	// with static network type that tabMgr and dcvMgr would be done while power on
 	if cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		peMgr.tabMgr = peMgr.sdl.SchGetTaskObject(sch.TabMgrName).(*tab.TableManager)
-		_, peMgr.ptnTab = peMgr.sdl.SchGetTaskNodeByName(sch.TabMgrName)
-		_, peMgr.ptnDcv = peMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName)
+		_, peMgr.ptnTab = peMgr.sdl.SchGetUserTaskNode(sch.TabMgrName)
+		_, peMgr.ptnDcv = peMgr.sdl.SchGetUserTaskNode(sch.DcvMgrName)
 	}
 
 	if _TEST_ == false {
 		var ok sch.SchErrno
-		ok, peMgr.ptnShell = peMgr.sdl.SchGetTaskNodeByName(sch.ShMgrName)
+		ok, peMgr.ptnShell = peMgr.sdl.SchGetUserTaskNode(sch.ShMgrName)
 		if ok != sch.SchEnoNone || peMgr.ptnShell == nil {
 			log.Debug("peMgrPoweron: shell not found")
 			return PeMgrEnoScheduler
@@ -2103,6 +2103,7 @@ rxLoop:
 				pkgCb.Payload = nil
 				pkgCb.PeerInfo = &peerInfo
 				pkgCb.ProtoId = int(upkg.Pid)
+				pkgCb.MsgId = int(upkg.Mid)
 				pkgCb.PayloadLength = int(upkg.PayloadLength)
 				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
 				inst.rxChan <- &pkgCb

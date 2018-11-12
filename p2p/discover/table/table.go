@@ -883,11 +883,11 @@ func (tabMgr *TableManager)tabSetupLocalHashId() TabMgrErrno {
 
 func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno {
 	var eno = sch.SchEnoNone
-	if eno, tabMgr.ptnNgbMgr = tabMgr.sdl.SchGetTaskNodeByName(sch.NgbMgrName); eno != sch.SchEnoNone {
+	if eno, tabMgr.ptnNgbMgr = tabMgr.sdl.SchGetUserTaskNode(sch.NgbMgrName); eno != sch.SchEnoNone {
 		log.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.NgbMgrName)
 		return TabMgrEnoScheduler
 	}
-	if eno, tabMgr.ptnDcvMgr = tabMgr.sdl.SchGetTaskNodeByName(sch.DcvMgrName); eno != sch.SchEnoNone {
+	if eno, tabMgr.ptnDcvMgr = tabMgr.sdl.SchGetUserTaskNode(sch.DcvMgrName); eno != sch.SchEnoNone {
 		log.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
 		return TabMgrEnoScheduler
 	}

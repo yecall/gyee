@@ -31,6 +31,7 @@ type P2pPackageRx struct {
 	Ptn				interface{}		// instance task node pointer
 	PeerInfo		*PeerInfo		// peer information
 	ProtoId			int				// protocol identity
+	MsgId			int				// message identity
 	PayloadLength	int				// bytes in payload buffer
 	Payload			[]byte			// payload buffer
 }

@@ -163,8 +163,8 @@ func (prdMgr *PrdMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	prdMgr.sdl = sch.SchGetScheduler(ptn)
 	prdMgr.ptnMe = ptn
-	_, prdMgr.ptnQryMgr = prdMgr.sdl.SchGetTaskNodeByName(QryMgrName)
-	_, prdMgr.ptnDhtMgr = prdMgr.sdl.SchGetTaskNodeByName(DsMgrName)
+	_, prdMgr.ptnQryMgr = prdMgr.sdl.SchGetUserTaskNode(QryMgrName)
+	_, prdMgr.ptnDhtMgr = prdMgr.sdl.SchGetUserTaskNode(DsMgrName)
 
 	prdMgr.prdCache, _ = lru.New(prdCacheSize)
 	prdMgr.ds = NewMapDatastore()

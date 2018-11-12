@@ -138,17 +138,17 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
-	if _, ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName); ptnQryMgr == nil {
+	if _, ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName); ptnQryMgr == nil {
 		log.Debug("powerOn: nil query manager")
 		return sch.SchEnoInternal
 	}
 
-	if _, ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName); ptnConMgr == nil {
+	if _, ptnConMgr = sdl.SchGetUserTaskNode(ConMgrName); ptnConMgr == nil {
 		log.Debug("powerOn: nil connection manager")
 		return sch.SchEnoInternal
 	}
 
-	if _, ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName); ptnRutMgr == nil {
+	if _, ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName); ptnRutMgr == nil {
 		log.Debug("powerOn: nil route manager")
 		return sch.SchEnoInternal
 	}

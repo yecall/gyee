@@ -104,7 +104,7 @@ func (shMgr *dhtShellManager)poweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
-	if eno, shMgr.ptnDhtMgr = shMgr.sdl.SchGetTaskNodeByName(sch.DhtMgrName); eno != sch.SchEnoNone {
+	if eno, shMgr.ptnDhtMgr = shMgr.sdl.SchGetUserTaskNode(sch.DhtMgrName); eno != sch.SchEnoNone {
 		log.Debug("poweron: dht manager task not found")
 		return eno
 	}

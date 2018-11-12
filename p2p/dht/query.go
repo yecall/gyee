@@ -259,13 +259,13 @@ func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
-	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetTaskNodeByName(DhtMgrName);
+	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetUserTaskNode(DhtMgrName);
 	eno != sch.SchEnoNone {
 		log.Debug("poweron: get task failed, task: %s", DhtMgrName)
 		return eno
 	}
 
-	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetTaskNodeByName(RutMgrName);
+	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetUserTaskNode(RutMgrName);
 	eno != sch.SchEnoNone {
 		log.Debug("poweron: get task failed, task: %s", RutMgrName)
 		return eno

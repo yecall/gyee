@@ -89,6 +89,7 @@ type Pingpong struct {
 //
 type P2pPackage struct {
 	Pid				uint32	// protocol identity
+	Mid				uint32	// message identity
 	PayloadLength	uint32	// payload length
 	Payload			[]byte	// payload
 }
@@ -569,6 +570,7 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 	//
 
 	upkg.Pid			= uint32(*pkg.Pid)
+	upkg.Mid			= uint32(*pkg.ExtMid)
 	upkg.PayloadLength	= *pkg.PayloadLength
 	upkg.Payload		= append(upkg.Payload, pkg.Payload ...)
 

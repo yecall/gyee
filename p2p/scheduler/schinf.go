@@ -204,20 +204,20 @@ func (sdl *Scheduler)SchStopTask(ptn interface{}) SchErrno {
 }
 
 // Get user task node pointer
-func (sdl *Scheduler)SchGetTaskNodeByName(name string) (eno SchErrno, task interface{}) {
+func (sdl *Scheduler)SchGetUserTaskNode(name string) (eno SchErrno, task interface{}) {
 	return sdl.schGetTaskNodeByName(name)
 }
 
 // Send message to a specific task
 func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
-	eno, src := sdl.SchGetTaskNodeByName(srcTask)
+	eno, src := sdl.SchGetUserTaskNode(srcTask)
 	if eno != SchEnoNone {
 		return eno
 	}
 	if src == nil {
 		return SchEnoInternal
 	}
-	eno, dst := sdl.SchGetTaskNodeByName(dstTask)
+	eno, dst := sdl.SchGetUserTaskNode(dstTask)
 	if eno != SchEnoNone {
 		return eno
 	}
@@ -289,7 +289,7 @@ func SchGetScheduler(ptn interface{}) *Scheduler {
 
 // Get user task interface exported to scheduler
 func (sdl *Scheduler)SchGetTaskObject(tn string) interface{} {
-	eno, ptn := sdl.SchGetTaskNodeByName(tn)
+	eno, ptn := sdl.SchGetUserTaskNode(tn)
 	if eno != SchEnoNone {
 		return nil
 	}
@@ -334,7 +334,7 @@ func (sdl *Scheduler)SchShowTaskName() []string {
 
 // Test if task exist with specific name
 func (sdl *Scheduler)SchTaskExist(name string) bool {
-	eno, ptn := sdl.SchGetTaskNodeByName(name)
+	eno, ptn := sdl.SchGetUserTaskNode(name)
 	return eno == SchEnoNone && ptn != nil
 }
 

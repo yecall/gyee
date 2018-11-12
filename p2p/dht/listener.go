@@ -162,7 +162,7 @@ func (lsnMgr *LsnMgr)poweron(ptn interface{}) sch.SchErrno {
 	sdl := sch.SchGetScheduler(ptn)
 	lsnMgr.sdl = sdl
 	lsnMgr.ptnMe = ptn
-	_, lsnMgr.ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName)
+	_, lsnMgr.ptnConMgr = sdl.SchGetUserTaskNode(ConMgrName)
 
 	if lsnMgr.sdl == nil || lsnMgr.ptnMe == nil || lsnMgr.ptnConMgr == nil {
 		log.Debug("poweron: scheduler failed")

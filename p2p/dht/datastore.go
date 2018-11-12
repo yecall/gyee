@@ -240,9 +240,9 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 	}
 
 	dsMgr.ptnMe = ptn
-	_, dsMgr.ptnDhtMgr = sdl.SchGetTaskNodeByName(DsMgrName)
-	_, dsMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
-	_, dsMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
+	_, dsMgr.ptnDhtMgr = sdl.SchGetUserTaskNode(DsMgrName)
+	_, dsMgr.ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName)
+	_, dsMgr.ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName)
 
 	if dsMgr.ptnDhtMgr == nil ||
 		dsMgr.ptnQryMgr == nil ||

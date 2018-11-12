@@ -306,7 +306,7 @@ func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, _ *sch.SchMessage)
 	var eno = sch.SchEnoNone
 	buf := make([]byte, udpMaxMsgSize)
 	udpReader.ptnMe = ptn
-	_, udpReader.ptnNgbMgr = udpReader.sdl.SchGetTaskNodeByName(NgbMgrName)
+	_, udpReader.ptnNgbMgr = udpReader.sdl.SchGetUserTaskNode(NgbMgrName)
 	// We just read until errors fired from udp, for example, when
 	// the mamager is asked to stop the reader, it can close the
 	// connection. See function procStop for details please.

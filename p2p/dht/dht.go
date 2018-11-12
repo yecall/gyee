@@ -203,15 +203,15 @@ func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
 	dhtMgr.sdl = sdl
 
 	dhtMgr.ptnMe = ptn
-	_, dhtMgr.ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName)
-	_, dhtMgr.ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName)
-	_, dhtMgr.ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName)
-	_, dhtMgr.ptnPrdMgr = sdl.SchGetTaskNodeByName(PrdMgrName)
-	_, dhtMgr.ptnDsMgr = sdl.SchGetTaskNodeByName(DsMgrName)
+	_, dhtMgr.ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName)
+	_, dhtMgr.ptnConMgr = sdl.SchGetUserTaskNode(ConMgrName)
+	_, dhtMgr.ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName)
+	_, dhtMgr.ptnPrdMgr = sdl.SchGetUserTaskNode(PrdMgrName)
+	_, dhtMgr.ptnDsMgr = sdl.SchGetUserTaskNode(DsMgrName)
 
 	if _TEST_ == false {
 		var eno sch.SchErrno
-		eno, dhtMgr.ptnShMgr = sdl.SchGetTaskNodeByName(sch.DhtShMgrName)
+		eno, dhtMgr.ptnShMgr = sdl.SchGetUserTaskNode(sch.DhtShMgrName)
 		if eno != sch.SchEnoNone || dhtMgr.ptnShMgr == nil {
 			log.Debug("poweron: shell not found")
 			return sch.SchEnoNotFound

@@ -112,12 +112,12 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 		return DcvMgrEnoNone
 	}
 
-	if eno, dcvMgr.ptnTab = sdl.SchGetTaskNodeByName(sch.TabMgrName); eno != sch.SchEnoNone {
+	if eno, dcvMgr.ptnTab = sdl.SchGetUserTaskNode(sch.TabMgrName); eno != sch.SchEnoNone {
 		log.Debug("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
 		return DcvMgrEnoScheduler
 	}
 
-	if eno, dcvMgr.ptnPeMgr = dcvMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName); eno != sch.SchEnoNone {
+	if eno, dcvMgr.ptnPeMgr = dcvMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName); eno != sch.SchEnoNone {
 		log.Debug("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
 		return DcvMgrEnoScheduler
 	}

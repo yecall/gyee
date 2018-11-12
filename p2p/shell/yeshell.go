@@ -25,11 +25,13 @@ import (
 	"time"
 	"errors"
 	"fmt"
+	yep2p "github.com/yeeco/gyee/p2p"
 	log "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
-	yep2p "github.com/yeeco/gyee/p2p"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	dht "github.com/yeeco/gyee/p2p/dht"
+	peer "github.com/yeeco/gyee/p2p/peer"
+	pepb "github.com/yeeco/gyee/p2p/peer/pb"
 )
 
 const (
@@ -56,6 +58,7 @@ type yeShellManager struct {
 	dhtEvChan			chan *sch.MsgDhtShEventInd				// dht event indication channel
 	dhtCsChan			chan *sch.MsgDhtConInstStatusInd		// dht connection status indication channel
 	subscribers      	*sync.Map								// subscribers for incoming messages
+	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
 }
 
 func NewYeshellManager(cfg *config.Config) *yeShellManager {
@@ -74,7 +77,7 @@ func NewYeshellManager(cfg *config.Config) *yeShellManager {
 		return nil
 	}
 
-	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetTaskNodeByName(sch.ShMgrName)
+	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
 		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
@@ -92,7 +95,7 @@ func NewYeshellManager(cfg *config.Config) *yeShellManager {
 		return nil
 	}
 
-	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetTaskNodeByName(sch.DhtShMgrName)
+	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
 		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
@@ -112,9 +115,11 @@ func NewYeshellManager(cfg *config.Config) *yeShellManager {
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
 	yeShMgr.subscribers = new(sync.Map);
+	yeShMgr.chainRxChan = yeShMgr.ptChainShMgr.GetRxChan()
 
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
+	go yeShMgr.chainRxProc()
 
 	return &yeShMgr
 }
@@ -401,6 +406,45 @@ _csLoop:
 	log.Debug("dhtCsProc: exit")
 }
 
+func (yeShMgr *yeShellManager)chainRxProc() {
+
+	mid2Str := map[int] string {
+		int(pepb.MessageId_MID_TX): yep2p.MessageTypeTx,
+		int(pepb.MessageId_MID_EVENT): yep2p.MessageTypeEvent,
+		int(pepb.MessageId_MID_BLOCKHEADER): yep2p.MessageTypeBlockHeader,
+		int(pepb.MessageId_MID_BLOCK): yep2p.MessageTypeBlock,
+	}
+
+_rxLoop:
+	for {
+		select {
+		case pkg, ok := <-yeShMgr.chainRxChan:
+			if !ok {
+				log.Debug("chainRxProc: channel closed")
+				break _rxLoop
+			}
+			if pkg.ProtoId != int(peer.PID_EXT) {
+				log.Debug("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
+				continue
+			}
+			msgType := mid2Str[pkg.MsgId]
+			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
+				subList.(*sync.Map).Range(func(key, value interface{}) bool {
+					msg := yep2p.Message {
+						MsgType: msgType,
+						From: fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
+						Data: pkg.Payload,
+					}
+					sub, _ := key.(*yep2p.Subscriber)
+					sub.MsgChan<-msg
+					return true
+				})
+			}
+		}
+	}
+	log.Debug("chainRxProc: exit")
+}
+
 func (yeShMgr *yeShellManager)broadcastTx(msg *yep2p.Message) error {
 	return nil
 }
@@ -432,3 +476,4 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
 func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
 	return nil
 }
+

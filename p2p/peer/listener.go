@@ -86,7 +86,7 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	lsnMgr.ptn = ptn
 	lsnMgr.sdl = sdl
-	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName); eno != sch.SchEnoNone {
+	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName); eno != sch.SchEnoNone {
 		return eno
 	}
 	if lsnMgr.ptnPeerMgr == nil {
@@ -124,7 +124,7 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 	// to close it, see function lsnMgrStop. BUT in extreme case, the accepter task
 	// might be still alive in the scheduler, so we had to check this by the name of
 	// accepter with the scheduler.
-	if eno, _ := lsnMgr.sdl.SchGetTaskNodeByName(PeerAccepterName); eno == sch.SchEnoNone {
+	if eno, _ := lsnMgr.sdl.SchGetUserTaskNode(PeerAccepterName); eno == sch.SchEnoNone {
 		return sch.SchEnoDuplicated
 	}
 	if lsnMgr.accepter != nil {
@@ -205,14 +205,14 @@ func (accepter *acceptTskCtrlBlock)TaskProc4Scheduler(ptn interface{}, msg *sch.
 
 func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
 	sdl := accepter.sdl.SchGetP2pCfgName()
-	_, accepter.ptnLsnMgr = accepter.sdl.SchGetTaskNodeByName(PeerLsnMgrName)
+	_, accepter.ptnLsnMgr = accepter.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 	if accepter.ptnLsnMgr == nil {
 		log.Debug("PeerAcceptProc: sdl: %s, invalid listener manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
-	_, accepter.ptnPeMgr = accepter.sdl.SchGetTaskNodeByName(sch.PeerMgrName)
+	_, accepter.ptnPeMgr = accepter.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	if accepter.ptnPeMgr == nil {
 		log.Debug("PeerAcceptProc: sdl: %s, invalid peer manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)

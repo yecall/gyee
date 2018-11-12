@@ -27,12 +27,15 @@ import (
 	peer "github.com/yeeco/gyee/p2p/peer"
 )
 
-const ShMgrName = sch.ShMgrName
+const (
+	ShMgrName = sch.ShMgrName					// name registered in scheduler
+	rxChanSize = 128							// total rx chan capacity
+)
 
 type shellPeerID struct {
-	snid		config.SubNetworkID // sub network identity
-	dir    		int         	  	// direct
-	nodeId		config.NodeID		// node identity
+	snid		config.SubNetworkID 			// sub network identity
+	dir    		int         	  				// direct
+	nodeId		config.NodeID					// node identity
 }
 
 type shellPeerInst struct {
@@ -55,6 +58,7 @@ type shellManager struct {
 	ptnMe			interface{}						// pointer to task node of myself
 	ptnPeMgr		interface{}						// pointer to task node of peer manager
 	peerActived		map[shellPeerID]shellPeerInst	// active peers
+	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all intances
 }
 
 //
@@ -64,6 +68,7 @@ func NewShellMgr() *shellManager  {
 	shMgr := shellManager {
 		name: ShMgrName,
 		peerActived: make(map[shellPeerID]shellPeerInst, 0),
+		rxChan: make(chan *peer.P2pPackageRx, rxChanSize),
 	}
 	shMgr.tep = shMgr.shMgrProc
 	return &shMgr
@@ -104,7 +109,7 @@ func (shMgr *shellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 func (shMgr *shellManager)powerOn(ptn interface{}) sch.SchErrno {
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
-	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetTaskNodeByName(sch.PeerMgrName)
+	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	return sch.SchEnoNone
 }
 
@@ -134,6 +139,20 @@ func (shMgr *shellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 		return sch.SchEnoUserTask
 	}
 	shMgr.peerActived[peerId] = peerInst
+
+	go func() {
+		for {
+			select {
+			case rxPkg, ok := <-peerInst.rxChan:
+				if !ok {
+					log.Debug("exit for rxChan closed")
+					return
+				}
+				shMgr.rxChan<-rxPkg
+			}
+		}
+	}()
+
 	return sch.SchEnoNone
 }
 
@@ -160,7 +179,7 @@ func (shMgr *shellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErr
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
 	panic("peerCloseInd: should never be called!!!")
-	return sch.SchEnoNone
+	return sch.SchEnoInternal
 }
 
 func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
@@ -193,3 +212,6 @@ func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 	}
 }
 
+func (shMgr *shellManager)GetRxChan() chan *peer.P2pPackageRx {
+	return shMgr.rxChan
+}
