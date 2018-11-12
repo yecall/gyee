@@ -90,10 +90,14 @@ const MaxInbounds	= MaxPeers / 2 // +2
 const MaxOutbounds	= MaxPeers / 2 // +2
 
 // Node
-type SubNetworkID [2]byte					// sbu network identity
 const SubNetIdBytes = 2						// 2 bytes for sub network identity
-var ZeroSubNet = SubNetworkID{0,0}			// zero sub network
-var AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
+type SubNetworkID [SubNetIdBytes]byte		// sbu network identity
+
+var (
+	ZeroSubNet = SubNetworkID{0,0}			// zero sub network
+	AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
+	VSubNet = SubNetworkID{0xef, 0xff}		// validators' sub network identity
+)
 
 type Node struct {
 	IP				net.IP					// ip address

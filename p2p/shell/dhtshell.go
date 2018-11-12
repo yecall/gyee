@@ -27,7 +27,11 @@ import (
 )
 
 
-const dhtShMgrName = sch.DhtShMgrName
+const (
+	dhtShMgrName = sch.DhtShMgrName						// name registered in scheduler
+	dhtShEvQueueSize = 64								// event indication queue size
+	dhtShCsQueueSize = 64								// connection status indication queue size
+)
 
 type dhtShellManager struct {
 	sdl				*sch.Scheduler						// pointer to scheduler
@@ -45,8 +49,10 @@ type dhtShellManager struct {
 func NewDhtShellMgr() *dhtShellManager {
 	shMgr := dhtShellManager {
 		name: dhtShMgrName,
+		evChan: make(chan *sch.MsgDhtShEventInd, dhtShEvQueueSize),
+		csChan: make(chan *sch.MsgDhtConInstStatusInd, dhtShCsQueueSize),
 	}
-	shMgr.tep = nil
+	shMgr.tep = shMgr.shMgrProc
 	return &shMgr
 }
 
@@ -95,11 +101,21 @@ func (shMgr *dhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 }
 
 func (shMgr *dhtShellManager)poweron(ptn interface{}) sch.SchErrno {
+	var eno sch.SchErrno
+	shMgr.ptnMe = ptn
+	shMgr.sdl = sch.SchGetScheduler(ptn)
+	if eno, shMgr.ptnDhtMgr = shMgr.sdl.SchGetTaskNodeByName(sch.DhtMgrName); eno != sch.SchEnoNone {
+		log.Debug("poweron: dht manager task not found")
+		return eno
+	}
 	return sch.SchEnoNone
 }
 
 func (shMgr *dhtShellManager)poweroff(ptn interface{}) sch.SchErrno {
-	return sch.SchEnoNone
+	log.Debug("poweroff: task will be done...")
+	close(shMgr.evChan)
+	close(shMgr.csChan)
+	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
 }
 
 func (shMgr *dhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {
@@ -142,10 +158,15 @@ func (shMgr *dhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 
 	case  sch.EvDhtConInstStatusInd:
 		eno = shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
+		return eno
 
 	default:
 		log.Debug("dhtTestEventCallback: unknown event type: %d", evt)
-		eno = sch.SchEnoParameter
+		return sch.SchEnoParameter
+	}
+
+	if eno == sch.SchEnoNone {
+		shMgr.evChan<-ind
 	}
 
 	return eno
@@ -221,8 +242,10 @@ func (shMgr *dhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 
 	default:
 		log.Debug("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
+		return sch.SchEnoParameter
 	}
 
+	shMgr.csChan<-msg
 	return sch.SchEnoNone
 }
 

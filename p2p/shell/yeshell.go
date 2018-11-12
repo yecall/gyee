@@ -23,12 +23,13 @@ package shell
 import (
 	"sync"
 	"time"
+	"errors"
+	"fmt"
 	log "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 	yep2p "github.com/yeeco/gyee/p2p"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	dht "github.com/yeeco/gyee/p2p/dht"
-	"errors"
 )
 
 const (
@@ -141,11 +142,37 @@ func (yeShMgr *yeShellManager)Stop() {
 }
 
 func (yeShMgr *yeShellManager)BroadcastMessage(message yep2p.Message) error {
-	return nil
+	var err error = nil
+	switch message.MsgType {
+	case yep2p.MessageTypeTx:
+		err = yeShMgr.broadcastTx(&message)
+	case yep2p.MessageTypeEvent:
+		err = yeShMgr.broadcastEv(&message)
+	case yep2p.	MessageTypeBlockHeader:
+		err = yeShMgr.broadcastBh(&message)
+	case yep2p.	MessageTypeBlock:
+		err = yeShMgr.broadcastBk(&message)
+	default:
+		return errors.New(fmt.Sprintf("BroadcastMessage: invalid type: %d", message.MsgType))
+	}
+	return err
 }
 
 func (yeShMgr *yeShellManager)BroadcastMessageOsn(message yep2p.Message) error {
-	return nil
+	var err error = nil
+	switch message.MsgType {
+	case yep2p.MessageTypeTx:
+		err = yeShMgr.broadcastTxOsn(&message)
+	case yep2p.MessageTypeEvent:
+		err = yeShMgr.broadcastEvOsn(&message)
+	case yep2p.	MessageTypeBlockHeader:
+		err = yeShMgr.broadcastBhOsn(&message)
+	case yep2p.	MessageTypeBlock:
+		err = yeShMgr.broadcastBkOsn(&message)
+	default:
+		return errors.New(fmt.Sprintf("BroadcastMessageOsn: invalid type: %d", message.MsgType))
+	}
+	return err
 }
 
 func (yeShMgr *yeShellManager)Register(subscriber *yep2p.Subscriber) {
@@ -312,8 +339,22 @@ func (yeShMgr *yeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 func (yeShMgr *yeShellManager)dhtEvProc() {
 	evCh := yeShMgr.dhtEvChan
 	evHandler := func(evi *sch.MsgDhtShEventInd) {
-
+		switch evi.Evt {
+		case  sch.EvDhtBlindConnectRsp:
+		case  sch.EvDhtMgrFindPeerRsp:
+		case  sch.EvDhtQryMgrQueryStartRsp:
+		case  sch.EvDhtQryMgrQueryStopRsp:
+		case  sch.EvDhtConMgrSendCfm:
+		case  sch.EvDhtMgrPutProviderRsp:
+		case  sch.EvDhtMgrGetProviderRsp:
+		case  sch.EvDhtMgrPutValueRsp:
+		case  sch.EvDhtMgrGetValueRsp:
+		case  sch.EvDhtConMgrCloseRsp:
+		case  sch.EvDhtConInstStatusInd:
+		default:
+		}
 	}
+
 _evLoop:
 	for {
 		select {
@@ -332,8 +373,19 @@ _evLoop:
 func (yeShMgr *yeShellManager)dhtCsProc() {
 	csCh := yeShMgr.dhtCsChan
 	csHandler := func(csi *sch.MsgDhtConInstStatusInd) {
-
+		switch csi.Status {
+		case dht.CisNull:
+		case dht.CisConnecting:
+		case dht.CisConnected:
+		case dht.CisAccepted:
+		case dht.CisInHandshaking:
+		case dht.CisHandshaked:
+		case dht.CisInService:
+		case dht.CisClosed:
+		default:
+		}
 	}
+
 _csLoop:
 	for {
 		select {
@@ -347,4 +399,36 @@ _csLoop:
 		}
 	}
 	log.Debug("dhtCsProc: exit")
+}
+
+func (yeShMgr *yeShellManager)broadcastTx(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastEv(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastBh(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastBk(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
+	return nil
+}
+
+func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
+	return nil
 }

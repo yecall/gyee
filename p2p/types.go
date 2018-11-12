@@ -21,9 +21,10 @@
 package p2p
 
 const (
-	MessageTypeTx    = "tx"
-	MessageTypeEvent = "ev"
-	MessageTypeBlock = "blk"
+	MessageTypeTx    		= "tx"
+	MessageTypeEvent 		= "ev"
+	MessageTypeBlockHeader	= "blkH"
+	MessageTypeBlock 		= "blk"
 )
 
 type Message struct {

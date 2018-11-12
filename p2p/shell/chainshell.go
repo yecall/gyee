@@ -40,7 +40,7 @@ type shellPeerInst struct {
 	txChan		chan *peer.P2pPackage			// tx channel of peer instance
 	rxChan		chan *peer.P2pPackageRx			// rx channel of peer instance
 	hsInfo		*peer.Handshake					// handshake info about peer
-	status			int							// active peer instance status
+	status		int								// active peer instance status
 }
 
 const (
