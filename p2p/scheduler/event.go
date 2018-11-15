@@ -31,7 +31,7 @@ package scheduler
 import (
 	"net"
 	"time"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 )
 

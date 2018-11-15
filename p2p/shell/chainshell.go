@@ -21,10 +21,10 @@
 package shell
 
 import (
-	log "github.com/ethereum/go-ethereum/log"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	peer "github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/peer"
 )
 
 const (

@@ -27,12 +27,12 @@ import (
 	"math/rand"
 	"fmt"
 	"sync"
+	"bytes"
 	"crypto/sha256"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"bytes"
 )
 
 

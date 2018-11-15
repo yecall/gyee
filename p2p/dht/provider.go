@@ -24,11 +24,11 @@ package dht
 import (
 	"time"
 	"sync"
-	config "github.com/yeeco/gyee/p2p/config"
+	"bytes"
+	"github.com/yeeco/gyee/p2p/config"
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	"bytes"
 )
 
 //
@@ -211,7 +211,7 @@ func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 
 		if i, ok := c.Get(k); ok {
 
-			del := []config.NodeID{}
+			del := make([]config.NodeID, 0)
 			ps := i.(*PrdSet)
 
 			for id, t := range ps.addTime {
@@ -299,7 +299,7 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 	var dsk DsKey
 	copy(dsk[0:], msg.Key)
 
-	var prds = []*config.Node{}
+	var prds = make([]*config.Node, 0)
 	var eno = DhtErrno(DhtEnoUnknown)
 	var qry = sch.MsgDhtQryMgrQueryStartReq{}
 	var schMsg = sch.SchMessage{}

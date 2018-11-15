@@ -36,12 +36,12 @@ import (
 	"errors"
 	golog	"log"
 	"crypto/sha256"
-	shell	"github.com/yeeco/gyee/p2p/shell"
-	peer	"github.com/yeeco/gyee/p2p/peer"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/shell"
+	"github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	dht		"github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/dht"
 )
 
 //
@@ -165,6 +165,7 @@ const (
 )
 
 func newTcb(name string, idEx peerIdEx, tcbList map[peerIdEx]*testCaseCtrlBlock, lock sync.Mutex) *testCaseCtrlBlock {
+	_, _ = tcbList, lock
 	tcb := testCaseCtrlBlock {
 		peerId: idEx,
 		done: make(chan bool),
@@ -435,6 +436,7 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 }
 
 func p2pPkgProc(pkg *peer.P2pPackageRx, userData interface{}) interface{} {
+	_, _ = pkg, userData
 	return nil
 }
 
@@ -464,7 +466,7 @@ func main() {
 // testCase0
 //
 func testCase0(tc *testCase) {
-
+	_ = tc
 	log.Debug("testCase0: going to start ycp2p...")
 
 	// fetch default from underlying
@@ -524,6 +526,7 @@ func testCase0(tc *testCase) {
 // testCase1
 //
 func testCase1(tc *testCase) {
+	_ = tc
 	log.Debug("testCase1: going to start ycp2p ...")
 
 	var p2pInstNum = 16
@@ -531,7 +534,7 @@ func testCase1(tc *testCase) {
 	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 	for loop := 0; loop < p2pInstNum; loop++ {
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.Debug("testCase1: handling configuration:%s ...", cfgName)
@@ -610,13 +613,13 @@ func testCase1(tc *testCase) {
 // testCase2
 //
 func testCase2(tc *testCase) {
-
+	_ = tc
 	log.Debug("testCase2: going to start ycp2p ...")
 
 	var p2pInstNum = 8
 	var cfgName = ""
 
-	var staticNodeIdList = []*config.Node{}
+	var staticNodeIdList = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
@@ -694,7 +697,7 @@ func testCase2(tc *testCase) {
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 	}
 
-	var p2pInstList = []*sch.Scheduler{}
+	var p2pInstList = make([]*sch.Scheduler, 0)
 	for p2pInst := range p2pInst2Cfg {
 		p2pInstList = append(p2pInstList, p2pInst)
 	}
@@ -734,7 +737,7 @@ func testCase2(tc *testCase) {
 // testCase3
 //
 func testCase3(tc *testCase) {
-
+	_ = tc
 	log.Debug("testCase3: going to start ycp2p ...")
 
 	var p2pInstNum = 16
@@ -743,7 +746,7 @@ func testCase3(tc *testCase) {
 	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
@@ -864,7 +867,7 @@ func testCase3(tc *testCase) {
 // testCase4
 //
 func testCase4(tc *testCase) {
-
+	_ = tc
 	log.Debug("testCase4: going to start ycp2p ...")
 
 	var p2pInstNum = 8
@@ -873,10 +876,10 @@ func testCase4(tc *testCase) {
 	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 	var p2pInstBootstrap *sch.Scheduler = nil
 
-	var staticNodeIdList = []*config.Node{}
+	var staticNodeIdList = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
@@ -1021,7 +1024,7 @@ func testCase4(tc *testCase) {
 		}
 	}
 
-	var p2pInstList = []*sch.Scheduler{}
+	var p2pInstList = make([]*sch.Scheduler, 0)
 	for p2pInst := range p2pInst2Cfg {
 		if p2pInst != p2pInstBootstrap {
 			p2pInstList = append(p2pInstList, p2pInst)
@@ -1070,6 +1073,7 @@ func testCase4(tc *testCase) {
 //
 func testCase5(tc *testCase) {
 
+	_ = tc
 	log.Debug("testCase5: going to start ycp2p ...")
 
 	var p2pInstNum = 16
@@ -1078,10 +1082,10 @@ func testCase5(tc *testCase) {
 	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 	var p2pInstBootstrap *sch.Scheduler = nil
 
-	var staticNodeIdList = []*config.Node{}
+	var staticNodeIdList = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
@@ -1227,7 +1231,7 @@ func testCase5(tc *testCase) {
 		}
 	}
 
-	var p2pInstList = []*sch.Scheduler{}
+	var p2pInstList = make([]*sch.Scheduler, 0)
 	for p2pInst := range p2pInst2Cfg {
 		if p2pInst != p2pInstBootstrap {
 			p2pInstList = append(p2pInstList, p2pInst)
@@ -1305,11 +1309,12 @@ _waitStop:
 // testCase6
 //
 func testCase6(tc *testCase) {
-	
+
+	_ = tc
 	log.Debug("testCase6: going to start ycDht ...")
 
 	var dhtInstNum = 8
-	var dhtInstList = []*sch.Scheduler{}
+	var dhtInstList = make([]*sch.Scheduler, 0)
 
 	for loop := 0; loop < dhtInstNum; loop++ {
 
@@ -1387,10 +1392,11 @@ func testCase6(tc *testCase) {
 //
 func testCase7(tc *testCase) {
 
+	_ = tc
 	log.Debug("testCase7: going to start ycDht ...")
 
 	var dhtInstNum = 32
-	var dhtInstList = []*sch.Scheduler{}
+	var dhtInstList = make([]*sch.Scheduler, 0)
 
 	for loop := 0; loop < dhtInstNum; loop++ {
 
@@ -1710,7 +1716,7 @@ type DhtTestKV struct {
 }
 func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 	rand.Seed(time.Now().Unix())
-	kvList := []*DhtTestKV{}
+	kvList := make([]*DhtTestKV, 0)
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:	nil,
 		Val:	nil,
@@ -1759,7 +1765,7 @@ type DhtTestPrd struct {
 }
 func dhtTestPutProvider(dhtInstList []*sch.Scheduler) (int, []*DhtTestPrd) {
 	rand.Seed(time.Now().Unix())
-	prdList := []*DhtTestPrd{}
+	prdList := make([]*DhtTestPrd, 0)
 	req := sch.MsgDhtPrdMgrAddProviderReq {
 		Key:	nil,
 		Prd:	config.Node{},

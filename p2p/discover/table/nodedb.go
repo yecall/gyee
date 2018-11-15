@@ -36,7 +36,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 
 	log "github.com/yeeco/gyee/p2p/logger"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 var (
@@ -96,7 +96,7 @@ func newPersistentNodeDB(path string, version int, self NodeID) (*nodeDB, error)
 	if err != nil {
 		return nil, err
 	}
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, self[:]...)
 	idEx = append(idEx, ZeroSubNet[:]...)
 	verKey := makeKey(idEx, versionKey)
@@ -157,7 +157,7 @@ func (db *nodeDB) storeInt64(key []byte, n int64) error {
 }
 
 func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	blob, err := db.lvl.Get(makeKey(idEx, rootKey), nil)
@@ -178,14 +178,14 @@ func (db *nodeDB) updateNode(snid SubNetworkID, node *Node) error {
 	if err != nil {
 		return err
 	}
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, node.ID[:]...)
 	idEx = append(idEx, snid[:]...)
 	return db.lvl.Put(makeKey(idEx, rootKey), blob, nil)
 }
 
 func (db *nodeDB) deleteNode(snid SubNetworkID, id NodeID) error {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	deleter := db.lvl.NewIterator(util.BytesPrefix(makeKey(idEx, "")), nil)
@@ -221,42 +221,42 @@ func (db *nodeDB) expireNodes() error {
 }
 
 func (db *nodeDB) lastPing(snid SubNetworkID, id NodeID) time.Time {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	return time.Unix(db.fetchInt64(makeKey(idEx, pingKey)), 0)
 }
 
 func (db *nodeDB) updateLastPing(snid SubNetworkID, id NodeID, instance time.Time) error {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	return db.storeInt64(makeKey(idEx, pingKey), instance.Unix())
 }
 
 func (db *nodeDB) lastPong(snid SubNetworkID, id NodeID) time.Time {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	return time.Unix(db.fetchInt64(makeKey(idEx, pongKey)), 0)
 }
 
 func (db *nodeDB) updateLastPong(snid SubNetworkID, id NodeID, instance time.Time) error {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	return db.storeInt64(makeKey(idEx, pongKey), instance.Unix())
 }
 
 func (db *nodeDB) findFails(snid SubNetworkID, id NodeID) int {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	return int(db.fetchInt64(makeKey(idEx, findfailKey)))
 }
 
 func (db *nodeDB) updateFindFails(snid SubNetworkID, id NodeID, fails int) error {
-	var idEx = []byte{}
+	var idEx = make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	return db.storeInt64(makeKey(idEx, findfailKey), int64(fails))
@@ -287,7 +287,7 @@ seek:
 		id[0] = ctr + id[0]%16
 
 		// construct the key
-		var idEx = []byte{}
+		var idEx = make([]byte, 0)
 		idEx = append(idEx, id[:]...)
 		idEx = append(idEx, snid[:]...)
 

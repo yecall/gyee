@@ -27,10 +27,10 @@ import (
 	"fmt"
 	yep2p "github.com/yeeco/gyee/p2p"
 	log "github.com/yeeco/gyee/p2p/logger"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	dht "github.com/yeeco/gyee/p2p/dht"
-	peer "github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/peer"
 	pepb "github.com/yeeco/gyee/p2p/peer/pb"
 )
 
@@ -114,7 +114,7 @@ func NewYeshellManager(cfg *config.Config) *yeShellManager {
 	yeShMgr.putProviderMap = make(map[yesKey]chan interface{}, yesMaxPutProvider)
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
-	yeShMgr.subscribers = new(sync.Map);
+	yeShMgr.subscribers = new(sync.Map)
 	yeShMgr.chainRxChan = yeShMgr.ptChainShMgr.GetRxChan()
 
 	go yeShMgr.dhtEvProc()

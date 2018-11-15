@@ -147,8 +147,8 @@ type Config struct {
 	StaticNodes			[]*Node					// static nodes
 	NodeDataDir			string					// node data directory
 	NodeDatabase		string					// node database
-	NoDial				bool					// outboundless flag
-	NoAccept			bool					// inboundless flag
+	NoDial				bool					// do not dial out flag
+	NoAccept			bool					// do not accept incoming dial flag
 	BootstrapNode		bool					// bootstrap node flag
 	Local				Node					// local node struct
 	ProtoNum			uint32					// local protocol number
@@ -886,24 +886,24 @@ func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 // controls whether the key's length should be enforced at the curve size or
 // it can also accept legacy encodings (0 prefixes).
 func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
-	priv := new(ecdsa.PrivateKey)
-	priv.PublicKey.Curve = S256()
-	if strict && 8*len(d) != priv.Params().BitSize {
-		return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
+	priK := new(ecdsa.PrivateKey)
+	priK.PublicKey.Curve = S256()
+	if strict && 8*len(d) != priK.Params().BitSize {
+		return nil, fmt.Errorf("invalid length, need %d bits", priK.Params().BitSize)
 	}
-	priv.D = new(big.Int).SetBytes(d)
-	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(d)
-	if priv.PublicKey.X == nil {
+	priK.D = new(big.Int).SetBytes(d)
+	priK.PublicKey.X, priK.PublicKey.Y = priK.PublicKey.Curve.ScalarBaseMult(d)
+	if priK.PublicKey.X == nil {
 		return nil, errors.New("invalid private key")
 	}
-	return priv, nil
+	return priK, nil
 }
 
 // FromECDSA exports a private key into a binary dump.
-func FromECDSA(priv *ecdsa.PrivateKey) []byte {
-	if priv == nil {
+func FromECDSA(priK *ecdsa.PrivateKey) []byte {
+	if priK == nil {
 		return nil
 	}
-	return priv.D.Bytes()
+	return priK.D.Bytes()
 }
 

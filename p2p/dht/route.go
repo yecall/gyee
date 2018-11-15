@@ -29,7 +29,7 @@ import (
 	"fmt"
 	golog "log"
 	log	"github.com/yeeco/gyee/p2p/logger"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 

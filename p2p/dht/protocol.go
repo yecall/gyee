@@ -25,7 +25,7 @@ import (
 	"time"
 	"bytes"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
 )
 

@@ -511,7 +511,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 
 	qcb.qryPending = list.New()
 
-	pendInfo := []*qryPendingInfo{}
+	pendInfo := make([]*qryPendingInfo, 0)
 	for idx := 0; idx < len(peers); idx++ {
 		var pi = qryPendingInfo{
 			rutMgrBucketNode:*peers[idx],
@@ -584,7 +584,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 	}
 
 	qpi := msg.Peers.([]*rutMgrBucketNode)
-	pendInfo := []*qryPendingInfo{}
+	pendInfo := make([]*qryPendingInfo, 0)
 	for idx := 0; idx < len(qpi); idx++ {
 		var pi = qryPendingInfo{
 			rutMgrBucketNode:*qpi[idx],
@@ -736,9 +736,9 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	}
 
 	var qcb *qryCtrlBlock= nil
-	var qpiList = []*qryPendingInfo{}
-	var hashList = []*Hash{}
-	var distList = []int{}
+	var qpiList = make([]*qryPendingInfo, 0)
+	var hashList = make([]*Hash, 0)
+	var distList = make([]int, 0)
 	var rutMgr = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
 
 	if len(msg.Peers) != len(msg.Pcs) {

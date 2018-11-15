@@ -234,7 +234,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	p2pInstName := sdl.SchGetP2pCfgName()
 	log.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
 
-	var staticTasks = []string{}
+	var staticTasks = make([]string, 0)
 	appType := sdl.SchGetAppType()
 
 	if P2pType(appType) == config.P2P_TYPE_CHAIN {

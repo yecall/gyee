@@ -24,7 +24,7 @@ package scheduler
 import (
 	"sync"
 	"time"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
@@ -98,7 +98,6 @@ type schTmcbNode struct {
 // Timer node pool
 //
 const schTimerNodePoolSize	= 2048						// timer node pool size, must be (2^n)
-var schTimerNodePool [schTimerNodePoolSize]schTmcbNode	// timer node pool
 
 //
 // Task struct
@@ -136,11 +135,10 @@ type schTaskNode struct {
 
 //
 // The ycp2p scheduler struct: since it's only planed to invoke the scheduler
-// internal modle ycp2p, this struct is not exported, any interface to created
+// internal mode ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
 const schTaskNodePoolSize = 1024						// task node pool size, must be (2^n)
-var schTaskNodePool	[schTaskNodePoolSize]schTaskNode	// task node pool
 
 type scheduler struct {
 

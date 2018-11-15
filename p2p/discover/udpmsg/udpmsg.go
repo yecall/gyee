@@ -23,7 +23,7 @@ package udpmsg
 import (
 	"net"
 	log	"github.com/yeeco/gyee/p2p/logger"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	pb		"github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
 )
 

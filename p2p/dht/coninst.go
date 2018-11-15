@@ -30,7 +30,7 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
 )
 

@@ -26,7 +26,7 @@ import (
 	"strings"
 	"runtime"
 	"fmt"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 

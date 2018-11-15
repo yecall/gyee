@@ -21,9 +21,9 @@
 package shell
 
 import (
-	log "github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/log"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	dht "github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/dht"
 )
 
 

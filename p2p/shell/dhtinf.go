@@ -24,7 +24,7 @@ package shell
 import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	dht "github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/dht"
 )
 
 //

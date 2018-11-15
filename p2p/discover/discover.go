@@ -22,7 +22,7 @@
 package discover
 
 import (
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
