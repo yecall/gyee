@@ -64,22 +64,27 @@ type yeShellManager struct {
 	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
 }
 
+const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity
+
 type YeShellConfig struct {
 	// Notice: in current stage, a simple configuration for p2p is applied, for total configuration
 	// about p2p, see config.Config please.
 	AppType				config.P2pAppType						// application type
 	Name				string									// node name
+	Validator			bool									// validator flag
 	BootstrapNode		bool									// bootstrap node flag
 	BootstrapNodes		[]*config.Node							// bootstrap nodes
 	NodeDataDir			string									// node data directory
 	NodeDatabase		string									// node database
-	SubNetIdList		[]config.SubNetworkID					// sub network identity list
+	SubNetMaskBits		int										// mask bits for sub network identity
 }
 
 const (
 	ChainCfgIdx = 0
 	DhtCfgIdx = 1
 )
+
+var YeShellCfg *YeShellConfig	// global shell configuration pointer
 
 func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	if yesCfg == nil {
@@ -92,6 +97,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		return nil
 	}
 
+	YeShellCfg = yesCfg
 	cfg := []*config.Config{nil, nil}
 	chainCfg := (*config.Config)(nil)
 	dhtCfg := (*config.Config)(nil)
@@ -102,11 +108,52 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		chainCfg = config.P2pDefaultConfig()
 	}
 
+	if config.P2pSetupLocalNodeId(chainCfg) != config.PcfgEnoNone {
+		log.Debug("YeShellConfigToP2pCfg: P2pSetupLocalNodeId failed")
+		return nil
+	}
+
 	chainCfg.AppType = config.P2P_TYPE_CHAIN
 	chainCfg.Name = yesCfg.Name
 	chainCfg.NodeDataDir = yesCfg.NodeDataDir
 	chainCfg.NodeDatabase = yesCfg.NodeDatabase
-	chainCfg.SubNetIdList = yesCfg.SubNetIdList
+
+	if yesCfg.Validator {
+		chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, config.VSubNet)
+		chainCfg.SubNetMaxPeers[config.VSubNet] = config.MaxPeers
+		chainCfg.SubNetMaxOutbounds[config.VSubNet] = config.MaxOutbounds
+		chainCfg.SubNetMaxInBounds[config.VSubNet] = config.MaxInbounds
+	}
+
+	if yesCfg.SubNetMaskBits > MaxSubNetMaskBits {
+		log.Debug("YeShellConfigToP2pCfg: too big, SubNetMaskBits: %d", yesCfg.SubNetMaskBits)
+		return nil
+	}
+	end := len(chainCfg.Local.ID) - 1
+	snw := uint16((chainCfg.Local.ID[end-1] << 8) | chainCfg.Local.ID[end])
+	snw = snw << uint(16 - yesCfg.SubNetMaskBits)
+	snw = snw >> uint(16 - yesCfg.SubNetMaskBits)
+	snid := config.SubNetworkID{
+		byte((snw >> 8) & 0xff),
+		byte(snw & 0xff),
+	}
+	chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, snid)
+	chainCfg.SubNetMaxPeers[snid] = config.MaxPeers
+	chainCfg.SubNetMaxOutbounds[snid] = config.MaxOutbounds
+	chainCfg.SubNetMaxInBounds[snid] = config.MaxInbounds
+
+	chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, config.AnySubNet)
+	chainCfg.SubNetMaxPeers[config.AnySubNet] = config.MaxPeers
+	chainCfg.SubNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
+	chainCfg.SubNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
+
+	if chCfgName, eno := config.P2pSetConfig("chain", chainCfg); eno != config.PcfgEnoNone {
+		log.Debug("YeShellConfigToP2pCfg: P2pSetConfig failed")
+		return nil
+	} else {
+		chainCfg = config.P2pGetConfig(chCfgName)
+	}
+
 	dhtCfg = chainCfg
 	dhtCfg.AppType = config.P2P_TYPE_DHT
 	cfg[ChainCfgIdx] = chainCfg
@@ -204,6 +251,10 @@ func (yeShMgr *yeShellManager)Stop() {
 	stopCh := make(chan bool, 0)
 	P2pStop(yeShMgr.dhtInst, stopCh)
 	P2pStop(yeShMgr.chainInst, stopCh)
+}
+
+func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
+	return nil
 }
 
 func (yeShMgr *yeShellManager)BroadcastMessage(message yep2p.Message) error {
