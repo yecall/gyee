@@ -32,6 +32,7 @@ import (
 	"github.com/yeeco/gyee/p2p/dht"
 	"github.com/yeeco/gyee/p2p/peer"
 	pepb "github.com/yeeco/gyee/p2p/peer/pb"
+	"bytes"
 )
 
 const (
@@ -50,7 +51,9 @@ type yeShellManager struct {
 	dhtInst				*sch.Scheduler							// dht scheduler pointer
 	ptnDhtShell			interface{}								// dht shell manager task node pointer
 	ptDhtShMgr			*dhtShellManager						// dht shell manager object
+	getValKey			yesKey									// key of value to get
 	getValChan			chan []byte								// get value channel
+	putValKey			yesKey									// key of value to put
 	putValChan			chan bool								// put value channel
 	findNodeMap			map[config.NodeID]chan interface{}		// find node command map to channel
 	getProviderMap		map[yesKey]chan interface{}				// find node command map to channel
@@ -211,6 +214,7 @@ func (yeShMgr *yeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 		return nil, eno
 	}
 
+	copy(yeShMgr.getValKey[0:], key)
 	if val, ok := <-yeShMgr.getValChan; ok {
 		return val, nil
 	}
@@ -234,6 +238,7 @@ func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
 		return eno
 	}
 
+	copy(yeShMgr.putValKey[0:], key)
 	result, ok := <-yeShMgr.putValChan
 	if !ok {
 		return errors.New("DhtSetValue: failed, channel closed")
@@ -343,21 +348,46 @@ func (yeShMgr *yeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 
 func (yeShMgr *yeShellManager)dhtEvProc() {
 	evCh := yeShMgr.dhtEvChan
-	evHandler := func(evi *sch.MsgDhtShEventInd) {
+	evHandler := func(evi *sch.MsgDhtShEventInd) error {
+		eno := sch.SchEnoNone
 		switch evi.Evt {
+
 		case  sch.EvDhtBlindConnectRsp:
+			eno = yeShMgr.dhtBlindConnectRsp(evi.Msg.(*sch.MsgDhtBlindConnectRsp))
+
 		case  sch.EvDhtMgrFindPeerRsp:
+			eno = yeShMgr.dhtMgrFindPeerRsp(evi.Msg.(*sch.MsgDhtQryMgrQueryResultInd))
+
 		case  sch.EvDhtQryMgrQueryStartRsp:
+			eno = yeShMgr.dhtQryMgrQueryStartRsp(evi.Msg.(*sch.MsgDhtQryMgrQueryStartRsp))
+
 		case  sch.EvDhtQryMgrQueryStopRsp:
+			eno = yeShMgr.dhtQryMgrQueryStopRsp(evi.Msg.(*sch.MsgDhtQryMgrQueryStopRsp))
+
 		case  sch.EvDhtConMgrSendCfm:
+			eno = yeShMgr.dhtConMgrSendCfm(evi.Msg.(*sch.MsgDhtConMgrSendCfm))
+
 		case  sch.EvDhtMgrPutProviderRsp:
+			eno = yeShMgr.dhtMgrPutProviderRsp(evi.Msg.(*sch.MsgDhtPrdMgrAddProviderRsp))
+
 		case  sch.EvDhtMgrGetProviderRsp:
+			eno = yeShMgr.dhtMgrGetProviderRsp(evi.Msg.(*sch.MsgDhtMgrGetProviderRsp))
+
 		case  sch.EvDhtMgrPutValueRsp:
+			eno = yeShMgr.dhtMgrPutValueRsp(evi.Msg.(*sch.MsgDhtMgrPutValueRsp))
+
 		case  sch.EvDhtMgrGetValueRsp:
+			eno = yeShMgr.dhtMgrGetValueRsp(evi.Msg.(*sch.MsgDhtMgrGetValueRsp))
+
 		case  sch.EvDhtConMgrCloseRsp:
+			eno = yeShMgr.dhtConMgrCloseRsp(evi.Msg.(*sch.MsgDhtConMgrCloseRsp))
+
 		default:
 			log.Debug("evHandler: invalid event: %d", evi.Evt)
+			eno = sch.SchEnoParameter
 		}
+
+		return eno
 	}
 
 _evLoop:
@@ -376,19 +406,38 @@ _evLoop:
 }
 
 func (yeShMgr *yeShellManager)dhtCsProc() {
+	// Notice: the DHT manager export function InstallRxDataCallback for users to install
+	// their callback for data rx, but in gyee application, currently this is not applied.
 	csCh := yeShMgr.dhtCsChan
 	csHandler := func(csi *sch.MsgDhtConInstStatusInd) {
 		switch csi.Status {
+
 		case dht.CisNull:
+			log.Debug("dhtCsProc: CisNull, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisConnecting:
+			log.Debug("dhtCsProc: CisConnecting, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisConnected:
+			log.Debug("dhtCsProc: CisConnected, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisAccepted:
+			log.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisInHandshaking:
+			log.Debug("dhtCsProc: CisInHandshaking, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisHandshaked:
+			log.Debug("dhtCsProc: CisHandshaked, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisInService:
+			log.Debug("dhtCsProc: CisInService, dir: %d, peer: %x", *csi.Peer)
+
 		case dht.CisClosed:
+			log.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
+
 		default:
-			log.Debug("csHandler: invalid connection status: %d", csi.Status)
+			log.Debug("dhtCsProc: invalid connection status: %d", csi.Status)
 		}
 	}
 
@@ -444,6 +493,96 @@ _rxLoop:
 		}
 	}
 	log.Debug("chainRxProc: exit")
+}
+
+func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
+	log.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	log.Debug("dhtMgrFindPeerRsp: msg: %+v", *msg)
+	if done, ok := yeShMgr.findNodeMap[msg.Target]; ok {
+		done<-msg
+		delete(yeShMgr.findNodeMap, msg.Target)
+	}
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	log.Debug("dhtQryMgrQueryStartRsp: msg: %+v", *msg)
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	log.Debug("dhtQryMgrQueryStopRsp: msg: %+v", *msg)
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
+	log.Debug("dhtConMgrSendCfm: msg: %+v", *msg)
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+	log.Debug("dhtMgrPutProviderRsp: msg: %+v", *msg)
+	if len(msg.Key) != yesKeyBytes {
+		return sch.SchEnoParameter
+	}
+	yk := yesKey{}
+	copy(yk[0:], msg.Key)
+	if done, ok := yeShMgr.putProviderMap[yk]; ok {
+		done<-msg
+		delete(yeShMgr.putProviderMap, yk)
+	}
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
+	log.Debug("dhtMgrGetProviderRsp: msg: %+v", *msg)
+	if len(msg.Key) != yesKeyBytes {
+		return sch.SchEnoParameter
+	}
+	yk := yesKey{}
+	copy(yk[0:], msg.Key)
+	if done, ok := yeShMgr.getProviderMap[yk]; ok {
+		done<-msg
+		delete(yeShMgr.getProviderMap, yk)
+	}
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	log.Debug("dhtMgrPutValueRsp: msg: %+v", *msg)
+	if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
+		log.Debug("dhtMgrPutValueRsp: key mismatched")
+		return sch.SchEnoMismatched
+	}
+	if msg.Eno == dht.DhtEnoNone {
+		yeShMgr.putValChan<-true
+	} else {
+		yeShMgr.putValChan<-false
+	}
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+	log.Debug("dhtMgrGetValueRsp: msg: %+v", *msg)
+	if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
+		log.Debug("dhtMgrGetValueRsp: key mismatched")
+		return sch.SchEnoMismatched
+	}
+	if msg.Eno == dht.DhtEnoNone {
+		yeShMgr.getValChan<-msg.Val
+	} else {
+		yeShMgr.getValChan<-[]byte{}
+	}
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *yeShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+	log.Debug("dhtConMgrCloseRsp: msg: %+v", *msg)
+	return sch.SchEnoNone
 }
 
 func (yeShMgr *yeShellManager)broadcastTx(msg *yep2p.Message) error {

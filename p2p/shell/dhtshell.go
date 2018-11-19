@@ -157,8 +157,7 @@ func (shMgr *dhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 		eno = shMgr.dhtConMgrCloseRsp(msg.(*sch.MsgDhtConMgrCloseRsp))
 
 	case  sch.EvDhtConInstStatusInd:
-		eno = shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
-		return eno
+		return shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
 
 	default:
 		log.Debug("dhtTestEventCallback: unknown event type: %d", evt)
