@@ -294,11 +294,19 @@ const dftName = "test"
 const (
 	dftUdpPort = 30303
 	dftTcpPort = 30303
+	dftDhtPort = 80808
 )
 var dftLocal = Node {
 	IP:		P2pGetLocalIpAddr(),
 	UDP:	dftUdpPort,
 	TCP:	dftTcpPort,
+	ID:		NodeID{0},
+}
+
+var dhtLocal = Node {
+	IP:		P2pGetLocalIpAddr(),
+	UDP:	0,	// udp not in use for DHT
+	TCP:	dftDhtPort,
 	ID:		NodeID{0},
 }
 
@@ -309,7 +317,10 @@ var config = make(map[string] *Config)
 var dftDatDir = P2pDefaultDataDir(true)
 func P2pDefaultConfig() *Config {
 	var defaultConfig = Config {
+		//
 		// Chain application part
+		//
+
 		NetworkType:			P2pNetworkTypeDynamic,
 		Name:					dftName,
 		Version:				dftVersion,
@@ -334,15 +345,18 @@ func P2pDefaultConfig() *Config {
 		SubNetMaxInBounds:		map[SubNetworkID]int{},
 		SubNetIdList:			[]SubNetworkID{},
 
+		//
 		// DHT application part
-		DhtLocal:				dftLocal,
+		//
+
+		DhtLocal:				dhtLocal,
 		DhtRutCfg: Cfg4DhtRouteManager {
 			NodeId:				NodeID{0},
 			RandomQryNum:		1,
 			Period:				time.Minute * 1,
 		},
 		DhtQryCfg: Cfg4DhtQryManager {
-			Local:				&dftLocal,
+			Local:				&dhtLocal,
 			MaxPendings:		32,
 			MaxActInsts:		8,
 			QryExpired:			time.Second * 60,
@@ -365,6 +379,9 @@ func P2pDefaultConfig() *Config {
 // Get default bootstrap node config
 func P2pDefaultBootstrapConfig() *Config {
 	var defaultConfig = Config {
+		//
+		// Chain application part
+		//
 		NetworkType:			P2pNetworkTypeDynamic,
 		Name:					dftName,
 		Version:				dftVersion,
@@ -388,6 +405,33 @@ func P2pDefaultBootstrapConfig() *Config {
 		SubNetMaxOutbounds:		map[SubNetworkID]int{},
 		SubNetMaxInBounds:		map[SubNetworkID]int{},
 		SubNetIdList:			[]SubNetworkID{},
+
+		//
+		// DHT application part
+		//
+		DhtLocal:				dhtLocal,
+		DhtRutCfg: Cfg4DhtRouteManager {
+			NodeId:				NodeID{0},
+			RandomQryNum:		1,
+			Period:				time.Minute * 1,
+		},
+		DhtQryCfg: Cfg4DhtQryManager {
+			Local:				&dhtLocal,
+			MaxPendings:		32,
+			MaxActInsts:		8,
+			QryExpired:			time.Second * 60,
+			QryInstExpired:		time.Second * 16,
+		},
+		DhtConCfg: Cfg4DhtConManager {
+			MaxCon:				512,
+			HsTimeout:			time.Second * 16,
+		},
+		DhtFdsCfg: Cfg4DhtFileDatastore {
+			Path:				dftDatDir,
+			ShardFuncName:		sfnNextToLast,
+			PadLength:			2,
+			Sync:				true,
+		},
 	}
 	return &defaultConfig
 }
@@ -478,10 +522,9 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		return name, PcfgEnoNodeId
 	}
 
-	// check if DHT application, we need prepare node identity for this case now,
-	// we would make individual identities for chain and dht application later.
+	// check if DHT application, we set same node identity as chain application
+	// for DHT now, individual identities might need in the future.
 	if cfg.AppType == P2P_TYPE_DHT {
-		cfg.DhtLocal = cfg.Local
 		cfg.DhtRutCfg.NodeId = cfg.DhtLocal.ID
 		cfg.DhtQryCfg.Local = &cfg.DhtLocal
 		cfg.DhtConCfg.Local = &cfg.DhtLocal

@@ -25,6 +25,7 @@ import (
 	"time"
 	"errors"
 	"fmt"
+	"bytes"
 	yep2p "github.com/yeeco/gyee/p2p"
 	log "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
@@ -32,7 +33,6 @@ import (
 	"github.com/yeeco/gyee/p2p/dht"
 	"github.com/yeeco/gyee/p2p/peer"
 	pepb "github.com/yeeco/gyee/p2p/peer/pb"
-	"bytes"
 )
 
 const (
@@ -64,49 +64,106 @@ type yeShellManager struct {
 	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
 }
 
-func NewYeshellManager(cfg *config.Config) *yeShellManager {
+type YeShellConfig struct {
+	// Notice: in current stage, a simple configuration for p2p is applied, for total configuration
+	// about p2p, see config.Config please.
+	AppType				config.P2pAppType						// application type
+	Name				string									// node name
+	BootstrapNode		bool									// bootstrap node flag
+	BootstrapNodes		[]*config.Node							// bootstrap nodes
+	NodeDataDir			string									// node data directory
+	NodeDatabase		string									// node database
+	SubNetIdList		[]config.SubNetworkID					// sub network identity list
+}
+
+const (
+	ChainCfgIdx = 0
+	DhtCfgIdx = 1
+)
+
+func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
+	if yesCfg == nil {
+		log.Debug("YeShellConfigToP2pCfg: nil configuration")
+		return nil
+	}
+
+	if yesCfg.AppType != config.P2P_TYPE_ALL {
+		log.Debug("YeShellConfigToP2pCfg: P2P_TYPE_ALL needed")
+		return nil
+	}
+
+	cfg := []*config.Config{nil, nil}
+	chainCfg := (*config.Config)(nil)
+	dhtCfg := (*config.Config)(nil)
+
+	if yesCfg.BootstrapNode {
+		chainCfg = config.P2pDefaultBootstrapConfig()
+	} else {
+		chainCfg = config.P2pDefaultConfig()
+	}
+
+	chainCfg.AppType = config.P2P_TYPE_CHAIN
+	chainCfg.Name = yesCfg.Name
+	chainCfg.NodeDataDir = yesCfg.NodeDataDir
+	chainCfg.NodeDatabase = yesCfg.NodeDatabase
+	chainCfg.SubNetIdList = yesCfg.SubNetIdList
+	dhtCfg = chainCfg
+	dhtCfg.AppType = config.P2P_TYPE_DHT
+	cfg[ChainCfgIdx] = chainCfg
+	cfg[DhtCfgIdx] = dhtCfg
+
+	return cfg
+}
+
+func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 	yeShMgr := yeShellManager{}
 	var eno sch.SchErrno
 	var ok bool
 
-	if cfg == nil {
-		log.Debug("NewYeshellManager: nil configuration")
+	cfg := YeShellConfigToP2pCfg(yesCfg)
+	if cfg == nil || len(cfg) != 2 {
+		log.Debug("NewYeShellManager: YeShellConfigToP2pCfg failed")
 		return nil
 	}
 
-	yeShMgr.chainInst, eno = P2pCreateInstance(cfg)
+	if cfg[0] == nil || cfg[1] == nil {
+		log.Debug("NewYeShellManager: nil configuration")
+		return nil
+	}
+
+	yeShMgr.chainInst, eno = P2pCreateInstance(cfg[ChainCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.chainInst == nil {
-		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
-		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*shellManager)
 	if !ok || yeShMgr.ptChainShMgr == nil {
-		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
-	yeShMgr.dhtInst, eno = P2pCreateInstance(cfg)
+	yeShMgr.dhtInst, eno = P2pCreateInstance(cfg[DhtCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
-		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
-		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*dhtShellManager)
 	if !ok || yeShMgr.ptDhtShMgr == nil {
-		log.Debug("NewYeshellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
@@ -150,6 +207,8 @@ func (yeShMgr *yeShellManager)Stop() {
 }
 
 func (yeShMgr *yeShellManager)BroadcastMessage(message yep2p.Message) error {
+	// Notice: the function is not supported in fact, see handler function
+	// in each case please.
 	var err error = nil
 	switch message.MsgType {
 	case yep2p.MessageTypeTx:
@@ -586,19 +645,19 @@ func (yeShMgr *yeShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) s
 }
 
 func (yeShMgr *yeShellManager)broadcastTx(msg *yep2p.Message) error {
-	return nil
+	return errors.New("broadcastTx: not supported")
 }
 
 func (yeShMgr *yeShellManager)broadcastEv(msg *yep2p.Message) error {
-	return nil
+	return errors.New("broadcastEv: not supported")
 }
 
 func (yeShMgr *yeShellManager)broadcastBh(msg *yep2p.Message) error {
-	return nil
+	return errors.New("broadcastBh: not supported")
 }
 
 func (yeShMgr *yeShellManager)broadcastBk(msg *yep2p.Message) error {
-	return nil
+	return errors.New("broadcastBk: not supported")
 }
 
 func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
