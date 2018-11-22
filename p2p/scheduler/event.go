@@ -79,6 +79,7 @@ const (
 	EvShellPeerCloseCfm			= EvShellBase + 2
 	EvShellPeerCloseInd			= EvShellBase + 3
 	EvShellPeerAskToCloseInd	= EvShellBase + 4
+	EvShellReconfigReq			= EvShellBase + 5
 )
 
 //
@@ -118,6 +119,16 @@ type MsgShellPeerAskToCloseInd struct {
 	PeerId 	config.NodeID			// target node
 	Dir		int						// direction
 	Why		interface{}				// tell why it's closed
+}
+
+//
+// EvShellReconfigReq
+//
+type MsgShellReconfigReq struct {
+	VSnidAdd	[]config.SubNetworkID	// validator sub network identities to be added
+	VSnidDel	[]config.SubNetworkID	// validator sub network identities to be deleted
+	SnidAdd		[]config.SubNetworkID	// common sub network identities to be added
+	SnidDel		[]config.SubNetworkID	// common sub network identities to be deleted
 }
 
 //

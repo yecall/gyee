@@ -232,6 +232,8 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = peMgr.peMgrPoweron(ptn)
 	case sch.EvSchPoweroff:
 		eno = peMgr.peMgrPoweroff(ptn)
+	case sch.EvShellReconfigReq:
+		eno = peMgr.shellReconfigReq(msg.Body.(sch.MsgShellReconfigReq))
 	case sch.EvPeOcrCleanupTimer:
 		peMgr.ocrTimestampCleanup()
 	case sch.EvPeMgrStartReq:
@@ -875,6 +877,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			}
 			if _, dup := peMgr.nodes[snid][idEx]; dup {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				peMgr.conflictAccessProtect(rsp.peNode, rsp.dir)
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -901,6 +904,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			}
 			if _, dup := peMgr.nodes[snid][idEx]; dup {
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				peMgr.conflictAccessProtect(rsp.peNode, rsp.dir)
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -909,7 +913,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peMgr.updateStaticStatus(snid, idEx, peerActivated)
 	}
 
-	var schMsg = sch.SchMessage{}
+	schMsg := sch.SchMessage{}
 	cfmCh := make(chan int)
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, &cfmCh)
 	peMgr.sdl.SchSendMessage(&schMsg)

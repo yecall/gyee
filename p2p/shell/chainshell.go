@@ -57,6 +57,7 @@ type shellManager struct {
 	tep				sch.SchUserTaskEp				// task entry
 	ptnMe			interface{}						// pointer to task node of myself
 	ptnPeMgr		interface{}						// pointer to task node of peer manager
+	ptnTabMgr		interface{}						// pointer to task node of table manager
 	peerActived		map[shellPeerID]shellPeerInst	// active peers
 	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all intances
 }
@@ -99,6 +100,8 @@ func (shMgr *shellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = shMgr.peerCloseInd(msg.Body.(*sch.MsgShellPeerCloseInd))
 	case sch.EvShellPeerAskToCloseInd:
 		eno = shMgr.peerAskToCloseInd(msg.Body.(*sch.MsgShellPeerAskToCloseInd))
+	case sch.EvShellReconfigReq:
+		eno = shMgr.reconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
 	default:
 		log.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -110,6 +113,7 @@ func (shMgr *shellManager)powerOn(ptn interface{}) sch.SchErrno {
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
 	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName)
+	_, shMgr.ptnTabMgr = shMgr.sdl.SchGetUserTaskNode(sch.TabMgrName)
 	return sch.SchEnoNone
 }
 
@@ -214,4 +218,14 @@ func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 
 func (shMgr *shellManager)GetRxChan() chan *peer.P2pPackageRx {
 	return shMgr.rxChan
+}
+
+func (shMgr *shellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnPeMgr, sch.EvShellReconfigReq, req)
+	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		return eno
+	}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnTabMgr, sch.EvShellReconfigReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
 }

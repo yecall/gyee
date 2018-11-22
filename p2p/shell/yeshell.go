@@ -84,7 +84,10 @@ const (
 	DhtCfgIdx = 1
 )
 
-var YeShellCfg *YeShellConfig	// global shell configuration pointer
+// Global shell configuration: this var is set when function YeShellConfigToP2pCfg called,
+// the p2p user should not change those fields other than "Validator" and "SubNetMaskBits"
+// which can be reconfigurated, since YeShellConfigToP2pCfg should be called once only.
+var YeShellCfg = YeShellConfig{}
 
 func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	if yesCfg == nil {
@@ -97,7 +100,8 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		return nil
 	}
 
-	YeShellCfg = yesCfg
+	YeShellCfg = *yesCfg
+
 	cfg := []*config.Config{nil, nil}
 	chainCfg := (*config.Config)(nil)
 	dhtCfg := (*config.Config)(nil)
@@ -254,6 +258,55 @@ func (yeShMgr *yeShellManager)Stop() {
 }
 
 func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
+	if reCfg == nil {
+		log.Debug("Reconfig: invalid parameter")
+		return errors.New("nil reconfigurate command")
+	}
+
+	if reCfg.SubnetMaskBits <= 0 || reCfg.SubnetMaskBits > MaxSubNetMaskBits {
+		log.Debug("")
+		return errors.New(fmt.Sprintf("too much mask bits: %d", reCfg.SubnetMaskBits))
+	}
+
+	VSnidAdd := make([]config.SubNetworkID, 0)
+	VSnidDel := make([]config.SubNetworkID, 0)
+	SnidAdd := make([]config.SubNetworkID, 0)
+	SnidDel := make([]config.SubNetworkID, 0)
+
+	if reCfg.Validator && !YeShellCfg.Validator{
+		VSnidAdd = append(VSnidAdd, config.VSubNet)
+	} else if !reCfg.Validator && YeShellCfg.Validator {
+		VSnidDel = append(VSnidDel, config.VSubNet)
+	}
+
+	if reCfg.SubnetMaskBits != YeShellCfg.SubNetMaskBits {
+		oldSnid, err := yeShMgr.getSubnetIdentity(YeShellCfg.SubNetMaskBits)
+		if err != nil {
+			log.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
+			return err
+		}
+		newSnid, err := yeShMgr.getSubnetIdentity(reCfg.SubnetMaskBits)
+		if err != nil {
+			log.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
+			return err
+		}
+		SnidAdd = append(SnidAdd, newSnid)
+		SnidDel = append(SnidDel, oldSnid)
+	}
+
+	req := sch.MsgShellReconfigReq {
+		VSnidAdd: VSnidAdd,
+		VSnidDel: VSnidDel,
+		SnidAdd: SnidAdd,
+		SnidDel: SnidDel,
+	}
+	msg := sch.SchMessage{}
+	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellReconfigReq, &req)
+	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Debug("Reconfig: SchSendMessage failed, eno: %d", eno)
+		return eno
+	}
+
 	return nil
 }
 
@@ -727,3 +780,18 @@ func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
 	return nil
 }
 
+func (yeShMgr *yeShellManager)getSubnetIdentity(maskBits int) (config.SubNetworkID, error) {
+	if maskBits <= 0 || maskBits > MaxSubNetMaskBits {
+		return config.SubNetworkID{}, errors.New("invalid mask bits")
+	}
+	localId := yeShMgr.chainInst.SchGetP2pConfig().Local.ID
+	end := len(localId.ID) - 1
+	snw := uint16((localId[end-1] << 8) | localId[end])
+	snw = snw << uint(16 - maskBits)
+	snw = snw >> uint(16 - maskBits)
+	snid := config.SubNetworkID {
+		byte((snw >> 8) & 0xff),
+		byte(snw & 0xff),
+	}
+	return snid, nil
+}
