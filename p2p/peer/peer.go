@@ -91,6 +91,9 @@ const (
 	minDuration4FindNodeReq = time.Second * 2			// min duration to send find-node-request again
 	minDuration4OutboundConnectReq = time.Second * 2	// min duration to try oubound connect for a specific
 														// sub-network and peer
+
+	conflictAccessDelayLower = 1000						// conflict delay lower bounder in time.Millisecond
+	conflictAccessDelayUpper = 4000						// conflict delay upper bounder in time.Millisecond
 )
 
 const (
@@ -135,6 +138,13 @@ type PeerIdEx struct {
 	Id				config.NodeID					// node identity
 	Dir				int								// direction
 }
+
+type PeerIdExx struct {
+	Snid			config.SubNetworkID				// sub network identity
+	Node			config.Node						// node
+	Dir				int								// direction
+}
+
 type PeerManager struct {
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// name
@@ -232,8 +242,10 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = peMgr.peMgrPoweron(ptn)
 	case sch.EvSchPoweroff:
 		eno = peMgr.peMgrPoweroff(ptn)
+	case sch.EvPeConflictAccessTimer:
+		eno = peMgr.peMgrCatHandler(msg.Body)
 	case sch.EvShellReconfigReq:
-		eno = peMgr.shellReconfigReq(msg.Body.(sch.MsgShellReconfigReq))
+		eno = peMgr.shellReconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
 	case sch.EvPeOcrCleanupTimer:
 		peMgr.ocrTimestampCleanup()
 	case sch.EvPeMgrStartReq:
@@ -482,13 +494,17 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	var snid = rsp.Snid
 	var appended = make(map[SubNetworkID]int, 0)
 	var dup bool
-	var idEx = PeerIdEx {
-			Id:		config.NodeID{},
-			Dir:	PeInstDirOutbound,
-		}
+	var idEx PeerIdEx
 
 	for _, n := range rsp.Nodes {
+
 		idEx.Id = n.ID
+		idEx.Dir = PeInstDirOutbound
+		if _, ok := peMgr.nodes[snid][idEx]; ok {
+			continue
+		}
+
+		idEx.Dir = PeInstDirInbound
 		if _, ok := peMgr.nodes[snid][idEx]; ok {
 			continue
 		}
@@ -526,6 +542,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	}
+
 	return PeMgrEnoNone
 }
 
@@ -720,11 +737,15 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	}
 
 	var candidates = make([]*config.Node, 0)
-	var idEx = PeerIdEx{Dir:PeInstDirOutbound}
+	var idEx PeerIdEx
 	for _, n := range peMgr.randoms[*snid] {
 		idEx.Id = n.ID
+		idEx.Dir = PeInstDirOutbound
 		if _, ok := peMgr.nodes[*snid][idEx]; !ok {
-			candidates = append(candidates, n)
+			idEx.Dir = PeInstDirInbound
+			if _, ok := peMgr.nodes[*snid][idEx]; !ok {
+				candidates = append(candidates, n)
+			}
 		}
 	}
 	peMgr.randoms[*snid] = make([]*config.Node, 0)
@@ -876,8 +897,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				return PeMgrEnoDuplicated
 			}
 			if _, dup := peMgr.nodes[snid][idEx]; dup {
+				// this case, both instances are not in working, we kill one instance local,
+				// but the peer might kill another, then two connections are lost, we need a
+				// protection for this.
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-				peMgr.conflictAccessProtect(rsp.peNode, rsp.dir)
+				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -903,8 +927,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				return PeMgrEnoDuplicated
 			}
 			if _, dup := peMgr.nodes[snid][idEx]; dup {
+				// this case, both instances are not in working, we kill one instance local,
+				// but the peer might kill another, then two connections are lost, we need a
+				// protection for this.
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-				peMgr.conflictAccessProtect(rsp.peNode, rsp.dir)
+				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -1252,6 +1279,47 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	peInst.state = peInstStateKilled
 	peMgr.sdl.SchStopTask(ptn)
 
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)peMgrConflictAccessProtect(snid config.SubNetworkID, peer *config.Node, dir int) PeMgrErrno {
+
+
+
+	delay := conflictAccessDelayLower + rand.Intn(conflictAccessDelayUpper - conflictAccessDelayLower)
+	dur := time.Millisecond * time.Duration(delay)
+	idexx := PeerIdExx {
+		Snid: snid,
+		Node: *peer,
+		Dir: dir,
+	}
+	td := sch.TimerDescription {
+		Name:	"_conflictTimer",
+		Utid:	sch.PeConflictAccessTimerId,
+		Tmt:	sch.SchTmTypeAbsolute,
+		Dur:	dur,
+		Extra:	&idexx,
+	}
+	if eno, _ := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
+		log.Debug("peMgrConflictAccessProtect: SchSetTimer failed, eno: %d", eno)
+		return PeMgrEnoScheduler
+	}
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
+	idexx := msg.(*PeerIdExx)
+	schMsg := sch.SchMessage{}
+	r := sch.MsgDcvFindNodeRsp{
+		Snid:	idexx.Snid,
+		Nodes:	[]*config.Node{&idexx.Node},
+	}
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvDcvFindNodeRsp, &r)
+	peMgr.sdl.SchSendMessage(&schMsg)
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErrno {
 	return PeMgrEnoNone
 }
 

@@ -785,7 +785,7 @@ func (yeShMgr *yeShellManager)getSubnetIdentity(maskBits int) (config.SubNetwork
 		return config.SubNetworkID{}, errors.New("invalid mask bits")
 	}
 	localId := yeShMgr.chainInst.SchGetP2pConfig().Local.ID
-	end := len(localId.ID) - 1
+	end := len(localId) - 1
 	snw := uint16((localId[end-1] << 8) | localId[end])
 	snw = snw << uint(16 - maskBits)
 	snw = snw >> uint(16 - maskBits)

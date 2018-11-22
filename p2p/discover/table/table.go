@@ -276,7 +276,7 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 	case sch.EvSchPoweroff:
 		eno = tabMgr.tabMgrPoweroff(ptn)
 	case sch.EvShellReconfigReq:
-		eno = tabMgr.shellReconfigReq(msg.Body.(sch.MsgShellReconfigReq))
+		eno = tabMgr.shellReconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
 	case sch.EvTabRefreshTimer:
 		eno = tabMgr.tabMgrRefreshTimerHandler(msg.Body.(*SubNetworkID))
 	case sch.EvTabPingpongTimer:
@@ -420,6 +420,10 @@ func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 	if tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
+	return TabMgrEnoNone
+}
+
+func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgrErrno {
 	return TabMgrEnoNone
 }
 
