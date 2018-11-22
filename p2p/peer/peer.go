@@ -1283,9 +1283,6 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 }
 
 func (peMgr *PeerManager)peMgrConflictAccessProtect(snid config.SubNetworkID, peer *config.Node, dir int) PeMgrErrno {
-
-
-
 	delay := conflictAccessDelayLower + rand.Intn(conflictAccessDelayUpper - conflictAccessDelayLower)
 	dur := time.Millisecond * time.Duration(delay)
 	idexx := PeerIdExx {
