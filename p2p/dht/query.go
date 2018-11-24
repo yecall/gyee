@@ -167,12 +167,7 @@ func NewQryMgr() *QryMgr {
 	}
 
 	qryMgr := QryMgr{
-		sdl:		nil,
 		name:		QryMgrName,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnRutMgr:	nil,
-		ptnDhtMgr:	nil,
 		instSeq:	0,
 		qcbTab:		map[config.NodeID]*qryCtrlBlock{},
 		qmCfg:		qmCfg,

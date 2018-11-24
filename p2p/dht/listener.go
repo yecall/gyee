@@ -82,7 +82,6 @@ type lsnMgrCfg struct {
 func NewLsnMgr() *LsnMgr {
 
 	lsnMgr := LsnMgr {
-		sdl:		nil,
 		name:		LsnMgrName,
 		status:		lmsNull,
 		config:		lsnMgrCfg {
@@ -90,11 +89,6 @@ func NewLsnMgr() *LsnMgr {
 			ip:			net.IP{127,0,0,1},
 			port:		8899,
 		},
-		tep:		nil,
-		ptnMe:		nil,
-		ptnConMgr:	nil,
-		listener:	nil,
-		listenAddr:	nil,
 	}
 
 	lsnMgr.tep = lsnMgr.lsnMgrProc

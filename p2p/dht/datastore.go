@@ -156,11 +156,6 @@ func NewDsMgr() *DsMgr {
 
 	dsMgr := DsMgr{
 		name:		DsMgrName,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnDhtMgr:	nil,
-		ptnQryMgr:	nil,
-		ds:			nil,
 		fdsCfg:		FileDatastoreConfig{},
 	}
 

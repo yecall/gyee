@@ -86,13 +86,7 @@ func NewPrdMgr() *PrdMgr {
 
 	prdMgr := PrdMgr{
 		name:		PrdMgrName,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnDhtMgr:	nil,
-		ptnQryMgr:	nil,
 		clrTid:		sch.SchInvalidTid,
-		ds:			nil,
-		prdCache:	nil,
 	}
 
 	prdMgr.tep = prdMgr.prdMgrProc

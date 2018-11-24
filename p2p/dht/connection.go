@@ -82,14 +82,7 @@ type ConMgr struct {
 func NewConMgr() *ConMgr {
 
 	conMgr := ConMgr{
-		sdl:		nil,
 		name:		ConMgrName,
-		tep:		nil,
-		ptnMe:		nil,
-		ptnRutMgr:	nil,
-		ptnQryMgr:	nil,
-		ptnLsnMgr:	nil,
-		ptnDhtMgr:	nil,
 		ciTab:		make(map[conInstIdentity]*ConInst, 0),
 		ciSeq:		0,
 		txQueTab:	make(map[conInstIdentity]*list.List, 0),

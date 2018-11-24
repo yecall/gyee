@@ -270,31 +270,45 @@ func (tabMgr *TableManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessa
 
 func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	var eno TabMgrErrno = TabMgrEnoNone
+
 	switch msg.Id {
+
 	case sch.EvSchPoweron:
 		eno = tabMgr.tabMgrPoweron(ptn)
+
 	case sch.EvSchPoweroff:
 		eno = tabMgr.tabMgrPoweroff(ptn)
+
 	case sch.EvShellReconfigReq:
 		eno = tabMgr.shellReconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
+
 	case sch.EvTabRefreshTimer:
 		eno = tabMgr.tabMgrRefreshTimerHandler(msg.Body.(*SubNetworkID))
+
 	case sch.EvTabPingpongTimer:
 		eno = tabMgr.tabMgrPingpongTimerHandler(msg.Body.(*instCtrlBlock))
+
 	case sch.EvTabFindNodeTimer:
 		eno = tabMgr.tabMgrFindNodeTimerHandler(msg.Body.(*instCtrlBlock))
+
 	case sch.EvTabRefreshReq:
 		eno = tabMgr.tabMgrRefreshReq(msg.Body.(*sch.MsgTabRefreshReq))
+
 	case sch.EvNblFindNodeRsp:
 		eno = tabMgr.tabMgrFindNodeRsp(msg.Body.(*sch.NblFindNodeRsp))
+
 	case sch.EvNblPingpongRsp:
 		eno = tabMgr.tabMgrPingpongRsp(msg.Body.(*sch.NblPingRsp))
+
 	case sch.EvNblPingedInd:
 		eno = tabMgr.tabMgrPingedInd(msg.Body.(*um.Ping))
+
 	case sch.EvNblPongedInd:
 		eno = tabMgr.tabMgrPongedInd(msg.Body.(*um.Pong))
+
 	case sch.EvNblQueriedInd:
 		eno = tabMgr.tabMgrQueriedInd(msg.Body.(*um.FindNode))
+
 	default:
 		log.Debug("TabMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
@@ -744,13 +758,18 @@ func (ndbc *NodeDbCleaner)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessag
 
 func (ndbc *NodeDbCleaner)ndbcProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	var eno TabMgrErrno
+
 	switch msg.Id {
+
 	case sch.EvSchPoweron:
 		eno = ndbc.ndbcPoweron(ptn)
+
 	case sch.EvSchPoweroff:
 		eno = ndbc.ndbcPoweroff(ptn)
+
 	case sch.EvNdbCleanerTimer:
 		eno = ndbc.ndbcAutoCleanTimerHandler()
+
 	default:
 		log.Debug("NdbcProc: invalid message: %d", msg.Id)
 		return sch.SchEnoInternal
@@ -760,6 +779,7 @@ func (ndbc *NodeDbCleaner)ndbcProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 		log.Debug("NdbcProc: errors, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
+
 	return sch.SchEnoNone
 }
 
@@ -794,30 +814,38 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 	}
 
 	ndbc.tid = tid
+
 	return TabMgrEnoNone
 }
 
 func (ndbc *NodeDbCleaner)ndbcPoweroff(ptn interface{}) TabMgrErrno {
+
 	log.Debug("ndbcPoweroff: task will be done")
+
 	if ndbc.tid != sch.SchInvalidTid {
 		ndbc.sdl.SchKillTimer(ptn, ndbc.tid)
 		ndbc.tid = sch.SchInvalidTid
 	}
+
 	if ndbc.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
+
 	return TabMgrEnoNone
 }
 
 func (ndbc *NodeDbCleaner)ndbcAutoCleanTimerHandler() TabMgrErrno {
 	log.Debug("ndbcAutoCleanTimerHandler: " +
 		"auto cleanup timer expired, it's time to clean ...")
+
 	err := ndbc.tabMgr.nodeDb.expireNodes()
 	if err != nil {
 		log.Debug("ndbcAutoCleanTimerHandler: cleanup failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
+
 	log.Debug("ndbcAutoCleanTimerHandler: cleanup ok")
+
 	return TabMgrEnoNone
 }
 
@@ -862,13 +890,17 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 		log.Debug("tabNodeDbPrepare: node database had been opened")
 		return TabMgrEnoDatabase
 	}
+
 	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.name, tabMgr.cfg.nodeDb)
 	db, err := newNodeDB(dbPath, ndbVersion, NodeID(tabMgr.cfg.local.ID))
+
 	if err != nil {
 		log.Debug("tabNodeDbPrepare: newNodeDB failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
+
 	tabMgr.nodeDb = db
+
 	return TabMgrEnoNone
 }
 
@@ -882,25 +914,31 @@ func (tabMgr *TableManager)tabSetupLocalHashId() TabMgrErrno {
 		log.Debug("tabSetupLocalHashId: hash identity should be 32 bytes")
 		return TabMgrEnoParameter
 	}
-	var h = TabNodeId2Hash(NodeID(tabMgr.cfg.local.ID))
+
+	h := TabNodeId2Hash(NodeID(tabMgr.cfg.local.ID))
 	tabMgr.shaLocal = *h
+
 	return TabMgrEnoNone
 }
 
 func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno {
 	var eno = sch.SchEnoNone
+
 	if eno, tabMgr.ptnNgbMgr = tabMgr.sdl.SchGetUserTaskNode(sch.NgbMgrName); eno != sch.SchEnoNone {
 		log.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.NgbMgrName)
 		return TabMgrEnoScheduler
 	}
+
 	if eno, tabMgr.ptnDcvMgr = tabMgr.sdl.SchGetUserTaskNode(sch.DcvMgrName); eno != sch.SchEnoNone {
 		log.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
 		return TabMgrEnoScheduler
 	}
+
 	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil {
 		log.Debug("tabRelatedTaskPrepare: invaid task node pointer")
 		return TabMgrEnoInternal
 	}
+
 	return TabMgrEnoNone
 }
 
@@ -994,6 +1032,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	}
 
 	mgr.refreshing = true
+
 	return TabMgrEnoNone
 }
 
@@ -1272,13 +1311,17 @@ func (tabMgr *TableManager)tabUpdateNodeDb4Query(inst *instCtrlBlock, result int
 	}
 
 	switch {
+
 	case inst.state == TabInstStateQuering && result == TabMgrEnoNone:
 		return TabMgrEnoNone
+
 	case inst.state == TabInstStateQuering && result == TabMgrEnoFindNodeFailed:
 		return fnFailUpdate()
+
 	case (inst.state == TabInstStateQuering || inst.state == TabInstStateQTimeout) &&
 		result == TabMgrEnoTimeout:
 		return fnFailUpdate()
+
 	default:
 		log.Debug("tabUpdateNodeDb4Query: nvalid context, update nothing, state: %d, result: %d",
 			inst.state, result)
@@ -1329,22 +1372,28 @@ func (tabMgr *TableManager)tabUpdateBucket(inst *instCtrlBlock, result int) TabM
 	// 2) When pingpong failed, add peer node to a bucket;
 	// 3) When findnode failed counter reach the threshold, remove peer node from bucket;
 	var eno TabMgrErrno
+
 	switch {
+
 	case inst.state == TabInstStateQuering && result == TabMgrEnoNone:
 		return TabMgrEnoNone
+
 	case (inst.state == TabInstStateQuering || inst.state == TabInstStateQTimeout) && result != TabMgrEnoNone:
 		id := NodeID(inst.req.(*um.FindNode).To.NodeId)
 		if eno = tabMgr.tabBucketUpdateFailCounter(id, +1); eno == TabMgrEnoRemove {
 			return tabMgr.tabBucketRemoveNode(id)
 		}
 		return eno
+
 	case inst.state == TabInstStateBonding && result == TabMgrEnoNone:
 		node := &inst.req.(*um.Ping).To
 		inst.pot = time.Now()
 		return tabMgr.TabBucketAddNode(tabMgr.snid, node, &inst.qrt, &inst.pit, &inst.pot)
+
 	case (inst.state == TabInstStateBonding || inst.state == TabInstStateBTimeout) && result != TabMgrEnoNone:
 		node := &inst.req.(*um.Ping).To
 		return tabMgr.TabBucketAddNode(tabMgr.snid, node, &inst.qrt, &inst.pit, nil)
+
 	default:
 		log.Debug("tabUpdateBucket: invalid context, update nothing, state: %d, result: %d",
 			inst.state, result)
@@ -1383,6 +1432,7 @@ func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 		TCP:	node.TCP,
 		NodeId:	node.ID,
 	}
+
 	return tabMgr.TabBucketAddNode(snid, &umn, &time.Time{}, &now, &now)
 }
 
@@ -1400,18 +1450,22 @@ func (tabMgr *TableManager)tabStartTimer(inst *instCtrlBlock, tmt int, dur time.
 	}
 
 	switch tmt {
+
 	case sch.TabRefreshTimerId:
 		td.Tmt = sch.SchTmTypePeriod
 		td.Name = td.Name + "_AutoRefresh"
 		td.Extra = &tabMgr.snid
+
 	case sch.TabFindNodeTimerId:
 		td.Tmt = sch.SchTmTypeAbsolute
 		td.Name = td.Name + "_FindNode"
 		td.Extra = inst
+
 	case sch.TabPingpongTimerId:
 		td.Tmt = sch.SchTmTypeAbsolute
 		td.Name = td.Name + "_Pingpong"
 		td.Extra = inst
+
 	default:
 		log.Debug("tabStartTimer: invalid time type, type: %d", tmt)
 		return TabMgrEnoParameter

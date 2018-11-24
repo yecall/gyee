@@ -141,13 +141,8 @@ var defautBspCfg = bootstrapPolicy {
 //
 func NewRutMgr() *RutMgr {
 
-	rutMgr := RutMgr{
-		sdl:			nil,
+	rutMgr := RutMgr {
 		name:			RutMgrName,
-		tep:			nil,
-		ptnMe:			nil,
-		ptnQryMgr:		nil,
-		ptnConMgr:		nil,
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
 		bpTargets:		map[config.NodeID] interface{}{},
