@@ -30,10 +30,9 @@ import (
 	"bytes"
 	"crypto/sha256"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
-	"golang.org/x/sys/windows/svc/mgr"
 )
 
 

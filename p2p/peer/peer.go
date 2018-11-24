@@ -58,6 +58,18 @@ const (
 )
 
 type PeMgrErrno int
+type SubNetworkID = config.SubNetworkID
+
+type PeerIdEx struct {
+	Id				config.NodeID					// node identity
+	Dir				int								// direction
+}
+
+type PeerIdExx struct {
+	Snid			config.SubNetworkID				// sub network identity
+	Node			config.Node						// node
+	Dir				int								// direction
+}
 
 // Peer identity as string
 type PeerId = config.NodeID
@@ -65,7 +77,7 @@ type PeerId = config.NodeID
 // Peer information
 type PeerInfo Handshake
 
-// Peer manager configuration
+// Peer manager parameters
 const (
 	defaultConnectTimeout = 15 * time.Second		// default dial outbound timeout value, currently
 													// it's a fixed value here than can be configurated
@@ -96,14 +108,13 @@ const (
 	conflictAccessDelayUpper = 4000						// conflict delay upper bounder in time.Millisecond
 )
 
+// peer status
 const (
 	peerIdle			= iota						// idle
 	peerConnectOutInited							// connecting out inited
 	peerActivated									// had been activated
 	peerKilling										// in killing
 )
-
-type SubNetworkID = config.SubNetworkID
 
 // peer manager configuration
 type peMgrConfig struct {
@@ -134,17 +145,7 @@ type peMgrConfig struct {
 	ibpNumTotal			int							// total number of concurrency inbound peers
 }
 
-type PeerIdEx struct {
-	Id				config.NodeID					// node identity
-	Dir				int								// direction
-}
-
-type PeerIdExx struct {
-	Snid			config.SubNetworkID				// sub network identity
-	Node			config.Node						// node
-	Dir				int								// direction
-}
-
+// peer manager
 type PeerManager struct {
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// name
@@ -185,7 +186,7 @@ type PeerManager struct {
 	indCbUserData	interface{}									// user data pointer for callback
 	staticsStatus	map[PeerIdEx]int							// status about static nodes
 
-	ocrTid			int											// OCR timestamp cleanup timer
+	ocrTid			int											// OCR(outbound connect request) timestamp cleanup timer
 	tmLastOCR		map[SubNetworkID]map[PeerId]time.Time		// time of last outbound connect request for sub-netowerk
 																// and peer-identity
 	tmLastFNR		map[SubNetworkID]time.Time					// time of last find node request sent for sub network
@@ -302,6 +303,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 	if eno != PeMgrEnoNone {
 		schEno = sch.SchEnoUserTask
 	}
+
 	return schEno
 }
 
@@ -413,6 +415,7 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 	// some moment later.
 	peMgr.isInited = true
 	peMgr.inited<-PeMgrEnoNone
+
 	return PeMgrEnoNone
 }
 
@@ -1438,6 +1441,12 @@ func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErrno {
+	// for sub networks deletion:
+	// 1) kill half of the total outbound peer instances;
+	// 2) start a timer and when it's expired, kill all outbounds and inbounds;
+	// 3) before the timer expired, no inbounds accepted and no outbounds request;
+	// for sub networks adding:
+	// 1)add each sub network and make all of them ready to play;
 	return PeMgrEnoNone
 }
 
@@ -1467,8 +1476,8 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 			return PeMgrEnoNone
 		}
 
-		var schMsg= sch.SchMessage{}
-		var req = sch.MsgDcvFindNodeReq{
+		schMsg := sch.SchMessage{}
+		req := sch.MsgDcvFindNodeReq{
 			Snid:	*snid,
 			More:    more,
 			Include: nil,
