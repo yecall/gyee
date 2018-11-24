@@ -1004,7 +1004,6 @@ func (rutMgr *RutMgr)showRoute(tag string) {
 				golog.Printf("%s", routInfo)
 			}
 		}
-
 	}
 }
 

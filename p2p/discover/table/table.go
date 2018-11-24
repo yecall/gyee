@@ -325,6 +325,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	var eno TabMgrErrno = TabMgrEnoNone
 	tabMgr.ptnMe = ptn
 	tabMgr.sdl = sch.SchGetScheduler(ptn)
+
 	if eno = tabMgr.tabGetConfig(&tabMgr.cfg); eno != TabMgrEnoNone {
 		log.Debug("tabMgrPoweron: tabGetConfig failed, eno: %d", eno)
 		return eno
@@ -333,6 +334,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// if it's a static type, no table manager needed, just done the table
 	// manager task and then return. so, in this case, any other must not
 	// try to interact with table manager for it is not exist.
+
 	if tabMgr.networkType == p2pTypeStatic {
 		log.Debug("tabMgrPoweron: static type, tabMgr is not needed")
 		tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
@@ -360,42 +362,66 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	}
 
 	// Since the system is just powered on at this moment, we start table
-	// refreshing at once. Before doing this, we update the random seed for
+	// refreshing bellow. Before doing this, we update the random seed for
 	// the underlying.
+
 	rand.Seed(time.Now().UnixNano())
 	tabMgr.refreshing = false
 
-	// setup table manager for sub networks
-	if tabMgr.snid != config.ZeroSubNet {
+	// setup table manager for AnySubNet type. at this moment, if this type
+	// set, the network type must be P2pNetworkTypeDynamic, and none of sub
+	// network identities are specified, see function tabGetConfig called
+	// aboved for details. if it's not a AnySubNet, then some sub network
+	// identities must be provided, and it must be a ZeroSubNet.
+
+	if tabMgr.snid == config.AnySubNet {
+
+		// we put object tabMgr into the sub network list, this case we get
+		// a list with only one item. see comments bellow for more please.
+
 		for loop := 0; loop < cap(tabMgr.buckets); loop++ {
 			b := new(bucket)
 			tabMgr.buckets[loop] = b
 			b.nodes = make([]*bucketEntry, 0, bucketSize)
 		}
-		tabMgr.SubNetMgrList[tabMgr.snid] = tabMgr
-	}
 
-	if len(tabMgr.cfg.subNetIdList) > 0 {
+		tabMgr.SubNetMgrList[tabMgr.snid] = tabMgr
+
+	} else if len(tabMgr.cfg.subNetIdList) > 0 {
+
+		// here we must have some specific sub networks, we construct table
+		// manager for each one basing on the tabMgr object we had worked on
+		// it, see above codes, and then the base tabMgr would not response
+		// to specific any sub network, instead, it plays the role as a task
+		// scheduled by the scheduler, dispatching messages to those real
+		// table managers according to sub network identities, and a task to
+		// send messages to other tasks in system.
+
 		if eno = tabMgr.setupSubNetTabMgr(); eno != TabMgrEnoNone {
 			log.Debug("tabMgrPoweron: SetSubNetTabMgr failed, eno: %d", eno)
 			return eno
 		}
+	} else {
+		log.Debug("tabMgrPoweron: configuration mismatched")
+		return TabMgrEnoInternal
 	}
 
-	// refresh all possible sub networks
+	// refresh all possible sub networks in the list. since we had put all
+	// into the list in any cases, we need just to loop the list, see codes
+	// and comments above please.
+
 	var cycle = autoRefreshCycle
 	if tabMgr.cfg.bootstrapNode {
 		cycle = autoBsnRefreshCycle
 	}
+
 	for _, mgr := range tabMgr.SubNetMgrList {
 		if eno = mgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
 			log.Debug("tabMgrPoweron: tabStartTimer failed, eno: %d", eno)
 			return eno
 		}
 		if eno = mgr.tabRefresh(&mgr.snid, nil); eno != TabMgrEnoNone {
-			log.Debug("tabMgrPoweron: " +
-				"tabRefresh sub network failed, eno: %d, subnet: %x",
-				eno, mgr.snid)
+			log.Debug("tabMgrPoweron: tabRefresh sub network failed, eno: %d, subnet: %x", eno, mgr.snid)
 			return eno
 		}
 	}
@@ -876,10 +902,15 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	tabMgr.networkType = cfg.NetworkType
 	if tabMgr.networkType == config.P2pNetworkTypeStatic {
 		tabMgr.snid = config.ZeroSubNet
-	} else if tabMgr.networkType == config.P2pNetworkTypeDynamic && len(tabCfg.subNetIdList) == 0 {
-		tabMgr.snid = AnySubNet
+	} else if tabMgr.networkType == config.P2pNetworkTypeDynamic {
+		if len(tabCfg.subNetIdList) == 0 {
+			tabMgr.snid = AnySubNet
+		} else {
+			tabMgr.snid = config.ZeroSubNet
+		}
 	} else {
-		tabMgr.snid = config.ZeroSubNet
+		log.Debug("tabGetConfig: invalid network type: %d", tabMgr.networkType)
+		return TabMgrEnoConfig
 	}
 
 	return TabMgrEnoNone
