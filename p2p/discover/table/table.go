@@ -33,6 +33,7 @@ import (
 	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	log		"github.com/yeeco/gyee/p2p/logger"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 
@@ -222,7 +223,7 @@ type TableManager struct {
 
 	//
 	// Notice: currently Ethereum's database interface is introduced, and
-	// we had make some modification on it, see file nodedb.go for details
+	// we had make some modifications on it, see file nodedb.go for details
 	// please.
 	//
 
@@ -230,8 +231,12 @@ type TableManager struct {
 
 	//
 	// Notice: one node can attach to multiple sub networks, and we allocate
-	// a table manager for each sub network. A table manager is allocated to
-	// handle the case which no sub networks are needed.
+	// a table manager for each sub network. when network type is specified
+	// as dynamic but no specific sub network identities provided, a table
+	// manager with identity as AnySubNet would be allocated. There is always
+	// one base table manager act as a task for dispatching messages to real
+	// sub network table managers in SubNetMgrList, and sending messages for
+	// them when necessary.
 	//
 
 	networkType		int								// network type
@@ -410,60 +415,102 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// into the list in any cases, we need just to loop the list, see codes
 	// and comments above please.
 
-	var cycle = autoRefreshCycle
-	if tabMgr.cfg.bootstrapNode {
-		cycle = autoBsnRefreshCycle
-	}
-
 	for _, mgr := range tabMgr.SubNetMgrList {
-		if eno = mgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
-			log.Debug("tabMgrPoweron: tabStartTimer failed, eno: %d", eno)
-			return eno
-		}
-		if eno = mgr.tabRefresh(&mgr.snid, nil); eno != TabMgrEnoNone {
-			log.Debug("tabMgrPoweron: tabRefresh sub network failed, eno: %d, subnet: %x", eno, mgr.snid)
-			return eno
-		}
+		mgr.startSubnetRefresh()
 	}
 
 	return TabMgrEnoNone
 }
 
-func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
-	snl := tabMgr.cfg.subNetIdList
-	for _, snid := range snl {
-		mgr := NewTabMgr()
-		*mgr = *tabMgr
-		mgr.queryIcb		= make([]*instCtrlBlock, 0, TabInstQueringMax)
-		mgr.boundIcb		= make([]*instCtrlBlock, 0, TabInstBondingMax)
-		mgr.queryPending	= make([]*queryPendingEntry, 0, TabInstQPendingMax)
-		mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
-		mgr.dlkTab			= make([]int, 256)
-		mgr.snid			= snid
-		tabMgr.SubNetMgrList[snid] = mgr
+func (tabMgr *TableManager)startSubnetRefresh() TabMgrErrno {
+	cycle := autoRefreshCycle
+	if tabMgr.cfg.bootstrapNode {
+		cycle = autoBsnRefreshCycle
+	}
 
-		for loop := 0; loop < cap(mgr.buckets); loop++ {
-			b := new(bucket)
-			mgr.buckets[loop] = b
-			b.nodes = make([]*bucketEntry, 0, bucketSize)
-		}
+	if eno := tabMgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
+		log.Debug("startSubnetRefresh: tabStartTimer failed, eno: %d", eno)
+		return eno
+	}
+
+	if eno := tabMgr.tabRefresh(&tabMgr.snid, nil); eno != TabMgrEnoNone {
+		log.Debug("startSubnetRefresh: tabRefresh sub network failed, eno: %d, subnet: %x", eno, tabMgr.snid)
+		return eno
+	}
+
+	return TabMgrEnoNone
+}
+
+func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
+	mgr := NewTabMgr()
+	*mgr = *tabMgr
+	mgr.queryIcb		= make([]*instCtrlBlock, 0, TabInstQueringMax)
+	mgr.boundIcb		= make([]*instCtrlBlock, 0, TabInstBondingMax)
+	mgr.queryPending	= make([]*queryPendingEntry, 0, TabInstQPendingMax)
+	mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
+	mgr.dlkTab			= make([]int, 256)
+	mgr.snid			= snid
+	tabMgr.SubNetMgrList[snid] = mgr
+
+	for loop := 0; loop < cap(mgr.buckets); loop++ {
+		b := new(bucket)
+		mgr.buckets[loop] = b
+		b.nodes = make([]*bucketEntry, 0, bucketSize)
+	}
+	return mgr
+}
+
+func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
+	for _, snid := range tabMgr.cfg.subNetIdList {
+		mgr := tabMgr.mgr4Subnet(snid)
+		tabMgr.SubNetMgrList[snid] = mgr
 	}
 	return TabMgrEnoNone
 }
 
 func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
+
 	log.Debug("tabMgrPoweroff: task will be done, name: %s", tabMgr.sdl.SchGetTaskName(ptn))
+
 	if tabMgr.nodeDb != nil {
 		tabMgr.nodeDb.close()
 		tabMgr.nodeDb = nil
 	}
+
 	if tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
+
 	return TabMgrEnoNone
 }
 
 func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgrErrno {
+	delList := make([]config.SubNetworkID, 0)
+	addList := make([]config.SubNetworkID, 0)
+	delList = append(append(nil, msg.VSnidDel), msg.SnidDel)
+	addList = append(append(nil, msg.VSnidAdd), msg.SnidAdd)
+
+	for _, del := range delList {
+		if _, ok := tabMgr.SubNetMgrList[del]; ok {
+			delete(tabMgr.SubNetMgrList, del)
+		}
+	}
+
+	for _, add := range addList {
+		if _, ok := tabMgr.SubNetMgrList[add]; ok {
+			log.Debug("shellReconfigReq: duplicated for adding")
+			continue
+		}
+
+		mgr := tabMgr.mgr4Subnet(add)
+		tabMgr.SubNetMgrList[add] = mgr
+
+		if eno := mgr.startSubnetRefresh(); eno != TabMgrEnoNone {
+			log.Debug("shellReconfigReq: failed, eno: %d, snid: %x", eno, mgr.snid)
+			return eno
+		}
+	}
+
 	return TabMgrEnoNone
 }
 
