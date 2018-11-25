@@ -486,8 +486,8 @@ func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgrErrno {
 	delList := make([]config.SubNetworkID, 0)
 	addList := make([]config.SubNetworkID, 0)
-	delList = append(append(nil, msg.VSnidDel), msg.SnidDel)
-	addList = append(append(nil, msg.VSnidAdd), msg.SnidAdd)
+	delList = append(append(delList, msg.VSnidDel...), msg.SnidDel...)
+	addList = append(append(addList, msg.VSnidAdd...), msg.SnidAdd...)
 
 	for _, del := range delList {
 		if _, ok := tabMgr.SubNetMgrList[del]; ok {

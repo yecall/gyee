@@ -181,6 +181,7 @@ const (
 	EvDcvMgrBase		= 1300
 	EvDcvFindNodeReq	= EvDcvMgrBase	+ 1
 	EvDcvFindNodeRsp	= EvDcvMgrBase	+ 2
+	EvDcvReconfigReq	= EvDcvMgrBase	+ 3
 )
 
 // EvDcvFindNodeReq
@@ -196,6 +197,15 @@ type MsgDcvFindNodeRsp struct {
 	Snid	config.SubNetworkID	// sub network identity
 	Nodes	[]*config.Node		// nodes found
 }
+
+//
+// EvDcvReconfigReq
+//
+type MsgDcvReconfigReq struct {
+	DelList	map[config.SubNetworkID]interface{}	// sub networks to be deleted
+	AddList	map[config.SubNetworkID]interface{}	// sub networks to be added
+}
+
 
 //
 // Neighbor lookup on Udp event
@@ -300,6 +310,7 @@ const (
 	PeDcvFindNodeTimerId	= 1
 	PeMinOcrCleanupTimerId	= 2
 	PeConflictAccessTimerId	= 3
+	PeReconfigTimerId		= 4
 )
 
 const (
@@ -308,6 +319,7 @@ const (
 	EvPeDcvFindNodeTimer	= EvTimerBase	+ PeDcvFindNodeTimerId
 	EvPeOcrCleanupTimer		= EvTimerBase	+ PeMinOcrCleanupTimerId
 	EvPeConflictAccessTimer	= EvTimerBase	+ PeConflictAccessTimerId
+	EvPeReconfigTimer		= EvTimerBase	+ PeReconfigTimerId
 	EvPeConnOutReq			= EvPeerEstBase + 1
 	EvPeConnOutRsp			= EvPeerEstBase + 2
 	EvPeHandshakeReq		= EvPeerEstBase + 3

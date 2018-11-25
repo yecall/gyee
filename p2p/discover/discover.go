@@ -82,6 +82,8 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		eno = dcvMgr.DcvMgrFindNodeReq(msg.Body.(*sch.MsgDcvFindNodeReq))
 	case sch.EvTabRefreshRsp:
 		eno = dcvMgr.DcvMgrTabRefreshRsp(msg.Body.(*sch.MsgTabRefreshRsp))
+	case sch.EvDcvReconfigReq:
+		eno = dcvMgr.DcvMgrReconfigReq(msg.Body.(*sch.MsgDcvReconfigReq))
 	default:
 		log.Debug("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
@@ -168,6 +170,9 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 	return DcvMgrEnoNone
 }
 
+func (dcvMgr *DiscoverManager)DcvMgrReconfigReq(req *sch.MsgDcvReconfigReq) DcvMgrErrno {
+	return DcvMgrEnoNone
+}
 
 
 

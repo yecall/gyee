@@ -54,6 +54,7 @@ const (
 	PeMgrEnoMismatched
 	PeMgrEnoInternal
 	PeMgrEnoPingpongTh
+	PeMgrEnoRecofig
 	PeMgrEnoUnknown
 )
 
@@ -69,6 +70,11 @@ type PeerIdExx struct {
 	Snid			config.SubNetworkID				// sub network identity
 	Node			config.Node						// node
 	Dir				int								// direction
+}
+
+type PeerReconfig struct {
+	delList			map[config.SubNetworkID]interface{}	// sub networks to be deleted
+	addList			map[config.SubNetworkID]interface{}	// sub networks to be added
 }
 
 // Peer identity as string
@@ -106,6 +112,8 @@ const (
 
 	conflictAccessDelayLower = 1000						// conflict delay lower bounder in time.Millisecond
 	conflictAccessDelayUpper = 4000						// conflict delay upper bounder in time.Millisecond
+
+	reconfigDelay = time.Second * 4						// reconfiguration delay time duration
 )
 
 // peer status
@@ -190,27 +198,35 @@ type PeerManager struct {
 	tmLastOCR		map[SubNetworkID]map[PeerId]time.Time		// time of last outbound connect request for sub-netowerk
 																// and peer-identity
 	tmLastFNR		map[SubNetworkID]time.Time					// time of last find node request sent for sub network
+
+	reCfg			PeerReconfig								// sub network reconfiguration
+	reCfgTid		int											// reconfiguration timer
 }
 
 func NewPeerMgr() *PeerManager {
 	var peMgr = PeerManager{
-		name:        sch.PeerMgrName,
-		inited:      make(chan PeMgrErrno, 1),
-		cfg:         peMgrConfig{},
-		tidFindNode: map[SubNetworkID]int{},
-		peers:       map[interface{}]*peerInstance{},
-		nodes:       map[SubNetworkID]map[PeerIdEx]*peerInstance{},
-		workers:     map[SubNetworkID]map[PeerIdEx]*peerInstance{},
-		wrkNum:      map[SubNetworkID]int{},
-		ibpNum:      map[SubNetworkID]int{},
-		obpNum:      map[SubNetworkID]int{},
-		ibpTotalNum: 0,
-		indChan:     make(chan interface{}, maxIndicationQueueSize),
-		randoms:     map[SubNetworkID][]*config.Node{},
+		name:        	sch.PeerMgrName,
+		inited:      	make(chan PeMgrErrno, 1),
+		cfg:         	peMgrConfig{},
+		tidFindNode: 	map[SubNetworkID]int{},
+		peers:			map[interface{}]*peerInstance{},
+		nodes:			map[SubNetworkID]map[PeerIdEx]*peerInstance{},
+		workers:		map[SubNetworkID]map[PeerIdEx]*peerInstance{},
+		wrkNum:      	map[SubNetworkID]int{},
+		ibpNum:      	map[SubNetworkID]int{},
+		obpNum:      	map[SubNetworkID]int{},
+		ibpTotalNum:	0,
+		indChan:     	make(chan interface{}, maxIndicationQueueSize),
+		randoms:     	map[SubNetworkID][]*config.Node{},
 		staticsStatus:	map[PeerIdEx]int{},
 		ocrTid:			sch.SchInvalidTid,
 		tmLastOCR:		make(map[SubNetworkID]map[PeerId]time.Time, 0),
 		tmLastFNR:		make(map[SubNetworkID]time.Time, 0),
+		reCfg:			PeerReconfig{
+			delList:	make(map[config.SubNetworkID]interface{}, 0),
+			addList:	make(map[config.SubNetworkID]interface{}, 0),
+		},
+		reCfgTid:		sch.SchInvalidTid,
 	}
 	peMgr.tep = peMgr.peerMgrProc
 	return &peMgr
@@ -250,6 +266,9 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	case sch.EvShellReconfigReq:
 		eno = peMgr.shellReconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
+
+	case sch.EvPeReconfigTimer:
+		eno = peMgr.reconfigTimerHandler()
 
 	case sch.EvPeOcrCleanupTimer:
 		peMgr.ocrTimestampCleanup()
@@ -372,6 +391,8 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.cfg.protocols = append(peMgr.cfg.protocols, Protocol{ Pid:p.Pid, Ver:p.Ver,})
 	}
 
+	// Notice: even the network type is P2pNetworkTypeDynamic, a static sub network can
+	// still be exist, if static nodes are specified.
 	for _, sn := range peMgr.cfg.staticNodes {
 		idEx := PeerIdEx{Id:sn.ID, Dir:PeInstDirOutbound}
 		peMgr.staticsStatus[idEx] = peerIdle
@@ -379,28 +400,32 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.staticsStatus[idEx] = peerIdle
 	}
 
-	if len(peMgr.cfg.subNetIdList) == 0 && peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
-		peMgr.cfg.subNetIdList = append(peMgr.cfg.subNetIdList, config.AnySubNet)
-		peMgr.cfg.subNetMaxPeers[config.AnySubNet] = config.MaxPeers
-		peMgr.cfg.subNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
-		peMgr.cfg.subNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
+	if len(peMgr.cfg.staticNodes) > 0 {
+		staticSnid := peMgr.cfg.staticSubNetId
+		peMgr.nodes[staticSnid] = make(map[PeerIdEx]*peerInstance)
+		peMgr.workers[staticSnid] = make(map[PeerIdEx]*peerInstance)
+		peMgr.wrkNum[staticSnid] = 0
+		peMgr.ibpNum[staticSnid] = 0
+		peMgr.obpNum[staticSnid] = 0
 	}
 
 	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
+		// setup each dynamic sub network: if no identities are provided, we set a AnySubNet,
+		// else deal with each one; dynamic sub network identities are also put into the "add"
+		// list of the reconfiguration struct.
+		if len(peMgr.cfg.subNetIdList) == 0 {
+			peMgr.cfg.subNetIdList = append(peMgr.cfg.subNetIdList, config.AnySubNet)
+			peMgr.cfg.subNetMaxPeers[config.AnySubNet] = config.MaxPeers
+			peMgr.cfg.subNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
+			peMgr.cfg.subNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
+		}
 		for _, snid := range peMgr.cfg.subNetIdList {
 			peMgr.nodes[snid] = make(map[PeerIdEx]*peerInstance)
 			peMgr.workers[snid] = make(map[PeerIdEx]*peerInstance)
 			peMgr.wrkNum[snid] = 0
 			peMgr.ibpNum[snid] = 0
 			peMgr.obpNum[snid] = 0
-		}
-		if len(peMgr.cfg.staticNodes) > 0 {
-			staticSnid := peMgr.cfg.staticSubNetId
-			peMgr.nodes[staticSnid] = make(map[PeerIdEx]*peerInstance)
-			peMgr.workers[staticSnid] = make(map[PeerIdEx]*peerInstance)
-			peMgr.wrkNum[staticSnid] = 0
-			peMgr.ibpNum[staticSnid] = 0
-			peMgr.obpNum[staticSnid] = 0
+			peMgr.reCfg.addList[snid] = nil
 		}
 	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
 		staticSnid := peMgr.cfg.staticSubNetId
@@ -409,6 +434,9 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.wrkNum[staticSnid] = 0
 		peMgr.ibpNum[staticSnid] = 0
 		peMgr.obpNum[staticSnid] = 0
+	} else {
+		log.Debug("peMgrPoweron: invalid network type: %d", peMgr.cfg.networkType)
+		return PeMgrEnoConfig
 	}
 
 	// tell initialization result, and EvPeMgrStartReq would be sent to us
@@ -1440,13 +1468,135 @@ func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
+func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
+	return PeMgrEnoNone
+}
+
 func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErrno {
+	// notice: if last reconfiguration is not completed, this one would be failed.
+	//
 	// for sub networks deletion:
-	// 1) kill half of the total outbound peer instances;
+	// 1) kill half of the total peer instances;
 	// 2) start a timer and when it's expired, kill all outbounds and inbounds;
 	// 3) before the timer expired, no inbounds accepted and no outbounds request;
 	// for sub networks adding:
 	// 1)add each sub network and make all of them ready to play;
+	//
+	// notice: the same sub network should not be presented in both deleting list
+	// and the adding list of "msg" pass to this function.
+
+	if peMgr.reCfgTid != sch.SchInvalidTid {
+		log.Debug("shellReconfigReq: previous reconfiguration not completed")
+		return PeMgrEnoRecofig
+	}
+
+	delList := make([]config.SubNetworkID, 0)
+	addList := make([]config.SubNetworkID, 0)
+	delList = append(append(delList, msg.VSnidDel...), msg.SnidDel...)
+	addList = append(append(addList, msg.VSnidAdd...), msg.SnidAdd...)
+
+	// filter out deleting list
+	filterOut := make([]int, 0)
+	for idx, del := range delList {
+		_, inAdding := peMgr.reCfg.addList[del]
+		_, inDeling := peMgr.reCfg.delList[del]
+		if !inAdding || inDeling { continue }
+		filterOut = append(filterOut, idx)
+	}
+	for _, fo := range filterOut {
+		if fo == len(delList) - 1 {
+			delList = delList[0:fo-1]
+		} else {
+			delList = append(delList[fo:], delList[fo])
+		}
+	}
+
+	for _, del := range delList {
+		peMgr.reCfg.delList[del] = nil
+	}
+
+	// filter out adding list
+	filterOut = make([]int, 0)
+	for idx, add := range addList {
+		_, inAdding := peMgr.reCfg.addList[add]
+		_, inDeling := peMgr.reCfg.delList[add]
+		if inAdding { continue }
+		filterOut = append(filterOut, idx)
+		if inDeling {
+			delete(peMgr.reCfg.delList, add)
+		}
+	}
+	for _, fo := range filterOut {
+		if fo == len(addList) - 1 {
+			addList = addList[0:fo-1]
+		} else {
+			addList = append(addList[fo:], addList[fo])
+		}
+	}
+
+	for _, add := range addList {
+		peMgr.reCfg.addList[add] = nil
+	}
+
+	// config adding part sub networks
+	for _, add := range addList {
+		peMgr.nodes[add] = make(map[PeerIdEx]*peerInstance)
+		peMgr.workers[add] = make(map[PeerIdEx]*peerInstance)
+		peMgr.wrkNum[add] = 0
+		peMgr.ibpNum[add] = 0
+		peMgr.obpNum[add] = 0
+		peMgr.cfg.subNetMaxPeers[add] = config.MaxPeers
+		peMgr.cfg.subNetMaxOutbounds[add] = config.MaxOutbounds
+		peMgr.cfg.subNetMaxInBounds[add] = config.MaxInbounds
+	}
+
+	// kill part of peer instances of each sub network to deleted
+	for _, del := range delList {
+		wks, ok := peMgr.workers[del]
+		if !ok { continue }
+		wkNum := len(wks);
+		count := 0;
+		schMsg := sch.SchMessage{}
+		for _, peerInst := range wks {
+			if count++; count >= wkNum / 2 {
+				break
+			}
+			req := sch.MsgPeCloseReq {
+				Ptn:	peerInst.ptnMe,
+				Snid:	peerInst.snid,
+				Node:	peerInst.node,
+				Dir:	peerInst.dir,
+				Why:	msg,
+			}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
+			peMgr.sdl.SchSendMessage(&schMsg)
+		}
+	}
+
+	// start timer for remain peer instances of deleting part
+	td := sch.TimerDescription {
+		Name:	"_recfgTimer",
+		Utid:	sch.PeReconfigTimerId,
+		Tmt:	sch.SchTmTypeAbsolute,
+		Dur:	reconfigDelay,
+		Extra:	&idexx,
+	}
+	if eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
+		log.Debug("shellReconfigReq: SchSetTimer failed, eno: %d", eno)
+		return PeMgrEnoScheduler
+	} else {
+		peMgr.reCfgTid = tid
+	}
+
+	// tell discover manager that sub networks changed
+	schMsg := sch.SchMessage{}
+	req := sch.MsgDcvReconfigReq {
+		DelList: peMgr.reCfg.delList,
+		AddList: peMgr.reCfg.addList,
+	}
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvReconfigReq, &req)
+	peMgr.sdl.SchSendMessage(&schMsg)
+
 	return PeMgrEnoNone
 }
 
