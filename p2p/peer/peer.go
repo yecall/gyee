@@ -542,13 +542,17 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		return PeMgrEnoNotfound
 	}
 
+	if _, ok := peMgr.reCfg.delList[rsp.Snid]; ok {
+		log.Debug("peMgrDcvFindNodeRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
+		return PeMgrEnoRecofig
+	}
+
 	var snid = rsp.Snid
 	var appended = make(map[SubNetworkID]int, 0)
 	var dup bool
 	var idEx PeerIdEx
 
 	for _, n := range rsp.Nodes {
-
 		idEx.Id = n.ID
 		idEx.Dir = PeInstDirOutbound
 		if _, ok := peMgr.nodes[snid][idEx]; ok {
@@ -926,6 +930,12 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		log.Debug("peMgrHandshakeRsp: response mismatched with instance, rsp: %s",
 			fmt.Sprintf("%+v", *rsp))
 		return PeMgrEnoParameter
+	}
+
+	if _, ok := peMgr.reCfg.delList[rsp.snid]; ok {
+		log.Debug("peMgrHandshakeRsp: kill instance for reconfiguration, snid: %x", rsp.snid)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		return PeMgrEnoRecofig
 	}
 
 	// Check result, if failed, kill the instance
@@ -1469,6 +1479,24 @@ func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
+	peMgr.reCfgTid = sch.SchInvalidTid
+	for del, _, := range peMgr.reCfg.delList {
+		wks, ok := peMgr.workers[del]
+		if !ok { continue }
+		msg := sch.SchMessage{}
+		for _, peerInst := range wks {
+			req := sch.MsgPeCloseReq {
+				Ptn:	peerInst.ptnMe,
+				Snid:	peerInst.snid,
+				Node:	peerInst.node,
+				Dir:	peerInst.dir,
+				Why:	msg,
+			}
+			peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
+			peMgr.sdl.SchSendMessage(&msg)
+		}
+	}
+	peMgr.reCfg.delList = make(map[config.SubNetworkID]interface{}, 0)
 	return PeMgrEnoNone
 }
 
@@ -1479,6 +1507,8 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	// 1) kill half of the total peer instances;
 	// 2) start a timer and when it's expired, kill all outbounds and inbounds;
 	// 3) before the timer expired, no inbounds accepted and no outbounds request;
+	// 4) clean the randoms for outbound connection;
+	// 5) tell discover manager the sub networks changed;
 	// for sub networks adding:
 	// 1)add each sub network and make all of them ready to play;
 	//
@@ -1586,6 +1616,13 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 		return PeMgrEnoScheduler
 	} else {
 		peMgr.reCfgTid = tid
+	}
+
+	// cleanup the randoms
+	for _, del := range delList {
+		if _, ok :=	peMgr.randoms[del]; ok {
+			delete(peMgr.randoms, del)
+		}
 	}
 
 	// tell discover manager that sub networks changed
