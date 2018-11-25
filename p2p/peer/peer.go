@@ -427,6 +427,12 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 			peMgr.obpNum[snid] = 0
 			peMgr.reCfg.addList[snid] = nil
 		}
+
+		// tell discover manager that sub networks changed, notice that at this moment, it's
+		// in the power on procedure of system, the discover manager task must be powered on
+		// now, see power on order table in file static.go please.
+		peMgr.peMgrRecfg2DcvMgr()
+
 	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
 		staticSnid := peMgr.cfg.staticSubNetId
 		peMgr.nodes[staticSnid] = make(map[PeerIdEx]*peerInstance)
@@ -1626,14 +1632,25 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	}
 
 	// tell discover manager that sub networks changed
+	peMgr.peMgrRecfg2DcvMgr()
+
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)peMgrRecfg2DcvMgr() PeMgrErrno {
 	schMsg := sch.SchMessage{}
 	req := sch.MsgDcvReconfigReq {
-		DelList: peMgr.reCfg.delList,
-		AddList: peMgr.reCfg.addList,
+		DelList: make(map[config.SubNetworkID]interface{}, 0),
+		AddList: make(map[config.SubNetworkID]interface{}, 0),
+	}
+	for del, _ := range peMgr.reCfg.delList {
+		req.DelList[del] = nil
+	}
+	for add, _ := range peMgr.reCfg.addList {
+		req.AddList[add] = nil
 	}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvReconfigReq, &req)
 	peMgr.sdl.SchSendMessage(&schMsg)
-
 	return PeMgrEnoNone
 }
 

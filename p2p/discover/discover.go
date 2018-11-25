@@ -35,18 +35,20 @@ const (
 )
 
 type DcvMgrErrno int
+type DcvMgrReconfig = sch.MsgDcvReconfigReq
 
 // Discover manager
 const DcvMgrName = sch.DcvMgrName
 
 type DiscoverManager struct {
+	sdl			*sch.Scheduler		// pointer to scheduler
 	name		string				// name
 	tep			sch.SchUserTaskEp	// entry
 	ptnMe		interface{}			// task node pointer to myself
 	ptnTab		interface{}			// task node pointer to table manager task
 	ptnPeMgr	interface{}			// task node pointer to peer manager task
 	more		int					// number more peers are needed
-	sdl			*sch.Scheduler		// pointer to scheduler
+	reCfg		DcvMgrReconfig		// reconfiguration request from peer manager
 }
 
 func NewDcvMgr() *DiscoverManager {
@@ -156,21 +158,36 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) DcvMgrErrno {
 	if dcvMgr.more <= 0 {
 		// since nodes reported to peer manager might be useless for these nods might
-		// be duplicated ones in current implement, we should improve this later.
+		// be duplicated ones in current implement, we can't return here, this should
+		// be improve this later.
 		// return DcvMgrEnoNone
 	}
+
+	if _, inDeling := dcvMgr.reCfg.DelList[rsp.Snid]; inDeling {
+		log.Debug("DcvMgrTabRefreshRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
+		return DcvMgrEnoNone
+	}
+
+	if _, inAdding := dcvMgr.reCfg.AddList[rsp.Snid]; !inAdding {
+		log.Debug("DcvMgrTabRefreshRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
+		return DcvMgrEnoNone
+	}
+
 	var schMsg = sch.SchMessage{}
 	var r = sch.MsgDcvFindNodeRsp{
 		Snid:	rsp.Snid,
 		Nodes:	rsp.Nodes,
 	}
+
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r)
 	dcvMgr.sdl.SchSendMessage(&schMsg)
 	dcvMgr.more -= len(r.Nodes)
+
 	return DcvMgrEnoNone
 }
 
 func (dcvMgr *DiscoverManager)DcvMgrReconfigReq(req *sch.MsgDcvReconfigReq) DcvMgrErrno {
+	dcvMgr.reCfg = *req
 	return DcvMgrEnoNone
 }
 
