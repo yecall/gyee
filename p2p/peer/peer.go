@@ -1579,7 +1579,7 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 		Utid:	sch.PeReconfigTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	reconfigDelay,
-		Extra:	&idexx,
+		Extra:	nil,
 	}
 	if eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
 		log.Debug("shellReconfigReq: SchSetTimer failed, eno: %d", eno)
