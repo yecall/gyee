@@ -32,6 +32,7 @@ import (
 	"time"
 	"io"
 	"errors"
+	"bytes"
 	"crypto/rand"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -40,7 +41,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	log "github.com/yeeco/gyee/p2p/logger"
-	"bytes"
 )
 
 
@@ -437,18 +437,16 @@ func P2pDefaultBootstrapConfig() *Config {
 }
 
 func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
+
 	// Update, one SHOULD first call P2pDefaultConfig to get default value, modify
 	// some fields if necessary, and then call this function, since the configuration
 	// is overlapped directly here in this function.
+
 	if cfg == nil {
 		log.Debug("P2pSetConfig: invalid configuration")
 		return name, PcfgEnoParameter
 	}
 
-	// Check configuration. Notice that we do not need a private key in current
-	// implement, only public key needed to build the local node identity, so one
-	// can leave private to be nil while give a not nil public key. If both are
-	// nils, key pair will be built, see bellow pls.
 	if cfg.PrivateKey == nil {
 		log.Debug("P2pSetConfig: private key is empty")
 	}
@@ -483,7 +481,6 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		log.Debug("P2pSetConfig: StaticNodes is empty")
 	}
 
-	// Seems path.IsAbs does not work under Windows
 	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
 		log.Debug("P2pSetConfig: invaid data directory")
 		return name, PcfgEnoDataDir
@@ -498,6 +495,8 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		log.Debug("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoIpAddr
 	}
+	log.Debug("P2pSetConfig: [ip, udp, tcp]=[%s, %d, %d]",
+		cfg.Local.IP.String(), cfg.Local.UDP, cfg.Local.TCP)
 
 	name = strings.Trim(name, " ")
 	if len(name) == 0 {
@@ -516,14 +515,11 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 	config[name] = cfg
 
-	// setup local node identity from key
 	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
 		log.Debug("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoNodeId
 	}
 
-	// check if DHT application, we set same node identity as chain application
-	// for DHT now, individual identities might need in the future.
 	if cfg.AppType == P2P_TYPE_DHT {
 		cfg.DhtRutCfg.NodeId = cfg.DhtLocal.ID
 		cfg.DhtQryCfg.Local = &cfg.DhtLocal
@@ -643,9 +639,11 @@ func P2pGetUserHomeDir() string {
 
 // Build private key
 func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
+
 	// 1) if no data directory specified, try to generate key, but do no save to file;
 	// 2) if data directory presented, try to load key from file;
 	// 3) if load failed, try to generate key and the save it to file;
+
 	if cfg.NodeDataDir == "" {
 		key, err := GenerateKey()
 		if err != nil {
@@ -712,13 +710,16 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 		}
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	}
+
 	pnid := p2pPubkey2NodeId(cfg.PublicKey)
 	if pnid == nil {
 		log.Debug("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
 		return PcfgEnoPublicKye
 	}
+
 	cfg.Local.ID = *pnid
 	log.Debug("p2pSetupLocalNodeId: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
+
 	return PcfgEnoNone
 }
 

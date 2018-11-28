@@ -492,6 +492,8 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 	pbPkg := new(pb.P2PPackage)
 	pbPkg.Pid = new(pb.ProtocolId)
 	*pbPkg.Pid = pb.ProtocolId(upkg.Pid)
+	pbPkg.ExtMid = new(pb.MessageId)
+	*pbPkg.ExtMid = pb.MessageId(upkg.Mid)
 	pbPkg.PayloadLength = new(uint32)
 	*pbPkg.PayloadLength = uint32(upkg.PayloadLength)
 	pbPkg.Payload = append(pbPkg.Payload, upkg.Payload...)
