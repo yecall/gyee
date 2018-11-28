@@ -26,7 +26,6 @@ import (
 	"encoding/binary"
 	"os"
 	"time"
-	"crypto/sha256"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -157,7 +156,7 @@ func (db *nodeDB) storeInt64(key []byte, n int64) error {
 }
 
 func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
-	var idEx = make([]byte, 0)
+	idEx := make([]byte, 0)
 	idEx = append(idEx, id[:]...)
 	idEx = append(idEx, snid[:]...)
 	blob, err := db.lvl.Get(makeKey(idEx, rootKey), nil)
@@ -169,7 +168,7 @@ func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
 		log.Debug("node: DecodeBytes failed")
 		return nil
 	}
-	node.sha = sha256.Sum256(id[:])
+	node.sha = *TabNodeId2Hash(id)
 	return node
 }
 

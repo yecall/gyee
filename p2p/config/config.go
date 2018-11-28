@@ -513,7 +513,6 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		log.Debug("P2pSetConfig: old configuration: %+v", *config[name])
 		log.Debug("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
 	}
-	config[name] = cfg
 
 	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
 		log.Debug("P2pSetConfig: invalid ip address")
@@ -525,6 +524,8 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		cfg.DhtQryCfg.Local = &cfg.DhtLocal
 		cfg.DhtConCfg.Local = &cfg.DhtLocal
 	}
+
+	config[name] = cfg
 
 	return name, PcfgEnoNone
 }
@@ -703,8 +704,7 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 	if cfg.PrivateKey != nil {
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	} else if cfg.PublicKey == nil {
-		cfg.PrivateKey = p2pBuildPrivateKey(cfg)
-		if cfg.PrivateKey == nil {
+		if cfg.PrivateKey = p2pBuildPrivateKey(cfg); cfg.PrivateKey == nil {
 			log.Debug("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
 			return PcfgEnoPrivateKye
 		}
