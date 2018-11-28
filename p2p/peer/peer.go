@@ -55,6 +55,8 @@ const (
 	PeMgrEnoInternal
 	PeMgrEnoPingpongTh
 	PeMgrEnoRecofig
+	PeMgrEnoSign
+	PeMgrEnoVerify
 	PeMgrEnoUnknown
 )
 

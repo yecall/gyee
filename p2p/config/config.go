@@ -654,9 +654,9 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 		return key
 	}
 
-	keyfile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
-	if key, err := LoadECDSA(keyfile); err == nil {
-		log.Debug("p2pBuildPrivateKey: private key loaded ok from file: %s", keyfile)
+	keyFile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
+	if key, err := LoadECDSA(keyFile); err == nil {
+		log.Debug("p2pBuildPrivateKey: private key loaded ok from file: %s", keyFile)
 		return key
 	}
 
@@ -675,11 +675,11 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 		}
 	}
 
-	if err := SaveECDSA(keyfile, key); err != nil {
+	if err := SaveECDSA(keyFile, key); err != nil {
 		log.Debug("p2pBuildPrivateKey: SaveECDSA failed, err: %s", err.Error())
 	}
 
-	log.Debug("p2pBuildPrivateKey: key save ok to file: %s", keyfile)
+	log.Debug("p2pBuildPrivateKey: key save ok to file: %s", keyFile)
 	return key
 }
 
@@ -698,7 +698,7 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 // Trans node identity to public key
 func P2pNodeId2Pubkey(id NodeID) *ecdsa.PublicKey {
 	data := make([]byte, 1 + NodeIDBytes)
-	data[0] = 4;
+	data[0] = 4
 	copy(data[1:], id[0:])
 	x, y := elliptic.Unmarshal(S256(), data)
 	return &ecdsa.PublicKey {
@@ -730,7 +730,11 @@ func P2pSignBigInt(bi *big.Int) int {
 
 // Sign
 func P2pSign(priKey *ecdsa.PrivateKey, data []byte) (r, s *big.Int, err error) {
-	return ecdsa.Sign(rand.Reader, priKey, data)
+	r, s, err = ecdsa.Sign(rand.Reader, priKey, data)
+	if err != nil {
+		log.Debug("P2pSign: failed, error: %s", err.Error())
+	}
+	return
 }
 
 // Verify

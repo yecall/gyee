@@ -195,6 +195,11 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	pbHS := pbMsg.Handshake
 
+	if upkg.verifyInbound(inst, pbHS) != true {
+		log.Debug("putHandshakeOutbound: verifyInbound failed")
+		return nil, PeMgrEnoVerify
+	}
+
 	if pbHS == nil {
 
 		log.Debug("getHandshakeInbound: " +
@@ -276,6 +281,11 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 		pbProto.Pid = new(pb.ProtocolId)
 		*pbProto.Pid = pb.ProtocolId_PID_P2P
 		pbProto.Ver = append(pbProto.Ver, p.Ver[:]...)
+	}
+
+	if upkg.signOutbound(inst, pbHandshakeMsg) != true {
+		log.Debug("putHandshakeOutbound: signOutbound failed")
+		return PeMgrEnoSign
 	}
 
 	pbMsg := new(pb.P2PMessage)
