@@ -91,7 +91,11 @@ message P2PMessage {
         required uint32     TCP         = 5;    // tcp port number
         required uint32     ProtoNum    = 6;    // number of protocols
         repeated Protocol   Protocols   = 7;    // protocol table
-        optional bytes      Extra       = 8;    // extra info, reserved
+        required int32      SignR       = 8;    // sign for r
+        repeated bytes      R           = 9;    // r
+        required int32      SignS       = 10;   // sign for s
+        repeated bytes      S           = 11;   // s
+        optional bytes      Extra       = 12;   // extra info, reserved
     }
 
     message Ping {

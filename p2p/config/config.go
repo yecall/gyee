@@ -695,6 +695,49 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 	return &id
 }
 
+// Trans node identity to public key
+func P2pNodeId2Pubkey(id NodeID) *ecdsa.PublicKey {
+	data := make([]byte, 1 + NodeIDBytes)
+	data[0] = 4;
+	copy(data[1:], id[0:])
+	x, y := elliptic.Unmarshal(S256(), data)
+	return &ecdsa.PublicKey {
+		Curve:S256(),
+		X: x,
+		Y: y,
+	}
+}
+
+// Construct big integer by sign and absolute value
+func P2pBigInt(sign int, abs []byte) *big.Int {
+	bi := big.Int{}
+	bi.SetBytes(abs)
+	if sign == -1 {
+		bi.Neg(&bi)
+	}
+	return &bi
+}
+
+// Get bytes of big int absolute value
+func P2pBigIntAbs2Bytes(bi *big.Int) []byte {
+	return bi.Bytes()
+}
+
+// Get sign value of big int
+func P2pSignBigInt(bi *big.Int) int {
+	return bi.Sign()
+}
+
+// Sign
+func P2pSign(priKey *ecdsa.PrivateKey, data []byte) (r, s *big.Int, err error) {
+	return ecdsa.Sign(rand.Reader, priKey, data)
+}
+
+// Verify
+func P2pVerify(pubKey *ecdsa.PublicKey, data [] byte, r, s *big.Int) bool {
+	return ecdsa.Verify(pubKey, data, r, s)
+}
+
 // Setup local node identity
 func P2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 	return p2pSetupLocalNodeId(cfg)
