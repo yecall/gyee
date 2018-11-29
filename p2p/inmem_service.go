@@ -134,6 +134,10 @@ func (is *InmemService) DhtSetValue(key []byte, value []byte) error {
 	return is.hub.SetValue(key, value)
 }
 
+func (is *InmemService) Reconfig(reCfg *RecfgCommand) error {
+	return nil
+}
+
 //Inmem Hub for all InmemService
 //模拟消息的延迟，丢失，dht检索
 type InmemHub struct {
