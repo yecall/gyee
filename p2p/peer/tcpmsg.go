@@ -25,7 +25,7 @@ import (
 	"time"
 	"net"
 	ggio "github.com/gogo/protobuf/io"
-	"github.com/yeeco/gyee/p2p/config"
+	config "github.com/yeeco/gyee/p2p/config"
 	pb		"github.com/yeeco/gyee/p2p/peer/pb"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	log	"github.com/yeeco/gyee/p2p/logger"
@@ -660,4 +660,27 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	}
 
 	return PeMgrEnoNone
+}
+
+func (upkg *P2pPackage)signOutbound(inst *peerInstance, hs *pb.P2PMessage_Handshake) bool {
+	cfg := inst.sdl.SchGetP2pConfig()
+	r, s, err := config.P2pSign(cfg.PrivateKey, hs.NodeId)
+	if err != nil {
+		log.Debug("signOutbound: P2pSign failed, error: %s", err.Error())
+		return false
+	}
+	hs.SignR = new(int32)
+	*hs.SignR = int32(config.P2pSignBigInt(r))
+	hs.R = append(hs.R, config.P2pBigIntAbs2Bytes(r)...)
+	hs.SignS = new(int32)
+	*hs.SignS = int32(config.P2pSignBigInt(s))
+	hs.S = append(hs.S, config.P2pBigIntAbs2Bytes(s)...)
+	return true
+}
+
+func (upkg *P2pPackage)verifyInbound(inst *peerInstance, hs *pb.P2PMessage_Handshake) bool {
+	pubKey := config.P2pNodeId2Pubkey(hs.NodeId)
+	r := config.P2pBigInt(int(*hs.SignR), hs.R)
+	s := config.P2pBigInt(int(*hs.SignS), hs.S)
+	return config.P2pVerify(pubKey, hs.NodeId, r, s)
 }

@@ -695,8 +695,32 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 	return &id
 }
 
+// Setup local node identity
+func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
+	if cfg.PrivateKey != nil {
+		cfg.PublicKey = &cfg.PrivateKey.PublicKey
+	} else if cfg.PublicKey == nil {
+		if cfg.PrivateKey = p2pBuildPrivateKey(cfg); cfg.PrivateKey == nil {
+			log.Debug("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
+			return PcfgEnoPrivateKye
+		}
+		cfg.PublicKey = &cfg.PrivateKey.PublicKey
+	}
+
+	pnid := p2pPubkey2NodeId(cfg.PublicKey)
+	if pnid == nil {
+		log.Debug("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
+		return PcfgEnoPublicKye
+	}
+
+	cfg.Local.ID = *pnid
+	log.Debug("p2pSetupLocalNodeId: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
+
+	return PcfgEnoNone
+}
+
 // Trans node identity to public key
-func P2pNodeId2Pubkey(id NodeID) *ecdsa.PublicKey {
+func P2pNodeId2Pubkey(id []byte) *ecdsa.PublicKey {
 	data := make([]byte, 1 + NodeIDBytes)
 	data[0] = 4
 	copy(data[1:], id[0:])
@@ -745,29 +769,6 @@ func P2pVerify(pubKey *ecdsa.PublicKey, data [] byte, r, s *big.Int) bool {
 // Setup local node identity
 func P2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 	return p2pSetupLocalNodeId(cfg)
-}
-
-func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
-	if cfg.PrivateKey != nil {
-		cfg.PublicKey = &cfg.PrivateKey.PublicKey
-	} else if cfg.PublicKey == nil {
-		if cfg.PrivateKey = p2pBuildPrivateKey(cfg); cfg.PrivateKey == nil {
-			log.Debug("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
-			return PcfgEnoPrivateKye
-		}
-		cfg.PublicKey = &cfg.PrivateKey.PublicKey
-	}
-
-	pnid := p2pPubkey2NodeId(cfg.PublicKey)
-	if pnid == nil {
-		log.Debug("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
-		return PcfgEnoPublicKye
-	}
-
-	cfg.Local.ID = *pnid
-	log.Debug("p2pSetupLocalNodeId: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
-
-	return PcfgEnoNone
 }
 
 // Setup default bootstrap nodes
