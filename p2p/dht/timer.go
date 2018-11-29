@@ -22,6 +22,7 @@ package dht
 
 import (
 	"time"
+	"fmt"
 	"container/list"
 )
 
@@ -32,6 +33,19 @@ const (
 	dayCycle		= 64			// cycle in days
 	oneTick			= time.Second	// unit tick to driver the timer manager
 )
+
+type timerEno int
+
+const (
+	TmEnoNone			timerEno = iota		// none of errors
+	TmEnoPara								// invalid parameters
+	TmEnoDurTooBig							// duration too big
+	TmEnoDurTooSmall						// duration too small
+)
+
+func (eno timerEno)Error() string {
+	return fmt.Sprintf("%d", eno)
+}
 
 type timerCallback = func(el *list.Element, para interface{})interface{}
 
@@ -71,7 +85,7 @@ func (mgr *timerManager)setTimerData(tm *timer, data interface{}) error {
 	return nil
 }
 
-func (mgr *timerManager)setTimer(tm *timer) (*list.Element, error) {
+func (mgr *timerManager)startTimer(tm *timer) (*list.Element, error) {
 	return nil, nil
 }
 
