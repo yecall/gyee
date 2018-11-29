@@ -393,6 +393,7 @@ func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
 	req := sch.MsgDhtMgrPutValueReq {
 		Key: key,
 		Val: value,
+		KeepTime: time.Duration(0),
 	}
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)

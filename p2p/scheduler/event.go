@@ -398,6 +398,7 @@ type MsgDhtMgrGetProviderRsp struct {
 type MsgDhtMgrPutValueReq struct {
 	Key			[]byte				// key wanted
 	Val			[]byte				// value
+	KeepTime	time.Duration		// duration for the value to be kept
 }
 
 //
