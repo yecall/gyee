@@ -77,7 +77,6 @@ func (eno P2pErrno) Error() string {
 //
 // Register user callback function to p2p
 //
-
 const (
 	P2pIndCb = peer.P2pIndCb	// callback type for indication
 	P2pPkgCb = peer.P2pPkgCb	// callback type for incoming packages
@@ -85,94 +84,49 @@ const (
 
 const (
 	P2pIndPeerActivated	= peer.P2pIndPeerActivated	// indication for a peer activated to work
-	P2pIndConnStatus	= peer.P2pIndConnStatus		// indication for peer connection status changed
 	P2pIndPeerClosed	= peer.P2pIndPeerClosed		// indication for peer connection closed
 )
 
-func P2pRegisterCallback(what int, cb interface{}, target interface{}) P2pErrno {
-
-	if what != P2pIndCb && what != P2pPkgCb {
-		log.LogCallerFileLine("P2pRegisterCallback: unknown what is: %d", what)
+func P2pRegisterCallback(what int, cb interface{}, userData interface{}, target interface{}) P2pErrno {
+	if what != peer.P2pIndCb {
+		log.Debug("P2pRegisterCallback: not supported, what: %d", what)
 		return P2pEnoParameter
 	}
-
-	if what == P2pIndCb {
-
-		sdl := target.(*sch.Scheduler)
-		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
-
-		if peMgr.P2pIndHandler != nil {
-			log.LogCallerFileLine("P2pRegisterCallback: old handler will be overlapped")
-		}
-
-		if cb == nil {
-			log.LogCallerFileLine("P2pRegisterCallback: user registers nil indication handler")
-		}
-
-		peMgr.Lock4Cb.Lock()
-		peMgr.P2pIndHandler = cb.(peer.P2pIndCallback)
-		peMgr.Lock4Cb.Unlock()
-
-		return P2pEnoNone
+	pem := target.(*sch.Scheduler).SchGetTaskObject(sch.PeerMgrName)
+	if pem == nil {
+		log.Debug("P2pRegisterCallback: get peer manager failed, name: %s", sch.PeerMgrName)
+		return P2pEnoScheduler
 	}
-
-	var peerInst = target
-
-	if peerInst == nil {
-		log.LogCallerFileLine("P2pRegisterCallback: nil task node pointer")
-		return P2pEnoParameter
-	}
-
-	if cb == nil {
-		log.LogCallerFileLine("P2pRegisterCallback: user registers nil package handler")
-	}
-
-	if eno := peer.SetP2pkgCallback(cb, peerInst); eno != peer.PeMgrEnoNone {
-		log.LogCallerFileLine("P2pRegisterCallback: " +
-			"SetP2pkgCallback failed, eno: %d",
-			eno)
+	peMgr := pem.(*peer.PeerManager)
+	if eno := peMgr.RegisterInstIndCallback(cb, userData); eno != peer.PeMgrEnoNone {
+		log.Debug("P2pRegisterCallback: RegisterInstIndCallback failed, eno: %d", eno)
 		return P2pEnoInternal
 	}
-
 	return P2pEnoNone
 }
 
 //
-// Send message to peer
+// Send package to peer
 //
 func P2pSendPackage(pkg *peer.P2pPackage2Peer) P2pErrno {
-
-	if eno, failed := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
-
-		log.LogCallerFileLine("P2pSendPackage: " +
-			"SendPackage failed, eno: %d, pkg: %s",
-			eno,
-			fmt.Sprintf("%+v", *pkg))
-
-		_ = failed
+	if eno := peer.SendPackage(pkg); eno != peer.PeMgrEnoNone {
+		log.Debug("P2pSendPackage: SendPackage failed, eno: %d, pkg: %s",
+			eno, fmt.Sprintf("%+v", *pkg))
 		return P2pEnoInternal
 	}
-
 	return P2pEnoNone
 }
 
 //
-// Disconnect peer
+// Close peer
 //
 func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) P2pErrno {
-
-	peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
-
+	peMgr := sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
 	if eno := peMgr.ClosePeer(snid, id); eno != peer.PeMgrEnoNone {
-
-		log.LogCallerFileLine("P2pSendPackage: " +
-			"ClosePeer failed, eno: %d, peer: %s",
-			eno,
-			fmt.Sprintf("%+v", *id))
-
+		log.Debug("P2pSendPackage: ClosePeer failed, eno: %d, peer: %s",
+			eno, fmt.Sprintf("%+v", *id))
 		return P2pEnoInternal
 	}
-
 	return P2pEnoNone
 }
 
@@ -180,11 +134,13 @@ func P2pClosePeer(sdl *sch.Scheduler, snid *peer.SubNetworkID, id *peer.PeerId) 
 // Turn off specific p2p instance
 //
 func P2pPoweroff(p2pInst *sch.Scheduler) P2pErrno {
-
-	if eno := P2pStop(p2pInst); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("P2pPoweroff: P2pStop failed, eno: %d", eno)
+	stopChain := make(chan bool, 1)
+	if eno := P2pStop(p2pInst, stopChain); eno != sch.SchEnoNone {
+		log.Debug("P2pPoweroff: P2pStop failed, eno: %d", eno)
+		close(stopChain)
 		return P2pEnoScheduler
 	}
-
+	<-stopChain
+	close(stopChain)
 	return P2pEnoNone
 }

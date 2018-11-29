@@ -30,9 +30,9 @@ package scheduler
 
 import (
 	"net"
-	config	"github.com/yeeco/gyee/p2p/config"
-	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	"time"
+	"github.com/yeeco/gyee/p2p/config"
+	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 )
 
 //
@@ -71,9 +71,65 @@ const (
 const EvTimerBase = 1000
 
 //
-// Shell event
+// Chain shell manager event
 //
-const EvShellBase = 1100
+const (
+	EvShellBase 				= 1100
+	EvShellPeerActiveInd		= EvShellBase + 1
+	EvShellPeerCloseCfm			= EvShellBase + 2
+	EvShellPeerCloseInd			= EvShellBase + 3
+	EvShellPeerAskToCloseInd	= EvShellBase + 4
+	EvShellReconfigReq			= EvShellBase + 5
+)
+
+//
+// EvShellPeerActiveInd
+//
+type MsgShellPeerActiveInd struct {
+	TxChan		interface{}			// channel for packages sending
+	RxChan		interface{}			// channel for packages received
+	PeerInfo	interface{}			// handshake info about peer
+}
+
+//
+// EvShellPeerCloseCfm
+//
+type MsgShellPeerCloseCfm struct {
+	Result	int						// result
+	Dir		int						// direction
+	Snid	config.SubNetworkID		// sub network identity
+	PeerId 	config.NodeID			// target node
+}
+
+//
+// EvShellPeerCloseInd
+//
+type MsgShellPeerCloseInd struct {
+	Cause	int						// tell why it's closed
+	Dir		int						// direction
+	Snid	config.SubNetworkID		// sub network identity
+	PeerId 	config.NodeID			// target node
+}
+
+//
+// EvShellPeerAskToCloseInd
+//
+type MsgShellPeerAskToCloseInd struct {
+	Snid	config.SubNetworkID		// sub network identity
+	PeerId 	config.NodeID			// target node
+	Dir		int						// direction
+	Why		interface{}				// tell why it's closed
+}
+
+//
+// EvShellReconfigReq
+//
+type MsgShellReconfigReq struct {
+	VSnidAdd	[]config.SubNetworkID	// validator sub network identities to be added
+	VSnidDel	[]config.SubNetworkID	// validator sub network identities to be deleted
+	SnidAdd		[]config.SubNetworkID	// common sub network identities to be added
+	SnidDel		[]config.SubNetworkID	// common sub network identities to be deleted
+}
 
 //
 // Table manager event
@@ -125,6 +181,7 @@ const (
 	EvDcvMgrBase		= 1300
 	EvDcvFindNodeReq	= EvDcvMgrBase	+ 1
 	EvDcvFindNodeRsp	= EvDcvMgrBase	+ 2
+	EvDcvReconfigReq	= EvDcvMgrBase	+ 3
 )
 
 // EvDcvFindNodeReq
@@ -142,6 +199,15 @@ type MsgDcvFindNodeRsp struct {
 }
 
 //
+// EvDcvReconfigReq
+//
+type MsgDcvReconfigReq struct {
+	DelList	map[config.SubNetworkID]interface{}	// sub networks to be deleted
+	AddList	map[config.SubNetworkID]interface{}	// sub networks to be added
+}
+
+
+//
 // Neighbor lookup on Udp event
 //
 const NblFindNodeTimerId	= 0
@@ -157,6 +223,7 @@ const (
 	EvNblPingedInd			= EvNblUdpBase	+ 5
 	EvNblPongedInd			= EvNblUdpBase	+ 6
 	EvNblQueriedInd			= EvNblUdpBase	+ 7
+	EvNblCleanMapReq		= EvNblUdpBase	+ 8
 )
 
 //
@@ -238,15 +305,21 @@ const (
 //
 // Peer connection establishment event
 //
-const PePingpongTimerId		= 0
-const PeDcvFindNodeTimerId	= 1
-const PeTestStatTimerId		= 2
+const (
+	PePingpongTimerId		= 0
+	PeDcvFindNodeTimerId	= 1
+	PeMinOcrCleanupTimerId	= 2
+	PeConflictAccessTimerId	= 3
+	PeReconfigTimerId		= 4
+)
 
 const (
 	EvPeerEstBase			= 1800
 	EvPePingpongTimer		= EvTimerBase	+ PePingpongTimerId
 	EvPeDcvFindNodeTimer	= EvTimerBase	+ PeDcvFindNodeTimerId
-	EvPeTestStatTimer		= EvTimerBase	+ PeTestStatTimerId
+	EvPeOcrCleanupTimer		= EvTimerBase	+ PeMinOcrCleanupTimerId
+	EvPeConflictAccessTimer	= EvTimerBase	+ PeConflictAccessTimerId
+	EvPeReconfigTimer		= EvTimerBase	+ PeReconfigTimerId
 	EvPeConnOutReq			= EvPeerEstBase + 1
 	EvPeConnOutRsp			= EvPeerEstBase + 2
 	EvPeHandshakeReq		= EvPeerEstBase + 3
@@ -259,7 +332,8 @@ const (
 	EvPeOutboundReq			= EvPeerEstBase + 10
 	EvPeEstablishedInd		= EvPeerEstBase + 11
 	EvPeMgrStartReq			= EvPeerEstBase + 12
-	EvPeDataReq				= EvPeerEstBase + 13
+	EvPeTxDataReq			= EvPeerEstBase + 13
+	EvPeRxDataInd			= EvPeerEstBase + 14
 )
 
 //
@@ -270,6 +344,16 @@ type MsgPeCloseReq struct {
 	Snid	config.SubNetworkID		// sub network identity
 	Node	config.Node				// peer node
 	Dir		int						// direction
+	Why		interface{}				// cause
+}
+
+//
+// EvPeTxDataReq
+//
+type MsgPeDataReq struct {
+	SubNetId	config.SubNetworkID	// sub network identity
+	PeerId		config.NodeID		// peer node identity
+	Pkg			interface{}			// package pointer
 }
 
 //
@@ -314,6 +398,7 @@ type MsgDhtMgrGetProviderRsp struct {
 type MsgDhtMgrPutValueReq struct {
 	Key			[]byte				// key wanted
 	Val			[]byte				// value
+	KeepTime	time.Duration		// duration for the value to be kept
 }
 
 //
@@ -442,7 +527,7 @@ type MsgDhtConMgrSendCfm struct {
 // EvDhtConMgrCloseReq
 //
 type MsgDhtConMgrCloseReq struct {
-	Task		interface{}				// pointer to task node
+	Task		string				// owner task name
 	Peer		*config.Node			// peer to be connected
 	Dir			int						// instance direction
 }
@@ -866,3 +951,18 @@ type MsgDhtDsMgrGetValReq struct {
 	Msg			interface{}		// the message pointer
 }
 
+//
+// DHT shell manager event
+//
+const (
+	EvDhtShellBase 				= 2800
+	EvDhtShEventInd				= EvDhtShellBase + 1
+)
+
+//
+// EvDhtShEventInd
+//
+type MsgDhtShEventInd struct {
+	Evt		int					// event indication type
+	Msg		interface{}			// event body pointer
+}

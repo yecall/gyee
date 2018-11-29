@@ -23,14 +23,14 @@ package shell
 
 import (
 	"time"
-	golog	"log"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"fmt"
+	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
-	peer	"github.com/yeeco/gyee/p2p/peer"
-	dht		"github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/dht"
 	log		"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -59,49 +59,83 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 
 		return []sch.TaskStaticDescription{
 			{Name: dcv.DcvMgrName,		Tep: dcv.NewDcvMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: tab.NdbcName,		Tep: tab.NewNdbCleaner(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: ngb.LsnMgrName,		Tep: ngb.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: ngb.NgbMgrName,		Tep: ngb.NewNgbMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: peer.PeerMgrName,	Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.PeerMgrName,		Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
 	} else if what == config.P2P_TYPE_DHT {
 
 		return []sch.TaskStaticDescription{
-			{Name: dht.DhtMgrName,	Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.DsMgrName,	Tep: dht.NewDsMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.LsnMgrName,	Tep: dht.NewLsnMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.PrdMgrName,	Tep: dht.NewPrdMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.QryMgrName,	Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.RutMgrName,	Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.ConMgrName,	Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DhtMgrName,		Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DsMgrName,		Tep: dht.NewDsMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.LsnMgrName,		Tep: dht.NewLsnMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.PrdMgrName,		Tep: dht.NewPrdMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.QryMgrName,		Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.RutMgrName,		Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.ConMgrName,		Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 	}
 
-	log.LogCallerFileLine("P2pCreateStaticTaskTab: invalid type: %d", what)
+	log.Debug("P2pCreateStaticTaskTab: invalid type: %d", what)
 
 	return nil
 }
 
 //
-// Poweron order of static user tasks for chain application
+// Poweron order of static user tasks for chain application.
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify this table if necessary.
 //
 var taskStaticPoweronOrder4Chain = []string {
 	dcv.DcvMgrName,
-	tab.TabMgrName,
 	tab.NdbcName,
 	ngb.LsnMgrName,
 	ngb.NgbMgrName,
-	peer.PeerMgrName,
+	tab.TabMgrName,
+	sch.PeerMgrName,
 	peer.PeerLsnMgrName,
 }
 
 //
+// Poweroff order of static user tasks for chain application.
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify this table if necessary.
+//
+var taskStaticPoweroffOrder4Chain = []string {
+	dcv.DcvMgrName,
+	tab.NdbcName,
+	sch.PeerMgrName,
+	ngb.LsnMgrName,
+	ngb.NgbMgrName,
+	peer.PeerLsnMgrName,
+	tab.TabMgrName,
+}
+
+//
 // Poweron order of static user tasks for dht application
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify this table if necessary.
 //
 var taskStaticPoweronOrder4Dht = [] string {
+	dht.DhtMgrName,
+	dht.DsMgrName,
+	dht.ConMgrName,
+	dht.QryMgrName,
+	dht.PrdMgrName,
+	dht.RutMgrName,
+	dht.LsnMgrName,
+}
+
+//
+// Poweroff order of static user tasks for dht application
+// Notice: there are some dependencies between the tasks, one should check them
+// to modify this table if necessary.
+//
+var taskStaticPoweroffOrder4Dht = [] string {
 	dht.DhtMgrName,
 	dht.DsMgrName,
 	dht.ConMgrName,
@@ -140,16 +174,16 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Dht)
 
 	case config.P2P_TYPE_ALL:
-		log.LogCallerFileLine("P2pStart: not supported type: %d", what)
+		log.Debug("P2pStart: not supported type: %d", what)
 		return sch.SchEnoNotImpl
 
 	default:
-		log.LogCallerFileLine("P2pStart: invalid application type: %d", what)
+		log.Debug("P2pStart: invalid application type: %d", what)
 		return sch.SchEnoParameter
 	}
 
 	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("P2pStart: failed, eno: %d", eno)
+		log.Debug("P2pStart: failed, eno: %d", eno)
 		return eno
 	}
 
@@ -162,11 +196,11 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 
 		var pmEno peer.PeMgrErrno
 
-		peMgr := sdl.SchGetUserTaskIF(sch.PeerMgrName).(*peer.PeerManager)
+		peMgr := sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
 		pmEno = peMgr.PeMgrInited()
 
 		if pmEno != peer.PeMgrEnoNone {
-			log.LogCallerFileLine("P2pStart: pmEno: %d", pmEno)
+			log.Debug("P2pStart: pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 
@@ -177,7 +211,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		pmEno = peMgr.PeMgrStart()
 
 		if pmEno != peer.PeMgrEnoNone {
-			log.LogCallerFileLine("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
+			log.Debug("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -188,7 +222,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 //
 // Stop p2p instance
 //
-func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
+func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
 	//
 	// Set power off stage first, and after that, we send poweroff message
@@ -197,57 +231,76 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 	// they might be done when they receive the poweron message.
 	//
 
-	sdl.SchSetPoweroffStage()
 	p2pInstName := sdl.SchGetP2pCfgName()
+	log.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+
+	var staticTasks = make([]string, 0)
+	appType := sdl.SchGetAppType()
+
+	if P2pType(appType) == config.P2P_TYPE_CHAIN {
+
+		staticTasks = taskStaticPoweroffOrder4Chain
+
+	} else if P2pType(appType) == config.P2P_TYPE_DHT {
+
+		staticTasks = taskStaticPoweroffOrder4Dht
+
+	} else {
+
+		log.Debug("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
+		return sch.SchEnoMismatched
+	}
 
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
 
-	var staticTasks = []string{}
-	appType := sdl.SchGetAppType()
-
-	if P2pType(appType) == config.P2P_TYPE_CHAIN {
-
-		staticTasks = taskStaticPoweronOrder4Chain
-
-	} else if P2pType(appType) == config.P2P_TYPE_DHT {
-
-		staticTasks = taskStaticPoweronOrder4Dht
-
-	} else {
-
-		golog.Printf("P2pStop: p2pInst: %s, invalid application type: %d", p2pInstName, appType)
-		return sch.SchEnoMismatched
-	}
+	sdl.SchSetPoweroffStage()
 
 	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
-			golog.Printf("P2pStop: p2pInst: %s, task not exist: %s", p2pInstName, taskName)
+			log.Debug("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
 			continue
 		}
 
+		log.Debug("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
+			p2pInstName, taskName)
+
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
 
-			golog.Printf("P2pStop: p2pInst: %s, " +
+			log.Debug("P2pStop: inst: %s, " +
 				"SchSendMessageByName failed, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
 		} else {
 
-			golog.Printf("P2pStop: p2pInst: %s, " +
+			log.Debug("P2pStop: inst: %s, " +
 				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
+
+			//
+			// Wait current static task to be done, to ensure the poweroff order specified
+			// in table taskStaticPoweroffOrder4Chain or taskStaticPoweroffOrder4Dht.
+			//
+
+			for sdl.SchTaskExist(taskName) {
+				log.Debug("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
+				time.Sleep(time.Millisecond * 500)
+			}
+
+			log.Debug("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
 		}
 	}
 
-	golog.Printf("P2pStop: p2pInst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
-	golog.Printf("P2pStop: p2pInst: %s, wait all tasks to be done ...", p2pInstName)
+	log.Debug("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	log.Debug("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
-	// just wait all to be done
+	// Notice:
+	// All static tasks had been done when come here, BUT some dynamic tasks might be still
+	// alive, we just wait all to be done.
 	//
 
 	seconds := 0
@@ -261,14 +314,26 @@ func P2pStop(sdl *sch.Scheduler) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			golog.Printf("P2pStop: p2pInst: %s, all tasks are done", p2pInstName)
+			log.Debug("P2pStop: inst: %s, all tasks are done", p2pInstName)
 			break
 		}
 
-		golog.Printf("P2pStop: " +
-			"p2pInst: %s, wait seconds: %d, remain tasks: %d",
-			p2pInstName, seconds, tasks)
+		tkNames := sdl.SchShowTaskName()
+		strNames := ""
+		for _, n := range tkNames {
+			if len(strNames) != 0 {
+				strNames = fmt.Sprintf("%s,%s", strNames, n)
+			} else {
+				strNames = n
+			}
+		}
+
+		log.Debug("P2pStop: " +
+			"inst: %s, wait seconds: %d, remain tasks: %d, names: %s",
+			p2pInstName, seconds, tasks, strNames)
 	}
+
+	ch<-true
 
 	return sch.SchEnoNone
 }

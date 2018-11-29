@@ -27,10 +27,11 @@ import (
 //
 // Package passed into user's callback
 //
-type P2pPackage4Callback struct {
+type P2pPackageRx struct {
 	Ptn				interface{}		// instance task node pointer
 	PeerInfo		*PeerInfo		// peer information
 	ProtoId			int				// protocol identity
+	MsgId			int				// message identity
 	PayloadLength	int				// bytes in payload buffer
 	Payload			[]byte			// payload buffer
 }
@@ -63,12 +64,12 @@ const (
 //
 const (
 	P2pIndPeerActivated	= iota		// peer activated
-	P2pIndConnStatus				// connection status changed
 	P2pIndPeerClosed				// connection closed
 )
 
 type P2pIndPeerActivatedPara struct {
-	Ptn			interface{}			// task node pointer
+	P2pInst		*sch.Scheduler		// p2p instance pointer
+	RxChan		chan *P2pPackageRx	// channel for packages received
 	PeerInfo	*Handshake			// handshake info
 }
 
@@ -90,19 +91,18 @@ type P2pIndConnStatusPara struct {
 }
 
 type P2pIndPeerClosedPara struct {
-	Ptn			interface{}			// task node pointer, notice: it points to the peer manager
-									// task node than peer instance, since the instance had been
-									// closed.
+	P2pInst		*sch.Scheduler		// p2p instance pointer
 	Snid		SubNetworkID		// sub network identity
 	PeerId		PeerId				// peer identity
+	Dir			int					// direction
 }
 
-type P2pIndCallback func(what int, para interface{}) interface{}
+type P2pIndCallback func(what int, para interface{}, userData interface{}) interface{}
 
 //
 // P2p callback function type for package incoming
 //
-type P2pPkgCallback func(msg *P2pPackage4Callback) interface{}
+type P2pPkgCallback func(msg *P2pPackageRx, userData interface{}) interface{}
 
 
 

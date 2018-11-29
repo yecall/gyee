@@ -27,7 +27,7 @@ import (
 	"time"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
@@ -82,7 +82,6 @@ type lsnMgrCfg struct {
 func NewLsnMgr() *LsnMgr {
 
 	lsnMgr := LsnMgr {
-		sdl:		nil,
 		name:		LsnMgrName,
 		status:		lmsNull,
 		config:		lsnMgrCfg {
@@ -90,11 +89,6 @@ func NewLsnMgr() *LsnMgr {
 			ip:			net.IP{127,0,0,1},
 			port:		8899,
 		},
-		tep:		nil,
-		ptnMe:		nil,
-		ptnConMgr:	nil,
-		listener:	nil,
-		listenAddr:	nil,
 	}
 
 	lsnMgr.tep = lsnMgr.lsnMgrProc
@@ -115,7 +109,7 @@ func (lsnMgr *LsnMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.LogCallerFileLine("lsnMgrProc: " +
+		log.Debug("lsnMgrProc: " +
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -147,7 +141,7 @@ func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = lsnMgr.driveSelf()
 
 	default:
-		log.LogCallerFileLine("lsnMgrProc: unknown event: %d", msg.Id)
+		log.Debug("lsnMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -162,10 +156,10 @@ func (lsnMgr *LsnMgr)poweron(ptn interface{}) sch.SchErrno {
 	sdl := sch.SchGetScheduler(ptn)
 	lsnMgr.sdl = sdl
 	lsnMgr.ptnMe = ptn
-	_, lsnMgr.ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName)
+	_, lsnMgr.ptnConMgr = sdl.SchGetUserTaskNode(ConMgrName)
 
 	if lsnMgr.sdl == nil || lsnMgr.ptnMe == nil || lsnMgr.ptnConMgr == nil {
-		log.LogCallerFileLine("poweron: scheduler failed")
+		log.Debug("poweron: scheduler failed")
 		return sch.SchEnoInternal
 	}
 
@@ -184,7 +178,7 @@ func (lsnMgr *LsnMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff event handler
 //
 func (lsnMgr *LsnMgr)poweroff(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("poweroff: task will be done ...")
+	log.Debug("poweroff: task will be done ...")
 	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, sch.SchEnoKilled)
 }
 
@@ -194,12 +188,12 @@ func (lsnMgr *LsnMgr)poweroff(ptn interface{}) sch.SchErrno {
 func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 
 	if lsnMgr.status != lmsStopped && lsnMgr.status != lmsNull {
-		log.LogCallerFileLine("startReq: status mismatched: %d", lsnMgr.status)
+		log.Debug("startReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
 	}
 
 	if dhtEno := lsnMgr.setupListener(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("startReq: setupListener failed, eno: %d", dhtEno)
+		log.Debug("startReq: setupListener failed, eno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -211,7 +205,7 @@ func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 	lsnMgr.status = lmsStartup
 	lsnMgr.dispStaus()
 
-	log.LogCallerFileLine("startReq: listener starup ok, cfg: %v", lsnMgr.config)
+	log.Debug("startReq: listener starup ok, cfg: %v", lsnMgr.config)
 
 	return sch.SchEnoNone
 }
@@ -222,12 +216,12 @@ func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
 
 	if lsnMgr.status == lmsNull || lsnMgr.status == lmsStopped {
-		log.LogCallerFileLine("stopReq: status mismatched: %d", lsnMgr.status)
+		log.Debug("stopReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
 	}
 
 	if lsnMgr.listener == nil {
-		log.LogCallerFileLine("stopReq: nil listener")
+		log.Debug("stopReq: nil listener")
 		return sch.SchEnoUserTask
 	}
 
@@ -245,7 +239,7 @@ func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
 func (lsnMgr *LsnMgr)pauseReq() sch.SchErrno {
 
 	if lsnMgr.status != lmsWorking {
-		log.LogCallerFileLine("pauseReq: status mismatched: %d", lsnMgr.status)
+		log.Debug("pauseReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
 	}
 
@@ -261,7 +255,7 @@ func (lsnMgr *LsnMgr)pauseReq() sch.SchErrno {
 func (lsnMgr *LsnMgr)resumeReq() sch.SchErrno {
 
 	if lsnMgr.status != lmsPaused {
-		log.LogCallerFileLine("resumeReq: status mismatched: %d", lsnMgr.status)
+		log.Debug("resumeReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
 	}
 
@@ -295,23 +289,23 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	//
 
 	if lsnMgr.status == lmsStartup {
-		log.LogCallerFileLine("driveSelf: begin to work...")
+		log.Debug("driveSelf: begin to work...")
 		lsnMgr.status = lmsWorking
 		lsnMgr.dispStaus()
 	}
 
 	if lsnMgr.status != lmsWorking {
-		log.LogCallerFileLine("driveSelf: not in working")
+		log.Debug("driveSelf: not in working")
 		return sch.SchEnoUserTask
 	}
 
 	//
 	// we might be block for a duration lmAcceptTimeout, but we also provide
-	// interface to force ourself to get out from accept action, see function
+	// interface to force ourselves to get out from accept action, see function
 	// ForceAcceptOut.
 	//
 
-	log.LogCallerFileLine("driveSelf: " +
+	log.Debug("driveSelf: " +
 		"listener:[%s:%d], try accept again ...",
 		lsnMgr.config.ip.String(), lsnMgr.config.port)
 
@@ -338,7 +332,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 
 		if doClose {
 
-			log.LogCallerFileLine("driveSelf: close listener for accept error: %s", err.Error())
+			log.Debug("driveSelf: close listener for accept error: %s", err.Error())
 
 			lsnMgr.listener.Close()
 			lsnMgr.listener = nil
@@ -351,7 +345,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 
 	if con == nil {
 
-		log.LogCallerFileLine("driveSelf: nil connection without accept error")
+		log.Debug("driveSelf: nil connection without accept error")
 
 		lsnMgr.driveMore()
 
@@ -366,7 +360,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrAcceptInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 
-	log.LogCallerFileLine("driveSelf: connection accepted ok, " +
+	log.Debug("driveSelf: connection accepted ok, " +
 		"listener:[%s:%d], loccal address: %s, remote address: %s",
 		lsnMgr.config.ip.String(), lsnMgr.config.port,
 		con.LocalAddr().String(),
@@ -390,7 +384,7 @@ func (lsnMgr *LsnMgr)setupListener() DhtErrno {
 	lsnAddr := fmt.Sprintf("%s:%d", ip, port)
 
 	if lsnMgr.listener, err = net.Listen(network, lsnAddr); err != nil {
-		log.LogCallerFileLine("setupListener: "+
+		log.Debug("setupListener: "+
 			"listen failed, addr: %s, err: %s",
 			lsnAddr, err.Error())
 		return DhtEnoOs
@@ -398,7 +392,7 @@ func (lsnMgr *LsnMgr)setupListener() DhtErrno {
 
 	lsnMgr.listenAddr = lsnMgr.listener.Addr().(*net.TCPAddr)
 
-	log.LogCallerFileLine("setupListener: "+
+	log.Debug("setupListener: "+
 		"task inited ok, listening address: %s",
 		lsnMgr.listenAddr.String())
 
@@ -435,12 +429,12 @@ func (lsnMgr *LsnMgr) ForceAcceptOut() DhtErrno {
 	defer lsnMgr.lock.Unlock()
 
 	if lsnMgr.status == lmsNull || lsnMgr.status == lmsStopped {
-		log.LogCallerFileLine("ForceAcceptOut: status mismatched: %d", lsnMgr.status)
+		log.Debug("ForceAcceptOut: status mismatched: %d", lsnMgr.status)
 		return DhtEnoMismatched
 	}
 
 	if lsnMgr.listener == nil {
-		log.LogCallerFileLine("ForceAcceptOut: nil listener")
+		log.Debug("ForceAcceptOut: nil listener")
 		return DhtEnoInternal
 	}
 

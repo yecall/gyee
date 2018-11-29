@@ -36,9 +36,15 @@ osn_service: overlay sub-network
 消息格式：消息类型及payload？由应用层自己去解析
  */
 
+type RecfgCommand struct {
+	Validator		bool		// is validator
+	SubnetMaskBits	int			// mask bits for sub network identity
+}
+
 type Service interface {
 	Start() error
 	Stop()
+	Reconfig(reCfg *RecfgCommand) error
 	BroadcastMessage(message Message) error
 	//如果在多个子网，随机选一个。如果单一子网，直接发布。
 	BroadcastMessageOsn(message Message) error
@@ -46,5 +52,4 @@ type Service interface {
 	UnRegister(subscriber *Subscriber)
     DhtGetValue(key []byte) ([]byte, error)
     DhtSetValue(key []byte, value []byte) error
-
 }

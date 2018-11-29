@@ -18,9 +18,11 @@
  *
  */
 
-
+//
+// Notice: the test cases can work only those _TEST_ in peer manager and dht
+// manager are set to "true", check them please.
+//
 package main
-
 
 import (
 	"os"
@@ -34,12 +36,12 @@ import (
 	"errors"
 	golog	"log"
 	"crypto/sha256"
-	shell	"github.com/yeeco/gyee/p2p/shell"
-	peer	"github.com/yeeco/gyee/p2p/peer"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/shell"
+	"github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	dht		"github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/dht"
 )
 
 //
@@ -72,17 +74,27 @@ type peerIdEx struct {
 // test statistics
 //
 type testCaseCtrlBlock struct {
-	done 	chan bool
-	txSeq	int64
-	rxSeq	int64
+	peerId		peerIdEx							// peer extend identity
+	done 		chan bool							// done channel
+	txSeq		int64								// tx sequence number
+	rxSeq		int64								// rx sequence number
+	killing		bool								// is currently in killing
+}
+
+//
+// Callback user data
+//
+type cbUserData struct {
+	lock		sync.Mutex							// lock to sync action on tcbList
+	tcbList		map[peerIdEx]*testCaseCtrlBlock		// test case control block list
 }
 
 //
 // Done signal for Tx routines
 //
-var doneMapLock sync.Mutex
-var indCbLock sync.Mutex
-var doneMap = make(map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock)
+var tcbListsLock sync.Mutex
+var tcbLists map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock
+var tcbLocks map[*sch.Scheduler]sync.Mutex
 
 //
 // test case
@@ -142,7 +154,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase6"
+var tgtCase = "testCase7"
 
 //
 // port base
@@ -152,21 +164,15 @@ const (
 	portBase4Dht = 40404
 )
 
-//
-// create test case control block by name
-//
-func newTcb(name string) *testCaseCtrlBlock {
-
+func newTcb(name string, idEx peerIdEx, tcbList map[peerIdEx]*testCaseCtrlBlock, lock sync.Mutex) *testCaseCtrlBlock {
+	_, _ = tcbList, lock
 	tcb := testCaseCtrlBlock {
-		done:	make(chan bool, 1),
-		txSeq:	0,
-		rxSeq:	0,
+		peerId: idEx,
+		done: make(chan bool),
+		txSeq: 0,
+		rxSeq: 0,
+		killing: false,
 	}
-
-	//
-	// more initialization specific to each case
-	//
-
 	switch name {
 	case "testCase0":
 	case "testCase1":
@@ -174,55 +180,78 @@ func newTcb(name string) *testCaseCtrlBlock {
 	case "testCase3":
 	case "testCase4":
 	case "testCase5":
+	case "testCase6":
+	case "testCase7":
 	default:
-		log.LogCallerFileLine("newTcb: undefined test: %s", name)
+		log.Debug("newTcb: undefined test: %s", name)
 		return nil
 	}
-
 	return &tcb
 }
 
-//
-// Tx routine
-//
-func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.PeerId) {
+var dataTxApply = true
+var dataTxTmApply = true
 
-	const dataTxApply = true
-
-	//
-	// This demo simply apply timer with 1s cycle and then sends a string
-	// again and again; The "done" signal is also checked to determine if
-	// task is done. See bellow pls.
-	//
-
-	idEx := peerIdEx {
-		subNetId:	snid,
-		nodeId:		id,
-		dir:		dir,
+func txrxStopAll() {
+	tcbListsLock.Lock()
+	defer tcbListsLock.Unlock()
+	instKeys := make([]*sch.Scheduler, 0)
+	for ik, tl := range tcbLists {
+		instKeys = append(instKeys, ik)
+		tcbKeys := make([]peerIdEx, 0)
+		for tk, tcb := range tl {
+			if !tcb.killing {
+				tcb.killing = true
+				tcb.done <- true
+				<-tcb.done
+				tcbKeys = append(tcbKeys, tk)
+			}
+		}
+		for _, tk := range tcbKeys {
+			delete(tl, tk)
+		}
 	}
-
-	doneMapLock.Lock()
-
-	if _, exist := doneMap[p2pInst]; exist == false {
-		doneMap[p2pInst] = make(map[peerIdEx] *testCaseCtrlBlock, 0)
+	for _, ik := range instKeys {
+		delete(tcbLists, ik)
 	}
+}
 
-	if _, dup := doneMap[p2pInst][idEx]; dup == true {
+func isTxRxAllDone() bool {
+	tcbListsLock.Lock()
+	defer tcbListsLock.Unlock()
+	return len(tcbLists) == 0
+}
 
-		log.LogCallerFileLine("txProc: " +
-			"duplicated, subnet: %s, id: %s",
-			fmt.Sprintf("%x", snid),
-			fmt.Sprintf("%X", id))
-
-		doneMapLock.Unlock()
+func createTcbLists(instList []*sch.Scheduler) {
+	if tcbLists != nil {
+		log.Debug("createTcbLists: duplicated")
 		return
 	}
+	tcbLists = make(map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock, len(instList))
+	tcbLocks = make(map[*sch.Scheduler]sync.Mutex, len(instList))
+	for _, inst := range instList {
+		tcbLists[inst] = make(map[peerIdEx]*testCaseCtrlBlock, 0)
+		tcbLocks[inst] = sync.Mutex{}
+	}
+}
 
-	tcb := newTcb(tgtCase)
-	doneMap[p2pInst][idEx] = tcb
+func appendTcb2List(instList []*sch.Scheduler) {
+	if tcbLists == nil {
+		tcbLists = make(map[*sch.Scheduler]map[peerIdEx]*testCaseCtrlBlock, len(instList))
+		tcbLocks = make(map[*sch.Scheduler]sync.Mutex, len(instList))
+	}
+	for _, inst := range instList {
+		if tcbLists[inst] != nil {
+			log.Debug("appendTcb2List: duplicated")
+			continue
+		}
+		tcbLists[inst] = make(map[peerIdEx]*testCaseCtrlBlock, 0)
+		tcbLocks[inst] = sync.Mutex{}
+	}
+}
 
-	doneMapLock.Unlock()
-
+func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.P2pPackageRx) {
+	sdl := p2pInst.SchGetP2pCfgName()
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,
 		IdList: 		make([]peer.PeerId, 0),
@@ -232,262 +261,193 @@ func txProc(p2pInst *sch.Scheduler, dir int, snid peer.SubNetworkID, id peer.Pee
 		Extra:			nil,
 	}
 
-	log.LogCallerFileLine("txProc: " +
-		"entered, subnet: %s, id: %s",
-		fmt.Sprintf("%x", snid),
-		fmt.Sprintf("%X", id))
-
+	var setupPkg = func(id *peerIdEx) {
+		txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
+			"to: subnet: %s\n, id: %s\n",
+			tcb.txSeq,
+			fmt.Sprintf("%x", tcb.peerId.subNetId),
+			fmt.Sprintf("%x", id))
+		pkg.SubNetId = id.subNetId
+		pkg.IdList = make([]peer.PeerId, 0)
+		pkg.IdList = append(pkg.IdList, id.nodeId)
+		pkg.Payload = []byte(txString)
+		pkg.PayloadLength = len(pkg.Payload)
+	}
 
 	var tmHandler = func() {
-
-		doneMapLock.Lock()
-
-		tcb.txSeq++
-
 		if dataTxApply {
-
-			pkg.IdList = make([]peer.PeerId, 1)
-
-			for id := range doneMap[p2pInst] {
-
-				txString := fmt.Sprintf(">>>>>> \nseq:%d\n"+
-					"to: subnet: %s\n, id: %s\n",
-					tcb.txSeq,
-					fmt.Sprintf("%x", snid),
-					fmt.Sprintf("%X", id))
-
-				pkg.SubNetId = id.subNetId
-				pkg.IdList[0] = id.nodeId
-				pkg.Payload = []byte(txString)
-				pkg.PayloadLength = len(pkg.Payload)
-
-				if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
-
-					log.LogCallerFileLine("txProc: "+
-						"send package failed, eno: %d, subnet: %s, id: %s",
-						eno,
-						fmt.Sprintf("%x", snid),
-						fmt.Sprintf("%X", id))
-				}
+			id := &tcb.peerId
+			setupPkg(id)
+			if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
+				log.Debug("txrxProc: P2pSendPackage failed, eno: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
+					eno, sdl, id.dir,
+					fmt.Sprintf("%x", id.subNetId),
+					fmt.Sprintf("%x", id.nodeId))
+			}
+			if tcb.txSeq++; tcb.txSeq & 0x0f == 0 {
+				log.Debug("txrxProc: txSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
+					tcb.rxSeq, sdl, id.dir,
+					fmt.Sprintf("%x", id.subNetId),
+					fmt.Sprintf("%x", id.nodeId))
 			}
 		}
-
-		doneMapLock.Unlock()
 	}
 
-	tm := time.NewTicker(time.Second * 1)
+	tm := time.NewTicker(time.Millisecond * 1000)
 	defer tm.Stop()
 
-txLoop:
+	doneOk := false
+	done4Done := false
+	done4RxChan := false
 
+txrxLoop:
 	for {
-
 		select {
-
-		case isDone := <-tcb.done:
-
-			if isDone {
-				log.LogCallerFileLine("txProc: "+
-					"it's done, isDone: %s, subnet: %s, id: %s",
-					fmt.Sprintf("%t", isDone),
-					fmt.Sprintf("%x", snid),
-					fmt.Sprintf("%X", id))
-				break txLoop
-			}
-
+		case _, doneOk = <-tcb.done:
+			log.Debug("txrxProc: it's done, sdl: %s, dir: %d, subnet: %s, id: %s",
+				sdl, tcb.peerId.dir,
+				fmt.Sprintf("%x", tcb.peerId.subNetId),
+				fmt.Sprintf("%x", tcb.peerId.nodeId))
+			done4Done = true
+			break txrxLoop
 		case <-tm.C:
-
-			indCbLock.Lock()
-
-			tmHandler()
-
-			indCbLock.Unlock()
+			if dataTxTmApply {
+				tmHandler()
+			}
+		case _, ok := <-rxChan:
+			if !ok {
+				log.Debug("txrxProc: rxChan closed, break loop, sdl: %s, dir: %d, subnet: %s, id: %s",
+					sdl, tcb.peerId.dir,
+					fmt.Sprintf("%x", tcb.peerId.subNetId),
+					fmt.Sprintf("%x", tcb.peerId.nodeId))
+				done4RxChan = true
+				break txrxLoop
+			}
+			tcb.rxSeq += 1
+			if tcb.rxSeq & 0x0f == 0 {
+				log.Debug("txrxProc: rxSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
+					tcb.rxSeq, sdl, tcb.peerId.dir,
+					fmt.Sprintf("%x", tcb.peerId.subNetId),
+					fmt.Sprintf("%x", tcb.peerId.nodeId))
+			}
 		}
 	}
 
-	doneMapLock.Lock()
-	close(tcb.done)
-	delete(doneMap[p2pInst], idEx)
-	if len(doneMap[p2pInst]) == 0 {
-		delete(doneMap, p2pInst)
+	if done4Done && doneOk {
+		close(tcb.done)
+	} else if done4RxChan {
+		_, doneOk := <-tcb.done
+		if doneOk {
+			close(tcb.done)
+		}
+	} else {
+		log.Debug("txrxProc: impossible loop broken")
 	}
-	doneMapLock.Unlock()
 
-	log.LogCallerFileLine("txProc: " +
-		"exit, subnet: %s, id: %s",
-		fmt.Sprintf("%x", snid),
-		fmt.Sprintf("%X", id))
+	log.Debug("txrxProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
+		sdl, tcb.peerId.dir,
+		fmt.Sprintf("%x", tcb.peerId.subNetId),
+		fmt.Sprintf("%x", tcb.peerId.nodeId))
 }
 
-
-//
-// Indication handler
-//
-func p2pIndProc(what int, para interface{}) interface{} {
-
-	indCbLock.Lock()
-	defer indCbLock.Unlock()
-
-
-	//
-	// check what is indicated
-	//
-
+func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 	switch what {
-
 	case shell.P2pIndPeerActivated:
-
-		//
-		// a peer is activated to work, so one can install the incoming packages
-		// handler.
-		//
-
 		pap := para.(*peer.P2pIndPeerActivatedPara)
-
-		log.LogCallerFileLine("p2pIndProc: " +
-			"P2pIndPeerActivated, para: %s",
-			fmt.Sprintf("%+v", *pap.PeerInfo))
-
-		if eno := shell.P2pRegisterCallback(shell.P2pPkgCb, p2pPkgHandler, pap.Ptn);
-		eno != shell.P2pEnoNone {
-
-			log.LogCallerFileLine("p2pIndProc: " +
-				"P2pRegisterCallback failed, eno: %d",
-				eno)
-		}
-
-		p2pInst := sch.SchGetScheduler(pap.Ptn)
+		p2pInst := pap.P2pInst
+		sdl := p2pInst.SchGetP2pCfgName()
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
+		dir := pap.PeerInfo.Dir
 
-		go txProc(p2pInst, pap.PeerInfo.Dir, snid, peerId)
-
-	case shell.P2pIndConnStatus:
-
-		//
-		// Peer connection status report. in general, this report is resulted for
-		// errors fired on the connection, one can check the "Flag" field in the
-		// indication to know if p2p underlying would try to close the connection
-		// itself, and one also can check the "Status" field to known what had
-		// happened(the interface for this is not completed yet). Following demo
-		// take a simple method: if connection is not closed by p2p itself, then
-		// request p2p to close it here.
-		//
-
-		psp := para.(*peer.P2pIndConnStatusPara)
-		p2pInst := sch.SchGetScheduler(psp.Ptn)
-
-		log.LogCallerFileLine("p2pIndProc: " +
-			"P2pIndConnStatus, para: %s",
-			fmt.Sprintf("%+v", *psp))
-
-		if psp.Status != 0 {
-
-			log.LogCallerFileLine("p2pIndProc: " +
-				"status: %d, close peer: %s",
-				psp.Status,
-				fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
-
-			if psp.Flag == false {
-
-				log.LogCallerFileLine("p2pIndProc: " +
-					"try to close the instance, peer: %s",
-					fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
-
-				if eno := shell.P2pClosePeer(p2pInst, &psp.PeerInfo.Snid, &psp.PeerInfo.NodeId);
-					eno != shell.P2pEnoNone {
-
-					log.LogCallerFileLine("p2pIndProc: "+
-						"P2pClosePeer failed, eno: %d, peer: %s",
-						eno,
-						fmt.Sprintf("subnet:%x, id:%X", psp.PeerInfo.Snid, psp.PeerInfo.NodeId))
-				}
-			}
+		idEx := peerIdEx {
+			subNetId:	snid,
+			nodeId:		peerId,
+			dir:		dir,
 		}
+
+		cud, ok := userData.(*cbUserData)
+		if !ok {
+			log.Debug("p2pIndProc: invalid user data, sdl: %s, dir: %d, snid: %x, peer: %x",
+				sdl, dir, snid, peerId)
+			return nil
+		}
+		tcbList := cud.tcbList
+		if _, dup := tcbList[idEx]; dup {
+			log.Debug("p2pIndProc: duplicated, sdl: %s, dir: %d, snid: %x, peer: %x",
+				sdl, dir, snid, peerId)
+			return nil
+		}
+
+		tcb := newTcb(tgtCase, idEx, tcbList, cud.lock)
+		tcbList[idEx] = tcb
+
+		log.Debug("p2pIndProc: start tx/rx, sdl: %s, dir: %d, snid: %x, peer: %x",
+			sdl, dir, snid, peerId)
+
+		go txrxProc(p2pInst, tcb, pap.RxChan)
 
 	case shell.P2pIndPeerClosed:
-
-		//
-		// Peer connection had been closed, one can clean his working context, see
-		// bellow statements please.
-		//
-
 		pcp := para.(*peer.P2pIndPeerClosedPara)
-		p2pInst := sch.SchGetScheduler(pcp.Ptn)
+		p2pInst := pcp.P2pInst
+		sdl := p2pInst.SchGetP2pCfgName()
 
-		log.LogCallerFileLine("p2pIndProc: " +
-			"P2pIndPeerClosed, para: %s",
-			fmt.Sprintf("%+v", *pcp))
-
-		doneMapLock.Lock()
-		defer doneMapLock.Unlock()
-
-		idEx := peerIdEx{subNetId:pcp.Snid, nodeId:pcp.PeerId}
-		if tcb, ok := doneMap[p2pInst][idEx]; ok && tcb != nil {
-			tcb.done<-true
-			break
+		idEx := peerIdEx {
+			subNetId: pcp.Snid,
+			nodeId: pcp.PeerId,
+			dir: pcp.Dir,
 		}
 
-		log.LogCallerFileLine("p2pIndProc: " +
-			"done failed, subnet: %s, id: %s",
-			fmt.Sprintf("%x", pcp.Snid),
-			fmt.Sprintf("%X", pcp.PeerId))
+		cud, ok := userData.(*cbUserData)
+		if !ok {
+			log.Debug("p2pIndProc: invalid user data, sdl: %s, dir: %d, snid: %x, peer: %x",
+				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
+			return nil
+		}
+		tcbList := cud.tcbList
 
+		tcbListsLock.Lock()
+		need2Kill := false
+		tcb, exist := tcbList[idEx]
+		if exist {
+			if need2Kill = !tcb.killing; need2Kill {
+				tcb.killing = true
+			}
+		}
+		tcbListsLock.Unlock()
+
+		if !need2Kill {
+			log.Debug("p2pIndProc: already in killing, sdl: %s, dir: %d, snid: %x, peer: %x",
+				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
+		} else {
+			log.Debug("p2pIndProc: try to kill, sdl: %s, dir: %d, snid: %x, peer: %x",
+				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
+			tcb.done<-true
+			<-tcb.done
+			tcbListsLock.Lock()
+			delete(tcbList, idEx)
+			tcbListsLock.Unlock()
+		}
 
 	default:
-
-		log.LogCallerFileLine("p2pIndProc: " +
-			"inknown indication: %d",
-			what)
+		log.Debug("p2pIndProc: inknown indication: %d", what)
 	}
-
 	return para
 }
 
-//
-// Package handler
-//
-func p2pPkgProc(pkg *peer.P2pPackage4Callback) interface{} {
-
-	p2pInst := sch.SchGetScheduler(pkg.Ptn)
-	snid := pkg.PeerInfo.Snid
-	peerId := pkg.PeerInfo.NodeId
-
-	doneMapLock.Lock()
-	defer doneMapLock.Unlock()
-
-	if _, exist := doneMap[p2pInst]; !exist {
-		log.LogCallerFileLine("p2pPkgProc: " +
-			"not activated, subnet: %s, id: %s",
-			fmt.Sprintf("%x", snid),
-			fmt.Sprintf("%X", peerId))
-		return nil
-	}
-
-	idEx := peerIdEx{subNetId:snid, nodeId:peerId}
-	tcb, exist := doneMap[p2pInst][idEx]
-	if !exist {
-		log.LogCallerFileLine("p2pPkgProc: " +
-			"not activated, subnet: %s, id: %s",
-			fmt.Sprintf("%x", snid),
-			fmt.Sprintf("%X", peerId))
-		return nil
-	}
-
-	tcb.rxSeq++
-
+func p2pPkgProc(pkg *peer.P2pPackageRx, userData interface{}) interface{} {
+	_, _ = pkg, userData
 	return nil
 }
 
-//
-// hook a system interrupt signal and wait on it
-//
 func waitInterrupt() {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt)
 	defer signal.Stop(sigc)
 	<-sigc
 }
+
+
 
 //
 // run target case
@@ -499,78 +459,66 @@ func main() {
 			return
 		}
 	}
-	log.LogCallerFileLine("main: target case not found: %s", tgtCase)
+	log.Debug("main: target case not found: %s", tgtCase)
 }
 
 //
 // testCase0
 //
 func testCase0(tc *testCase) {
+	_ = tc
+	log.Debug("testCase0: going to start ycp2p...")
 
-	log.LogCallerFileLine("testCase0: going to start ycp2p ...")
-
-	//
 	// fetch default from underlying
-	//
-
 	dftCfg := shell.ShellDefaultConfig()
 	if dftCfg == nil {
-		log.LogCallerFileLine("testCase0: ShellDefaultConfig failed")
+		log.Debug("testCase0: ShellDefaultConfig failed")
 		return
 	}
 
-	//
 	// one can then apply his configurations based on the default by calling
 	// ShellSetConfig with a defferent configuration if he likes to. notice
 	// that a configuration name also returned.
-	//
-
 	myCfg := *dftCfg
 	myCfg.AppType = config.P2P_TYPE_CHAIN
-	cfgName := "myCfg"
+	cfgName := "p2pInst0"
 	cfgName, _ = shell.ShellSetConfig(cfgName, &myCfg)
 	p2pName2Cfg[cfgName] = shell.ShellGetConfig(cfgName)
 
-	//
 	// init underlying p2p logic, an instance of p2p returned
-	//
-
 	p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 	if eno != sch.SchEnoNone {
-		log.LogCallerFileLine("testCase0: SchSchedulerInit failed, eno: %d", eno)
+		log.Debug("testCase0: SchSchedulerInit failed, eno: %d", eno)
 		return
 	}
 	p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
-	//
-	// start p2p instance
-	//
+	// create test cast control block list
+	createTcbLists([]*sch.Scheduler{p2pInst})
 
+	// start p2p instance
 	if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("testCase0: P2pStart failed, eno: %d", eno)
+		log.Debug("testCase0: P2pStart failed, eno: %d", eno)
 		return
 	}
 
-	//
 	// register indication handler. notice that please, the indication handler is a
 	// global object for all peers connected, while the incoming packages callback
 	// handler is owned by every peer, and it can be installed while activation of
 	// a peer is indicated. See demo indication handler p2pIndHandler and incoming
 	// package handler p2pPkgHandler for more please.
-	//
-
-	if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+	cud := cbUserData{
+		lock: tcbLocks[p2pInst],
+		tcbList: tcbLists[p2pInst],
+	}
+	if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 	eno != shell.P2pEnoNone {
-		log.LogCallerFileLine("testCase0: P2pRegisterCallback failed, eno: %d", eno)
+		log.Debug("testCase0: P2pRegisterCallback failed, eno: %d", eno)
 		return
 	}
+	log.Debug("testCase0: ycp2p started, cofig: %s", cfgName)
 
-	log.LogCallerFileLine("testCase0: ycp2p started, cofig: %s", cfgName)
-
-	//
-	// wait os interrupt signal
-	//
-
+	// wait to be interrupted
 	waitInterrupt()
 }
 
@@ -578,35 +526,29 @@ func testCase0(tc *testCase) {
 // testCase1
 //
 func testCase1(tc *testCase) {
-
-	log.LogCallerFileLine("testCase1: going to start ycp2p ...")
+	_ = tc
+	log.Debug("testCase1: going to start ycp2p ...")
 
 	var p2pInstNum = 16
-
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
-
+	var bootstrapNodes = make([]*config.Node, 0)
 	for loop := 0; loop < p2pInstNum; loop++ {
-
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase1: handling configuration:%s ...", cfgName)
-
+		log.Debug("testCase1: handling configuration:%s ...", cfgName)
 		dftCfg := shell.ShellDefaultConfig()
 		if dftCfg == nil {
-			log.LogCallerFileLine("testCase1: ShellDefaultConfig failed")
+			log.Debug("testCase1: ShellDefaultConfig failed")
 			return
 		}
 
 		myCfg := *dftCfg
 		myCfg.AppType = config.P2P_TYPE_CHAIN
 		myCfg.Name = cfgName
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(portBase4P2p + loop)
 		myCfg.Local.TCP = uint16(portBase4P2p + loop)
-
 		if loop == 0 {
 			myCfg.NoDial = true
 			myCfg.BootstrapNode = true
@@ -622,7 +564,7 @@ func testCase1(tc *testCase) {
 
 		if loop == 0 {
 			bootstrapIp = p2pName2Cfg[cfgName].Local.IP
-			bootstrapId = fmt.Sprintf("%X", p2pName2Cfg[cfgName].Local.ID)
+			bootstrapId = fmt.Sprintf("%x", p2pName2Cfg[cfgName].Local.ID)
 			bootstrapUdp = p2pName2Cfg[cfgName].Local.UDP
 			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
 
@@ -639,23 +581,29 @@ func testCase1(tc *testCase) {
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase1: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase1: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase1: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase1: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
-			log.LogCallerFileLine("testCase1: P2pRegisterCallback failed, eno: %d", eno)
+			log.Debug("testCase1: P2pRegisterCallback failed, eno: %d", eno)
 			return
 		}
 
-		log.LogCallerFileLine("testCase1: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase1: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -665,22 +613,22 @@ func testCase1(tc *testCase) {
 // testCase2
 //
 func testCase2(tc *testCase) {
-
-	log.LogCallerFileLine("testCase2: going to start ycp2p ...")
+	_ = tc
+	log.Debug("testCase2: going to start ycp2p ...")
 
 	var p2pInstNum = 8
 	var cfgName = ""
 
-	var staticNodeIdList = []*config.Node{}
+	var staticNodeIdList = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName = fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase2: prepare node identity: %s ...", cfgName)
+		log.Debug("testCase2: prepare node identity: %s ...", cfgName)
 
 		dftCfg := shell.ShellDefaultConfig()
 		if dftCfg == nil {
-			log.LogCallerFileLine("testCase2: ShellDefaultConfig failed")
+			log.Debug("testCase2: ShellDefaultConfig failed")
 			return
 		}
 
@@ -691,15 +639,14 @@ func testCase2(tc *testCase) {
 		myCfg.PublicKey = nil
 
 		if config.P2pSetupLocalNodeId(&myCfg) != config.PcfgEnoNone {
-			log.LogCallerFileLine("testCase2: P2pSetupLocalNodeId failed")
+			log.Debug("testCase2: P2pSetupLocalNodeId failed")
 			return
 		}
 
-		log.LogCallerFileLine("testCase2: cfgName: %s, id: %X",
+		log.Debug("testCase2: cfgName: %s, id: %x",
 			cfgName, myCfg.Local.ID)
 
 		n := config.Node{
-			IP:		net.IP{127, 0, 0, 1},
 			UDP:	uint16(portBase4P2p + loop),
 			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,
@@ -711,11 +658,11 @@ func testCase2(tc *testCase) {
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase2: handling configuration:%s ...", cfgName)
+		log.Debug("testCase2: handling configuration:%s ...", cfgName)
 
 		dftCfg := shell.ShellDefaultConfig()
 		if dftCfg == nil {
-			log.LogCallerFileLine("testCase2: ShellDefaultConfig failed")
+			log.Debug("testCase2: ShellDefaultConfig failed")
 			return
 		}
 
@@ -743,14 +690,14 @@ func testCase2(tc *testCase) {
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase2: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase2: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 	}
 
-	var p2pInstList = []*sch.Scheduler{}
+	var p2pInstList = make([]*sch.Scheduler, 0)
 	for p2pInst := range p2pInst2Cfg {
 		p2pInstList = append(p2pInstList, p2pInst)
 	}
@@ -763,18 +710,24 @@ func testCase2(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase2: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase2: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
-			log.LogCallerFileLine("testCase2: P2pRegisterCallback failed, eno: %d", eno)
+			log.Debug("testCase2: P2pRegisterCallback failed, eno: %d", eno)
 			return
 		}
 
-		log.LogCallerFileLine("testCase2: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase2: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -784,32 +737,32 @@ func testCase2(tc *testCase) {
 // testCase3
 //
 func testCase3(tc *testCase) {
-
-	log.LogCallerFileLine("testCase3: going to start ycp2p ...")
+	_ = tc
+	log.Debug("testCase3: going to start ycp2p ...")
 
 	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase3: handling configuration:%s ...", cfgName)
+		log.Debug("testCase3: handling configuration:%s ...", cfgName)
 
 		var dftCfg *config.Config = nil
 
 		if loop == 0 {
 			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
-				log.LogCallerFileLine("testCase3: ShellDefaultBootstrapConfig failed")
+				log.Debug("testCase3: ShellDefaultBootstrapConfig failed")
 				return
 			}
 		} else {
 			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
-				log.LogCallerFileLine("testCase3: ShellDefaultConfig failed")
+				log.Debug("testCase3: ShellDefaultConfig failed")
 				return
 			}
 		}
@@ -820,7 +773,6 @@ func testCase3(tc *testCase) {
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNetworkTypeDynamic
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(portBase4P2p + loop)
 		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 
@@ -866,7 +818,7 @@ func testCase3(tc *testCase) {
 		if loop == 0 {
 
 			bootstrapIp = p2pName2Cfg[cfgName].Local.IP
-			bootstrapId = fmt.Sprintf("%X", p2pName2Cfg[cfgName].Local.ID)
+			bootstrapId = fmt.Sprintf("%x", p2pName2Cfg[cfgName].Local.ID)
 			bootstrapUdp = p2pName2Cfg[cfgName].Local.UDP
 			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
 
@@ -883,23 +835,29 @@ func testCase3(tc *testCase) {
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase3: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase3: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno = shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase3: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase3: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
-			log.LogCallerFileLine("testCase3: P2pRegisterCallback failed, eno: %d", eno)
+			log.Debug("testCase3: P2pRegisterCallback failed, eno: %d", eno)
 			return
 		}
 
-		log.LogCallerFileLine("testCase3: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase3: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -909,28 +867,28 @@ func testCase3(tc *testCase) {
 // testCase4
 //
 func testCase4(tc *testCase) {
-
-	log.LogCallerFileLine("testCase4: going to start ycp2p ...")
+	_ = tc
+	log.Debug("testCase4: going to start ycp2p ...")
 
 	var p2pInstNum = 8
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 	var p2pInstBootstrap *sch.Scheduler = nil
 
-	var staticNodeIdList = []*config.Node{}
+	var staticNodeIdList = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase4: prepare node identity: %s ...", cfgName)
+		log.Debug("testCase4: prepare node identity: %s ...", cfgName)
 
 		dftCfg := shell.ShellDefaultConfig()
 		if dftCfg == nil {
-			log.LogCallerFileLine("testCase4: ShellDefaultConfig failed")
+			log.Debug("testCase4: ShellDefaultConfig failed")
 			return
 		}
 
@@ -941,15 +899,14 @@ func testCase4(tc *testCase) {
 		myCfg.PublicKey = nil
 
 		if config.P2pSetupLocalNodeId(&myCfg) != config.PcfgEnoNone {
-			log.LogCallerFileLine("testCase4: P2pSetupLocalNodeId failed")
+			log.Debug("testCase4: P2pSetupLocalNodeId failed")
 			return
 		}
 
-		log.LogCallerFileLine("testCase4: cfgName: %s, id: %X",
+		log.Debug("testCase4: cfgName: %s, id: %x",
 			cfgName, myCfg.Local.ID)
 
 		n := config.Node{
-			IP:		net.IP{127, 0, 0, 1},
 			UDP:	uint16(portBase4P2p + loop),
 			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,
@@ -961,18 +918,18 @@ func testCase4(tc *testCase) {
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase4: handling configuration:%s ...", cfgName)
+		log.Debug("testCase4: handling configuration:%s ...", cfgName)
 
 		var dftCfg *config.Config = nil
 
 		if loop == 0 {
 			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
-				log.LogCallerFileLine("testCase4: ShellDefaultBootstrapConfig failed")
+				log.Debug("testCase4: ShellDefaultBootstrapConfig failed")
 				return
 			}
 		} else {
 			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
-				log.LogCallerFileLine("testCase4: ShellDefaultConfig failed")
+				log.Debug("testCase4: ShellDefaultConfig failed")
 				return
 			}
 		}
@@ -984,7 +941,6 @@ func testCase4(tc *testCase) {
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.StaticNetId = config.ZeroSubNet
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(portBase4P2p + loop)
 		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 		myCfg.Local.ID = (*staticNodeIdList[loop]).ID
@@ -1041,7 +997,7 @@ func testCase4(tc *testCase) {
 		if loop == 0 {
 
 			bootstrapIp = append(bootstrapIp, p2pName2Cfg[cfgName].Local.IP[:]...)
-			bootstrapId = fmt.Sprintf("%X", p2pName2Cfg[cfgName].Local.ID)
+			bootstrapId = fmt.Sprintf("%x", p2pName2Cfg[cfgName].Local.ID)
 			bootstrapUdp = p2pName2Cfg[cfgName].Local.UDP
 			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
 
@@ -1058,7 +1014,7 @@ func testCase4(tc *testCase) {
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase4: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase4: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
@@ -1068,7 +1024,7 @@ func testCase4(tc *testCase) {
 		}
 	}
 
-	var p2pInstList = []*sch.Scheduler{}
+	var p2pInstList = make([]*sch.Scheduler, 0)
 	for p2pInst := range p2pInst2Cfg {
 		if p2pInst != p2pInstBootstrap {
 			p2pInstList = append(p2pInstList, p2pInst)
@@ -1076,7 +1032,7 @@ func testCase4(tc *testCase) {
 	}
 
 	if eno := shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
+		log.Debug("testCase4: P2pStart failed, eno: %d", eno)
 		return
 	}
 
@@ -1088,19 +1044,25 @@ func testCase4(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase4: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase4: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
-			log.LogCallerFileLine("testCase4: P2pRegisterCallback failed, eno: %d", eno)
+			log.Debug("testCase4: P2pRegisterCallback failed, eno: %d", eno)
 			return
 		}
 
 		cfgName := p2pInst.SchGetP2pCfgName()
-		log.LogCallerFileLine("testCase4: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase4: ycp2p started, cofig: %s", cfgName)
 	}
 
 	waitInterrupt()
@@ -1111,27 +1073,28 @@ func testCase4(tc *testCase) {
 //
 func testCase5(tc *testCase) {
 
-	log.LogCallerFileLine("testCase5: going to start ycp2p ...")
+	_ = tc
+	log.Debug("testCase5: going to start ycp2p ...")
 
-	var p2pInstNum = 8
+	var p2pInstNum = 16
 
 	var bootstrapIp net.IP
-	var bootstrapId string = ""
+	var bootstrapId = ""
 	var bootstrapUdp uint16 = 0
 	var bootstrapTcp uint16 = 0
-	var bootstrapNodes = []*config.Node{}
+	var bootstrapNodes = make([]*config.Node, 0)
 	var p2pInstBootstrap *sch.Scheduler = nil
 
-	var staticNodeIdList = []*config.Node{}
+	var staticNodeIdList = make([]*config.Node, 0)
 
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase5: prepare node identity: %s ...", cfgName)
+		log.Debug("testCase5: prepare node identity: %s ...", cfgName)
 
 		dftCfg := shell.ShellDefaultConfig()
 		if dftCfg == nil {
-			log.LogCallerFileLine("testCase5: ShellDefaultConfig failed")
+			log.Debug("testCase5: ShellDefaultConfig failed")
 			return
 		}
 
@@ -1142,15 +1105,15 @@ func testCase5(tc *testCase) {
 		myCfg.PublicKey = nil
 
 		if config.P2pSetupLocalNodeId(&myCfg) != config.PcfgEnoNone {
-			log.LogCallerFileLine("testCase5: P2pSetupLocalNodeId failed")
+			log.Debug("testCase5: P2pSetupLocalNodeId failed")
 			return
 		}
 
-		log.LogCallerFileLine("testCase5: cfgName: %s, id: %X",
+		log.Debug("testCase5: cfgName: %s, id: %x",
 			cfgName, myCfg.Local.ID)
 
 		n := config.Node{
-			IP:		net.IP{127, 0, 0, 1},
+			IP:		dftCfg.Local.IP,
 			UDP:	uint16(portBase4P2p + loop),
 			TCP:	uint16(portBase4P2p + loop),
 			ID:		myCfg.Local.ID,
@@ -1162,18 +1125,18 @@ func testCase5(tc *testCase) {
 	for loop := 0; loop < p2pInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
-		log.LogCallerFileLine("testCase5: handling configuration:%s ...", cfgName)
+		log.Debug("testCase5: handling configuration:%s ...", cfgName)
 
 		var dftCfg *config.Config = nil
 
 		if loop == 0 {
 			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
-				log.LogCallerFileLine("testCase5: ShellDefaultBootstrapConfig failed")
+				log.Debug("testCase5: ShellDefaultBootstrapConfig failed")
 				return
 			}
 		} else {
 			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
-				log.LogCallerFileLine("testCase5: ShellDefaultConfig failed")
+				log.Debug("testCase5: ShellDefaultConfig failed")
 				return
 			}
 		}
@@ -1185,7 +1148,6 @@ func testCase5(tc *testCase) {
 		myCfg.PublicKey = nil
 		myCfg.NetworkType = config.P2pNetworkTypeDynamic
 		myCfg.StaticNetId = config.ZeroSubNet
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(portBase4P2p + loop)
 		myCfg.Local.TCP = uint16(portBase4P2p + loop)
 		myCfg.Local.ID = (*staticNodeIdList[loop]).ID
@@ -1202,15 +1164,15 @@ func testCase5(tc *testCase) {
 
 		if loop == 0 {
 			for idx := 0; idx < p2pInstNum; idx++ {
-				snid0 := config.SubNetworkID{0xff, byte(idx & 0x0f)}
+				snid0 := config.SubNetworkID{0xff, byte(idx & 0x3f)}
 				myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
 				myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
 				myCfg.SubNetMaxInBounds[snid0] = config.MaxPeers
 				myCfg.SubNetMaxOutbounds[snid0] = 0
 			}
 		} else {
-			snid0 := config.SubNetworkID{0xff, byte(loop & 0x0f)}
-			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x0f)}
+			snid0 := config.SubNetworkID{0xff, byte(loop & 0x3f)}
+			snid1 := config.SubNetworkID{0xff, byte((loop + 1) & 0x3f)}
 			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid0)
 			myCfg.SubNetIdList = append(myCfg.SubNetIdList, snid1)
 			myCfg.SubNetMaxPeers[snid0] = config.MaxPeers
@@ -1242,7 +1204,7 @@ func testCase5(tc *testCase) {
 		if loop == 0 {
 
 			bootstrapIp = append(bootstrapIp, p2pName2Cfg[cfgName].Local.IP[:]...)
-			bootstrapId = fmt.Sprintf("%X", p2pName2Cfg[cfgName].Local.ID)
+			bootstrapId = fmt.Sprintf("%x", p2pName2Cfg[cfgName].Local.ID)
 			bootstrapUdp = p2pName2Cfg[cfgName].Local.UDP
 			bootstrapTcp = p2pName2Cfg[cfgName].Local.TCP
 
@@ -1259,7 +1221,7 @@ func testCase5(tc *testCase) {
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase5: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase5: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 		p2pInst2Cfg[p2pInst] = p2pName2Cfg[cfgName]
@@ -1269,7 +1231,7 @@ func testCase5(tc *testCase) {
 		}
 	}
 
-	var p2pInstList = []*sch.Scheduler{}
+	var p2pInstList = make([]*sch.Scheduler, 0)
 	for p2pInst := range p2pInst2Cfg {
 		if p2pInst != p2pInstBootstrap {
 			p2pInstList = append(p2pInstList, p2pInst)
@@ -1277,7 +1239,7 @@ func testCase5(tc *testCase) {
 	}
 
 	if eno := shell.P2pStart(p2pInstBootstrap); eno != sch.SchEnoNone {
-		log.LogCallerFileLine("testCase5: P2pStart failed, eno: %d", eno)
+		log.Debug("testCase5: P2pStart failed, eno: %d", eno)
 		return
 	}
 
@@ -1289,36 +1251,55 @@ func testCase5(tc *testCase) {
 		p2pInst := p2pInstList[pidx]
 		p2pInstList = append(p2pInstList[0:pidx], p2pInstList[pidx+1:]...)
 
+		appendTcb2List([]*sch.Scheduler{p2pInst})
+
 		if eno := shell.P2pStart(p2pInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase5: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase5: P2pStart failed, eno: %d", eno)
 			return
 		}
 
-		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, p2pInst);
+		cud := cbUserData{
+			lock: tcbLocks[p2pInst],
+			tcbList: tcbLists[p2pInst],
+		}
+		if eno := shell.P2pRegisterCallback(shell.P2pIndCb, p2pIndHandler, &cud, p2pInst);
 			eno != shell.P2pEnoNone {
-			log.LogCallerFileLine("testCase5: P2pRegisterCallback failed, eno: %d", eno)
+			log.Debug("testCase5: P2pRegisterCallback failed, eno: %d", eno)
 			return
 		}
 
 		cfgName := p2pInst.SchGetP2pCfgName()
-		log.LogCallerFileLine("testCase5: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase5: ycp2p started, cofig: %s", cfgName)
 	}
 
 	//
 	// Sleep and then stop p2p instance
 	//
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 64)
 	golog.Printf("testCase5: going to stop p2p instances ...")
 
-	for p2pInst, _ := range p2pInst2Cfg {
-		if eno := shell.P2pStop(p2pInst); eno != sch.SchEnoNone {
-			golog.Printf("testCase5: " +
-				"P2pStop failed, instance: %s",
-				p2pInst.SchGetP2pCfgName())
+	stopCount := len(p2pInst2Cfg)
+	stopChain := make(chan bool, stopCount)
+	for p2pInst := range p2pInst2Cfg {
+		go shell.P2pStop(p2pInst, stopChain)
+	}
+
+_waitStop:
+	for {
+		<-stopChain
+		if stopCount--; stopCount == 0 {
+			break _waitStop
 		}
 	}
 
+	log.Debug("testCase5: wait all tx/rx instances to be done...")
+
+	txrxStopAll()
+	for !isTxRxAllDone() {
+		log.Debug("testCase5: wait all tx/rx instances to be done...")
+		time.Sleep(time.Second * 1)
+	}
 	golog.Printf("testCase5: it's the end")
 
 	waitInterrupt()
@@ -1328,21 +1309,22 @@ func testCase5(tc *testCase) {
 // testCase6
 //
 func testCase6(tc *testCase) {
-	
-	log.LogCallerFileLine("testCase6: going to start ycDht ...")
+
+	_ = tc
+	log.Debug("testCase6: going to start ycDht ...")
 
 	var dhtInstNum = 8
-	var dhtInstList = []*sch.Scheduler{}
+	var dhtInstList = make([]*sch.Scheduler, 0)
 
 	for loop := 0; loop < dhtInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("dhtInst%d", loop)
-		log.LogCallerFileLine("testCase6: handling configuration:%s ...", cfgName)
+		log.Debug("testCase6: handling configuration:%s ...", cfgName)
 
 		var dftCfg *config.Config = nil
 
 		if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
-			log.LogCallerFileLine("testCase6: ShellDefaultConfig failed")
+			log.Debug("testCase6: ShellDefaultConfig failed")
 			return
 		}
 
@@ -1351,7 +1333,6 @@ func testCase6(tc *testCase) {
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(portBase4Dht + loop)
 		myCfg.Local.TCP = uint16(portBase4Dht + loop)
 
@@ -1360,7 +1341,7 @@ func testCase6(tc *testCase) {
 
 		dhtInst, eno := shell.P2pCreateInstance(dhtName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase6: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase6: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 
@@ -1371,35 +1352,35 @@ func testCase6(tc *testCase) {
 	for _, dhtInst := range dhtInstList {
 		time.Sleep(time.Second * 1)
 		if eno := shell.P2pStart(dhtInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase6: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase6: P2pStart failed, eno: %d", eno)
 			return
 		}
-		dhtMgr := dhtInst.SchGetUserTaskIF(sch.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(sch.DhtMgrName).(*dht.DhtMgr)
 		if eno := dhtMgr.InstallEventCallback(dhtTestEventCallback); eno != dht.DhtEnoNone {
-			log.LogCallerFileLine("testCase6: InstallEventCallback failed, eno: %d", eno)
+			log.Debug("testCase6: InstallEventCallback failed, eno: %d", eno)
 			return
 		}
 	}
 
-	cm := dhtTestBuildConnMatrix(dhtInstList);
+	cm := dhtTestBuildConnMatrix(dhtInstList)
 	if cm == nil {
-		log.LogCallerFileLine("testCase6: dhtBuildConnMatrix failed")
+		log.Debug("testCase6: dhtBuildConnMatrix failed")
 		return
 	}
 
-	log.LogCallerFileLine("testCase6: sleep a while for instances starup ...")
+	log.Debug("testCase6: sleep a while for instances starup ...")
 	time.Sleep(time.Second * 4)
-	log.LogCallerFileLine("testCase6: going to apply connection matrix ...")
+	log.Debug("testCase6: going to apply connection matrix ...")
 
 	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
-		log.LogCallerFileLine("testCase6: dhtConnMatrixApply failed, eno: %d", eno)
+		log.Debug("testCase6: dhtConnMatrixApply failed, eno: %d", eno)
 		return
 	}
 
 	time.Sleep(time.Second*8)
 
 	if eno := dhtTestBootstrapStart(dhtInstList); eno != dht.DhtEnoNone {
-		log.LogCallerFileLine("testCase6: dhtTestBootstrapStart failed, eno: %d", eno)
+		log.Debug("testCase6: dhtTestBootstrapStart failed, eno: %d", eno)
 		return
 	}
 
@@ -1411,20 +1392,21 @@ func testCase6(tc *testCase) {
 //
 func testCase7(tc *testCase) {
 
-	log.LogCallerFileLine("testCase7: going to start ycDht ...")
+	_ = tc
+	log.Debug("testCase7: going to start ycDht ...")
 
-	var dhtInstNum = 8
-	var dhtInstList = []*sch.Scheduler{}
+	var dhtInstNum = 32
+	var dhtInstList = make([]*sch.Scheduler, 0)
 
 	for loop := 0; loop < dhtInstNum; loop++ {
 
 		cfgName := fmt.Sprintf("dhtInst%d", loop)
-		log.LogCallerFileLine("testCase7: handling configuration:%s ...", cfgName)
+		log.Debug("testCase7: handling configuration:%s ...", cfgName)
 
 		var dftCfg *config.Config = nil
 
 		if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
-			log.LogCallerFileLine("testCase7: ShellDefaultConfig failed")
+			log.Debug("testCase7: ShellDefaultConfig failed")
 			return
 		}
 
@@ -1433,7 +1415,6 @@ func testCase7(tc *testCase) {
 		myCfg.Name = cfgName
 		myCfg.PrivateKey = nil
 		myCfg.PublicKey = nil
-		myCfg.Local.IP = net.IP{127, 0, 0, 1}
 		myCfg.Local.UDP = uint16(portBase4Dht + loop)
 		myCfg.Local.TCP = uint16(portBase4Dht + loop)
 
@@ -1442,7 +1423,7 @@ func testCase7(tc *testCase) {
 
 		dhtInst, eno := shell.P2pCreateInstance(dhtName2Cfg[cfgName])
 		if eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase7: SchSchedulerInit failed, eno: %d", eno)
+			log.Debug("testCase7: SchSchedulerInit failed, eno: %d", eno)
 			return
 		}
 
@@ -1453,44 +1434,49 @@ func testCase7(tc *testCase) {
 	for _, dhtInst := range dhtInstList {
 		time.Sleep(time.Second * 1)
 		if eno := shell.P2pStart(dhtInst); eno != sch.SchEnoNone {
-			log.LogCallerFileLine("testCase7: P2pStart failed, eno: %d", eno)
+			log.Debug("testCase7: P2pStart failed, eno: %d", eno)
 			return
 		}
-		dhtMgr := dhtInst.SchGetUserTaskIF(sch.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(sch.DhtMgrName).(*dht.DhtMgr)
 		if eno := dhtMgr.InstallEventCallback(dhtTestEventCallback); eno != dht.DhtEnoNone {
-			log.LogCallerFileLine("testCase7: InstallEventCallback failed, eno: %d", eno)
+			log.Debug("testCase7: InstallEventCallback failed, eno: %d", eno)
 			return
 		}
 	}
 
-	cm := dhtTestBuildConnMatrix(dhtInstList);
+	cm := dhtTestBuildConnMatrix(dhtInstList)
 	if cm == nil {
-		log.LogCallerFileLine("testCase7: dhtBuildConnMatrix failed")
+		log.Debug("testCase7: dhtBuildConnMatrix failed")
 		return
 	}
 
-	log.LogCallerFileLine("testCase7: sleep a while for instances starup ...")
+	log.Debug("testCase7: sleep a while for instances starup ...")
 	time.Sleep(time.Second * 4)
-	log.LogCallerFileLine("testCase7: going to apply connection matrix ...")
+	log.Debug("testCase7: going to apply connection matrix ...")
 
 	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
-		log.LogCallerFileLine("testCase7: dhtConnMatrixApply failed, eno: %d", eno)
+		log.Debug("testCase7: dhtConnMatrixApply failed, eno: %d", eno)
 		return
 	}
 
 	time.Sleep(time.Second * 8)
 	golog.Printf("testCase7: going to stop dht instances ...")
 
-	for dhtInst, _ := range dhtInst2Cfg {
-		if eno := shell.P2pStop(dhtInst); eno != sch.SchEnoNone {
-			golog.Printf("testCase7: " +
-				"P2pStop failed, instance: %s",
-				dhtInst.SchGetP2pCfgName())
-		}
+	stopCount := len(dhtInst2Cfg)
+	stopChain := make(chan bool, stopCount)
+
+	for dhtInst := range dhtInst2Cfg {
+		go shell.P2pStop(dhtInst, stopChain)
 	}
 
+_waitStop:
+	for {
+		<-stopChain
+		if stopCount--; stopCount == 0 {
+			break _waitStop
+		}
+	}
 	golog.Printf("testCase7: it's the end")
-
 	waitInterrupt()
 }
 
@@ -1508,26 +1494,21 @@ const (
 )
 
 func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
-
-	//
 	// initialize specific connection relationship between dht instances, for example:
 	// ring, star, line, random, ...
-	//
-
-	var instNum = 0
-
+	var instNum int
 	if instNum = len(p2pInstList); instNum <= minInstNum {
-		log.LogCallerFileLine("dhtTestBuildConnMatrix: " +
-			"instance not enougth, instNum: %d, should more than: %d",
+		log.Debug("dhtTestBuildConnMatrix: " +
+			"instance not enough, instNum: %d, should more than: %d",
 			instNum, minInstNum)
 		return nil
 	}
 
 	var m = make([][]bool, instNum)
-	for idx, _ := range m {
+	for idx := range m {
 		row := make([]bool, instNum)
 		m[idx] = row
-		for idx, _ := range row {
+		for idx := range row {
 			row[idx] = false
 		}
 	}
@@ -1535,26 +1516,16 @@ func dhtTestBuildConnMatrix(p2pInstList []*sch.Scheduler) [][]bool {
 	mt := lineMatrixType
 
 	if mt == lineMatrixType {
-
 		lineMatrix(m)
-
 	} else if mt == ringMatrixType {
-
 		ringMatrix(m)
-
 	} else if mt == starMatrixType {
-
 		starMatrix(m)
-
 	} else if mt == randMatrixType{
-
 		randMatrix(m)
-
 	} else {
-
 		lineMatrix(m)
 	}
-
 	return m
 }
 
@@ -1605,46 +1576,33 @@ func starMatrix(m [][]bool) error {
 // setup a random connection matrix
 //
 func randMatrix(m [][]bool) error {
-
 	rand.Seed(time.Now().Unix())
-
 	instNum := cap(m[0])
 	if instNum <= minInstNum {
 		return errors.New(fmt.Sprintf("min instances number: %d", minInstNum + 1))
 	}
-
 	var neighbors = make([]int, instNum)
 	for idx := 0; idx < instNum; idx++ {
 		neighbors[idx] = 0
 	}
-
-	log.LogCallerFileLine("dhtTestBuildConnMatrix: total instance number: %d", instNum)
-
+	log.Debug("dhtTestBuildConnMatrix: total instance number: %d", instNum)
 	for idx, row := range m {
-
-		log.LogCallerFileLine("dhtTestBuildConnMatrix: instance index: %d", idx)
-
+		log.Debug("dhtTestBuildConnMatrix: instance index: %d", idx)
 		count := neighbors[idx]
 		if count >= instNeightbors {
 			continue
 		}
-
 		for ; count < instNeightbors; {
-
 			mask := bytes.Repeat([]byte{1}, instNum)
 			randStop := false
-
 			for !randStop {
-
 				n := rand.Intn(instNum)
 				mask[n] = 0
-
 				allCovered := true
 				for _, mk := range mask {
 					allCovered = allCovered && (mk == 0)
 				}
 				randStop = allCovered
-
 				if n == idx {
 					continue
 				}
@@ -1661,18 +1619,14 @@ func randMatrix(m [][]bool) error {
 				m[n][idx] = true
 				neighbors[n]++
 				count++
-
 				break
 			}
-
 			if randStop {
 				break
 			}
 		}
-
 		neighbors[idx] = count
 	}
-
 	return nil
 }
 
@@ -1680,58 +1634,40 @@ func randMatrix(m [][]bool) error {
 // apply connection matrix for instance list
 //
 func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
-
-	//
 	// setup connection between dht instance according to the connection matrix
-	//
-
 	if len(p2pInstList) == 0 || cm == nil {
-		log.LogCallerFileLine("dhtTestConnMatrixApply: invalid parameters")
+		log.Debug("dhtTestConnMatrixApply: invalid parameters")
 		return -1
 	}
-
 	instNum := len(p2pInstList)
 	cmBackup := make([][]bool, instNum)
-
 	for idx := 0; idx < instNum; idx++ {
 		cmBackup[idx] = append(cmBackup[idx], cm[idx]...)
 	}
-
 	conCount := 0
-
 	for idx, row := range cmBackup {
-
 		for n, connFlag := range row {
-
 			if connFlag {
-
-				dhtMgr := p2pInstList[idx].SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+				dhtMgr := p2pInstList[idx].SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 				local := dhtInst2Cfg[p2pInstList[idx]].Local
 				peerCfg := dhtInst2Cfg[p2pInstList[n]]
-
 				req := sch.MsgDhtBlindConnectReq {
 					Peer: &peerCfg.Local,
 				}
-
 				if eno := dhtMgr.DhtCommand(sch.EvDhtBlindConnectReq, &req); eno != sch.SchEnoNone {
-					log.LogCallerFileLine("dhtTestConnMatrixApply: DhtCommand failed, eno: %d", eno)
+					log.Debug("dhtTestConnMatrixApply: DhtCommand failed, eno: %d", eno)
 					return -1
 				}
-
 				cmBackup[idx][n] = false
 				cmBackup[n][idx] = false
-
 				conCount++
-
-				log.LogCallerFileLine("dhtTestConnMatrixApply: " +
+				log.Debug("dhtTestConnMatrixApply: " +
 					"blind connect request sent ok, from: %+v, to: %+v",
 					local, peerCfg.Local)
 			}
 		}
 	}
-
-	log.LogCallerFileLine("dhtTestConnMatrixApply: applied, blind connection count: %d", conCount)
-
+	log.Debug("dhtTestConnMatrixApply: applied, blind connection count: %d", conCount)
 	return 0
 }
 
@@ -1740,7 +1676,7 @@ func dhtTestConnMatrixApply(p2pInstList []*sch.Scheduler, cm [][]bool) int {
 //
 func dhtTestBootstrapStart(dhtInstList []*sch.Scheduler) int {
 	for _, dhtInst := range dhtInstList {
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtRutRefreshReq, nil)
 	}
 	return dht.DhtEnoNone
@@ -1765,7 +1701,7 @@ func dhtTestFindNode(dhtInstList []*sch.Scheduler) int {
 		}
 		req.Target = dhtInstList[targetIdx].SchGetP2pConfig().Local.ID
 		req.Seq = time.Now().Unix()
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrFindPeerReq, &req)
 	}
 	return dht.DhtEnoNone
@@ -1780,7 +1716,7 @@ type DhtTestKV struct {
 }
 func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 	rand.Seed(time.Now().Unix())
-	kvList := []*DhtTestKV{}
+	kvList := make([]*DhtTestKV, 0)
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:	nil,
 		Val:	nil,
@@ -1789,8 +1725,9 @@ func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 		val := make([]byte, 128, 128)
 		rand.Read(val)
 		req.Val = []byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val))
-		req.Key = sha256.Sum256(req.Val)[0:]
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		key := sha256.Sum256(req.Val)
+		req.Key = key[0:]
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrPutValueReq, &req)
 		kv := DhtTestKV {
 			Key:	req.Key,
@@ -1813,7 +1750,7 @@ func dhtTestGetValue(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 	}
 	for idx, dhtInst := range dhtInstList {
 		req.Key = keys[idx]
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrGetValueReq, &req)
 	}
 	return dht.DhtEnoNone
@@ -1828,17 +1765,18 @@ type DhtTestPrd struct {
 }
 func dhtTestPutProvider(dhtInstList []*sch.Scheduler) (int, []*DhtTestPrd) {
 	rand.Seed(time.Now().Unix())
-	prdList := []*DhtTestPrd{}
+	prdList := make([]*DhtTestPrd, 0)
 	req := sch.MsgDhtPrdMgrAddProviderReq {
 		Key:	nil,
-		Prd:	nil,
+		Prd:	config.Node{},
 	}
 	for _, dhtInst := range dhtInstList {
 		val := make([]byte, 128, 128)
 		rand.Read(val)
-		req.Key = sha256.Sum256([]byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val)))[0:]
+		key := sha256.Sum256([]byte(fmt.Sprintf("%s:%x", dhtInst.SchGetP2pCfgName(), val)))
+		req.Key = key[0:]
 		req.Prd = dhtInst.SchGetP2pConfig().Local
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrPutProviderReq, &req)
 		prd := DhtTestPrd {
 			Key:	req.Key,
@@ -1861,7 +1799,7 @@ func dhtTestGetProvider(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 	}
 	for idx, dhtInst := range dhtInstList {
 		req.Key = keys[idx]
-		dhtMgr := dhtInst.SchGetUserTaskIF(dht.DhtMgrName).(*dht.DhtMgr)
+		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrGetProviderReq, &req)
 	}
 	return dht.DhtEnoNone
@@ -1871,330 +1809,227 @@ func dhtTestGetProvider(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 // dht event callback
 //
 func dhtTestEventCallback(mgr interface{}, mid int, msg interface{}) int {
-
 	eno := -1
-
 	switch mid {
-
 	case  sch.EvDhtBlindConnectRsp:
 		eno = dhtTestBlindConnectRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtBlindConnectRsp))
-
 	case  sch.EvDhtMgrFindPeerRsp:
 		eno = dhtTestMgrFindPeerRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtQryMgrQueryResultInd))
-
 	case  sch.EvDhtQryMgrQueryStartRsp:
 		eno = dhtTestQryMgrQueryStartRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtQryMgrQueryStartRsp))
-
 	case  sch.EvDhtQryMgrQueryStopRsp:
 		eno = dhtTestQryMgrQueryStopRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtQryMgrQueryStopRsp))
-
 	case  sch.EvDhtConMgrSendCfm:
 		eno = dhtTestConMgrSendCfm(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtConMgrSendCfm))
-
 	case  sch.EvDhtMgrPutProviderRsp:
 		eno = dhtTestMgrPutProviderRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtPrdMgrAddProviderRsp))
-
 	case  sch.EvDhtMgrGetProviderRsp:
 		eno = dhtTestMgrGetProviderRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtMgrGetProviderRsp))
-
 	case  sch.EvDhtMgrPutValueRsp:
 		eno = dhtTestMgrPutValueRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtMgrPutValueRsp))
-
 	case  sch.EvDhtMgrGetValueRsp:
 		eno = dhtTestMgrGetValueRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtMgrGetValueRsp))
-
 	case  sch.EvDhtConMgrCloseRsp:
 		eno = dhtTestConMgrCloseRsp(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtConMgrCloseRsp))
-
 	case  sch.EvDhtConInstStatusInd:
 		eno = dhtTestConInstStatusInd(mgr.(*dht.DhtMgr), msg.(*sch.MsgDhtConInstStatusInd))
-
 	default:
-		log.LogCallerFileLine("dhtTestEventCallback: unknown event: %d", mid)
+		log.Debug("dhtTestEventCallback: unknown event: %d", mid)
 	}
-
 	return eno
 }
 
 func dhtTestBlindConnectRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtBlindConnectRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestBlindConnectRsp: nil manager")
+		log.Debug("dhtTestBlindConnectRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestBlindConnectRsp: nil scheduler")
+		log.Debug("dhtTestBlindConnectRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestBlindConnectRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestBlindConnectRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestMgrFindPeerRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryResultInd) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestMgrFindPeerRsp: nil manager")
+		log.Debug("dhtTestMgrFindPeerRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestMgrFindPeerRsp: nil scheduler")
+		log.Debug("dhtTestMgrFindPeerRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestMgrFindPeerRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestMgrFindPeerRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestQryMgrQueryStartRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStartRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestQryMgrQueryStartRsp: nil manager")
+		log.Debug("dhtTestQryMgrQueryStartRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestQryMgrQueryStartRsp: nil scheduler")
+		log.Debug("dhtTestQryMgrQueryStartRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestQryMgrQueryStartRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestQryMgrQueryStartRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestQryMgrQueryStopRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStopRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestQryMgrQueryStopRsp: nil manager")
+		log.Debug("dhtTestQryMgrQueryStopRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestQryMgrQueryStopRsp: nil scheduler")
+		log.Debug("dhtTestQryMgrQueryStopRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestQryMgrQueryStopRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestQryMgrQueryStopRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestConMgrSendCfm(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrSendCfm) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestConMgrSendCfm: nil manager")
+		log.Debug("dhtTestConMgrSendCfm: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestConMgrSendCfm: nil scheduler")
+		log.Debug("dhtTestConMgrSendCfm: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestConMgrSendCfm: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestConMgrSendCfm: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestMgrPutProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtPrdMgrAddProviderRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestMgrPutProviderRsp: nil manager")
+		log.Debug("dhtTestMgrPutProviderRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestMgrPutProviderRsp: nil scheduler")
+		log.Debug("dhtTestMgrPutProviderRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestMgrPutProviderRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestMgrPutProviderRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestMgrGetProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetProviderRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestMgrGetProviderRsp: nil manager")
+		log.Debug("dhtTestMgrGetProviderRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestMgrGetProviderRsp: nil scheduler")
+		log.Debug("dhtTestMgrGetProviderRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestMgrGetProviderRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestMgrGetProviderRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestMgrPutValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrPutValueRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestMgrPutValueRsp: nil manager")
+		log.Debug("dhtTestMgrPutValueRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestMgrPutValueRsp: nil scheduler")
+		log.Debug("dhtTestMgrPutValueRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestMgrPutValueRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestMgrPutValueRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestMgrGetValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetValueRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestMgrGetValueRsp: nil manager")
+		log.Debug("dhtTestMgrGetValueRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestMgrGetValueRsp: nil scheduler")
+		log.Debug("dhtTestMgrGetValueRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestMgrGetValueRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestMgrGetValueRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestConMgrCloseRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrCloseRsp) int {
-
 	if mgr == nil {
-		log.LogCallerFileLine("dhtTestConMgrCloseRsp: nil manager")
+		log.Debug("dhtTestConMgrCloseRsp: nil manager")
 		return -1
 	}
-
 	sdl := mgr.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestConMgrCloseRsp: nil scheduler")
+		log.Debug("dhtTestConMgrCloseRsp: nil scheduler")
 		return -1
 	}
-
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestConMgrCloseRsp: " +
-		"instance: %s, msg: %v",
-		cfgName, *msg)
-
+	log.Debug("dhtTestConMgrCloseRsp: instance: %s, msg: %v", cfgName, *msg)
 	return 0
 }
 
 func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) int {
-
 	switch msg.Status {
-
 	case dht.CisNull:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisNull")
-
+		log.Debug("dhtTestConInstStatusInd: CisNull")
 	case dht.CisConnecting:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisConnecting")
-
+		log.Debug("dhtTestConInstStatusInd: CisConnecting")
 	case dht.CisConnected:
-
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisConnected")
-
+		log.Debug("dhtTestConInstStatusInd: CisConnected")
 		if msg.Dir == dht.ConInstDirOutbound {
 			if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
 				msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
 
-				log.LogCallerFileLine("dhtTestConInstStatusInd: "+
+				log.Debug("dhtTestConInstStatusInd: "+
 					"InstallRxDataCallback failed, eno: %d, peer: %x",
 					eno, *msg.Peer)
 
 				return -1
 			}
 		}
-
 	case dht.CisAccepted:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisAccepted")
-
+		log.Debug("dhtTestConInstStatusInd: CisAccepted")
 	case dht.CisInHandshaking:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisInHandshaking")
-
+		log.Debug("dhtTestConInstStatusInd: CisInHandshaking")
 	case dht.CisHandshaked:
-
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisHandshaked")
-
+		log.Debug("dhtTestConInstStatusInd: CisHandshaked")
 		if msg.Dir == dht.ConInstDirInbound {
 			if eno := mgr.InstallRxDataCallback(dhtTestConInstRxDataCallback,
 				msg.Peer, dht.ConInstDir(msg.Dir)); eno != dht.DhtEnoNone {
-
-				log.LogCallerFileLine("dhtTestConInstStatusInd: "+
+				log.Debug("dhtTestConInstStatusInd: "+
 					"InstallRxDataCallback failed, eno: %d, peer: %x",
 					eno, *msg.Peer)
-
 				return -1
 			}
 		}
-
-
 	case dht.CisInService:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisInService")
-
+		log.Debug("dhtTestConInstStatusInd: CisInService")
 	case dht.CisClosed:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: CisClosed")
-
+		log.Debug("dhtTestConInstStatusInd: CisClosed")
 	default:
-		log.LogCallerFileLine("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
+		log.Debug("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
 	}
-
 	return 0
 }
 
@@ -2202,47 +2037,35 @@ func dhtTestConInstStatusInd(mgr *dht.DhtMgr, msg *sch.MsgDhtConInstStatusInd) i
 // connetion instance rx-data callback
 //
 func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interface{}) int {
-
 	if conInst == nil || msg == nil {
-		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
-			"invalid parameters, conInst: %p, pid: %d, msg: %p",
-			conInst, pid, msg)
+		log.Debug("dhtTestConInstRxDataCallback:invalid parameters, " +
+			"conInst: %p, pid: %d, msg: %p", conInst, pid, msg)
 		return -1
 	}
-
 	ci, ok := conInst.(*dht.ConInst)
 	if !ok {
-		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
-			"invalid connection instance, type: %T",
-			conInst)
+		log.Debug("dhtTestConInstRxDataCallback: invalid connection instance, type: %T", conInst)
 		return -1
 	}
-
 	data, ok := msg.([]byte)
 	if !ok {
-		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
-			"invalid message, type: %T",
-			msg)
+		log.Debug("dhtTestConInstRxDataCallback: invalid message, type: %T", msg)
 		return -1
 	}
 
 	if pid != uint32(dht.PID_EXT) {
-		log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
+		log.Debug("dhtTestConInstRxDataCallback: " +
 			"invalid pid: %d",
 			pid)
 		return -1
 	}
-
 	sdl := ci.GetScheduler()
 	if sdl == nil {
-		log.LogCallerFileLine("dhtTestConInstRxDataCallback: nil scheduler")
+		log.Debug("dhtTestConInstRxDataCallback: nil scheduler")
 		return -1
 	}
 	cfgName := sdl.SchGetP2pCfgName()
-
-	log.LogCallerFileLine("dhtTestConInstRxDataCallback: " +
-		"instance: %s, pid: %d, length: %d, data: %x",
+	log.Debug("dhtTestConInstRxDataCallback: instance: %s, pid: %d, length: %d, data: %x",
 		cfgName, pid, len(data), data)
-
 	return 0
 }

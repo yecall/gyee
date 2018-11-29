@@ -25,7 +25,7 @@ import (
 	"time"
 	"bytes"
 	log "github.com/yeeco/gyee/p2p/logger"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -75,7 +75,7 @@ func (qryInst *QryInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.LogCallerFileLine("qryInstProc: " +
+		log.Debug("qryInstProc: " +
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -110,7 +110,7 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 		eno = qryInst.conInstTxInd(msg.Body.(*sch.MsgDhtConInstTxInd))
 
 	default:
-		log.LogCallerFileLine("qryInstProc: unknown event: %d", msg.Id)
+		log.Debug("qryInstProc: unknown event: %d", msg.Id)
 		return sch.SchEnoParameter
 	}
 
@@ -129,27 +129,27 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 	var icb *qryInstCtrlBlock
 
 	if sdl == nil {
-		log.LogCallerFileLine("powerOn: SchGetScheduler failed")
+		log.Debug("powerOn: SchGetScheduler failed")
 		return sch.SchEnoInternal
 	}
 
 	if icb = sdl.SchGetUserDataArea(ptn).(*qryInstCtrlBlock); icb == nil {
-		log.LogCallerFileLine("powerOn: impossible nil instance control block")
+		log.Debug("powerOn: impossible nil instance control block")
 		return sch.SchEnoInternal
 	}
 
-	if _, ptnQryMgr = sdl.SchGetTaskNodeByName(QryMgrName); ptnQryMgr == nil {
-		log.LogCallerFileLine("powerOn: nil query manager")
+	if _, ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName); ptnQryMgr == nil {
+		log.Debug("powerOn: nil query manager")
 		return sch.SchEnoInternal
 	}
 
-	if _, ptnConMgr = sdl.SchGetTaskNodeByName(ConMgrName); ptnConMgr == nil {
-		log.LogCallerFileLine("powerOn: nil connection manager")
+	if _, ptnConMgr = sdl.SchGetUserTaskNode(ConMgrName); ptnConMgr == nil {
+		log.Debug("powerOn: nil connection manager")
 		return sch.SchEnoInternal
 	}
 
-	if _, ptnRutMgr = sdl.SchGetTaskNodeByName(RutMgrName); ptnRutMgr == nil {
-		log.LogCallerFileLine("powerOn: nil route manager")
+	if _, ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName); ptnRutMgr == nil {
+		log.Debug("powerOn: nil route manager")
 		return sch.SchEnoInternal
 	}
 
@@ -176,7 +176,7 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 // Power off handler
 //
 func (qryInst *QryInst)powerOff(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("powerOff: task will be done ...")
+	log.Debug("powerOff: task will be done ...")
 	return qryInst.icb.sdl.SchTaskDone(qryInst.icb.ptnInst, sch.SchEnoKilled)
 }
 
@@ -188,7 +188,7 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 	icb := qryInst.icb
 
 	if icb.status != qisInited {
-		log.LogCallerFileLine("startReq: state mismatched: %d", icb.status)
+		log.Debug("startReq: state mismatched: %d", icb.status)
 		return sch.SchEnoUserTask
 	}
 
@@ -199,7 +199,7 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 		IsBlind:	false,
 	}
 
-	log.LogCallerFileLine("startReq: ask connection manager for peer, " +
+	log.Debug("startReq: ask connection manager for peer, " +
 		"inst: %s, req: %+v", qryInst.icb.name, req)
 
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
@@ -227,7 +227,7 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 
 	if eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 
-		log.LogCallerFileLine("startReq: SchSetTimer failed, eno: %d", eno)
+		log.Debug("startReq: SchSetTimer failed, eno: %d", eno)
 
 		ind.Status = qisDone
 		icb.status = qisDone
@@ -259,26 +259,27 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 	schMsg := sch.SchMessage{}
 
 	if msg.Target != icb.target || msg.Peer != icb.to.ID {
-		log.LogCallerFileLine("")
+		log.Debug("stopReq: mismatched")
 		return sch.SchEnoMismatched
 	}
 
-	log.LogCallerFileLine("stopReq: stopped for eno: %d, target: %x, peer: %x",
+	log.Debug("stopReq: stopped for eno: %d, target: %x, peer: %x",
 		msg.Eno, msg.Target, msg.Peer)
 
-	if icb.status == qisWaitConnect {
-
-		req := sch.MsgDhtConMgrCloseReq {
-			Task:	icb.ptnInst,
-			Peer:	&icb.to,
-		}
-		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
-		sdl.SchSendMessage(&schMsg)
+	if icb.status == qisWaitConnect  || icb.status == qisWaitResponse {
 
 		if icb.qTid != sch.SchInvalidTid {
 			sdl.SchKillTimer(icb.ptnInst, icb.qTid)
 			icb.qTid = sch.SchInvalidTid
 		}
+
+		req := sch.MsgDhtConMgrCloseReq {
+			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
+			Peer:	&icb.to,
+		}
+
+		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
+		sdl.SchSendMessage(&schMsg)
 	}
 
 	rsp := sch.MsgDhtQryInstStopRsp {
@@ -287,9 +288,7 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 	}
 
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStopRsp, &rsp)
-	sdl.SchSendMessage(&schMsg)
-
-	return sch.SchEnoNone
+	return sdl.SchSendMessage(&schMsg)
 }
 
 //
@@ -298,18 +297,18 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 
 	if msg == nil {
-		log.LogCallerFileLine("icbTimerHandler: invalid parameter")
+		log.Debug("icbTimerHandler: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
 	dht := qryInst.icb.sdl.SchGetP2pCfgName()
 
-	log.LogCallerFileLine("icbTimerHandler: " +
+	log.Debug("icbTimerHandler: " +
 		"query instance timer expired, dht: %s, inst: %s",
 		dht, qryInst.icb.name)
 
 	if qryInst != msg {
-		log.LogCallerFileLine("icbTimerHandler: dht: %s, instance pointer mismatched", dht)
+		log.Debug("icbTimerHandler: dht: %s, instance pointer mismatched", dht)
 		return sch.SchEnoMismatched
 	}
 
@@ -323,7 +322,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 
 	if (icb.status != qisWaitConnect && icb.status != qisWaitResponse) || icb.qTid == sch.SchInvalidTid {
-		log.LogCallerFileLine("icbTimerHandler:" +
+		log.Debug("icbTimerHandler:" +
 			"mismatched, dht: %s, status: %d, qTid: %d",
 			dht, icb.status, icb.qTid)
 		return sch.SchEnoMismatched
@@ -337,9 +336,9 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	// resources had been allocated to the connection instance.
 	//
 
-	if icb.status == qisWaitConnect {
+	if icb.status == qisWaitConnect || icb.status == qisWaitResponse {
 		req := sch.MsgDhtConMgrCloseReq{
-			Task:	icb.ptnInst,
+			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
 			Peer:	&icb.to,
 		}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
@@ -384,11 +383,11 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno {
 
 	if msg == nil {
-		log.LogCallerFileLine("connectRsp: invalid parameter")
+		log.Debug("connectRsp: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
-	log.LogCallerFileLine("connectRsp: msg: %+v", *msg)
+	log.Debug("connectRsp: msg: %+v", *msg)
 
 	icb := qryInst.icb
 	sdl := icb.sdl
@@ -414,7 +413,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	if msg.Eno != DhtEnoNone && msg.Eno != DhtEnoDuplicated {
 
-		log.LogCallerFileLine("connectRsp:" +
+		log.Debug("connectRsp:" +
 			"connect failed, eno: %d, peer: %+V",
 			msg.Eno, *msg.Peer)
 
@@ -438,7 +437,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	if eno != DhtEnoNone {
 
-		log.LogCallerFileLine("connectRsp: setupQryPkg failed, eno: %d", eno)
+		log.Debug("connectRsp: setupQryPkg failed, eno: %d", eno)
 
 		ind.Status = qisDone
 		icb.status = qisDone
@@ -450,7 +449,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		return sch.SchEnoUserTask
 	}
 
-	log.LogCallerFileLine("connectRsp: setupQryPkg ok, " +
+	log.Debug("connectRsp: setupQryPkg ok, " +
 		"inst: %s, icb.qryReq: %+v", icb.name, *icb.qryReq)
 
 	sendReq.Task = icb.ptnInst
@@ -538,7 +537,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	schEno, tid := sdl.SchSetTimer(icb.ptnInst, &td)
 	if schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		log.LogCallerFileLine("connectRsp: SchSetTimer failed, eno: %d, tid: %d", eno, tid)
+		log.Debug("connectRsp: SchSetTimer failed, eno: %d, tid: %d", eno, tid)
 		return schEno
 	}
 
@@ -562,7 +561,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		nbs, ok := msg.Msg.(*Neighbors)
 		if !ok {
-			log.LogCallerFileLine("protoMsgInd: mismatched type Neighbors")
+			log.Debug("protoMsgInd: mismatched type Neighbors")
 			return sch.SchEnoMismatched
 		}
 
@@ -583,14 +582,14 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		gvr, ok := msg.Msg.(*GetValueRsp)
 		if !ok {
-			log.LogCallerFileLine("protoMsgInd: mismatched type GetValueRsp")
+			log.Debug("protoMsgInd: mismatched type GetValueRsp")
 			return sch.SchEnoMismatched
 		}
 
 		if gvr.Value != nil {
 
 			if bytes.Equal(gvr.Value.Key, icb.target[0:]) == false {
-				log.LogCallerFileLine("protoMsgInd: key mismatched")
+				log.Debug("protoMsgInd: key mismatched")
 				return sch.SchEnoMismatched
 			}
 
@@ -628,7 +627,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		gpr, ok := msg.Msg.(*GetProviderRsp)
 		if !ok {
-			log.LogCallerFileLine("protoMsgInd: mismatched type GetProviderRsp")
+			log.Debug("protoMsgInd: mismatched type GetProviderRsp")
 			return sch.SchEnoMismatched
 		}
 
@@ -664,7 +663,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		}
 
 	default:
-		log.LogCallerFileLine("protoMsgInd: mismatched, ForWhat: %d", msg.ForWhat)
+		log.Debug("protoMsgInd: mismatched, ForWhat: %d", msg.ForWhat)
 		return sch.SchEnoMismatched
 	}
 
@@ -677,10 +676,10 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 func (qryInst *QryInst)conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
 	dht := qryInst.icb.sdl.SchGetP2pCfgName()
 	if msg == nil {
-		log.LogCallerFileLine("conInstTxInd： invalid parameter, dht: %s, inst: %s", dht, qryInst.icb.name)
+		log.Debug("conInstTxInd： invalid parameter, dht: %s, inst: %s", dht, qryInst.icb.name)
 		return sch.SchEnoParameter
 	}
-	log.LogCallerFileLine("conInstTxInd： dht: %s, inst: %s, msg: %+v", dht, qryInst.icb.name, *msg)
+	log.Debug("conInstTxInd： dht: %s, inst: %s, msg: %+v", dht, qryInst.icb.name, *msg)
 	return sch.SchEnoNone
 }
 
@@ -762,12 +761,12 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 		dhtMsg.GetProviderReq = &gpr
 
 	} else {
-		log.LogCallerFileLine("setupQryPkg: unknown what's for")
+		log.Debug("setupQryPkg: unknown what's for")
 		return DhtEnoMismatched, nil
 	}
 
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		log.LogCallerFileLine("setupQryPkg: GetPackage failed, eno: %d", eno)
+		log.Debug("setupQryPkg: GetPackage failed, eno: %d", eno)
 		return eno, nil
 	}
 

@@ -24,7 +24,7 @@ package scheduler
 import (
 	"sync"
 	"time"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
@@ -35,7 +35,6 @@ type schMessage SchMessage
 //
 // User task entry point
 //
-type schUserTaskEp = SchUserTaskEp
 type schUserTaskInf = SchUserTaskInf
 
 //
@@ -99,14 +98,13 @@ type schTmcbNode struct {
 // Timer node pool
 //
 const schTimerNodePoolSize	= 2048						// timer node pool size, must be (2^n)
-var schTimerNodePool [schTimerNodePoolSize]schTmcbNode	// timer node pool
 
 //
 // Task struct
 //
 const schMaxTaskTimer	= SchMaxTaskTimer		// max timers can be held by one user task
 const schInvalidTid		= SchInvalidTid			// invalid timer identity
-
+const evHistorySize		= 64					// round buffer size fo event history
 type schTask struct {
 	lock		sync.Mutex						// lock to protect task control block
 	sdl			*scheduler						// pointer to scheduler
@@ -120,6 +118,9 @@ type schTask struct {
 	dog			schWatchDog						// wathch dog
 	dieCb		func(interface{}) SchErrno		// callbacked when going to die
 	goStatus	int								// in going or suspended
+	evHistory	[evHistorySize]schMessage		// event history
+	evhIndex	int								// event history index
+	evTotal		int64							// total event number
 	userData	interface{}						// data area pointer of user task
 }
 
@@ -134,11 +135,10 @@ type schTaskNode struct {
 
 //
 // The ycp2p scheduler struct: since it's only planed to invoke the scheduler
-// internal modle ycp2p, this struct is not exported, any interface to created
+// internal mode ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
 const schTaskNodePoolSize = 1024						// task node pool size, must be (2^n)
-var schTaskNodePool	[schTaskNodePoolSize]schTaskNode	// task node pool
 
 type scheduler struct {
 
@@ -168,6 +168,13 @@ type scheduler struct {
 // static tasks name
 //
 const (
+
+	//
+	// shell manager name
+	//
+
+	ShMgrName			= "ShMgr"			// chain shell manager
+	DhtShMgrName		= "DhtShMgr"		// dht shell manager
 
 	//
 	// followings are for chain application

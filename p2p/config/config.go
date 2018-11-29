@@ -25,31 +25,27 @@ import (
 	"strings"
 	"strconv"
 	"net"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"path/filepath"
 	"os"
 	"os/user"
 	"runtime"
 	"fmt"
 	"time"
-
-	"crypto/rand"
-	"encoding/hex"
 	"io"
+	"errors"
+	"bytes"
+	"crypto/rand"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"path/filepath"
+	"encoding/hex"
 	"io/ioutil"
 	"math/big"
-	"errors"
-
 	log "github.com/yeeco/gyee/p2p/logger"
 )
 
 
-//
 // errno
-//
 type P2pCfgErrno int
-
 const (
 	PcfgEnoNone			= iota
 	PcfgEnoParameter
@@ -61,67 +57,47 @@ const (
 	PcfgEnoNodeId
 )
 
-//
-// Some paths
-//
+// Some specific paths
 const (
 	PcfgEnoIpAddrivateKey	= "nodekey"		// Path within the datadir to the node's private key
 	datadirNodeDatabase		= "nodes"		// Path within the datadir to store the node infos
 )
 
-//
-// Bootstrap nodes, in a format like:
-//
-//	node-identity-hex-string@ip:udp-port:tcp-port
-//
+// Bootstrap nodes, in a format like: node-identity-hex-string@ip:udp-port:tcp-port
 const P2pMaxBootstrapNodes = 32
-
 var BootstrapNodeUrl = []string {
 	"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.191:30303:30303",
-	//"8FAEAD1F4B57494B6596B4320A9AA5B083486513222B8735E487A59F4C9CC59D2155B3668B1BAA34A7D07FC2F12384CE44EA50746BCA262B66B2F9E89F47D8E6@192.168.2.144:30303:30303",
 }
 
-//
 // Build "Node" struct for bootstraps
-//
 var BootstrapNodes = P2pSetupDefaultBootstrapNodes()
 
-//
 // Node ID length in bits
-//
 const NodeIDBits	= 512
 const NodeIDBytes	= NodeIDBits / 8
 
-//
 // Node identity
-//
 type NodeID [NodeIDBytes]byte
 
-//
 // Max protocols
-//
 const MaxProtocols = 32
 
-//
 // Max peers
-//
 const MaxPeers = 16
 
-//
 // Max concurrecny inboudn and outbound
-//
 const MaxInbounds	= MaxPeers / 2 // +2
 const MaxOutbounds	= MaxPeers / 2 // +2
 
-//
 // Node
-//
-
-type SubNetworkID [2]byte					// sbu network identity
-const MaxSubNetworks = 16					// max sub networks can a node attached to
 const SubNetIdBytes = 2						// 2 bytes for sub network identity
-var ZeroSubNet = SubNetworkID{0,0}			// zero sub network
-var AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
+type SubNetworkID [SubNetIdBytes]byte		// sbu network identity
+
+var (
+	ZeroSubNet = SubNetworkID{0,0}			// zero sub network
+	AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
+	VSubNet = SubNetworkID{0xef, 0xff}		// validators' sub network identity
+)
 
 type Node struct {
 	IP				net.IP					// ip address
@@ -134,18 +110,13 @@ type Protocol struct {
 	Ver		[4]byte							// protocol version: M.m0.m1.m2
 }
 
-//
 // Node static Configuration parameters
-//
-
 const (
 	P2pNetworkTypeDynamic	= 0				// neighbor discovering needed
 	P2pNetworkTypeStatic	= 1				// no discovering
 )
 
-//
 // Application type
-//
 type P2pAppType int
 const (
 	P2P_TYPE_CHAIN	P2pAppType = 0
@@ -153,6 +124,7 @@ const (
 	P2P_TYPE_ALL	P2pAppType = 2
 )
 
+// Total configuration
 type Config struct {
 
 	AppType				P2pAppType				// application type
@@ -175,10 +147,10 @@ type Config struct {
 	StaticNodes			[]*Node					// static nodes
 	NodeDataDir			string					// node data directory
 	NodeDatabase		string					// node database
-	NoDial				bool					// outboundless flag
-	NoAccept			bool					// inboundless flag
+	NoDial				bool					// do not dial out flag
+	NoAccept			bool					// do not accept incoming dial flag
 	BootstrapNode		bool					// bootstrap node flag
-	Local				Node					// myself
+	Local				Node					// local node struct
 	ProtoNum			uint32					// local protocol number
 	Protocols			[]Protocol				// local protocol table
 	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be
@@ -197,9 +169,7 @@ type Config struct {
 	DhtFdsCfg			Cfg4DhtFileDatastore	// for dht file data store
 }
 
-//
 // Configuration about neighbor manager on UDP
-//
 type Cfg4UdpNgbManager struct {
 	IP				net.IP			// ip address
 	UDP				uint16			// udp port numbers
@@ -209,29 +179,23 @@ type Cfg4UdpNgbManager struct {
 	SubNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
 }
 
-//
 // Configuration about neighbor listener on UDP
-//
 type Cfg4UdpNgbListener struct {
-	IP		net.IP		// ip address
-	UDP		uint16		// udp port numbers
-	TCP		uint16		// tcp port numbers
-	ID		NodeID		// the node's public key
+	IP				net.IP			// ip address
+	UDP				uint16			// udp port numbers
+	TCP				uint16			// tcp port numbers
+	ID				NodeID			// the node's public key
 }
 
-//
 // Configuration about peer listener on TCP
-//
 type Cfg4PeerListener struct {
-	IP			net.IP	// ip address
-	Port		uint16	// port numbers
-	ID			NodeID	// the node's public key
-	MaxInBounds	int		// max concurrency inbounds
+	IP				net.IP			// ip address
+	Port			uint16			// port numbers
+	ID				NodeID			// the node's public key
+	MaxInBounds		int				// max concurrency inbounds
 }
 
-//
 // Configuration about peer manager
-//
 type Cfg4PeerManager struct {
 	CfgName				string					// p2p configuration name
 	NetworkType			int						// p2p network type
@@ -256,9 +220,7 @@ type Cfg4PeerManager struct {
 	Protocols			[]Protocol				// local protocol table
 }
 
-//
 // Configuration about table manager
-//
 type Cfg4TabManager struct {
 	NetworkType		int				// Network type
 	Local			Node			// local node
@@ -271,26 +233,20 @@ type Cfg4TabManager struct {
 									// of the local node in this list.
 }
 
-//
 // Configuration about protocols supported
-//
 type Cfg4Protocols struct {
-	ProtoNum  uint32     	// local protocol number
-	Protocols []Protocol	// local protocol table
+	ProtoNum  		uint32 	    	// local protocol number
+	Protocols 		[]Protocol		// local protocol table
 }
 
-//
 // Configuration about dht route manager
-//
 type Cfg4DhtRouteManager struct {
 	NodeId			NodeID			// local node identity
 	RandomQryNum	int				// times to try query for a random peer identity
 	Period			time.Duration	// timer period to fire a bootstrap
 }
 
-//
 // Configuration about dht query manager
-//
 type Cfg4DhtQryManager struct {
 	Local			*Node			// pointer to local node specification
 	MaxPendings		int				// max pendings can be held in the list
@@ -299,34 +255,26 @@ type Cfg4DhtQryManager struct {
 	QryInstExpired	time.Duration 	// duration to get expired for a query instance
 }
 
-//
 // Configuration about dht listener management
-//
 type Cfg4DhtLsnManager struct {
 	IP				net.IP			// ip address
 	PortTcp			uint16			// port number for tcp
 	PortUdp			uint16			// port number for udp
 }
 
-//
 // Configuration about dht connection manager
-//
 type Cfg4DhtConManager struct {
 	Local			*Node			// pointer to local node specification
 	MaxCon    		int				// max number of connection
 	HsTimeout 		time.Duration	// handshake timeout duration
 }
 
-//
 // configuration about dht file data store
-//
-
 const (
 	sfnPrefix		= "prefix"
 	sfnSuffix		= "suffix"
 	sfnNextToLast	= "next-to-last"
 )
-
 type Cfg4DhtFileDatastore struct {
 	Path				string		// data store path
 	ShardFuncName		string		// shard function name
@@ -334,47 +282,41 @@ type Cfg4DhtFileDatastore struct {
 	Sync				bool		// sync file store flag
 }
 
-//
 // Default version string, formated as "M.m0.m1.m2"
-//
 const dftVersion = "0.1.0.0"
 
-//
 // Default p2p instance name
-//
 const dftName = "test"
 
-//
 // Default configuration(notice that it's not a validated configuration and
 // could never be applied), most of those defaults must be overided by higher
 // lever module of system.
-//
 const (
 	dftUdpPort = 30303
 	dftTcpPort = 30303
+	dftDhtPort = 80808
 )
-
 var dftLocal = Node {
-	IP:		net.IPv4(192,168,2, 123),
+	IP:		P2pGetLocalIpAddr(),
 	UDP:	dftUdpPort,
 	TCP:	dftTcpPort,
 	ID:		NodeID{0},
 }
 
+var dhtLocal = Node {
+	IP:		P2pGetLocalIpAddr(),
+	UDP:	0,	// udp not in use for DHT
+	TCP:	dftDhtPort,
+	ID:		NodeID{0},
+}
 
-//
 // Multiple configurations each identified by its' name
-//
 var config = make(map[string] *Config)
 
-//
 // Get default non-bootstrap node config
-//
 var dftDatDir = P2pDefaultDataDir(true)
 func P2pDefaultConfig() *Config {
-
 	var defaultConfig = Config {
-
 		//
 		// Chain application part
 		//
@@ -407,27 +349,23 @@ func P2pDefaultConfig() *Config {
 		// DHT application part
 		//
 
-		DhtLocal:				dftLocal,
-
+		DhtLocal:				dhtLocal,
 		DhtRutCfg: Cfg4DhtRouteManager {
 			NodeId:				NodeID{0},
 			RandomQryNum:		1,
 			Period:				time.Minute * 1,
 		},
-
 		DhtQryCfg: Cfg4DhtQryManager {
-			Local:				&dftLocal,
+			Local:				&dhtLocal,
 			MaxPendings:		32,
 			MaxActInsts:		8,
 			QryExpired:			time.Second * 60,
 			QryInstExpired:		time.Second * 16,
 		},
-
 		DhtConCfg: Cfg4DhtConManager {
 			MaxCon:				512,
 			HsTimeout:			time.Second * 16,
 		},
-
 		DhtFdsCfg: Cfg4DhtFileDatastore {
 			Path:				dftDatDir,
 			ShardFuncName:		sfnNextToLast,
@@ -435,16 +373,15 @@ func P2pDefaultConfig() *Config {
 			Sync:				true,
 		},
 	}
-
 	return &defaultConfig
 }
 
-//
 // Get default bootstrap node config
-//
 func P2pDefaultBootstrapConfig() *Config {
-
 	var defaultConfig = Config {
+		//
+		// Chain application part
+		//
 		NetworkType:			P2pNetworkTypeDynamic,
 		Name:					dftName,
 		Version:				dftVersion,
@@ -468,92 +405,103 @@ func P2pDefaultBootstrapConfig() *Config {
 		SubNetMaxOutbounds:		map[SubNetworkID]int{},
 		SubNetMaxInBounds:		map[SubNetworkID]int{},
 		SubNetIdList:			[]SubNetworkID{},
-	}
 
+		//
+		// DHT application part
+		//
+		DhtLocal:				dhtLocal,
+		DhtRutCfg: Cfg4DhtRouteManager {
+			NodeId:				NodeID{0},
+			RandomQryNum:		1,
+			Period:				time.Minute * 1,
+		},
+		DhtQryCfg: Cfg4DhtQryManager {
+			Local:				&dhtLocal,
+			MaxPendings:		32,
+			MaxActInsts:		8,
+			QryExpired:			time.Second * 60,
+			QryInstExpired:		time.Second * 16,
+		},
+		DhtConCfg: Cfg4DhtConManager {
+			MaxCon:				512,
+			HsTimeout:			time.Second * 16,
+		},
+		DhtFdsCfg: Cfg4DhtFileDatastore {
+			Path:				dftDatDir,
+			ShardFuncName:		sfnNextToLast,
+			PadLength:			2,
+			Sync:				true,
+		},
+	}
 	return &defaultConfig
 }
 
-//
-// P2pSetConfig
-//
 func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 
-	//
 	// Update, one SHOULD first call P2pDefaultConfig to get default value, modify
 	// some fields if necessary, and then call this function, since the configuration
 	// is overlapped directly here in this function.
-	//
 
 	if cfg == nil {
-		log.LogCallerFileLine("P2pSetConfig: invalid configuration")
+		log.Debug("P2pSetConfig: invalid configuration")
 		return name, PcfgEnoParameter
 	}
 
-	//
-	// Check configuration. Notice that we do not need a private key in current
-	// implement, only public key needed to build the local node identity, so one
-	// can leave private to be nil while give a not nil public key. If both are
-	// nils, key pair will be built, see bellow pls.
-	//
-
 	if cfg.PrivateKey == nil {
-		log.LogCallerFileLine("P2pSetConfig: private key is empty")
+		log.Debug("P2pSetConfig: private key is empty")
 	}
 
 	if cfg.PublicKey == nil {
-		log.LogCallerFileLine("P2pSetConfig: public key is empty")
+		log.Debug("P2pSetConfig: public key is empty")
 	}
 
 	if m1, m2, m3 := len(cfg.SubNetIdList) == len(cfg.SubNetMaxPeers),
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxInBounds),
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxOutbounds); !(m1 && m2 && m3) {
-
-		log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration")
+		log.Debug("P2pSetConfig: invalid sub network configuration")
 		return name, PcfgEnoParameter
 	}
 
 	for key, maxPeers := range cfg.SubNetMaxPeers {
 		if maxPeers < cfg.SubNetMaxOutbounds[key] + cfg.SubNetMaxInBounds[key] {
-			log.LogCallerFileLine("P2pSetConfig: invalid sub network configuration")
+			log.Debug("P2pSetConfig: invalid sub network configuration")
 			return name, PcfgEnoParameter
 		}
 	}
 
 	if len(cfg.Name) == 0 {
-		log.LogCallerFileLine("P2pSetConfig: node name is empty")
+		log.Debug("P2pSetConfig: node name is empty")
 	}
 
 	if cap(cfg.BootstrapNodes) == 0 {
-		log.LogCallerFileLine("P2pSetConfig: BootstrapNodes is empty")
+		log.Debug("P2pSetConfig: BootstrapNodes is empty")
 	}
 
 	if cap(cfg.StaticNodes) == 0 {
-		log.LogCallerFileLine("P2pSetConfig: StaticNodes is empty")
+		log.Debug("P2pSetConfig: StaticNodes is empty")
 	}
 
-	//
-	// Seems path.IsAbs does not work under Windows
-	//
-
 	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
-		log.LogCallerFileLine("P2pSetConfig: invaid data directory")
+		log.Debug("P2pSetConfig: invaid data directory")
 		return name, PcfgEnoDataDir
 	}
 
 	if len(cfg.NodeDatabase) == 0 {
-		log.LogCallerFileLine("P2pSetConfig: invalid database name")
+		log.Debug("P2pSetConfig: invalid database name")
 		return name, PcfgEnoDatabase
 	}
 
 	if cfg.Local.IP == nil {
-		log.LogCallerFileLine("P2pSetConfig: invalid ip address")
+		log.Debug("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoIpAddr
 	}
+	log.Debug("P2pSetConfig: [ip, udp, tcp]=[%s, %d, %d]",
+		cfg.Local.IP.String(), cfg.Local.UDP, cfg.Local.TCP)
 
 	name = strings.Trim(name, " ")
 	if len(name) == 0 {
 		if len(cfg.CfgName) == 0 {
-			log.LogCallerFileLine("P2pSetConfig: empty configuration name")
+			log.Debug("P2pSetConfig: empty configuration name")
 			return name, PcfgEnoParameter
 		}
 		name = cfg.CfgName
@@ -561,73 +509,50 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	cfg.CfgName = name
 
 	if _, dup := config[name]; dup {
-		log.LogCallerFileLine("P2pSetConfig: duplicated configuration name: %s", name)
-		log.LogCallerFileLine("P2pSetConfig: old configuration: %+v", *config[name])
-		log.LogCallerFileLine("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
+		log.Debug("P2pSetConfig: duplicated configuration name: %s", name)
+		log.Debug("P2pSetConfig: old configuration: %+v", *config[name])
+		log.Debug("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
 	}
-	config[name] = cfg
-
-	//
-	// setup local node identity from key
-	//
 
 	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
-		log.LogCallerFileLine("P2pSetConfig: invalid ip address")
+		log.Debug("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoNodeId
 	}
 
-	//
-	// check if DHT application, we need prepare node identity for this case now,
-	// we would make individual identities for chain and dht application later.
-	//
-
 	if cfg.AppType == P2P_TYPE_DHT {
-		cfg.DhtLocal = cfg.Local
 		cfg.DhtRutCfg.NodeId = cfg.DhtLocal.ID
 		cfg.DhtQryCfg.Local = &cfg.DhtLocal
 		cfg.DhtConCfg.Local = &cfg.DhtLocal
 	}
 
+	config[name] = cfg
+
 	return name, PcfgEnoNone
 }
 
-//
 // Get global configuration pointer
-//
 func P2pGetConfig(name string) *Config {
 	return config[name]
 }
 
-//
 // Node identity to hex string
-//
 func P2pNodeId2HexString(id NodeID) string {
 	return fmt.Sprintf("%X", id[:])
 }
 
-//
 // Sub network identity to hex string
-//
 func P2pSubNetId2HexString(id SubNetworkID) string {
 	return fmt.Sprintf("%X", id[:])
 }
 
-//
 // Hex-string to node identity
-//
 func P2pHexString2NodeId(hex string) *NodeID {
-
 	var nid = NodeID{byte(0)}
-
 	if len(hex) != NodeIDBytes * 2 {
-		log.LogCallerFileLine("P2pHexString2NodeId: " +
-			"invalid length: %d",
-			len(hex))
+		log.Debug("P2pHexString2NodeId: invalid length: %d", len(hex))
 		return nil
 	}
-
 	for cidx, c := range hex {
-
 		if c >= '0' && c <= '9' {
 			c = c - '0'
 		} else if c >= 'a' && c <= 'f' {
@@ -635,12 +560,9 @@ func P2pHexString2NodeId(hex string) *NodeID {
 		} else if c >= 'A' && c <= 'F' {
 			c = c - 'A' + 10
 		} else {
-			log.LogCallerFileLine("P2pHexString2NodeId: " +
-				"invalid string: %s",
-				hex)
+			log.Debug("P2pHexString2NodeId: invalid string: %s", hex)
 			return nil
 		}
-
 		bidx := cidx >> 1
 		if cidx & 0x01 == 0 {
 			nid[bidx] = byte(c << 4)
@@ -648,21 +570,13 @@ func P2pHexString2NodeId(hex string) *NodeID {
 			nid[bidx] += byte(c)
 		}
 	}
-
 	return &nid
 }
 
-//
 // Get default data directory
-//
 func P2pDefaultDataDir(flag bool) string {
-
-	//
-	// get home and setup default dir
-	//
-
+	// get home and setup default directory
 	home := P2pGetUserHomeDir()
-
 	if home != "" {
 		if runtime.GOOS == "darwin" {
 			home = filepath.Join(home, "Library", "yee")
@@ -672,11 +586,7 @@ func P2pDefaultDataDir(flag bool) string {
 			home = filepath.Join(home, ".yee")
 		}
 	}
-
-	//
 	// check flag to create default directory if it's not exit
-	//
-
 	if flag {
 		_, err := os.Stat(home)
 		if err == nil {
@@ -689,13 +599,35 @@ func P2pDefaultDataDir(flag bool) string {
 			}
 		}
 	}
-
 	return home
 }
 
-//
+// Get local ip address
+func P2pGetLocalIpAddr() net.IP {
+	// Filter for debug only
+	filter := func (ip net.IP) bool {
+		ipWithNetworkId := [3]byte{192, 168, 1,}
+		return bytes.Compare(ip[0:3], ipWithNetworkId[:]) == 0
+	}
+
+	dftIp := net.IPv4(127, 0, 0, 1)
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.Debug("P2pGetLocalIpAddr: failed, error: %s", err.Error())
+		return dftIp
+	}
+	for idx := 0; idx < len(addrs); idx++ {
+		addr := addrs[idx]
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipv4 := ipnet.IP.To4(); ipv4 != nil && filter(ipv4) {
+				return ipv4
+			}
+		}
+	}
+	return dftIp
+}
+
 // Get user directory
-//
 func P2pGetUserHomeDir() string {
 	if home := os.Getenv("HOME"); home != "" {
 		return home
@@ -706,191 +638,181 @@ func P2pGetUserHomeDir() string {
 	return ""
 }
 
-//
 // Build private key
-//
 func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 
-	//
 	// 1) if no data directory specified, try to generate key, but do no save to file;
 	// 2) if data directory presented, try to load key from file;
 	// 3) if load failed, try to generate key and the save it to file;
-	//
 
 	if cfg.NodeDataDir == "" {
 		key, err := GenerateKey()
 		if err != nil {
-			log.LogCallerFileLine("p2pBuildPrivateKey: " +
-				"GenerateKey failed, err: %s",
-				err.Error())
+			log.Debug("p2pBuildPrivateKey: GenerateKey failed, err: %s", err.Error())
 			return nil
 		}
 		return key
 	}
 
-	keyfile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
-	if key, err := LoadECDSA(keyfile); err == nil {
-		log.LogCallerFileLine("p2pBuildPrivateKey: " +
-			"private key loaded ok from file: %s",
-			keyfile)
+	keyFile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
+	if key, err := LoadECDSA(keyFile); err == nil {
+		log.Debug("p2pBuildPrivateKey: private key loaded ok from file: %s", keyFile)
 		return key
 	}
 
 	key, err := GenerateKey()
 	if err != nil {
-		log.LogCallerFileLine("p2pBuildPrivateKey: " +
-			"GenerateKey failed, err: %s",
-			err.Error())
+		log.Debug("p2pBuildPrivateKey: GenerateKey failed, err: %s", err.Error())
 		return nil
 	}
 
 	instanceDir := filepath.Join(cfg.NodeDataDir, cfg.Name)
 	if _, err := os.Stat(instanceDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(instanceDir, 0700); err != nil {
-			log.LogCallerFileLine("p2pBuildPrivateKey: " +
-				"MkdirAll failed, err: %s, path: %s",
+			log.Debug("p2pBuildPrivateKey: MkdirAll failed, err: %s, path: %s",
 				err.Error(), instanceDir)
 			return key
 		}
 	}
 
-	if err := SaveECDSA(keyfile, key); err != nil {
-		log.LogCallerFileLine("p2pBuildPrivateKey: " +
-			"SaveECDSA failed, err: %s",
-			err.Error())
+	if err := SaveECDSA(keyFile, key); err != nil {
+		log.Debug("p2pBuildPrivateKey: SaveECDSA failed, err: %s", err.Error())
 	}
 
-	log.LogCallerFileLine("p2pBuildPrivateKey: " +
-		"key save ok to file: %s",
-		keyfile)
-
+	log.Debug("p2pBuildPrivateKey: key save ok to file: %s", keyFile)
 	return key
 }
 
-//
 // Trans public key to node identity
-//
 func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
-
 	var id NodeID
-
 	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-
 	if len(pbytes)-1 != len(id) {
-		log.LogCallerFileLine("p2pPubkey2NodeId: " +
-			"invalid public key for node identity")
+		log.Debug("p2pPubkey2NodeId: invalid public key for node identity")
 		return nil
 	}
 	copy(id[:], pbytes[1:])
-
 	return &id
 }
 
-//
 // Setup local node identity
-//
-func P2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
-	return p2pSetupLocalNodeId(cfg)
-}
-
 func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
-
 	if cfg.PrivateKey != nil {
-
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
-
 	} else if cfg.PublicKey == nil {
-
-		cfg.PrivateKey = p2pBuildPrivateKey(cfg)
-
-		if cfg.PrivateKey == nil {
-			log.LogCallerFileLine("p2pSetupLocalNodeId: " +
-				"p2pBuildPrivateKey failed")
+		if cfg.PrivateKey = p2pBuildPrivateKey(cfg); cfg.PrivateKey == nil {
+			log.Debug("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
 			return PcfgEnoPrivateKye
 		}
-
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	}
 
 	pnid := p2pPubkey2NodeId(cfg.PublicKey)
-
 	if pnid == nil {
-
-		log.LogCallerFileLine("p2pSetupLocalNodeId: " +
-			"p2pPubkey2NodeId failed")
+		log.Debug("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
 		return PcfgEnoPublicKye
 	}
-	cfg.Local.ID = *pnid
 
-	log.LogCallerFileLine("p2pSetupLocalNodeId: " +
-		"local node identity: %s",
-		P2pNodeId2HexString(cfg.Local.ID))
+	cfg.Local.ID = *pnid
+	log.Debug("p2pSetupLocalNodeId: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
 
 	return PcfgEnoNone
 }
 
-//
+// Trans node identity to public key
+func P2pNodeId2Pubkey(id []byte) *ecdsa.PublicKey {
+	data := make([]byte, 1 + NodeIDBytes)
+	data[0] = 4
+	copy(data[1:], id[0:])
+	x, y := elliptic.Unmarshal(S256(), data)
+	return &ecdsa.PublicKey {
+		Curve:S256(),
+		X: x,
+		Y: y,
+	}
+}
+
+// Construct big integer by sign and absolute value
+func P2pBigInt(sign int, abs []byte) *big.Int {
+	bi := big.Int{}
+	bi.SetBytes(abs)
+	if sign == -1 {
+		bi.Neg(&bi)
+	}
+	return &bi
+}
+
+// Get bytes of big int absolute value
+func P2pBigIntAbs2Bytes(bi *big.Int) []byte {
+	return bi.Bytes()
+}
+
+// Get sign value of big int
+func P2pSignBigInt(bi *big.Int) int {
+	return bi.Sign()
+}
+
+// Sign
+func P2pSign(priKey *ecdsa.PrivateKey, data []byte) (r, s *big.Int, err error) {
+	r, s, err = ecdsa.Sign(rand.Reader, priKey, data)
+	if err != nil {
+		log.Debug("P2pSign: failed, error: %s", err.Error())
+	}
+	return
+}
+
+// Verify
+func P2pVerify(pubKey *ecdsa.PublicKey, data [] byte, r, s *big.Int) bool {
+	return ecdsa.Verify(pubKey, data, r, s)
+}
+
+// Setup local node identity
+func P2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
+	return p2pSetupLocalNodeId(cfg)
+}
+
 // Setup default bootstrap nodes
-//
 func P2pSetupDefaultBootstrapNodes() []*Node {
 	return P2pSetupBootstrapNodes(BootstrapNodeUrl)
 }
 
-//
 // Setup bootstrap nodes
-//
 func P2pSetupBootstrapNodes(urls []string) []*Node {
-
 	var bsn = make([]*Node, 0, P2pMaxBootstrapNodes)
-
 	for idx, url := range urls {
-
 		strs := strings.Split(url,"@")
 		if len(strs) != 2 {
-			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
-				"invalid bootstrap url: %s",
-				url)
+			log.Debug("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
 			return nil
 		}
-
 		strNodeId := strs[0]
 		strs = strings.Split(strs[1],":")
 		if len(strs) != 3 {
-			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
-				"invalid bootstrap url: %s",
-				url)
+			log.Debug("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
 			return nil
 		}
 
 		strIp := strs[0]
 		strUdpPort := strs[1]
 		strTcpPort := strs[2]
-
 		pid := P2pHexString2NodeId(strNodeId)
 		if pid == nil {
-			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
-				"P2pHexString2NodeId failed, strNodeId: %s",
-				strNodeId)
+			log.Debug("P2pSetupBootstrapNodes: P2pHexString2NodeId failed, strNodeId: %s", strNodeId)
 			return nil
 		}
 
 		bsn = append(bsn, new(Node))
 		copy(bsn[idx].ID[:], (*pid)[:])
 		bsn[idx].IP = net.ParseIP(strIp)
-
 		if port, err := strconv.Atoi(strUdpPort); err != nil {
-			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
-				"Atoi for UDP port failed, err: %s",
-				err.Error())
+			log.Debug("P2pSetupBootstrapNodes: Atoi for UDP port failed, err: %s", err.Error())
 			return nil
 		} else {
 			bsn[idx].UDP = uint16(port)
 		}
 
 		if port, err := strconv.Atoi(strTcpPort); err != nil {
-			log.LogCallerFileLine("P2pSetupBootstrapNodes: " +
-				"Atoi for TCP port failed, err: %s",
-				err.Error())
+			log.Debug("P2pSetupBootstrapNodes: Atoi for TCP port failed, err: %s", err.Error())
 			return nil
 		} else {
 			bsn[idx].TCP = uint16(port)
@@ -900,9 +822,7 @@ func P2pSetupBootstrapNodes(urls []string) []*Node {
 	return  bsn
 }
 
-//
 // Get configuration of neighbor discovering manager
-//
 func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 	return &Cfg4UdpNgbManager {
 		IP:				config[name].Local.IP,
@@ -914,9 +834,7 @@ func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 	}
 }
 
-//
 // Get configuration of neighbor discovering listener
-//
 func P2pConfig4UdpNgbListener(name string) *Cfg4UdpNgbListener {
 	return &Cfg4UdpNgbListener {
 		IP:		config[name].Local.IP,
@@ -926,9 +844,7 @@ func P2pConfig4UdpNgbListener(name string) *Cfg4UdpNgbListener {
 	}
 }
 
-//
 // Get configuration of peer listener
-//
 func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
 	return &Cfg4PeerListener {
 		IP:			config[name].Local.IP,
@@ -937,9 +853,7 @@ func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
 	}
 }
 
-//
 // Get configuration of peer manager
-//
 func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 	return &Cfg4PeerManager {
 		CfgName:			name,
@@ -964,9 +878,7 @@ func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 	}
 }
 
-//
 // Get configuration of table manager
-//
 func P2pConfig4TabManager(name string) *Cfg4TabManager {
 	return &Cfg4TabManager {
 		Local:			config[name].Local,
@@ -980,9 +892,7 @@ func P2pConfig4TabManager(name string) *Cfg4TabManager {
 	}
 }
 
-//
 // Get protocols
-//
 func P2pConfig4Protocols(name string) *Cfg4Protocols {
 	return &Cfg4Protocols {
 		ProtoNum: config[name].ProtoNum,
@@ -990,25 +900,19 @@ func P2pConfig4Protocols(name string) *Cfg4Protocols {
 	}
 }
 
-//
 // Get configuration for dht route manager
-//
 func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
 	config[name].DhtRutCfg.NodeId = config[name].Local.ID
 	return &config[name].DhtRutCfg
 }
 
-//
 // Get configuration for dht query manager
-//
 func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
 	config[name].DhtQryCfg.Local = &config[name].Local
 	return &config[name].DhtQryCfg
 }
 
-//
 // Get configuration for dht file data store
-//
 func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
 	dir := config[name].DhtFdsCfg.Path
 	inst := config[name].Name
@@ -1016,9 +920,7 @@ func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
 	return &config[name].DhtFdsCfg
 }
 
-//
 // Get configuration for dht listener manager
-//
 func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 	return &Cfg4DhtLsnManager {
 		IP:			config[name].DhtLocal.IP,
@@ -1027,24 +929,18 @@ func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 	}
 }
 
-//
 // Get configuration for dht connection manager
-//
 func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
 	config[name].DhtConCfg.Local = &config[name].Local
 	return &config[name].DhtConCfg
 }
 
-//
 // by yeeco, alias Ethereum's S256 to elliptic.P256
-//
 func S256() elliptic.Curve {
 	return elliptic.P256()
 }
 
-//
 // LoadECDSA loads a secp256k1 private key from the given file
-//
 func LoadECDSA(file string) (*ecdsa.PrivateKey, error) {
 	buf := make([]byte, 64)
 	fd, err := os.Open(file)
@@ -1055,7 +951,6 @@ func LoadECDSA(file string) (*ecdsa.PrivateKey, error) {
 	if _, err := io.ReadFull(fd, buf); err != nil {
 		return nil, err
 	}
-
 	key, err := hex.DecodeString(string(buf))
 	if err != nil {
 		return nil, err
@@ -1063,10 +958,8 @@ func LoadECDSA(file string) (*ecdsa.PrivateKey, error) {
 	return ToECDSA(key)
 }
 
-//
 // SaveECDSA saves a secp256k1 private key to the given file with
 // restrictive permissions. The key data is saved hex-encoded.
-//
 func SaveECDSA(file string, key *ecdsa.PrivateKey) error {
 	k := hex.EncodeToString(FromECDSA(key))
 	return ioutil.WriteFile(file, []byte(k), 0600)
@@ -1076,61 +969,33 @@ func GenerateKey() (*ecdsa.PrivateKey, error) {
 	return ecdsa.GenerateKey(S256(), rand.Reader)
 }
 
-//
 // ToECDSA creates a private key with the given D value.
-//
 func ToECDSA(d []byte) (*ecdsa.PrivateKey, error) {
 	return toECDSA(d, true)
 }
 
-//
 // toECDSA creates a private key with the given D value. The strict parameter
 // controls whether the key's length should be enforced at the curve size or
 // it can also accept legacy encodings (0 prefixes).
-//
 func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
-	priv := new(ecdsa.PrivateKey)
-	priv.PublicKey.Curve = S256()
-	if strict && 8*len(d) != priv.Params().BitSize {
-		return nil, fmt.Errorf("invalid length, need %d bits", priv.Params().BitSize)
+	priK := new(ecdsa.PrivateKey)
+	priK.PublicKey.Curve = S256()
+	if strict && 8*len(d) != priK.Params().BitSize {
+		return nil, fmt.Errorf("invalid length, need %d bits", priK.Params().BitSize)
 	}
-	priv.D = new(big.Int).SetBytes(d)
-
-
-	//
-	// Notice: since S256 aliased to P256, we do not apply the following checks under original
-	// S256, it's not sure to be suitable. --- yeeco, 20180612
-	//
-	//
-
-	// The priv.D must < N
-	//if priv.D.Cmp(secp256k1_N) >= 0 {
-	//	return nil, fmt.Errorf("invalid private key, >=N")
-	//}
-
-	// The priv.D must not be zero or negative.
-	//if priv.D.Sign() <= 0 {
-	//	return nil, fmt.Errorf("invalid private key, zero or negative")
-	//}
-
-	priv.PublicKey.X, priv.PublicKey.Y = priv.PublicKey.Curve.ScalarBaseMult(d)
-	if priv.PublicKey.X == nil {
+	priK.D = new(big.Int).SetBytes(d)
+	priK.PublicKey.X, priK.PublicKey.Y = priK.PublicKey.Curve.ScalarBaseMult(d)
+	if priK.PublicKey.X == nil {
 		return nil, errors.New("invalid private key")
 	}
-	return priv, nil
+	return priK, nil
 }
 
-//
 // FromECDSA exports a private key into a binary dump.
-//
-func FromECDSA(priv *ecdsa.PrivateKey) []byte {
-	if priv == nil {
+func FromECDSA(priK *ecdsa.PrivateKey) []byte {
+	if priK == nil {
 		return nil
 	}
-	//
-	// Modified by yeeco, remove reference to Ethereum's math
-	//
-	//return math.PaddedBigBytes(priv.D, priv.Params().BitSize/8)
-	return priv.D.Bytes()
+	return priK.D.Bytes()
 }
 

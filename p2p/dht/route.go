@@ -26,9 +26,10 @@ import (
 	"container/list"
 	"crypto/sha256"
 	"bytes"
+	"fmt"
 	golog "log"
 	log	"github.com/yeeco/gyee/p2p/logger"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -140,13 +141,8 @@ var defautBspCfg = bootstrapPolicy {
 //
 func NewRutMgr() *RutMgr {
 
-	rutMgr := RutMgr{
-		sdl:			nil,
+	rutMgr := RutMgr {
 		name:			RutMgrName,
-		tep:			nil,
-		ptnMe:			nil,
-		ptnQryMgr:		nil,
-		ptnConMgr:		nil,
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
 		bpTargets:		map[config.NodeID] interface{}{},
@@ -174,7 +170,7 @@ func (rutMgr *RutMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.LogCallerFileLine("rutMgrProc: " +
+		log.Debug("rutMgrProc: " +
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -213,15 +209,15 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = rutMgr.stopNotifyReq(msg.Body.(*sch.MsgDhtRutMgrStopNofiyReq))
 
 	case sch.EvDhtRutPingInd:
-		log.LogCallerFileLine("rutMgrProc: ping is not supported")
+		log.Debug("rutMgrProc: ping is not supported")
 		eno = sch.SchEnoNotImpl
 
 	case sch.EvDhtRutPongInd:
-		log.LogCallerFileLine("rutMgrProc: pong is not supported")
+		log.Debug("rutMgrProc: pong is not supported")
 		eno = sch.SchEnoNotImpl
 
 	default:
-		log.LogCallerFileLine("rutMgrProc: unknown message: %d", msg.Id)
+		log.Debug("rutMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -234,7 +230,7 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	if ptn == nil {
-		log.LogCallerFileLine("poweron: nil task node pointer")
+		log.Debug("poweron: nil task node pointer")
 		return sch.SchEnoParameter
 	}
 
@@ -243,35 +239,35 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 	rutMgr.ptnMe = ptn
 	rutMgr.sdl = sch.SchGetScheduler(ptn)
 
-	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetTaskNodeByName(QryMgrName)
+	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetUserTaskNode(QryMgrName)
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
-		log.LogCallerFileLine("poweron: nil task node pointer, task: %s", QryMgrName)
+		log.Debug("poweron: nil task node pointer, task: %s", QryMgrName)
 		return eno
 	}
 
-	eno, rutMgr.ptnConMgr = rutMgr.sdl.SchGetTaskNodeByName(ConMgrName)
+	eno, rutMgr.ptnConMgr = rutMgr.sdl.SchGetUserTaskNode(ConMgrName)
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
-		log.LogCallerFileLine("poweron: nil task node pointer, task: %s", ConMgrName)
+		log.Debug("poweron: nil task node pointer, task: %s", ConMgrName)
 		return eno
 	}
 
 	if dhtEno := rutMgr.rutMgrGetRouteConfig(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: rutMgrGetRouteConfig failed, dhtEno: %d", dhtEno)
+		log.Debug("poweron: rutMgrGetRouteConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
 	if dhtEno := rutMgrSetupLog2DistLKT(rutMgr.distLookupTab); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: rutMgrSetupLog2DistLKT failed, dhtEno: %d", dhtEno)
+		log.Debug("poweron: rutMgrSetupLog2DistLKT failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
 	if dhtEno := rutMgr.rutMgrSetupRouteTable(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: rutMgrSetupRouteTable failed, dhtEno: %d", dhtEno)
+		log.Debug("poweron: rutMgrSetupRouteTable failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
 	if dhtEno := rutMgr.rutMgrStartBspTimer(); dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("poweron: rutMgrStartBspTimer failed, dhtEno: %d", dhtEno)
+		log.Debug("poweron: rutMgrStartBspTimer failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
@@ -282,7 +278,7 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff signal handler
 //
 func (rutMgr *RutMgr)poweroff(ptn interface{}) sch.SchErrno {
-	log.LogCallerFileLine("poweroff: task will be done ...")
+	log.Debug("poweroff: task will be done ...")
 	return rutMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
@@ -298,10 +294,10 @@ func (rutMgr *RutMgr)refreshReq() sch.SchErrno {
 //
 func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 
-	log.LogCallerFileLine("bootstarpTimerHandler: bootstrap will be carried out ...")
+	log.Debug("bootstarpTimerHandler: bootstrap will be carried out ...")
 
 	if len(rutMgr.bpTargets) != 0 {
-		log.LogCallerFileLine("bootstarpTimerHandler: the previous is not completed")
+		log.Debug("bootstarpTimerHandler: the previous is not completed")
 		return sch.SchEnoNone
 	}
 
@@ -318,7 +314,7 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 		}
 
 		rutMgr.bpTargets[req.Target] = &req.Target
-		log.LogCallerFileLine("bootstarpTimerHandler: query will be start, target: %x", req.Target)
+		log.Debug("bootstarpTimerHandler: query will be start, target: %x", req.Target)
 
 		sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		sdl.SchSendMessage(&msg)
@@ -333,16 +329,16 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 func (rutMgr *RutMgr)queryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 
 	if msg == nil {
-		log.LogCallerFileLine("queryStartRsp: invalid parameter")
+		log.Debug("queryStartRsp: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
-	log.LogCallerFileLine("queryStartRsp: " +
+	log.Debug("queryStartRsp: " +
 		"bootstrap startup response, eno: %d, target: %x",
 		msg.Eno, msg.Target)
 
 	if _, exist := rutMgr.bpTargets[msg.Target]; !exist {
-		log.LogCallerFileLine("queryStartRsp: not a bootstrap target: %x", msg.Target)
+		log.Debug("queryStartRsp: not a bootstrap target: %x", msg.Target)
 		return sch.SchEnoMismatched
 	}
 
@@ -361,16 +357,16 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	//
 
 	if msg == nil {
-		log.LogCallerFileLine("queryResultInd: invalid parameter")
+		log.Debug("queryResultInd: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
-	log.LogCallerFileLine("queryResultInd: " +
+	log.Debug("queryResultInd: " +
 		"bootstrap result indication, eno: %d, target: %x",
 		msg.Eno, msg.Target)
 
 	if _, ok := rutMgr.bpTargets[msg.Target]; !ok {
-		log.LogCallerFileLine("queryResultInd: not a bootstrap target: %x", msg.Target)
+		log.Debug("queryResultInd: not a bootstrap target: %x", msg.Target)
 		return sch.SchEnoMismatched
 	}
 
@@ -410,15 +406,13 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
 
 	if tskSender == nil || req == nil {
-		log.LogCallerFileLine("nearestReq: " +
-			"invalid parameters, tskSender: %p, req: %p",
-			tskSender, req)
+		log.Debug("nearestReq: invalid parameters, tskSender: %p, req: %p", tskSender, req)
 		return sch.SchEnoParameter
 	}
 
 	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
 	if dhtEno != DhtEnoNone {
-		log.LogCallerFileLine("nearestReq: rutMgrNearest failed, eno: %d", dhtEno)
+		log.Debug("nearestReq: rutMgrNearest failed, eno: %d", dhtEno)
 	}
 
 	var rsp = sch.MsgDhtRutMgrNearestRsp {
@@ -451,7 +445,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 
 	if req.NtfReq == true {
 		if dhtEno = rutMgr.rutMgrNotifeeReg(tskSender, &req.Target, req.Max, nil, nil); dhtEno != DhtEnoNone {
-			log.LogCallerFileLine("nearestReq: rutMgrNotifeeReg failed, eno: %d", dhtEno)
+			log.Debug("nearestReq: rutMgrNotifeeReg failed, eno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -467,7 +461,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 	dht := rutMgr.sdl.SchGetP2pCfgName()
 
 	if req == nil || len(req.Seens) != len(req.Duras) || len(req.Seens) == 0 {
-		log.LogCallerFileLine("updateReq: invalid prameter, dht: %s", dht)
+		log.Debug("updateReq: invalid prameter, dht: %s", dht)
 		return sch.SchEnoUserTask
 	}
 
@@ -480,7 +474,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone {
 
-		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Handshake, eno: DhtEnoNone", dht)
+		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Handshake, eno: DhtEnoNone", dht)
 
 		//
 		// new peer picked ok
@@ -508,13 +502,13 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
-			log.LogCallerFileLine("updateReq: dht: %s, rutMgrNotify failed, eno: %d", dht, dhtEno)
+			log.Debug("updateReq: dht: %s, rutMgrNotify failed, eno: %d", dht, dhtEno)
 			return sch.SchEnoUserTask
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout {
 
-		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoTimeout", dht)
+		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoTimeout", dht)
 
 		//
 		// query peer time out, check fail counter
@@ -526,7 +520,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			log.LogCallerFileLine("updateReq: not found, dht: %s, eno: %d", dht, eno)
+			log.Debug("updateReq: not found, dht: %s, eno: %d", dht, eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -535,7 +529,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 			if eno := rutMgr.delete(p); eno != DhtEnoNone {
 
-				log.LogCallerFileLine("updateReq: delete failed, dht: %s, eno: %d, id: %x", dht, eno, p)
+				log.Debug("updateReq: delete failed, dht: %s, eno: %d, id: %x", dht, eno, p)
 				return sch.SchEnoUserTask
 			}
 
@@ -545,10 +539,10 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone {
 
-		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
+		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
 
 		//
-		// this case the latency about an specific individual peer shoud be update,
+		// this case the latency about a specific individual peer should be update,
 		// should be only one peer in "req.Seens".
 		//
 
@@ -559,7 +553,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Closed {
 
-		log.LogCallerFileLine("updateReq: dht: %s, why: rutMgrUpdate4Closed", dht)
+		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Closed", dht)
 
 		//
 		// update peer connection status to be CisClosed, but do not remove it from
@@ -572,7 +566,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			log.LogCallerFileLine("updateReq: not found, dht: %s, eno: %d", dht, eno)
+			log.Debug("updateReq: not found, dht: %s, eno: %d", dht, eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -580,7 +574,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else {
 
-		log.LogCallerFileLine("updateReq: dht: %s, invalid (why:%d, eno:%d)", dht, why, eno)
+		log.Debug("updateReq: dht: %s, invalid (why:%d, eno:%d)", dht, why, eno)
 		return sch.SchEnoMismatched
 	}
 
@@ -600,7 +594,7 @@ func (rutMgr *RutMgr)stopNotifyReq(msg *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErr
 
 	if _, exist := rutMgr.ntfTab[nfi]; exist == false {
 
-		log.LogCallerFileLine("stopNotifyReq: " +
+		log.Debug("stopNotifyReq: " +
 			"notifee not found, task: %p, target: %x",
 			nfi.task, nfi.target)
 
@@ -642,7 +636,7 @@ func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 	if eno, tid := rutMgr.sdl.SchSetTimer(rutMgr.ptnMe, &td);
 	eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 
-		log.LogCallerFileLine("rutMgrStartBspTimer: " +
+		log.Debug("rutMgrStartBspTimer: " +
 			"SchSetTimer failed, eno: %d, tid: %d",
 			eno, tid)
 
@@ -770,14 +764,14 @@ func (rutMgr *RutMgr) rutMgrMetricUpdate(id config.NodeID) DhtErrno {
 	m, exist := rt.metricTab[id]
 
 	if !exist {
-		log.LogCallerFileLine("rutMgrMetricUpdate: not found: %x", id)
+		log.Debug("rutMgrMetricUpdate: not found: %x", id)
 		return DhtEnoNotFound
 	}
 
 	sn := len(m.ltnSamples)
 
 	if sn <= 0 {
-		log.LogCallerFileLine("rutMgrMetricUpdate: none of samples")
+		log.Debug("rutMgrMetricUpdate: none of samples")
 		return DhtEnoInternal
 	}
 
@@ -875,7 +869,7 @@ func (rutMgr *RutMgr)find(id config.NodeID, dist int) (DhtErrno, *list.Element) 
 //
 func (rutMgr *RutMgr)delete(id config.NodeID) DhtErrno {
 
-	log.LogCallerFileLine("delete: id: %x", id)
+	log.Debug("delete: id: %x", id)
 
 	hash := rutMgrNodeId2Hash(id)
 	dist := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash)
@@ -937,7 +931,7 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 
 	eno, ewma := rutMgr.rutMgrMetricGetEWMA(bn.node.ID)
 	if eno != DhtEnoNone && eno != DhtEnoNotFound {
-		log.LogCallerFileLine("update: " +
+		log.Debug("update: " +
 			"rutMgrMetricGetEWMA failed, eno: %d, ewma: %d",
 			eno, ewma)
 		return eno
@@ -948,7 +942,7 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 	}
 
 	if ewma > rt.maxLatency {
-		log.LogCallerFileLine("update: " +
+		log.Debug("update: " +
 			"discarded, ewma: %d,  maxLatency: %d",
 			ewma, rt.maxLatency)
 		return DhtEnoNone
@@ -986,13 +980,14 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 func (rutMgr *RutMgr)showRoute(tag string) {
 	if true {
 		dht := rutMgr.sdl.SchGetP2pCfgName()
-		golog.Printf("showRoute: dht: %s, rutTab: %+v", dht, rutMgr.rutTab)
+		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
 		rt := rutMgr.rutTab
 		for idx := 0; idx < len(rt.bucketTab); idx++ {
-			golog.Printf("showRoute: "+
-				"=============================== tag: %s, dht: %s, bucket: %d ==============================", tag, dht, idx)
+			routInfo = routInfo + fmt.Sprintf("showRoute: "+
+				"=============================== tag: %s, dht: %s, bucket: %d ==============================\n",
+				tag, dht, idx)
 			li := rt.bucketTab[idx]
-			count := 0;
+			count := 0
 			for el := li.Front(); el != nil; el = el.Next() {
 				bn, ok := el.Value.(*rutMgrBucketNode)
 				if !ok {
@@ -1000,12 +995,13 @@ func (rutMgr *RutMgr)showRoute(tag string) {
 					continue
 				}
 				count++
-				golog.Printf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>", dht, count)
-				golog.Printf("dht: %s, showRoute: node: %+v", dht, bn.node)
-				golog.Printf("dht: %s, showRoute: hash: %x", dht, bn.hash)
-				golog.Printf("dht: %s, showRoute: dist: %d", dht, bn.dist)
-				golog.Printf("dht: %s, showRoute: fails: %d", dht, bn.fails)
-				golog.Printf("dht: %s, showRoute: pcs: %d", dht, bn.pcs)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>\n", dht, count)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: node: %+v\n", dht, bn.node)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: hash: %x\n", dht, bn.hash)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: dist: %d\n", dht, bn.dist)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: fails: %d\n", dht, bn.fails)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: pcs: %d\n", dht, bn.pcs)
+				golog.Printf("%s", routInfo)
 			}
 		}
 	}
@@ -1018,18 +1014,18 @@ func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
 
 	//
 	// notice: this function called recursively, this would make the buckets
-	// int the bucket table must be continued from "0" to "tail".
+	// in the bucket table must be continued from "0" to "tail".
 	//
 
 	rt := &rutMgr.rutTab
 
 	if len(rt.bucketTab) - 1 != dist {
-		log.LogCallerFileLine("split: can only split the tail bucket")
+		log.Debug("split: can only split the tail bucket")
 		return DhtEnoParameter
 	}
 
 	if li.Len() == 0 {
-		log.LogCallerFileLine("split: can't split an empty bucket")
+		log.Debug("split: can't split an empty bucket")
 		return DhtEnoParameter
 	}
 
@@ -1042,7 +1038,7 @@ func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
 		elNext = el.Next()
 		bn := el.Value.(*rutMgrBucketNode)
 		if bn.dist > dist {
-			newLi.PushBack(el)
+			newLi.PushBack(bn)
 			li.Remove(el)
 		}
 		if elNext == nil {
@@ -1091,7 +1087,7 @@ func (rutMgr *RutMgr)rutMgrNotifeeReg(
 	ds		[]int) DhtErrno {
 
 	if len(rutMgr.ntfTab) >= rutMgrMaxNofifee {
-		log.LogCallerFileLine("rutMgrNotifeeReg: too much notifees, max: %d", rutMgrMaxNofifee)
+		log.Debug("rutMgrNotifeeReg: too much notifees, max: %d", rutMgrMaxNofifee)
 		return DhtEnoResource
 	}
 
@@ -1130,7 +1126,7 @@ func (rutMgr *RutMgr)rutMgrNotify() DhtErrno {
 		old := rutMgr.ntfTab[key].nearests
 		eno, nearest, dist := rutMgr.rutMgrNearest(target, size)
 		if eno != DhtEnoNone {
-			log.LogCallerFileLine("rutMgrNotify: rutMgrNearest failed, eno: %d", eno)
+			log.Debug("rutMgrNotify: rutMgrNearest failed, eno: %d", eno)
 			failCnt++
 			continue
 		}
@@ -1204,7 +1200,7 @@ func (rutMgr *RutMgr)rutMgrNearest(target *config.NodeID, size int) (DhtErrno, [
 	}
 
 	if size <= 0 || size > rutMgrMaxNearest {
-		log.LogCallerFileLine("rutMgrNearest: " +
+		log.Debug("rutMgrNearest: " +
 			"invalid size: %d, min: 1, max: %d",
 			size, rutMgrMaxNearest)
 
