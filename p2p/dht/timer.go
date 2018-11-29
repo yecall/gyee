@@ -55,27 +55,31 @@ type timerManager struct {
 	dTmList		[dayCycle]*list.List	// day timer list
 }
 
-func getTimer(dur time.Duration, dat interface{}, tcb timerCallback) (*timer, error) {
+func NewTimerManager() *timerManager {
+	return &timerManager{}
+}
+
+func (mgr *timerManager)getTimer(dur time.Duration, dat interface{}, tcb timerCallback) (*timer, error) {
 	return nil, nil
 }
 
-func setTimerHandler(tm *timer, tcb timerCallback) error {
+func (mgr *timerManager)setTimerHandler(tm *timer, tcb timerCallback) error {
 	return nil
 }
 
-func setTimerData(tm *timer, data interface{}) error {
+func (mgr *timerManager)setTimerData(tm *timer, data interface{}) error {
 	return nil
 }
 
-func setTimer(tm *timer) (*list.Element, error) {
+func (mgr *timerManager)setTimer(tm *timer) (*list.Element, error) {
 	return nil, nil
 }
 
-func killTimer(el *list.Element) error {
+func (mgr *timerManager)killTimer(el *list.Element) error {
 	return nil
 }
 
-func tickProc() error {
+func (mgr *timerManager)tickProc() error {
 	return nil
 }
 
