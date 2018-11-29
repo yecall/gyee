@@ -20,12 +20,5 @@
 
 package tetris
 
-type ICore interface {
-}
-
-//type ConsensusOutput string
-type ConsensusOutput struct {
-	Tx     []string
-	h      uint64
-	output string
+type Metrics struct {
 }

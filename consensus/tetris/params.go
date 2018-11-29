@@ -20,12 +20,14 @@
 
 package tetris
 
-type ICore interface {
-}
-
-//type ConsensusOutput string
-type ConsensusOutput struct {
-	Tx     []string
-	h      uint64
-	output string
+type Params struct {
+	f                 int
+	superMajority     int
+	maxTxPerEvent     int
+	minTxPerEvent     int
+	maxEventPerEvent  int
+	minEventPerEvent  int
+	maxPeriodForEvent int //ms
+	minPeriodForEvent int
+	maxSunk           int
 }

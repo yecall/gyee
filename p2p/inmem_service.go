@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yeeco/gyee/utils/logging"
+	//"github.com/yeeco/gyee/utils/logging"
 )
 
 type InmemService struct {
@@ -51,9 +51,9 @@ func NewInmemService() (*InmemService, error) {
 		hub:              GetInmemHub(),
 		receiveMessageCh: make(chan Message),
 		quitCh:           make(chan struct{}),
-		outDelay:         500,
+		outDelay:         50,
 		outMiss:          10,
-		inDelay:          100,
+		inDelay:          10,
 		inMiss:           0,
 	}
 	return is, nil
@@ -79,11 +79,11 @@ func (is *InmemService) Stop() {
 func (is *InmemService) loop() {
 	is.wg.Add(1)
 	defer is.wg.Done()
-	logging.Logger.Info("InmemService loop...")
+	//logging.Logger.Info("InmemService loop...")
 	for {
 		select {
 		case <-is.quitCh:
-			logging.Logger.Info("InmemService loop end.")
+			//logging.Logger.Info("InmemService loop end.")
 			return
 		case message := <-is.receiveMessageCh:
 			t, _ := is.subscribers.Load(message.MsgType)
@@ -139,6 +139,7 @@ func (is *InmemService) DhtSetValue(key []byte, value []byte) error {
 type InmemHub struct {
 	nodes map[*InmemService]bool
 	dht   map[string][]byte
+	lock  sync.RWMutex
 }
 
 var instance *InmemHub
@@ -155,14 +156,20 @@ func GetInmemHub() *InmemHub {
 }
 
 func (ih *InmemHub) AddNode(node *InmemService) {
+	ih.lock.Lock()
+	defer ih.lock.Unlock()
 	ih.nodes[node] = true
 }
 
 func (ih *InmemHub) RemoveNode(node *InmemService) {
+	ih.lock.Lock()
+	defer ih.lock.Unlock()
 	delete(ih.nodes, node)
 }
 
 func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
+	ih.lock.RLock()
+	defer ih.lock.RUnlock()
 	for n, _ := range ih.nodes {
 		if n != from {
 			if rand.Intn(100) < from.outMiss {
@@ -175,10 +182,14 @@ func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
 			}(n)
 		}
 	}
+
 	return nil
 }
 
 func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
+	ih.lock.RLock()
+	defer ih.lock.RUnlock()
+
 	v, ok := ih.dht[string(key)]
 	if ok {
 		return v, nil
@@ -187,6 +198,8 @@ func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
 }
 
 func (ih *InmemHub) SetValue(key []byte, value []byte) error {
+	ih.lock.Lock()
+	defer ih.lock.Unlock()
 	ih.dht[string(key)] = value
 	return nil
 }

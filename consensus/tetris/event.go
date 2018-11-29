@@ -21,7 +21,6 @@
 package tetris
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -30,7 +29,7 @@ import (
 )
 
 const ROUND_UNDECIDED = -1
-const FAMOUS_UNDECIDED = -1
+const COMMITTABLE_UNDECIDED = -1
 
 type EventBody struct {
 	H  uint64   //Block Height
@@ -51,13 +50,13 @@ type Event struct {
 	signature string
 
 	//fields for consensus computing
-	know    map[uint]uint64
-	parents map[uint]*Event
-	ready   bool //event is ready if all of it's self-parent events has existed and ready
-	round   int  //event's round number
-	witness bool
-	vote    int
-	famous  int
+	know        map[uint]uint64
+	parents     map[uint]*Event
+	ready       bool //event is ready if all of it's self-parent events has existed and ready
+	round       int  //event's round number
+	witness     bool
+	vote        int
+	committable int
 }
 
 func NewEvent(height uint64, member uint, sequenceNumber uint64) Event {
@@ -69,14 +68,14 @@ func NewEvent(height uint64, member uint, sequenceNumber uint64) Event {
 	}
 
 	event := Event{
-		Body:    body,
-		know:    make(map[uint]uint64),
-		parents: make(map[uint]*Event),
-		ready:   false,
-		round:   ROUND_UNDECIDED,
-		witness: false,
-		vote:    0,
-		famous:  FAMOUS_UNDECIDED,
+		Body:        body,
+		know:        make(map[uint]uint64),
+		parents:     make(map[uint]*Event),
+		ready:       false,
+		round:       ROUND_UNDECIDED,
+		witness:     false,
+		vote:        0,
+		committable: COMMITTABLE_UNDECIDED,
 	}
 
 	event.know[member] = sequenceNumber
@@ -93,17 +92,37 @@ func (e *Event) Hex() string {
 
 func (e *Event) Hash() []byte {
 	if len(e.hash) == 0 {
-		var b bytes.Buffer
-		enc := json.NewEncoder(&b)
-		if err := enc.Encode(e.Body); err != nil {
-			logging.Logger.Error("encode error")
-			return nil
-		}
-		h := sha256.Sum256(b.Bytes())
+		h := sha256.Sum256(e.Marshal())
 		e.hash = h[:]
 	}
 
 	return e.hash
+
+	//if len(e.hash) == 0 {
+	//	var b bytes.Buffer
+	//	enc := json.NewEncoder(&b)
+	//	if err := enc.Encode(e.Body); err != nil {
+	//		logging.Logger.Error("encode error")
+	//		return nil
+	//	}
+	//	h := sha256.Sum256(b.Bytes())
+	//	e.hash = h[:]
+	//}
+
+	return e.hash
+}
+
+func (e *Event) Marshal() []byte {
+	b, err := json.Marshal(e.Body)
+	if err != nil {
+		logging.Logger.Error("encode error")
+		return nil
+	}
+	return b
+}
+
+func (e *Event) Unmarshal(data []byte) {
+    json.Unmarshal(data, &e.Body)
 }
 
 func (e *Event) totalTxAndEvent() int {
