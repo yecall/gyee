@@ -205,6 +205,7 @@ func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
 func (ih *InmemHub) SetValue(key []byte, value []byte) error {
 	ih.lock.Lock()
 	defer ih.lock.Unlock()
+
 	ih.dht[string(key)] = value
 	return nil
 }

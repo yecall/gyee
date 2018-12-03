@@ -142,6 +142,8 @@ type Tetris struct {
 	requestCount   int
 	parentCountRaw int
 	parentCount    int
+	eventCount     int
+	txCount        int
 
 	//request map[string]int
 	level       int
@@ -166,7 +168,7 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 
 		EventCh:       make(chan Event, 100),
 		ParentEventCh: make(chan Event, 100),
-		TxsCh:         make(chan string, 100),
+		TxsCh:         make(chan string, 10000),
 
 		OutputCh:       make(chan ConsensusOutput, 10),
 		SendEventCh:    make(chan Event, 100),
@@ -284,6 +286,15 @@ func (t *Tetris) receiveTicker(time time.Time) {
 
 func (t *Tetris) receiveTx(tx string) {
 	if !t.txsCache.Contains(tx) {
+		t.txCount++
+		//if t.txCount % 30000 == 0 {
+		//	logging.Logger.WithFields(logrus.Fields{
+		//		"tm":     t.m,
+		//		"tn":     t.n,
+		//		"c":      t.txCount,
+		//		"pending": t.pendingEvents.Len(),
+		//	}).Info("Tx count")
+		//}
 		t.txsCache.Add(tx, true)
 		t.currentEvent.appendTx(tx)
 		//if t.noRecvCount > 5 {
@@ -305,7 +316,18 @@ func (t *Tetris) receiveEvent(event *Event) {
 	//放入cache
 	//放入unsettled，检查parent是否有到齐
 	//放入currentEvent
-
+    t.eventCount++
+	//if t.eventCount % 100 == 0 {
+	//	logging.Logger.WithFields(logrus.Fields{
+	//		"tm":     t.m,
+	//		"tn":     t.n,
+	//		"eventCh": len(t.EventCh),
+	//		"sendCh": len(t.SendEventCh),
+	//		"txCh": len(t.TxsCh),
+	//		"c":      t.eventCount,
+	//		"pending": t.pendingEvents.Len(),
+	//	}).Info("Event count")
+	//}
 	if t.eventCache.Contains(event.Hex()) {
 		logging.Logger.WithFields(logrus.Fields{
 			"event": event.Hex(),
@@ -349,6 +371,16 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 	//	"n": event.Body.N,
 	//}).Info("receive parent event")
 	t.parentCount++
+	//if t.parentCount % 300 == 0 {
+	//	logging.Logger.WithFields(logrus.Fields{
+	//		"em":     event.Body.M,
+	//		"en":     event.Body.N,
+	//		"tm":     t.m,
+	//		"tn":     t.n,
+	//		"c":      t.parentCount,
+	//		"pending": t.pendingEvents.Len(),
+	//	}).Info("Parent count")
+	//}
 	t.addReceivedEventToTetris(event)
 }
 
