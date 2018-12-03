@@ -27,11 +27,19 @@ import (
 )
 
 const (
-	secondCycle		= 64			// cycle in seconds
-	minuteCycle		= 64			// cycle in minutes
-	hourCycle		= 64			// cycle in hours
-	dayCycle		= 64			// cycle in days
-	oneTick			= time.Second	// unit tick to driver the timer manager
+	oneTick			= time.Second					// unit tick to driver the timer manager
+	xsecondBits		= 6
+	xsecondCycle	= 1 << xsecondBits				// x-second cycle in tick
+	xminuteBits		= 6
+	xminuteCycle	= 1 << xminuteBits				// x-minute cycle in x-second
+	xhourBits		= 6
+	xhourCycle		= 1 << xhourBits				// x-hour cycle in x-minute
+	xdayBits		= 6
+	xdayCycle		= 1 << xdayBits					// x-day cycle in x-hour
+
+	// min and max duration
+	minDur			= oneTick * xsecondCycle
+	maxDur			= (1 << (xsecondBits + xminuteBits + xhourBits + xdayBits)) * time.Second
 )
 
 type timerEno int
@@ -41,6 +49,9 @@ const (
 	TmEnoPara								// invalid parameters
 	TmEnoDurTooBig							// duration too big
 	TmEnoDurTooSmall						// duration too small
+	TmEnoInternal							// internal errors
+	TmEnoNotsupport							// not supported
+	TmEnoBadTimer							// bad timer parameters
 )
 
 func (eno timerEno)Error() string {
@@ -50,23 +61,25 @@ func (eno timerEno)Error() string {
 type timerCallback = func(el *list.Element, para interface{})interface{}
 
 type timer struct {
-	s			int				// seconds remain
-	m			int				// minutes remain
-	h			int				// hours remain
-	d			int				// day remain
-	data		interface{}		// pointer passed to callback
-	tcb			timerCallback	// callback when timer expired
+	s			int							// seconds remain
+	m			int							// minutes remain
+	h			int							// hours remain
+	d			int							// day remain
+	data		interface{}					// pointer passed to callback
+	tcb			timerCallback				// callback when timer expired
+	li			*list.List					// list pointer
+	el			*list.Element				// element pointer
 }
 
 type timerManager struct {
-	sp			int						// second pointer
-	mp			int						// minute pointer
-	hp			int						// hour pointer
-	dp			int						// day pointer
-	sTmList		[secondCycle]*list.List	// second timer list
-	mTmList		[minuteCycle]*list.List	// minute timer list
-	hTmList		[hourCycle]*list.List	// hour timer list
-	dTmList		[dayCycle]*list.List	// day timer list
+	sp			int							// second pointer
+	mp			int							// minute pointer
+	hp			int							// hour pointer
+	dp			int							// day pointer
+	sTmList		[xsecondCycle]*list.List	// second timer list
+	mTmList		[xminuteCycle]*list.List	// minute timer list
+	hTmList		[xhourCycle]*list.List		// hour timer list
+	dTmList		[xdayCycle]*list.List		// day timer list
 }
 
 func NewTimerManager() *timerManager {
@@ -74,28 +87,211 @@ func NewTimerManager() *timerManager {
 }
 
 func (mgr *timerManager)getTimer(dur time.Duration, dat interface{}, tcb timerCallback) (*timer, error) {
-	return nil, nil
+	if dur < minDur {
+		return nil, TmEnoDurTooSmall
+	}
+	if dur > maxDur {
+		return nil, TmEnoDurTooBig
+	}
+	if tcb == nil {
+		return nil, TmEnoPara
+	}
+
+	ss := int64(dur.Seconds())
+	xs := ss & (xsecondCycle - 1)
+	ss = ss >> xsecondBits
+	xm := ss & (xminuteCycle - 1)
+	ss = ss >> xminuteBits
+	xh := ss & (xhourCycle - 1)
+	ss = ss >> xhourBits
+	xd := ss & (xdayCycle - 1)
+
+	tm := timer {
+		s:		int(xs),
+		m:		int(xm),
+		h:		int(xh),
+		d:		int(xd),
+		data:	dat,
+		tcb:	tcb,
+		li:		nil,
+		el:		nil,
+	}
+
+	return &tm, TmEnoNone
 }
 
 func (mgr *timerManager)setTimerHandler(tm *timer, tcb timerCallback) error {
-	return nil
+	return TmEnoNotsupport
 }
 
 func (mgr *timerManager)setTimerData(tm *timer, data interface{}) error {
-	return nil
+	return TmEnoNotsupport
 }
 
-func (mgr *timerManager)startTimer(tm *timer) (*list.Element, error) {
-	return nil, nil
+func (mgr *timerManager)startTimer(tm *timer) error {
+	if tm == nil {
+		return TmEnoPara
+	}
+
+	if tm.s > 0 {
+		sp := (mgr.sp + tm.s) & (xsecondCycle - 1)
+		if mgr.sTmList[sp] == nil {
+			mgr.sTmList[sp] = list.New()
+		}
+		mgr.sTmList[sp].PushBack(tm)
+	} else if tm.m > 0 {
+		mp := (mgr.mp + tm.s) & (xminuteCycle- 1)
+		if mgr.mTmList[mp] == nil {
+			mgr.mTmList[mp] = list.New()
+		}
+		mgr.mTmList[mp].PushBack(tm)
+	} else if tm.h > 0 {
+		hp := (mgr.hp + tm.s) & (xhourCycle - 1)
+		if mgr.hTmList[hp] == nil {
+			mgr.hTmList[hp] = list.New()
+		}
+		mgr.hTmList[hp].PushBack(tm)
+	} else if tm.d > 0 {
+		dp := (mgr.dp + tm.s) & (xdayCycle - 1)
+		if mgr.dTmList[dp] == nil {
+			mgr.dTmList[dp] = list.New()
+		}
+		mgr.dTmList[dp].PushBack(tm)
+	} else {
+		return TmEnoBadTimer
+	}
+
+	return TmEnoNone
 }
 
-func (mgr *timerManager)killTimer(el *list.Element) error {
-	return nil
+func (mgr *timerManager)killTimer(tm *timer) error {
+	if tm == nil || tm.li == nil || tm.el == nil {
+		return TmEnoPara
+	}
+	tm.li.Remove(tm.el)
+	return TmEnoNone
 }
 
 func (mgr *timerManager)tickProc() error {
-	return nil
+	if mgr.sp = (mgr.sp + 1) & (xsecondCycle - 1); mgr.sp == 0 {
+		if mgr.mp = (mgr.mp + 1) & (xminuteCycle - 1); mgr.mp == 0 {
+			if mgr.hp = (mgr.hp + 1) & (xhourCycle - 1); mgr.hp == 0 {
+				mgr.dp = (mgr.dp + 1) & (xdayCycle - 1)
+			}
+		}
+	}
+	serr := mgr.spHandler(mgr.sTmList[mgr.sp])
+	merr := mgr.mpHandler(mgr.mTmList[mgr.mp])
+	herr := mgr.hpHandler(mgr.hTmList[mgr.hp])
+	derr := mgr.dpHandler(mgr.dTmList[mgr.dp])
+	
+	if serr, merr, herr, derr != nil, nil, nil, nil {
+		return TmEnoInternal
+	}
+
+	return TmEnoNone
 }
 
+func (mgr *timerManager)spHandler(li *list.List) error {
+	if li != nil {
+		for {
+			if el := li.Front(); el == nil {
+				break
+			} else {
+				tm, _ := el.Value.(*timer)
+				if tm.m > 0 {
+					mp := (mgr.mp + tm.m) & (xminuteCycle - 1)
+					if mgr.mTmList[mp] == nil {
+						mgr.mTmList[mp] = list.New()
+					}
+					mgr.mTmList[mp].PushBack(tm)
+				} else if tm.h > 0 {
+					hp := (mgr.hp + tm.h) & (xhourCycle - 1)
+					if mgr.hTmList[hp] == nil {
+						mgr.hTmList[hp] = list.New()
+					}
+					mgr.hTmList[hp].PushBack(tm)
+				} else if tm.d > 0 {
+					dp := (mgr.dp + tm.h) & (xdayCycle - 1)
+					if mgr.dTmList[dp] == nil {
+						mgr.dTmList[dp] = list.New()
+					}
+					mgr.dTmList[dp].PushBack(tm)
+				} else {
+					tm.tcb(el, tm.data)
+				}
+				li.Remove(el)
+			}
+		}
+	}
+	return TmEnoNone
+}
+
+func (mgr *timerManager)mpHandler(li *list.List) error {
+	if li != nil {
+		for {
+			if el := li.Front(); el == nil {
+				break
+			} else {
+				tm, _ := el.Value.(*timer)
+				if tm.h > 0 {
+					hp := (mgr.hp + tm.h) & (xhourCycle - 1)
+					if mgr.hTmList[hp] == nil {
+						mgr.hTmList[hp] = list.New()
+					}
+					mgr.hTmList[hp].PushBack(tm)
+				} else if tm.d > 0 {
+					dp := (mgr.dp + tm.h) & (xdayCycle - 1)
+					if mgr.dTmList[dp] == nil {
+						mgr.dTmList[dp] = list.New()
+					}
+					mgr.dTmList[dp].PushBack(tm)
+				} else {
+					tm.tcb(el, tm.data)
+				}
+				li.Remove(el)
+			}
+		}
+	}
+	return TmEnoNone
+}
+
+func (mgr *timerManager)hpHandler(li *list.List) error {
+	if li != nil {
+		for {
+			if el := li.Front(); el == nil {
+				break
+			} else {
+				tm, _ := el.Value.(*timer)
+				if tm.d > 0 {
+					dp := (mgr.dp + tm.h) & (xdayCycle - 1)
+					if mgr.dTmList[dp] == nil {
+						mgr.dTmList[dp] = list.New()
+					}
+					mgr.dTmList[dp].PushBack(tm)
+				} else {
+					tm.tcb(el, tm.data)
+				}
+				li.Remove(el)
+			}
+		}
+	}
+	return TmEnoNone
+}
+
+func (mgr *timerManager)dpHandler(li *list.List) error {
+	if li != nil {
+		for {
+			if el := li.Front(); el == nil {
+				break
+			} else {
+				tm, _ := el.Value.(*timer)
+				tm.tcb(el, tm.data)
+				li.Remove(el)
+			}
+		}
+	}
+	return TmEnoNone
+}
 
 

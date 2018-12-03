@@ -570,8 +570,6 @@ _evLoop:
 }
 
 func (yeShMgr *yeShellManager)dhtCsProc() {
-	// Notice: the DHT manager export function InstallRxDataCallback for users to install
-	// their callback for data rx, but in gyee application, currently this is not applied.
 	csCh := yeShMgr.dhtCsChan
 	csHandler := func(csi *sch.MsgDhtConInstStatusInd) {
 		switch csi.Status {
