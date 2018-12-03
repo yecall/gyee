@@ -650,11 +650,13 @@ func (dsMgr *DsMgr)store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 // response the add-value request sender task
 //
 func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
+
 	rsp := sch.MsgDhtMgrPutValueRsp {
 		Eno:	int(eno),
 		Key:	key,
 		Peers:	peers,
 	}
+
 	msg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrPutValueRsp, &rsp)
 	return dsMgr.sdl.SchSendMessage(&msg)
@@ -664,11 +666,13 @@ func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno
 // response the get-value request sender task
 //
 func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
+
 	rsp := sch.MsgDhtMgrGetValueRsp {
 		Eno:	int(eno),
 		Key:	key,
 		Val:	val,
 	}
+
 	msg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrGetValueRsp, &rsp)
 	return dsMgr.sdl.SchSendMessage(&msg)
@@ -678,6 +682,7 @@ func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchE
 // get file data store configuration
 //
 func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
+
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
 	dsMgr.fdsCfg = FileDatastoreConfig {
 		path:			path.Join(cfg.Path, "fds"),
@@ -685,7 +690,9 @@ func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 		padLength:		cfg.PadLength,
 		sync:			cfg.Sync,
 	}
+
 	*fdc = dsMgr.fdsCfg
+
 	return DhtEnoNone
 }
 
@@ -693,6 +700,7 @@ func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 // get levelDB data store configuration
 //
 func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
+
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
 	dsMgr.ldsCfg = LeveldbDatastoreConfig {
 		Path:					path.Join(cfg.Path, "lds"),
@@ -701,7 +709,9 @@ func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErr
 		BlockSize:				4 * opt.MiB,
 		FilterBits:				10,
 	}
+
 	*ldc = dsMgr.ldsCfg
+
 	return DhtEnoNone
 }
 
@@ -721,22 +731,27 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 // called back to clean [key, val] out of keep time
 //
 func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{} {
+
 	err := DhtErrno(DhtEnoNone)
 	tm, ok := data.(*timer)
 	if !ok {
 		log.Debug("cleanUpTimerCb: invalid timer")
 		return DhtEnoMismatched
 	}
+
 	expKey := dsMgr.makeExpiredKey(tm.k, tm.to)
 	if eno := dsMgr.ds.Delete(tm.k[0:]); eno != DhtEnoNone {
 		err = DhtErrno(DhtEnoDatastore)
 		goto _cleanUpfailed
 	}
+
 	if eno := dsMgr.dsExp.Delete(expKey); eno != DhtEnoNone {
 		err = DhtErrno(DhtEnoDatastore)
 		goto _cleanUpfailed
 	}
+
 _cleanUpfailed:
+
 	dsMgr.tmMgr.killTimer(tm)
 	if err.GetEno() != DhtEnoNone {
 		log.Debug("cleanUpTimerCb: Delete failed, error: %s", err.Error())
@@ -753,7 +768,7 @@ func (dsMgr *DsMgr)makeExpiredKey(k DsKey, to time.Time) []byte {
 }
 
 //
-// split a "expired" key into "expired time" and "key"
+// split a "expired" key into "expired time" and "real key"
 //
 func (dsMgr *DsMgr)splitExpiredKey(expKey []byte) (t []byte, k []byte) {
 	t = []byte{}
