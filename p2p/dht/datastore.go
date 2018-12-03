@@ -22,6 +22,8 @@ package dht
 
 import (
 	"time"
+	"path"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/config"
@@ -657,11 +659,24 @@ func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchE
 func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
 	dsMgr.fdsCfg = FileDatastoreConfig {
-		path:			cfg.Path,
+		path:			path.Join(cfg.Path, "fds"),
 		shardFuncName:	cfg.ShardFuncName,
 		padLength:		cfg.PadLength,
 		sync:			cfg.Sync,
 	}
 	*fdc = dsMgr.fdsCfg
+	return DhtEnoNone
+}
+
+//
+// get levelDB data store configuration
+//
+func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
+	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
+	ldc.Path = path.Join(cfg.Path, "lds")
+	ldc.OpenFilesCacheCapacity = 500
+	ldc.BlockCacheCapacity = 8 * opt.MiB
+	ldc.BlockSize = 4 * opt.MiB
+	ldc.FilterBits = 10
 	return DhtEnoNone
 }
