@@ -132,7 +132,13 @@ const DsMgrName = sch.DhtDsMgrName
 //
 // Memory map store for test flag
 //
-const mapDs4Test = false
+const (
+	dstMemoryMap	= iota
+	dstFileSystem
+	dstLevelDB
+)
+
+var dsType = dstLevelDB
 
 //
 // Data store manager
@@ -246,11 +252,11 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
-	if mapDs4Test == true {
+	if dsType == dstMemoryMap {
 
 		dsMgr.ds = NewMapDatastore()
 
-	} else {
+	} else if dsType == dstFileSystem {
 
 		fdc := FileDatastoreConfig{}
 		if eno := dsMgr.getFileDatastoreConfig(&fdc); eno != DhtEnoNone {
@@ -259,10 +265,25 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		}
 
 		dsMgr.ds = NewFileDatastore(&fdc)
+
+	} else if dsType == dstLevelDB {
+
+		ldc := LeveldbDatastoreConfig{}
+		if eno := dsMgr.getLeveldbDatastoreConfig(&ldc); eno != DhtEnoNone {
+			log.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		dsMgr.ds = NewLeveldbDatastore(&ldc)
+
+	} else {
+		log.Debug("poweron: invalid datastore type: %d", dsType)
+		return sch.SchEnoNotImpl
 	}
 
+
 	if dsMgr.ds == nil {
-		log.Debug("poweron: invalid ds")
+		log.Debug("poweron: nil datastore")
 		return sch.SchEnoUserTask
 	}
 

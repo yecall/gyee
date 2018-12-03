@@ -184,7 +184,7 @@ func (mgr *timerManager)tickProc() error {
 	merr := mgr.mpHandler(mgr.mTmList[mgr.mp])
 	herr := mgr.hpHandler(mgr.hTmList[mgr.hp])
 	derr := mgr.dpHandler(mgr.dTmList[mgr.dp])
-	
+
 	if serr, merr, herr, derr != nil, nil, nil, nil {
 		return TmEnoInternal
 	}
