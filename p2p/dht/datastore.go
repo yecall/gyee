@@ -155,6 +155,7 @@ type DsMgr struct {
 	ptnRutMgr	interface{}				// pointer to route manager task node
 	ds			Datastore				// data store
 	fdsCfg		FileDatastoreConfig		// file data store configuration
+	ldsCfg		LeveldbDatastoreConfig	// levelDB stat store configuration
 }
 
 //
@@ -165,6 +166,7 @@ func NewDsMgr() *DsMgr {
 	dsMgr := DsMgr{
 		name:		DsMgrName,
 		fdsCfg:		FileDatastoreConfig{},
+		ldsCfg:		LeveldbDatastoreConfig{},
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -673,10 +675,13 @@ func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 //
 func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
-	ldc.Path = path.Join(cfg.Path, "lds")
-	ldc.OpenFilesCacheCapacity = 500
-	ldc.BlockCacheCapacity = 8 * opt.MiB
-	ldc.BlockSize = 4 * opt.MiB
-	ldc.FilterBits = 10
+	dsMgr.ldsCfg = LeveldbDatastoreConfig {
+		Path:					path.Join(cfg.Path, "lds"),
+		OpenFilesCacheCapacity:	500,
+		BlockCacheCapacity:		8 * opt.MiB,
+		BlockSize:				4 * opt.MiB,
+		FilterBits:				10,
+	}
+	*ldc = dsMgr.ldsCfg
 	return DhtEnoNone
 }
