@@ -58,7 +58,7 @@ func (eno timerEno)Error() string {
 	return fmt.Sprintf("%d", eno)
 }
 
-type timerCallback = func(el *list.Element, para interface{})interface{}
+type timerCallback = func(el *list.Element, data interface{})interface{}
 
 type timer struct {
 	s			int							// seconds remain
@@ -69,6 +69,8 @@ type timer struct {
 	tcb			timerCallback				// callback when timer expired
 	li			*list.List					// list pointer
 	el			*list.Element				// element pointer
+	to			time.Time					// absolute time moment to be expired
+	k			DsKey						// key attached to this timer
 }
 
 type timerManager struct {

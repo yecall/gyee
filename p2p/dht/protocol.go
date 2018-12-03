@@ -146,6 +146,7 @@ type PutValue struct {
 	To				config.Node				// destination node
 	Values			[]DhtValue				// values
 	Id				int64					// message identity
+	KT				time.Duration			// duration to keep this [key, val] pair
 	Extra			[]byte					// extra info
 }
 

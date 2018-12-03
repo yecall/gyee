@@ -25,6 +25,7 @@ import (
 	ipfsds "github.com/ipfs/go-datastore"
 	ipfsfs "github.com/ipfs/go-ds-flatfs"
 	log "github.com/yeeco/gyee/p2p/logger"
+	"time"
 )
 
 //
@@ -83,9 +84,9 @@ func NewFileDatastore(cfg *FileDatastoreConfig) *FileDatastore {
 //
 // Put
 //
-func (fds *FileDatastore)Put(k *DsKey, v DsValue) DhtErrno {
+func (fds *FileDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
-	strKey := fmt.Sprintf("%x", *k)
+	strKey := fmt.Sprintf("%x", k)
 	dsk := ipfsds.NewKey(strKey)
 	log.Debug("Put: key: %s", dsk)
 
@@ -100,9 +101,9 @@ func (fds *FileDatastore)Put(k *DsKey, v DsValue) DhtErrno {
 //
 // Get
 //
-func (fds *FileDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
+func (fds *FileDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
 
-	strKey := fmt.Sprintf("%x", *k)
+	strKey := fmt.Sprintf("%x", k)
 	dsk := ipfsds.NewKey(strKey)
 	log.Debug("Get: key: %s", dsk)
 
@@ -125,9 +126,9 @@ func (fds *FileDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
 //
 // Delete
 //
-func (fds *FileDatastore)Delete(k *DsKey) DhtErrno {
+func (fds *FileDatastore)Delete(k []byte) DhtErrno {
 
-	strKey := fmt.Sprintf("%x", *k)
+	strKey := fmt.Sprintf("%x", k)
 	dsk := ipfsds.NewKey(strKey)
 	log.Debug("Delete: key: %s", dsk)
 

@@ -43,6 +43,7 @@ const (
 	prdCacheSize = 256					// cache size
 	prdCleanupInterval = time.Hour * 1	// cleanup period
 	prdLifeCached = time.Hour * 24		// lifetime
+	prdDftKeepTime = time.Hour * 24		// default duration to keep [key, provider] pair
 )
 
 //
@@ -61,6 +62,7 @@ type PrdMgr struct {
 	lockStore	sync.Mutex				// sync with store
 	prdCache	*lru.Cache				// providers cache
 	lockCache	sync.Mutex				// sync with cache operations
+	tmMgr		*timerManager			// timer manager
 }
 
 //
@@ -77,6 +79,7 @@ type PrdSet struct {
 type PsRecord struct {
 	Key		DsKey				// provider record key
 	Value	DsValue				// provider record value
+	KT		time.Duration		// duratio to keep this [key, val] pair
 }
 
 //
@@ -87,6 +90,7 @@ func NewPrdMgr() *PrdMgr {
 	prdMgr := PrdMgr{
 		name:		PrdMgrName,
 		clrTid:		sch.SchInvalidTid,
+		tmMgr:		NewTimerManager(),
 	}
 
 	prdMgr.tep = prdMgr.prdMgrProc
@@ -646,14 +650,14 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 		}
 	}
 
-	var psr = PsRecord{}
+	var psr = PsRecord{KT: prdDftKeepTime}
 	dpsr.Providers = append(dpsr.Providers, peerId)
 	if eno := dpsr.EncPsRecord(&psr); eno != DhtEnoNone {
 		log.Debug("store: EncPsRecord failed, eno: %d", eno)
 		return eno
 	}
 
-	return prdMgr.ds.Put(key, psr.Value)
+	return prdMgr.ds.Put(key, psr.Value, psr.KT)
 }
 
 //

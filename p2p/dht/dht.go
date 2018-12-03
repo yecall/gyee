@@ -25,6 +25,7 @@ import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/config"
+	"fmt"
 )
 
 
@@ -61,6 +62,14 @@ const (
 	DhtEnoDatastore				// data store errors
 	DhtEnoUnknown				// unknown
 )
+
+func (eno DhtErrno)Error() string {
+	return fmt.Sprintf("eno: %d", eno)
+}
+
+func (eno DhtErrno)GetEno() int {
+	return int(eno)
+}
 
 //
 // Dht manager control block
