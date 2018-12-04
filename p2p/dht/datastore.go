@@ -85,61 +85,12 @@ type DsRecord struct {
 }
 
 //
-// Data store based on "map" in memory, for test only
-//
-type MapDatastore struct {
-	ds map[DsKey]DsValue		// (key, value) map
-}
-
-//
-// New map datastore
-//
-func NewMapDatastore() *MapDatastore {
-	return &MapDatastore{
-		ds: make(map[DsKey]DsValue, 0),
-	}
-}
-
-//
-// Put
-//
-func (mds *MapDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
-	dsKey := DsKey{}
-	copy(dsKey[0:], k)
-	mds.ds[dsKey] = v
-	return DhtEnoNone
-}
-
-//
-// Get
-//
-func (mds *MapDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
-	dsKey := DsKey{}
-	copy(dsKey[0:], k)
-	v, ok := mds.ds[dsKey]
-	if !ok {
-		return DhtEnoNotFound, nil
-	}
-	return DhtEnoNone, &v
-}
-
-//
-// Delete
-//
-func (mds *MapDatastore)Delete(k []byte) DhtErrno {
-	dsKey := DsKey{}
-	copy(dsKey[0:], k)
-	delete(mds.ds, dsKey)
-	return DhtEnoNone
-}
-
-//
 // Data store manager name registered in scheduler
 //
 const DsMgrName = sch.DhtDsMgrName
 
 //
-// Memory map store for test flag
+// data store type
 //
 const (
 	dstMemoryMap	= iota
@@ -238,6 +189,57 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 }
 
 //
+// put
+//
+func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+
+	tm, eno := dsMgr.tmMgr.getTimer(kt, nil, nil)
+	if eno != TmEnoNone {
+		log.Debug("Put: getTimer failed, eno: %d", eno)
+		return DhtEnoTimer
+	}
+
+	dsMgr.tmMgr.setTimerData(tm, tm)
+	dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+
+	ek := dsMgr.makeExpiredKey(k, time.Now().Add(kt))
+	if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
+		log.Debug("Put: failed, eno: %d", eno)
+		return DhtEnoDatastore
+	}
+
+	if eno = dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
+		log.Debug("Put: failed, eno: %d", eno)
+		return DhtEnoDatastore
+	}
+
+	if err := dsMgr.tmMgr.startTimer(tm); err != nil {
+		log.Debug("Put: startTimer failed, error: %s", err.Error())
+		dsMgr.ds.Delete(k)
+		dsMgr.dsExp.Delete(ek)
+		return DhtEnoTimer
+	}
+
+	return DhtEnoNone
+}
+
+//
+// get
+//
+func (dsMgr *DsMgr)Get(k []byte) (eno DhtErrno, value DsValue) {
+	return dsMgr.ds.Get(k)
+}
+
+//
+// delete
+//
+func (dsMgr *DsMgr)Delete(k []byte) DhtErrno {
+	// timer might be in running, and would be removed when expired if any,
+	// just delete [key, val] from the "real" store here.
+	return dsMgr.Delete(k)
+}
+
+//
 // poweron handler
 //
 func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
@@ -269,6 +271,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 	if dsType == dstMemoryMap {
 
 		dsMgr.ds = NewMapDatastore()
+		dsMgr.dsExp = NewMapDatastore()
 
 	} else if dsType == dstFileSystem {
 
@@ -279,6 +282,10 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		}
 
 		dsMgr.ds = NewFileDatastore(&fdc)
+
+		fdcExp := fdc;
+		fdcExp.path = path.Join(fdcExp.path, "expired")
+		dsMgr.dsExp = NewFileDatastore(&fdcExp)
 
 	} else if dsType == dstLevelDB {
 
@@ -292,13 +299,12 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 		ldcExp := ldc;
 		ldcExp.Path = path.Join(ldcExp.Path, "expired")
-		dsMgr.dsExp = NewLeveldbDatastore(&ldc)
+		dsMgr.dsExp = NewLeveldbDatastore(&ldcExp)
 
 	} else {
 		log.Debug("poweron: invalid datastore type: %d", dsType)
 		return sch.SchEnoNotImpl
 	}
-
 
 	if dsMgr.ds == nil {
 		log.Debug("poweron: nil datastore")
@@ -732,6 +738,9 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 //
 func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{} {
 
+	// notice: need not to call dsMgr.tmMgr.killTimer, since the timer would
+	// be removed by timer manager itself.
+
 	err := DhtErrno(DhtEnoNone)
 	tm, ok := data.(*timer)
 	if !ok {
@@ -752,18 +761,18 @@ func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{}
 
 _cleanUpfailed:
 
-	dsMgr.tmMgr.killTimer(tm)
-	if err.GetEno() != DhtEnoNone {
+	if err != DhtEnoNone {
 		log.Debug("cleanUpTimerCb: Delete failed, error: %s", err.Error())
 		return err
 	}
+
 	return nil
 }
 
 //
 // make a "expired" key for [key, val] which expired
 //
-func (dsMgr *DsMgr)makeExpiredKey(k DsKey, to time.Time) []byte {
+func (dsMgr *DsMgr)makeExpiredKey(k []byte, to time.Time) []byte {
 	return nil
 }
 

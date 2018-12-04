@@ -45,7 +45,7 @@ const DhtMgrName = sch.DhtMgrName
 type DhtErrno int
 
 const (
-	DhtEnoNone	= iota			// none of errors
+	DhtEnoNone	DhtErrno = iota	// none of errors
 	DhtEnoParameter				// invalid parameters
 	DhtEnoScheduler				// scheduler errors
 	DhtEnoNotFound				// something not found
@@ -60,6 +60,7 @@ const (
 	DhtEnoProtocol				// protocol errors
 	DhtEnoNotSup				// not supported
 	DhtEnoDatastore				// data store errors
+	DhtEnoTimer					// timer errors
 	DhtEnoUnknown				// unknown
 )
 
@@ -119,7 +120,7 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	if ptn == nil || msg == nil {
 		log.Debug("dhtMgrProc: invalid parameters")
-		return DhtEnoParameter
+		return sch.SchEnoParameter
 	}
 
 	var eno = sch.SchEnoUnknown

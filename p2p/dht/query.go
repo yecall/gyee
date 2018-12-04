@@ -315,7 +315,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	log.Debug("queryStartReq: sender: %p, msg: %+v", sender, msg)
 
 	var forWhat = msg.ForWhat
-	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno:DhtEnoUnknown}
+	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno:DhtEnoUnknown.GetEno()}
 	var qcb *qryCtrlBlock = nil
 	var schMsg = sch.SchMessage{}
 
@@ -334,7 +334,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 
 	if _, dup := qryMgr.qcbTab[msg.Target]; dup {
 		log.Debug("queryStartReq: duplicated target: %x", msg.Target)
-		rsp.Eno = DhtEnoDuplicated
+		rsp.Eno = DhtEnoDuplicated.GetEno()
 		goto _rsp2Sender
 	}
 
@@ -362,14 +362,14 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
 	qryMgr.sdl.SchSendMessage(&schMsg)
 
-	rsp.Eno = DhtEnoNone
+	rsp.Eno = DhtEnoNone.GetEno()
 
 _rsp2Sender:
 
 	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStartRsp, &rsp)
 	qryMgr.sdl.SchSendMessage(&schMsg)
 
-	if rsp.Eno != DhtEnoNone {
+	if rsp.Eno != DhtEnoNone.GetEno() {
 		return sch.SchEnoUserTask
 	}
 
@@ -397,7 +397,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoMismatched
 	}
 
-	if (msg.Eno == DhtEnoNone) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
+	if (msg.Eno == DhtEnoNone.GetEno()) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
 		log.Debug("rutNearestRsp: invalid parameter")
 		return sch.SchEnoParameter
 	}
@@ -410,7 +410,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	peers := msg.Peers.([]*rutMgrBucketNode)
 	pcs := msg.Pcs.([]int)
 	dists := msg.Dists.([]int)
-	if (msg.Eno == DhtEnoNone) && (len(peers) != len(pcs) || len(peers) != len(dists)) {
+	if (msg.Eno == DhtEnoNone.GetEno()) && (len(peers) != len(pcs) || len(peers) != len(dists)) {
 		log.Debug("rutNearestRsp: invalid parameter")
 		return sch.SchEnoParameter
 	}
@@ -445,7 +445,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	qryOk2Sender := func(peer *config.Node) {
 		var schMsg = sch.SchMessage{}
 		var ind = sch.MsgDhtQryMgrQueryResultInd{
-			Eno:	DhtEnoNone,
+			Eno:	DhtEnoNone.GetEno(),
 			Target:	target,
 			Peers:	[]*config.Node{peer},
 		}
@@ -453,7 +453,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		qryMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	if msg.Eno != DhtEnoNone {
+	if msg.Eno != DhtEnoNone.GetEno() {
 		qryFailed2Sender(DhtErrno(msg.Eno))
 		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
 		return sch.SchEnoNone
@@ -542,7 +542,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 func (qryMgr *QryMgr)queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
 
 	target := msg.Target
-	rsp := sch.MsgDhtQryMgrQueryStopRsp{Target:target, Eno:DhtEnoNone}
+	rsp := sch.MsgDhtQryMgrQueryStopRsp{Target:target, Eno:DhtEnoNone.GetEno()}
 
 	rsp2Sender := func (rsp *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
 		var schMsg = sch.SchMessage{}
@@ -611,7 +611,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 			log.Debug("rutNotificationInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -689,7 +689,7 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 
 			log.Debug("instStatusInd: query done: %x", qcb.target)
 
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 				log.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 				return sch.SchEnoUserTask
 			}
@@ -768,7 +768,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		var schMsg= sch.SchMessage{}
 		var updateReq = sch.MsgDhtRutMgrUpdateReq{
 			Why: rutMgrUpdate4Query,
-			Eno: DhtEnoNone,
+			Eno: DhtEnoNone.GetEno(),
 			Seens: []config.Node{
 				*peer,
 			},
@@ -795,7 +795,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	icb, ok := qcb.qryActived[from.ID]
 	if !ok || icb == nil {
 		log.Debug("instResultInd: target not found: %x", target)
-		return DhtEnoNotFound
+		return sch.SchEnoUserTask
 	}
 
 	depth := icb.depth
@@ -828,7 +828,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 			if peer.ID == target {
 
-				qryMgr.qryMgrResultReport(qcb, DhtEnoNone, peer, msg.Value, msg.Provider)
+				qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), peer, msg.Value, msg.Provider)
 
 				if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
 					log.Debug("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
@@ -862,7 +862,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 		log.Debug("instResultInd: limited to stop query, depth: %d, width: %d", qcb.depth, len(qcb.qryHistory))
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 			log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -911,7 +911,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 			log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -970,7 +970,7 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound, nil, nil, nil); dhtEno != DhtEnoNone {
+		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 			log.Debug("instStopRsp: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
@@ -1075,7 +1075,7 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
 			body := sch.MsgDhtQryInstStopReq{
 				Target: target,
 				Peer: icb.to.ID,
-				Eno: DhtEnoNone,
+				Eno: DhtEnoNone.GetEno(),
 			}
 			icb.sdl.SchMakeMessage(&req, qryMgr.ptnMe, icb.ptnInst, sch.EvDhtQryInstStopReq, &body)
 			icb.sdl.SchSendMessage(&req)
@@ -1366,7 +1366,7 @@ func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
 		return sch.SchEnoParameter
 	}
 
-	qryMgr.qryMgrResultReport(qcb, DhtEnoTimeout, nil, nil, nil)
+	qryMgr.qryMgrResultReport(qcb, DhtEnoTimeout.GetEno(), nil, nil, nil)
 	qryMgr.qryMgrDelQcb(delQcb4Timeout, qcb.target)
 
 	return sch.SchEnoNone
@@ -1404,7 +1404,7 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 	// with this event when it's received in the owner task of the "qcb".
 	//
 
-	if eno != DhtEnoNone {
+	if eno != DhtEnoNone.GetEno() {
 		if peer != nil || val != nil || prd != nil {
 			log.Debug("qryMgrResultReport: invalid parameters, " +
 				"eno: %d, peer: %p, val: %p, prd: %p", eno, peer, &val, prd)

@@ -70,7 +70,7 @@ type timer struct {
 	li			*list.List					// list pointer
 	el			*list.Element				// element pointer
 	to			time.Time					// absolute time moment to be expired
-	k			DsKey						// key attached to this timer
+	k			[]byte						// key attached to this timer
 }
 
 type timerManager struct {
@@ -123,11 +123,13 @@ func (mgr *timerManager)getTimer(dur time.Duration, dat interface{}, tcb timerCa
 }
 
 func (mgr *timerManager)setTimerHandler(tm *timer, tcb timerCallback) error {
-	return TmEnoNotsupport
+	tm.tcb = tcb
+	return TmEnoNone
 }
 
 func (mgr *timerManager)setTimerData(tm *timer, data interface{}) error {
-	return TmEnoNotsupport
+	tm.data = data
+	return TmEnoNone
 }
 
 func (mgr *timerManager)startTimer(tm *timer) error {

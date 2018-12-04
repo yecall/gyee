@@ -472,7 +472,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 	// check "why" and "eno"
 	//
 
-	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone {
+	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone.GetEno() {
 
 		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Handshake, eno: DhtEnoNone", dht)
 
@@ -506,7 +506,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			return sch.SchEnoUserTask
 		}
 
-	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout {
+	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout.GetEno() {
 
 		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoTimeout", dht)
 
@@ -537,7 +537,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			rutMgr.showRoute("query-timeout-delete")
 		}
 
-	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone {
+	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone.GetEno() {
 
 		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
 

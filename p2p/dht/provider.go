@@ -112,7 +112,7 @@ func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	if ptn == nil || msg == nil {
 		log.Debug("prdMgrProc: invalid parameters")
-		return DhtEnoParameter
+		return sch.SchEnoParameter
 	}
 
 	eno := sch.SchEnoUnknown
@@ -609,7 +609,7 @@ func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
 		return nil
 	}
 
-	eno, val := prdMgr.ds.Get(key)
+	eno, val := prdMgr.ds.Get(key[0:])
 	if eno != DhtEnoNone || val == nil {
 		return nil
 	}
@@ -635,7 +635,7 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 		Extra:		nil,
 	}
 
-	if eno, val := prdMgr.ds.Get(key); eno == DhtEnoNone && val != nil {
+	if eno, val := prdMgr.ds.Get(key[0:]); eno == DhtEnoNone && val != nil {
 		psr := val.(*PsRecord)
 		if eno := dpsr.DecPsRecord(psr); eno != DhtEnoNone {
 			log.Debug("store: DecPsRecord failed, eno: %d", eno)
@@ -657,7 +657,7 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 		return eno
 	}
 
-	return prdMgr.ds.Put(key, psr.Value, psr.KT)
+	return prdMgr.ds.Put(key[0:], psr.Value, psr.KT)
 }
 
 //
