@@ -835,7 +835,7 @@ _cleanUpfailed:
 //
 func (dsMgr *DsMgr)makeExpiredKey(k []byte, to time.Time) []byte {
 	strTime := strconv.FormatInt(to.Unix(), 10)
-	strTime = strTime + strings.Repeat("0", 16 - len(strTime))
+	strTime = strings.Repeat("0", 16 - len(strTime)) + strTime
 	ek := append([]byte(strTime), k...)
 	return ek
 }
