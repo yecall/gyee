@@ -23,11 +23,13 @@ package dht
 import (
 	"time"
 	"path"
+	"strconv"
+	"strings"
+	"container/list"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
-	"container/list"
 )
 
 
@@ -208,7 +210,8 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	dsMgr.tmMgr.setTimerData(tm, tm)
 	dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
 
-	ek := dsMgr.makeExpiredKey(k, time.Now().Add(kt))
+	tm.to = time.Now().Add(kt)
+	ek := dsMgr.makeExpiredKey(k, tm.to)
 	if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
 		log.Debug("Put: failed, eno: %d", eno)
 		return DhtEnoDatastore
@@ -242,7 +245,7 @@ func (dsMgr *DsMgr)Get(k []byte) (eno DhtErrno, value DsValue) {
 func (dsMgr *DsMgr)Delete(k []byte) DhtErrno {
 	// timer might be in running, and would be removed when expired if any,
 	// just delete [key, val] from the "real" store here.
-	return dsMgr.Delete(k)
+	return dsMgr.ds.Delete(k)
 }
 
 //
@@ -730,14 +733,64 @@ func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErr
 }
 
 //
-// cleanup in poweron(reboot) stage
+// cleanup in power on stage
 //
 func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
-	//
+
 	// clean up those [key, val] pairs out of keep time. we loop the "expired" database
 	// keys, split them get the "real" key for the value, and then delete the "expired"
 	// keys and the "real" [key, val] pairs.
-	//
+
+	if dsType == dstMemoryMap {
+
+		return DhtEnoNone
+
+	} else if dsType == dstFileSystem {
+
+		return DhtEnoNotSup
+
+	} else if dsType == dstLevelDB {
+
+		lds, _ := dsMgr.dsExp.(*LeveldbDatastore)
+		ldb := lds.ls.GetLevelDB()
+		it := ldb.NewIterator(nil, nil)
+
+		for it.First() {
+
+			ek := it.Key()
+			t, k := dsMgr.splitExpiredKey(ek)
+			secondes, err := strconv.ParseInt(string(t), 10, 64)
+
+			if err != nil {
+				log.Debug("cleanUpReboot: invalid time string: %s", string(t))
+				continue
+			}
+
+			if time.Now().Unix() >=  secondes {
+
+				dsMgr.Delete(k)
+				lds.Delete(ek)
+
+			} else {
+
+				kt := time.Second * time.Duration(secondes - time.Now().Unix())
+				tm, err := dsMgr.tmMgr.getTimer(kt, nil, nil)
+
+				if err != nil {
+					log.Debug("cleanUpReboot: getTimer failed, error: %s", err.Error())
+					continue
+				}
+
+				dsMgr.tmMgr.setTimerData(tm, tm)
+				dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+			}
+		}
+	} else {
+
+		log.Debug("cleanUpReboot: unknown data store type: %d", dsType)
+		return DhtEnoDatastore
+	}
+
 	return DhtEnoNone
 }
 
@@ -781,15 +834,16 @@ _cleanUpfailed:
 // make a "expired" key for [key, val] which expired
 //
 func (dsMgr *DsMgr)makeExpiredKey(k []byte, to time.Time) []byte {
-	return nil
+	strTime := strconv.FormatInt(to.Unix(), 10)
+	strTime = strTime + strings.Repeat("0", 16 - len(strTime))
+	ek := append([]byte(strTime), k...)
+	return ek
 }
 
 //
 // split a "expired" key into "expired time" and "real key"
 //
 func (dsMgr *DsMgr)splitExpiredKey(expKey []byte) (t []byte, k []byte) {
-	t = []byte{}
-	k = []byte{}
-	return
+	return expKey[0:16], expKey[16:]
 }
 

@@ -139,3 +139,7 @@ func (storage *LevelStorage) Flush() error {
 
 	return storage.db.Write(batch, nil)
 }
+
+func (storage *LevelStorage)GetLevelDB() *leveldb.DB {
+	return storage.db
+}
