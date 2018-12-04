@@ -21,9 +21,9 @@
 package dht
 
 import (
+	"time"
 	"github.com/yeeco/gyee/persistent"
 	log "github.com/yeeco/gyee/p2p/logger"
-	"time"
 )
 
 type LeveldbDatastoreConfig struct {
@@ -81,3 +81,10 @@ func (lds *LeveldbDatastore)Delete(k []byte) DhtErrno {
 	return DhtEnoNone
 }
 
+func (lds *LeveldbDatastore)Close() DhtErrno {
+	if err := lds.ls.Close(); err != nil {
+		log.Debug("Close: failed, error: %s", err.Error())
+		return DhtEnoDatastore
+	}
+	return DhtEnoNone
+}

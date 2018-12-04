@@ -72,4 +72,10 @@ func (mds *MapDatastore)Delete(k []byte) DhtErrno {
 	return DhtEnoNone
 }
 
-
+//
+// Clsoe
+//
+func (mds *MapDatastore)Close() DhtErrno {
+	mds.ds = nil
+	return DhtEnoNone
+}

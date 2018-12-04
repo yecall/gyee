@@ -74,6 +74,12 @@ type Datastore interface {
 	//
 
 	Delete(key []byte) DhtErrno
+
+	//
+	// Close
+	//
+
+	Close() DhtErrno
 }
 
 //
@@ -324,6 +330,8 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 	log.Debug("poweroff: task will be done ...")
+	dsMgr.ds.Close()
+	dsMgr.dsExp.Close()
 	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
 }
 

@@ -140,3 +140,13 @@ func (fds *FileDatastore)Delete(k []byte) DhtErrno {
 	return DhtEnoNone
 }
 
+//
+// Close
+//
+func (fds *FileDatastore)Close() DhtErrno {
+	if err := fds.ffs.Close(); err != nil {
+		log.Debug("Close: failed, error: %s", err.Error())
+		return DhtEnoDatastore
+	}
+	return DhtEnoNone
+}
