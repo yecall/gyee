@@ -273,7 +273,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	var ci *ConInst = nil
 	var dht = conMgr.sdl.SchGetP2pCfgName()
 
-	if msg.Eno != DhtEnoNone {
+	if msg.Eno != DhtEnoNone.GetEno() {
 
 		//
 		// if it's a blind outbound, the request sender should be responsed here. at this
@@ -384,7 +384,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 		if ci.isBlind {
 			rsp := sch.MsgDhtBlindConnectRsp {
-				Eno:	DhtEnoNone,
+				Eno:	DhtEnoNone.GetEno(),
 				Ptn:	ci.ptnMe,
 				Peer:	msg.Peer,
 			}
@@ -444,7 +444,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	update := sch.MsgDhtRutMgrUpdateReq {
 		Why:	rutMgrUpdate4Handshake,
-		Eno:	DhtEnoNone,
+		Eno:	DhtEnoNone.GetEno(),
 		Seens:	[]config.Node {
 			*msg.Peer,
 		},
@@ -477,12 +477,12 @@ func (conMgr *ConMgr)lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrn
 func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	var rspNormal = sch.MsgDhtConMgrConnectRsp {
-		Eno:	DhtEnoNone,
+		Eno:	DhtEnoNone.GetEno(),
 		Peer:	msg.Peer,
 	}
 
 	var rspBlind = sch.MsgDhtBlindConnectRsp {
-		Eno:	DhtEnoNone,
+		Eno:	DhtEnoNone.GetEno(),
 		Peer:	msg.Peer,
 		Ptn:	nil,
 	}
@@ -781,7 +781,7 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 	rutUpdate := func(node *config.Node) sch.SchErrno {
 		update := sch.MsgDhtRutMgrUpdateReq {
 			Why:	rutMgrUpdate4Closed,
-			Eno:	DhtEnoNone,
+			Eno:	DhtEnoNone.GetEno(),
 			Seens:	[]config.Node {
 				*node,
 			},
@@ -1019,7 +1019,7 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		schMsg := sch.SchMessage{}
 		update := sch.MsgDhtRutMgrUpdateReq {
 			Why:	rutMgrUpdate4Closed,
-			Eno:	DhtEnoNone,
+			Eno:	DhtEnoNone.GetEno(),
 			Seens:	[]config.Node {
 				*node,
 			},

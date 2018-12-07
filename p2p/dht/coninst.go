@@ -270,7 +270,7 @@ func (conInst *ConInst)poweroff(ptn interface{}) sch.SchErrno {
 
 	log.Debug("poweroff: task will be done ...")
 
-	conInst.cleanUp(DhtEnoScheduler)
+	conInst.cleanUp(DhtEnoScheduler.GetEno())
 	conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
 
 	return sch.SchEnoNone
@@ -289,7 +289,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	dht := conInst.sdl.SchGetP2pCfgName()
 
 	rsp := sch.MsgDhtConInstHandshakeRsp {
-		Eno:	DhtEnoUnknown,
+		Eno:	DhtEnoUnknown.GetEno(),
 		Inst:	conInst,
 		Peer:	nil,
 		Dir:	int(conInst.dir),
@@ -380,7 +380,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.status = CisHandshaked
 	conInst.statusReport()
 
-	rsp.Eno = DhtEnoNone
+	rsp.Eno = DhtEnoNone.GetEno()
 	rsp.Peer = &conInst.hsInfo.peer
 	rsp.HsInfo = &conInst.hsInfo
 	rsp2ConMgr()
@@ -426,7 +426,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 		"connection will be closed, why: %d, peer: %x",
 		msg.Why, *msg.Peer)
 
-	conInst.cleanUp(DhtEnoNone)
+	conInst.cleanUp(DhtEnoNone.GetEno())
 	conInst.status = CisClosed
 
 	schMsg := sch.SchMessage{}
@@ -849,7 +849,7 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 
 				schMsg := sch.SchMessage{}
 				ind := sch.MsgDhtConInstTxInd {
-					Eno:		DhtEnoTimeout,
+					Eno:		DhtEnoTimeout.GetEno(),
 					WaitMid:	txPkg.waitMid,
 					WaitSeq:	txPkg.waitSeq,
 				}
@@ -1301,7 +1301,7 @@ _txLoop:
 		conInst.statusReport()
 
 		<-conInst.txDone
-		conInst.txDone<-DhtEnoNone
+		conInst.txDone<-DhtEnoNone.GetEno()
 
 		return
 	}
@@ -1312,7 +1312,7 @@ _txLoop:
 		// the 2) case: signal the done
 		//
 
-		conInst.txDone<-DhtEnoNone
+		conInst.txDone<-DhtEnoNone.GetEno()
 
 		return
 	}
@@ -1408,7 +1408,7 @@ _checkDone:
 		conInst.statusReport()
 
 		<-conInst.rxDone
-		conInst.rxDone <- DhtEnoNone
+		conInst.rxDone <- DhtEnoNone.GetEno()
 
 		return
 	}
@@ -1419,7 +1419,7 @@ _checkDone:
 		// the 2) case: signal the done
 		//
 
-		conInst.rxDone <- DhtEnoNone
+		conInst.rxDone <- DhtEnoNone.GetEno()
 
 		return
 	}

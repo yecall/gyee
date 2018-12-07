@@ -930,9 +930,11 @@ const (
 //
 // EvDhtDsMgrGetValReq
 //
+const Keep4Ever = time.Duration(-1)
 type MsgDhtDsMgrAddValReq struct {
 	Key			[]byte			// key
 	Val			[]byte			// value
+	KT			time.Duration	// duration to keep this [key, val] pair
 }
 
 //

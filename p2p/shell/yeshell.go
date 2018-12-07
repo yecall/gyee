@@ -720,7 +720,7 @@ func (yeShMgr *yeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) s
 		log.Debug("dhtMgrPutValueRsp: key mismatched")
 		return sch.SchEnoMismatched
 	}
-	if msg.Eno == dht.DhtEnoNone {
+	if msg.Eno == dht.DhtEnoNone.GetEno() {
 		yeShMgr.putValChan<-true
 	} else {
 		yeShMgr.putValChan<-false
@@ -734,7 +734,7 @@ func (yeShMgr *yeShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) s
 		log.Debug("dhtMgrGetValueRsp: key mismatched")
 		return sch.SchEnoMismatched
 	}
-	if msg.Eno == dht.DhtEnoNone {
+	if msg.Eno == dht.DhtEnoNone.GetEno() {
 		yeShMgr.getValChan<-msg.Val
 	} else {
 		yeShMgr.getValChan<-[]byte{}

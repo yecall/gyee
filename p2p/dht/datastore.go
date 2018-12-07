@@ -22,9 +22,14 @@ package dht
 
 import (
 	"time"
+	"path"
+	"strconv"
+	"strings"
+	"container/list"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/p2p/config"
+	config "github.com/yeeco/gyee/p2p/config"
 )
 
 
@@ -58,19 +63,25 @@ type Datastore interface {
 	// Put (key, value) to data store
 	//
 
-	Put(key *DsKey, value DsValue) DhtErrno
+	Put(key []byte, value DsValue, kt time.Duration) DhtErrno
 
 	//
 	// Get (key, value) from data store
 	//
 
-	Get(key *DsKey) (eno DhtErrno, value DsValue)
+	Get(key []byte) (eno DhtErrno, value DsValue)
 
 	//
 	// Delete (key, value) from data store
 	//
 
-	Delete(key *DsKey) DhtErrno
+	Delete(key []byte) DhtErrno
+
+	//
+	// Close
+	//
+
+	Close() DhtErrno
 }
 
 //
@@ -82,57 +93,20 @@ type DsRecord struct {
 }
 
 //
-// Data store based on "map" in memory, for test only
-//
-type MapDatastore struct {
-	ds map[DsKey]DsValue		// (key, value) map
-}
-
-//
-// New map datastore
-//
-func NewMapDatastore() *MapDatastore {
-	return &MapDatastore{
-		ds: make(map[DsKey]DsValue, 0),
-	}
-}
-
-//
-// Put
-//
-func (mds *MapDatastore)Put(k *DsKey, v DsValue) DhtErrno {
-	mds.ds[*k] = v
-	return DhtEnoNone
-}
-
-//
-// Get
-//
-func (mds *MapDatastore)Get(k *DsKey) (eno DhtErrno, value DsValue) {
-	v, ok := mds.ds[*k]
-	if !ok {
-		return DhtEnoNotFound, nil
-	}
-	return DhtEnoNone, &v
-}
-
-//
-// Delete
-//
-func (mds *MapDatastore)Delete(k *DsKey) DhtErrno {
-	delete(mds.ds, *k)
-	return DhtEnoNone
-}
-
-//
 // Data store manager name registered in scheduler
 //
 const DsMgrName = sch.DhtDsMgrName
 
 //
-// Memory map store for test flag
+// data store type
 //
-const mapDs4Test = false
+const (
+	dstMemoryMap	= iota
+	dstFileSystem
+	dstLevelDB
+)
+
+var dsType = dstLevelDB
 
 //
 // Data store manager
@@ -146,7 +120,10 @@ type DsMgr struct {
 	ptnQryMgr	interface{}				// pointer to query manager task node
 	ptnRutMgr	interface{}				// pointer to route manager task node
 	ds			Datastore				// data store
+	dsExp		Datastore				// data store for expired time
 	fdsCfg		FileDatastoreConfig		// file data store configuration
+	ldsCfg		LeveldbDatastoreConfig	// levelDB stat store configuration
+	tmMgr		*timerManager			// timer manager
 }
 
 //
@@ -157,6 +134,8 @@ func NewDsMgr() *DsMgr {
 	dsMgr := DsMgr{
 		name:		DsMgrName,
 		fdsCfg:		FileDatastoreConfig{},
+		ldsCfg:		LeveldbDatastoreConfig{},
+		tmMgr:		NewTimerManager(),
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -218,6 +197,58 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 }
 
 //
+// put
+//
+func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+
+	tm, eno := dsMgr.tmMgr.getTimer(kt, nil, nil)
+	if eno != TmEnoNone {
+		log.Debug("Put: getTimer failed, eno: %d", eno)
+		return DhtEnoTimer
+	}
+
+	dsMgr.tmMgr.setTimerData(tm, tm)
+	dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+
+	tm.to = time.Now().Add(kt)
+	ek := dsMgr.makeExpiredKey(k, tm.to)
+	if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
+		log.Debug("Put: failed, eno: %d", eno)
+		return DhtEnoDatastore
+	}
+
+	if eno = dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
+		log.Debug("Put: failed, eno: %d", eno)
+		return DhtEnoDatastore
+	}
+
+	if err := dsMgr.tmMgr.startTimer(tm); err != nil {
+		log.Debug("Put: startTimer failed, error: %s", err.Error())
+		dsMgr.ds.Delete(k)
+		dsMgr.dsExp.Delete(ek)
+		return DhtEnoTimer
+	}
+
+	return DhtEnoNone
+}
+
+//
+// get
+//
+func (dsMgr *DsMgr)Get(k []byte) (eno DhtErrno, value DsValue) {
+	return dsMgr.ds.Get(k)
+}
+
+//
+// delete
+//
+func (dsMgr *DsMgr)Delete(k []byte) DhtErrno {
+	// timer might be in running, and would be removed when expired if any,
+	// just delete [key, val] from the "real" store here.
+	return dsMgr.ds.Delete(k)
+}
+
+//
 // poweron handler
 //
 func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
@@ -246,11 +277,12 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoInternal
 	}
 
-	if mapDs4Test == true {
+	if dsType == dstMemoryMap {
 
 		dsMgr.ds = NewMapDatastore()
+		dsMgr.dsExp = NewMapDatastore()
 
-	} else {
+	} else if dsType == dstFileSystem {
 
 		fdc := FileDatastoreConfig{}
 		if eno := dsMgr.getFileDatastoreConfig(&fdc); eno != DhtEnoNone {
@@ -259,10 +291,37 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		}
 
 		dsMgr.ds = NewFileDatastore(&fdc)
+
+		fdcExp := fdc;
+		fdcExp.path = path.Join(fdcExp.path, "expired")
+		dsMgr.dsExp = NewFileDatastore(&fdcExp)
+
+	} else if dsType == dstLevelDB {
+
+		ldc := LeveldbDatastoreConfig{}
+		if eno := dsMgr.getLeveldbDatastoreConfig(&ldc); eno != DhtEnoNone {
+			log.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
+
+		dsMgr.ds = NewLeveldbDatastore(&ldc)
+
+		ldcExp := ldc;
+		ldcExp.Path = path.Join(ldcExp.Path, "expired")
+		dsMgr.dsExp = NewLeveldbDatastore(&ldcExp)
+
+	} else {
+		log.Debug("poweron: invalid datastore type: %d", dsType)
+		return sch.SchEnoNotImpl
 	}
 
 	if dsMgr.ds == nil {
-		log.Debug("poweron: invalid ds")
+		log.Debug("poweron: nil datastore")
+		return sch.SchEnoUserTask
+	}
+
+	if eno := dsMgr.cleanUpReboot(); eno != DhtEnoNone {
+		log.Debug("poweron: cleanUp failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -274,6 +333,8 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 	log.Debug("poweroff: task will be done ...")
+	dsMgr.ds.Close()
+	dsMgr.dsExp.Close()
 	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
 }
 
@@ -294,7 +355,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	// store it
 	//
 
-	if eno := dsMgr.store(&k, msg.Val); eno != DhtEnoNone {
+	if eno := dsMgr.store(&k, msg.Val, msg.KT); eno != DhtEnoNone {
 		log.Debug("localAddValReq: store failed, eno: %d", eno)
 		dsMgr.localAddValRsp(k[0:], nil, eno)
 		return sch.SchEnoUserTask
@@ -389,7 +450,7 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 
 		copy(dsk[0:], v.Key)
 
-		if eno := dsMgr.ds.Put(&dsk, v.Val); eno != DhtEnoNone {
+		if eno := dsMgr.ds.Put(dsk[0:], v.Val, pv.KT); eno != DhtEnoNone {
 			log.Debug("putValReq: put failed, eno: %d", eno)
 		}
 	}
@@ -558,7 +619,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 //
 func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 
-	eno, val := dsMgr.ds.Get(k)
+	eno, val := dsMgr.ds.Get(k[0:])
 	if eno != DhtEnoNone {
 		return  nil
 	}
@@ -585,7 +646,7 @@ func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 //
 // store (key, value) pair to data store
 //
-func (dsMgr *DsMgr)store(k *DsKey, v DsValue) DhtErrno {
+func (dsMgr *DsMgr)store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 
 	ddsr := DhtDatastoreRecord {
 		Key:	k[0:],
@@ -599,18 +660,20 @@ func (dsMgr *DsMgr)store(k *DsKey, v DsValue) DhtErrno {
 		return eno
 	}
 
-	return dsMgr.ds.Put(&dsr.Key, dsr.Value)
+	return dsMgr.ds.Put(dsr.Key[0:], dsr.Value, kt)
 }
 
 //
 // response the add-value request sender task
 //
 func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
+
 	rsp := sch.MsgDhtMgrPutValueRsp {
 		Eno:	int(eno),
 		Key:	key,
 		Peers:	peers,
 	}
+
 	msg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrPutValueRsp, &rsp)
 	return dsMgr.sdl.SchSendMessage(&msg)
@@ -620,11 +683,13 @@ func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno
 // response the get-value request sender task
 //
 func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
+
 	rsp := sch.MsgDhtMgrGetValueRsp {
 		Eno:	int(eno),
 		Key:	key,
 		Val:	val,
 	}
+
 	msg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrGetValueRsp, &rsp)
 	return dsMgr.sdl.SchSendMessage(&msg)
@@ -634,13 +699,151 @@ func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchE
 // get file data store configuration
 //
 func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
+
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
 	dsMgr.fdsCfg = FileDatastoreConfig {
-		path:			cfg.Path,
+		path:			path.Join(cfg.Path, "fds"),
 		shardFuncName:	cfg.ShardFuncName,
 		padLength:		cfg.PadLength,
 		sync:			cfg.Sync,
 	}
+
 	*fdc = dsMgr.fdsCfg
+
 	return DhtEnoNone
 }
+
+//
+// get levelDB data store configuration
+//
+func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
+
+	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
+	dsMgr.ldsCfg = LeveldbDatastoreConfig {
+		Path:					path.Join(cfg.Path, "lds"),
+		OpenFilesCacheCapacity:	500,
+		BlockCacheCapacity:		8 * opt.MiB,
+		BlockSize:				4 * opt.MiB,
+		FilterBits:				10,
+	}
+
+	*ldc = dsMgr.ldsCfg
+
+	return DhtEnoNone
+}
+
+//
+// cleanup in power on stage
+//
+func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
+
+	// clean up those [key, val] pairs out of keep time. we loop the "expired" database
+	// keys, split them get the "real" key for the value, and then delete the "expired"
+	// keys and the "real" [key, val] pairs.
+
+	if dsType == dstMemoryMap {
+
+		return DhtEnoNone
+
+	} else if dsType == dstFileSystem {
+
+		return DhtEnoNotSup
+
+	} else if dsType == dstLevelDB {
+
+		lds, _ := dsMgr.dsExp.(*LeveldbDatastore)
+		ldb := lds.ls.GetLevelDB()
+		it := ldb.NewIterator(nil, nil)
+
+		for it.First() {
+
+			ek := it.Key()
+			t, k := dsMgr.splitExpiredKey(ek)
+			secondes, err := strconv.ParseInt(string(t), 10, 64)
+
+			if err != nil {
+				log.Debug("cleanUpReboot: invalid time string: %s", string(t))
+				continue
+			}
+
+			if time.Now().Unix() >=  secondes {
+
+				dsMgr.Delete(k)
+				lds.Delete(ek)
+
+			} else {
+
+				kt := time.Second * time.Duration(secondes - time.Now().Unix())
+				tm, err := dsMgr.tmMgr.getTimer(kt, nil, nil)
+
+				if err != nil {
+					log.Debug("cleanUpReboot: getTimer failed, error: %s", err.Error())
+					continue
+				}
+
+				dsMgr.tmMgr.setTimerData(tm, tm)
+				dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+			}
+		}
+	} else {
+
+		log.Debug("cleanUpReboot: unknown data store type: %d", dsType)
+		return DhtEnoDatastore
+	}
+
+	return DhtEnoNone
+}
+
+//
+// called back to clean [key, val] out of keep time
+//
+func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{} {
+
+	// notice: need not to call dsMgr.tmMgr.killTimer, since the timer would
+	// be removed by timer manager itself.
+
+	err := DhtErrno(DhtEnoNone)
+	tm, ok := data.(*timer)
+	if !ok {
+		log.Debug("cleanUpTimerCb: invalid timer")
+		return DhtEnoMismatched
+	}
+
+	expKey := dsMgr.makeExpiredKey(tm.k, tm.to)
+	if eno := dsMgr.ds.Delete(tm.k[0:]); eno != DhtEnoNone {
+		err = DhtErrno(DhtEnoDatastore)
+		goto _cleanUpfailed
+	}
+
+	if eno := dsMgr.dsExp.Delete(expKey); eno != DhtEnoNone {
+		err = DhtErrno(DhtEnoDatastore)
+		goto _cleanUpfailed
+	}
+
+_cleanUpfailed:
+
+	if err != DhtEnoNone {
+		log.Debug("cleanUpTimerCb: Delete failed, error: %s", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+//
+// make a "expired" key for [key, val] which expired
+//
+func (dsMgr *DsMgr)makeExpiredKey(k []byte, to time.Time) []byte {
+	strTime := strconv.FormatInt(to.Unix(), 10)
+	strTime = strings.Repeat("0", 16 - len(strTime)) + strTime
+	ek := append([]byte(strTime), k...)
+	return ek
+}
+
+//
+// split a "expired" key into "expired time" and "real key"
+//
+func (dsMgr *DsMgr)splitExpiredKey(expKey []byte) (t []byte, k []byte) {
+	return expKey[0:16], expKey[16:]
+}
+

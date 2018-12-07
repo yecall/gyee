@@ -1372,14 +1372,14 @@ func testCase6(tc *testCase) {
 	time.Sleep(time.Second * 4)
 	log.Debug("testCase6: going to apply connection matrix ...")
 
-	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
+	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone.GetEno() {
 		log.Debug("testCase6: dhtConnMatrixApply failed, eno: %d", eno)
 		return
 	}
 
 	time.Sleep(time.Second*8)
 
-	if eno := dhtTestBootstrapStart(dhtInstList); eno != dht.DhtEnoNone {
+	if eno := dhtTestBootstrapStart(dhtInstList); eno != dht.DhtEnoNone.GetEno() {
 		log.Debug("testCase6: dhtTestBootstrapStart failed, eno: %d", eno)
 		return
 	}
@@ -1454,7 +1454,7 @@ func testCase7(tc *testCase) {
 	time.Sleep(time.Second * 4)
 	log.Debug("testCase7: going to apply connection matrix ...")
 
-	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone {
+	if eno := dhtTestConnMatrixApply(dhtInstList, cm); eno != dht.DhtEnoNone.GetEno() {
 		log.Debug("testCase7: dhtConnMatrixApply failed, eno: %d", eno)
 		return
 	}
@@ -1679,7 +1679,7 @@ func dhtTestBootstrapStart(dhtInstList []*sch.Scheduler) int {
 		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtRutRefreshReq, nil)
 	}
-	return dht.DhtEnoNone
+	return dht.DhtEnoNone.GetEno()
 }
 
 //
@@ -1704,7 +1704,7 @@ func dhtTestFindNode(dhtInstList []*sch.Scheduler) int {
 		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrFindPeerReq, &req)
 	}
-	return dht.DhtEnoNone
+	return dht.DhtEnoNone.GetEno()
 }
 
 //
@@ -1735,7 +1735,7 @@ func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 		}
 		kvList = append(kvList, &kv)
 	}
-	return dht.DhtEnoNone, kvList
+	return dht.DhtEnoNone.GetEno(), kvList
 }
 
 //
@@ -1743,7 +1743,7 @@ func dhtTestPutValue(dhtInstList []*sch.Scheduler) (int, [] *DhtTestKV) {
 //
 func dhtTestGetValue(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 	if len(dhtInstList) != len(keys) {
-		return dht.DhtEnoParameter
+		return dht.DhtEnoParameter.GetEno()
 	}
 	req := sch.MsgDhtMgrGetValueReq{
 		Key:	nil,
@@ -1753,7 +1753,7 @@ func dhtTestGetValue(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrGetValueReq, &req)
 	}
-	return dht.DhtEnoNone
+	return dht.DhtEnoNone.GetEno()
 }
 
 //
@@ -1784,7 +1784,7 @@ func dhtTestPutProvider(dhtInstList []*sch.Scheduler) (int, []*DhtTestPrd) {
 		}
 		prdList = append(prdList, &prd)
 	}
-	return dht.DhtEnoNone, prdList
+	return dht.DhtEnoNone.GetEno(), prdList
 }
 
 //
@@ -1792,7 +1792,7 @@ func dhtTestPutProvider(dhtInstList []*sch.Scheduler) (int, []*DhtTestPrd) {
 //
 func dhtTestGetProvider(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 	if len(dhtInstList) != len(keys) {
-		return dht.DhtEnoParameter
+		return dht.DhtEnoParameter.GetEno()
 	}
 	req := sch.MsgDhtMgrGetProviderReq {
 		Key:	nil,
@@ -1802,7 +1802,7 @@ func dhtTestGetProvider(dhtInstList []*sch.Scheduler, keys [][]byte) int {
 		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrGetProviderReq, &req)
 	}
-	return dht.DhtEnoNone
+	return dht.DhtEnoNone.GetEno()
 }
 
 //

@@ -351,7 +351,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 
 	var updateReq = sch.MsgDhtRutMgrUpdateReq{
 		Why:	rutMgrUpdate4Query,
-		Eno:	DhtEnoTimeout,
+		Eno:	DhtEnoTimeout.GetEno(),
 		Seens:	[]config.Node{icb.to},
 		Duras:	[]time.Duration{-1},
 	}
@@ -411,7 +411,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		icb.qTid = sch.SchInvalidTid
 	}
 
-	if msg.Eno != DhtEnoNone && msg.Eno != DhtEnoDuplicated {
+	if msg.Eno != DhtEnoNone.GetEno() && msg.Eno != DhtEnoDuplicated.GetEno() {
 
 		log.Debug("connectRsp:" +
 			"connect failed, eno: %d, peer: %+V",

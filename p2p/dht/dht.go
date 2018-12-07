@@ -25,6 +25,7 @@ import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/config"
+	"fmt"
 )
 
 
@@ -44,7 +45,7 @@ const DhtMgrName = sch.DhtMgrName
 type DhtErrno int
 
 const (
-	DhtEnoNone	= iota			// none of errors
+	DhtEnoNone	DhtErrno = iota	// none of errors
 	DhtEnoParameter				// invalid parameters
 	DhtEnoScheduler				// scheduler errors
 	DhtEnoNotFound				// something not found
@@ -59,8 +60,17 @@ const (
 	DhtEnoProtocol				// protocol errors
 	DhtEnoNotSup				// not supported
 	DhtEnoDatastore				// data store errors
+	DhtEnoTimer					// timer errors
 	DhtEnoUnknown				// unknown
 )
+
+func (eno DhtErrno)Error() string {
+	return fmt.Sprintf("eno: %d", eno)
+}
+
+func (eno DhtErrno)GetEno() int {
+	return int(eno)
+}
 
 //
 // Dht manager control block
@@ -110,7 +120,7 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	if ptn == nil || msg == nil {
 		log.Debug("dhtMgrProc: invalid parameters")
-		return DhtEnoParameter
+		return sch.SchEnoParameter
 	}
 
 	var eno = sch.SchEnoUnknown

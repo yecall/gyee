@@ -58,7 +58,7 @@ func (eno timerEno)Error() string {
 	return fmt.Sprintf("%d", eno)
 }
 
-type timerCallback = func(el *list.Element, para interface{})interface{}
+type timerCallback = func(el *list.Element, data interface{})interface{}
 
 type timer struct {
 	s			int							// seconds remain
@@ -69,6 +69,8 @@ type timer struct {
 	tcb			timerCallback				// callback when timer expired
 	li			*list.List					// list pointer
 	el			*list.Element				// element pointer
+	to			time.Time					// absolute time moment to be expired
+	k			[]byte						// key attached to this timer
 }
 
 type timerManager struct {
@@ -121,11 +123,13 @@ func (mgr *timerManager)getTimer(dur time.Duration, dat interface{}, tcb timerCa
 }
 
 func (mgr *timerManager)setTimerHandler(tm *timer, tcb timerCallback) error {
-	return TmEnoNotsupport
+	tm.tcb = tcb
+	return TmEnoNone
 }
 
 func (mgr *timerManager)setTimerData(tm *timer, data interface{}) error {
-	return TmEnoNotsupport
+	tm.data = data
+	return TmEnoNone
 }
 
 func (mgr *timerManager)startTimer(tm *timer) error {
@@ -184,7 +188,7 @@ func (mgr *timerManager)tickProc() error {
 	merr := mgr.mpHandler(mgr.mTmList[mgr.mp])
 	herr := mgr.hpHandler(mgr.hTmList[mgr.hp])
 	derr := mgr.dpHandler(mgr.dTmList[mgr.dp])
-	
+
 	if serr, merr, herr, derr != nil, nil, nil, nil {
 		return TmEnoInternal
 	}
