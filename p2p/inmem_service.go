@@ -51,7 +51,7 @@ func NewInmemService() (*InmemService, error) {
 		hub:              GetInmemHub(),
 		receiveMessageCh: make(chan Message),
 		quitCh:           make(chan struct{}),
-		outDelay:         50,
+		outDelay:         100,
 		outMiss:          10,
 		inDelay:          10,
 		inMiss:           0,

@@ -84,12 +84,11 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
-
-	"time"
 )
 
 type SyncRequest struct {
@@ -114,7 +113,8 @@ type Tetris struct {
 	witness       []map[uint]*Event
 	eventCache    *utils.LRU
 	txsCache      *utils.LRU
-
+	PendingTxs    map[string]map[uint]uint64 //交易在哪个member的哪个高度出现过
+	CommittedTxs  *utils.LRU
 	currentEvent Event
 
 	EventCh       chan Event
@@ -159,16 +159,19 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 		m:         members[mid],
 		n:         blockHeight + 1,
 		//TODO: cache size and policy need to be decide
-		eventCache:    utils.NewLRU(100000, nil),
-		txsCache:      utils.NewLRU(20000, nil),
+		eventCache: utils.NewLRU(10000, nil),
+		txsCache:   utils.NewLRU(10000, nil),
+		//knowWellCache: utils.NewLRU(1000, nil),
 		memberEvents:  make(map[uint]map[uint64]*Event, len(members)),
 		memberHeight:  make(map[uint]uint64, len(members)),
 		pendingEvents: utils.NewLRU(10000, nil),
-		eventRequest:  make(map[string]SyncRequest),
+		eventRequest:  make(map[string]SyncRequest), //TODO:memroy consumption optimize
+		PendingTxs:    make(map[string]map[uint]uint64),
+		CommittedTxs:  utils.NewLRU(10000, nil),
 
 		EventCh:       make(chan Event, 100),
 		ParentEventCh: make(chan Event, 100),
-		TxsCh:         make(chan string, 10000),
+		TxsCh:         make(chan string, 100000),
 
 		OutputCh:       make(chan ConsensusOutput, 10),
 		SendEventCh:    make(chan Event, 100),
@@ -197,7 +200,6 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 	}
 
 	tetris.pendingSync = true
-
 	tetris.currentEvent = NewEvent(tetris.h, tetris.m, tetris.n)
 	//tetris.currentEvent.appendEvent("")
 	tetris.prepare()
@@ -278,6 +280,7 @@ func (t *Tetris) sendEvent(event Event) {
 	t.n += 1
 	t.currentEvent = NewEvent(t.h, t.m, t.n)
 	t.currentEvent.appendEvent(&event)
+	t.update(&event)
 }
 
 func (t *Tetris) receiveTicker(time time.Time) {
@@ -302,7 +305,6 @@ func (t *Tetris) receiveTx(tx string) {
 		//}
 		if t.currentEvent.totalTx() > t.params.maxTxPerEvent {
 			t.sendEvent(t.currentEvent)
-			//t.update()
 		}
 	}
 }
@@ -316,7 +318,7 @@ func (t *Tetris) receiveEvent(event *Event) {
 	//放入cache
 	//放入unsettled，检查parent是否有到齐
 	//放入currentEvent
-    t.eventCount++
+	t.eventCount++
 	//if t.eventCount % 100 == 0 {
 	//	logging.Logger.WithFields(logrus.Fields{
 	//		"tm":     t.m,
@@ -407,7 +409,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		pending要搞个超时丢弃
 	*/
 
-	unpending := false
+	unpending := make([]*Event, 0)
 	for _, key := range t.pendingEvents.Keys() {
 		ei, ok := t.pendingEvents.Get(key)
 		if ok {
@@ -507,8 +509,9 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 								t.currentEvent.appendEvent(e)
 								//}
 								t.pendingEvents.Remove(e.Hex())
-								unpending = true
+								//unpending = true
 							}
+							unpending = append(unpending, e)
 						}
 					}
 				}
@@ -517,8 +520,16 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	}
 
 	//如果有event已经可以被加入到tetris中，update一次状态
-	if unpending {
-		t.update()
+	if len(unpending) > 0 {
+		sort.Slice(unpending, func(i, j int) bool {
+			return unpending[i].Body.N < unpending[j].Body.N
+		})
+
+		for _, event := range unpending {
+			//fmt.Print("    t:", t.m, " n:", event.Body.N, " m:", event.Body.M)
+			t.update(event)
+		}
+		//fmt.Println()
 	}
 }
 
@@ -531,6 +542,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 //每次启动的时候，和共识达成进入下一block的时候调用
 func (t *Tetris) prepare() {
 	for _, value := range t.memberEvents {
+		delete(value, t.h)
 		for _, me := range value {
 			me.round = ROUND_UNDECIDED
 			me.witness = false
@@ -542,7 +554,71 @@ func (t *Tetris) prepare() {
 }
 
 //有新event加入tetris的时候，
-func (t *Tetris) update() {
+
+func (t *Tetris) update(me *Event) {
+	newWitness := false
+	m := me.Body.M
+	n := me.Body.N
+	if n == t.h+1 {
+		me.round = 0
+		me.witness = true
+
+		if t.witness[0] == nil {
+			t.witness[0] = make(map[uint]*Event)
+		}
+		t.witness[0][m] = me
+	} else {
+		maxr := me.round
+		for _, e := range me.Body.E {
+			pe, ok := t.eventCache.Get(e)
+			if ok {
+				pme := t.memberEvents[pe.(*Event).Body.M][pe.(*Event).Body.N]
+				if pme != nil && pme.round > maxr {
+					maxr = pme.round
+				}
+			} else {
+				return
+			}
+		}
+		me.round = maxr
+		//fmt.Println(" round:",me.round, " ", n, " ", m, me.Body.E)
+		if len(t.witness[me.round]) >= t.params.superMajority {
+			c := 0
+			for _, v := range t.witness[me.round] {
+				if t.knowWell(me, v) {
+					c++
+				}
+			}
+			if c >= t.params.superMajority {
+				me.round++
+			}
+		}
+		pme := t.memberEvents[me.Body.M][me.Body.N-1]
+		if pme != nil {
+			if me.round > pme.round {
+				me.witness = true
+				//if t.witness[me.round] == nil {
+				//      t.witness[me.round] = make(map[uint32]*Event)
+				//}
+				if len(t.witness) <= me.round {
+					t.witness = append(t.witness, make(map[uint]*Event))
+				}
+				t.witness[me.round][m] = me
+				newWitness = true
+			}
+		} else {
+			fmt.Println("这儿应该不会跑到的。。。")
+			return
+		}
+	}
+
+	//如果发现新的witness，就计算一次共识
+	if newWitness {
+		t.consensusComputing()
+	}
+}
+
+func (t *Tetris) updateAll() {
 	//计算round， witness，
 	newWitness := false
 	for n := t.h + 1; n < t.n; n++ {
@@ -567,7 +643,7 @@ func (t *Tetris) update() {
 						pe, ok := t.eventCache.Get(e)
 						if ok {
 							pme := t.memberEvents[pe.(*Event).Body.M][pe.(*Event).Body.N]
-							if pme.round > maxr {
+							if pme != nil && pme.round > maxr {
 								maxr = pme.round
 							}
 						} else {
@@ -680,7 +756,7 @@ func (t *Tetris) consensusComputing() {
 
 				if vt >= t.params.superMajority {
 					me.committable = vv
-					//if i > 4 {
+					//if i > 3 {
 					//	fmt.Println("committable at", i)
 					//}
 					break loop
@@ -694,43 +770,80 @@ func (t *Tetris) consensusComputing() {
 		}
 	}
 
-	//如果witneww都decide，输出结果，这儿是一个临时算法，有问题的。
+	//用pendingTxs来实现, pendingTxs的hash写到区块里面，新成员加入时可直接获取
+	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！
 
-	cs := ""
 	c := make([]int, 0)
-	txtemp := make(map[string]int)
+	cs := ""
+	txc := make([]string, 0)
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
-			//fmt.Print(w.event.Body.M)
-			ww := w
-			c = append(c, int(ww.Body.M))
-			for i := 0; i <= t.params.maxSunk; i++ {
-				for _, tx := range ww.Body.Tx {
-					tc, ok := txtemp[tx]
-					if ok {
-						txtemp[tx] = tc + 1
-					} else {
-						txtemp[tx] = 1
-					}
+			c = append(c, int(w.Body.M))
+			for _, tx := range w.Body.Tx {
+				if t.CommittedTxs.Contains(tx) {
+					continue
 				}
-				e := ww.Body.E[0]
-				v, ok := t.eventCache.Get(e)
-				if ok {
-					ww = v.(*Event)
-				} else {
-					break
+				txm := t.PendingTxs[tx]
+				if txm == nil {
+					txm = make(map[uint]uint64)
+					t.PendingTxs[tx] = txm
+				}
+				txm[w.Body.M] = w.Body.N
+				if len(txm) > t.params.f {
+					txc = append(txc, tx)
+					t.CommittedTxs.Add(tx, true)
+					delete(t.PendingTxs, tx)
 				}
 			}
-
 		}
 	}
 
-	txc := make([]string, 0)
-	for tx, count := range txtemp {
-		if count > 0 /*t.params.f*/ {  //这个是demo用的参数，因为tx不是hash，所以不用maxSunk，也不用t+1限制
-			txc = append(txc, tx)
+
+	//for tx, txm := range t.PendingTxs {
+	//	if len(txm) > t.params.f {
+	//		txc = append(txc, tx)
+	//		delete(t.PendingTxs, tx)
+	//	}
+	//}
+
+	//如果witneww都decide，输出结果，这儿是一个临时算法，有问题的。
+	/*
+		cs := ""
+		c := make([]int, 0)
+		txtemp := make(map[string]int)
+		for _, w := range t.witness[0] {
+			if w.committable == 1 {
+				//fmt.Print(w.event.Body.M)
+				ww := w
+				c = append(c, int(ww.Body.M))
+				for i := 0; i <= t.params.maxSunk; i++ {
+					for _, tx := range ww.Body.Tx {
+						tc, ok := txtemp[tx]
+						if ok {
+							txtemp[tx] = tc + 1
+						} else {
+							txtemp[tx] = 1
+						}
+					}
+					e := ww.Body.E[0]
+					v, ok := t.eventCache.Get(e)
+					if ok {
+						ww = v.(*Event)
+					} else {
+						break
+					}
+				}
+
+			}
 		}
-	}
+
+		txc := make([]string, 0)
+		for tx, count := range txtemp {
+			if count > 0  { //这个是demo用的参数，因为tx不是hash，所以不用maxSunk，也不用t+1限制
+				txc = append(txc, tx)
+			}
+		}
+	*/
 
 	if len(txc) == 0 {
 		for _, w := range t.witness[0] {
@@ -754,7 +867,7 @@ func (t *Tetris) consensusComputing() {
 
 	t.h++
 	t.prepare() //开始下一轮
-	t.update()
+	t.updateAll()
 }
 
 func (t *Tetris) know(x, y *Event) bool {
@@ -843,3 +956,26 @@ func (t *Tetris) knowWell(x, y *Event) bool {
 	}
 	return false
 }
+
+//func (t *Tetris) cacheKnowWell(x, y *Event) bool {
+//    s, ok := t.knowWellCache.Get(x.Hex() + y.Hex())
+//    if ok {
+//    	    return s.(bool)
+//	}
+//
+//	c := 0
+//	for _, id := range t.membersID {
+//		e, ok := t.memberEvents[id][x.know[id]]
+//
+//		if ok && t.know(e, y) {
+//			c++
+//		}
+//	}
+//
+//	if c >= t.params.superMajority {
+//		t.knowWellCache.Add(x.Hex() + y.Hex(), true)
+//		return true
+//	}
+//	t.knowWellCache.Add(x.Hex() + y.Hex(), false)
+//	return false
+//}
