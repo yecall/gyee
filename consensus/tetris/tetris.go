@@ -77,6 +77,8 @@ package tetris
 8. 网络层面：group dht
    group包含成员validators，向group发送dht数据。搞一个group id？子网广播
 
+9. 需解决的工程问题：1）点火问题。2）区块同步效率问题。3）成员替换时的know清单问题。4）内存释放问题。
+
 */
 
 import (
@@ -167,7 +169,7 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 		pendingEvents: utils.NewLRU(10000, nil),
 		eventRequest:  make(map[string]SyncRequest), //TODO:memroy consumption optimize
 		PendingTxs:    make(map[string]map[uint]uint64),
-		CommittedTxs:  utils.NewLRU(10000, nil),
+		CommittedTxs:  utils.NewLRU(100000, nil),
 
 		EventCh:       make(chan Event, 100),
 		ParentEventCh: make(chan Event, 100),
@@ -198,6 +200,10 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 		minPeriodForEvent: 20,
 		maxSunk:           0,
 	}
+
+	//if tetris.m == 0 { //模拟不一样的发送频率影响
+	//	tetris.params.maxTxPerEvent = 500
+	//}
 
 	tetris.pendingSync = true
 	tetris.currentEvent = NewEvent(tetris.h, tetris.m, tetris.n)
@@ -551,6 +557,8 @@ func (t *Tetris) prepare() {
 		}
 	}
 	t.witness = make([]map[uint]*Event, 1)
+
+	//todo:如果有member切换，这儿要重新update know
 }
 
 //有新event加入tetris的时候，
@@ -771,7 +779,8 @@ func (t *Tetris) consensusComputing() {
 	}
 
 	//用pendingTxs来实现, pendingTxs的hash写到区块里面，新成员加入时可直接获取
-	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！
+	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！已确认交易只有一个cache来去重。
+	//todo:fair排序问题？
 
 	c := make([]int, 0)
 	cs := ""
@@ -798,52 +807,7 @@ func (t *Tetris) consensusComputing() {
 		}
 	}
 
-
-	//for tx, txm := range t.PendingTxs {
-	//	if len(txm) > t.params.f {
-	//		txc = append(txc, tx)
-	//		delete(t.PendingTxs, tx)
-	//	}
-	//}
-
-	//如果witneww都decide，输出结果，这儿是一个临时算法，有问题的。
-	/*
-		cs := ""
-		c := make([]int, 0)
-		txtemp := make(map[string]int)
-		for _, w := range t.witness[0] {
-			if w.committable == 1 {
-				//fmt.Print(w.event.Body.M)
-				ww := w
-				c = append(c, int(ww.Body.M))
-				for i := 0; i <= t.params.maxSunk; i++ {
-					for _, tx := range ww.Body.Tx {
-						tc, ok := txtemp[tx]
-						if ok {
-							txtemp[tx] = tc + 1
-						} else {
-							txtemp[tx] = 1
-						}
-					}
-					e := ww.Body.E[0]
-					v, ok := t.eventCache.Get(e)
-					if ok {
-						ww = v.(*Event)
-					} else {
-						break
-					}
-				}
-
-			}
-		}
-
-		txc := make([]string, 0)
-		for tx, count := range txtemp {
-			if count > 0  { //这个是demo用的参数，因为tx不是hash，所以不用maxSunk，也不用t+1限制
-				txc = append(txc, tx)
-			}
-		}
-	*/
+    //fmt.Println("pending tx:", len(t.PendingTxs))
 
 	if len(txc) == 0 {
 		for _, w := range t.witness[0] {
