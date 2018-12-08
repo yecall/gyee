@@ -778,7 +778,7 @@ func (t *Tetris) consensusComputing() {
 		}
 	}
 
-	//用pendingTxs来实现, pendingTxs的hash写到区块里面，新成员加入时可直接获取
+	//用pendingTxs来实现, pendingTxs的hash写到区块里面，新成员加入时可直接获取。另一个做法是有新成员时的stage清除pending检查
 	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！已确认交易只有一个cache来去重。
 	//todo:fair排序问题？
 
