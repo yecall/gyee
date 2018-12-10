@@ -272,10 +272,10 @@ func (shMgr *dhtShellManager)dhtShPutProviderReq(req *sch.MsgDhtPrdMgrAddProvide
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (schMgr *dhtShellManager)GetEventChan() chan *sch.MsgDhtShEventInd {
-	return schMgr.evChan
+func (shMgr *dhtShellManager)GetEventChan() chan *sch.MsgDhtShEventInd {
+	return shMgr.evChan
 }
 
-func (schMgr *dhtShellManager)GetConnStatusChan() chan *sch.MsgDhtConInstStatusInd {
-	return schMgr.csChan
+func (shMgr *dhtShellManager)GetConnStatusChan() chan *sch.MsgDhtConInstStatusInd {
+	return shMgr.csChan
 }
