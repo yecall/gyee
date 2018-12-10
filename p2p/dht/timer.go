@@ -137,33 +137,39 @@ func (mgr *timerManager)startTimer(tm *timer) error {
 		return TmEnoPara
 	}
 
+	targetLi := (*list.List)(nil)
+
 	if tm.s > 0 {
 		sp := (mgr.sp + tm.s) & (xsecondCycle - 1)
 		if mgr.sTmList[sp] == nil {
 			mgr.sTmList[sp] = list.New()
 		}
-		mgr.sTmList[sp].PushBack(tm)
+		targetLi = mgr.sTmList[sp]
 	} else if tm.m > 0 {
 		mp := (mgr.mp + tm.s) & (xminuteCycle- 1)
 		if mgr.mTmList[mp] == nil {
 			mgr.mTmList[mp] = list.New()
 		}
-		mgr.mTmList[mp].PushBack(tm)
+		targetLi = mgr.mTmList[mp]
 	} else if tm.h > 0 {
 		hp := (mgr.hp + tm.s) & (xhourCycle - 1)
 		if mgr.hTmList[hp] == nil {
 			mgr.hTmList[hp] = list.New()
 		}
-		mgr.hTmList[hp].PushBack(tm)
+		targetLi = mgr.hTmList[hp]
 	} else if tm.d > 0 {
 		dp := (mgr.dp + tm.s) & (xdayCycle - 1)
 		if mgr.dTmList[dp] == nil {
 			mgr.dTmList[dp] = list.New()
 		}
-		mgr.dTmList[dp].PushBack(tm)
+		targetLi = mgr.dTmList[dp]
 	} else {
 		return TmEnoBadTimer
 	}
+
+	targetEl := targetLi.PushBack(tm)
+	tm.li = targetLi
+	tm.el = targetEl
 
 	return TmEnoNone
 }

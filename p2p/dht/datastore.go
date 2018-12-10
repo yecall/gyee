@@ -124,6 +124,7 @@ type DsMgr struct {
 	fdsCfg		FileDatastoreConfig		// file data store configuration
 	ldsCfg		LeveldbDatastoreConfig	// levelDB stat store configuration
 	tmMgr		*timerManager			// timer manager
+	tidTick		int						// tick timer identity
 }
 
 //
@@ -136,6 +137,7 @@ func NewDsMgr() *DsMgr {
 		fdsCfg:		FileDatastoreConfig{},
 		ldsCfg:		LeveldbDatastoreConfig{},
 		tmMgr:		NewTimerManager(),
+		tidTick:	sch.SchInvalidTid,
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -169,6 +171,9 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 
 	case sch.EvSchPoweroff:
 		eno = dsMgr.poweroff(ptn)
+
+	case sch.EvDhtDsMgrTickTimer:
+		eno = dsMgr.tickTimerHandler()
 
 	case sch.EvDhtDsMgrAddValReq:
 		eno = dsMgr.localAddValReq(msg.Body.(*sch.MsgDhtDsMgrAddValReq))
@@ -325,6 +330,11 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
+	if eno := dsMgr.startTickTimer(); eno != DhtEnoNone {
+		log.Debug("poweron: startTickTimer failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -336,6 +346,17 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 	dsMgr.ds.Close()
 	dsMgr.dsExp.Close()
 	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
+}
+
+//
+// tick timer handler
+//
+func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
+	if err := dsMgr.tmMgr.tickProc(); err != nil {
+		log.Debug("tickProc: error: %s", err.Error())
+		return sch.SchEnoUserTask
+	}
+	return sch.SchEnoNone
 }
 
 //
@@ -790,6 +811,26 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 		log.Debug("cleanUpReboot: unknown data store type: %d", dsType)
 		return DhtEnoDatastore
 	}
+
+	return DhtEnoNone
+}
+
+func (dsMgr *DsMgr)startTickTimer() DhtErrno {
+	td := sch.TimerDescription {
+		Name:	"_dsMgrTickTimer",
+		Utid:	sch.DhtDsMgrTickTimerId,
+		Tmt:	sch.SchTmTypePeriod,
+		Dur:	oneTick,
+		Extra:	nil,
+	}
+
+	eno, tid := dsMgr.sdl.SchSetTimer(dsMgr.ptnMe, &td)
+	if eno != sch.SchEnoNone {
+		log.Debug("startTickTimer: SchSetTimer failed, eno: %d", eno)
+		return DhtEnoScheduler
+	}
+
+	dsMgr.tidTick = tid
 
 	return DhtEnoNone
 }

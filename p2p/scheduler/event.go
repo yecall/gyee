@@ -920,8 +920,10 @@ type MsgDhtPrdMgrGetProviderReq struct {
 //
 // DHT data store manager event
 //
+const DhtDsMgrTickTimerId	= 0
 const (
 	EvDhtDsMgrBase				= 2700
+	EvDhtDsMgrTickTimer			= EvTimerBase	+ DhtDsMgrTickTimerId
 	EvDhtDsMgrAddValReq			= EvDhtDsMgrBase + 1
 	EvDhtDsMgrPutValReq			= EvDhtDsMgrBase + 2
 	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 3
