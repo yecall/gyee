@@ -86,6 +86,12 @@ func (shMgr *dhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 	case sch.EvDhtBlindConnectReq:
 		eno = shMgr.dhtShBlindConnectReq(msg.Body.(*sch.MsgDhtBlindConnectReq))
 
+	case sch.EvDhtMgrGetValueReq:
+		eno = shMgr.dhtShGetValueReq(msg.Body.(*sch.MsgDhtMgrGetValueReq))
+
+	case sch.EvDhtMgrPutValueReq:
+		eno = shMgr.dhtShPutValueReq(msg.Body.(*sch.MsgDhtMgrPutValueReq))
+
 	case sch.EvDhtMgrGetProviderReq:
 		eno = shMgr.dhtShGetProviderReq(msg.Body.(*sch.MsgDhtMgrGetProviderReq))
 
@@ -257,6 +263,18 @@ func (shMgr *dhtShellManager)dhtShFindPeerReq(req *sch.MsgDhtQryMgrQueryStartReq
 func (shMgr *dhtShellManager)dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtBlindConnectReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *dhtShellManager)dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetValueReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *dhtShellManager)dhtShPutValueReq(req *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrPutValueReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 

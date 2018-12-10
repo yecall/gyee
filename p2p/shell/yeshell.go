@@ -466,11 +466,11 @@ func (yeShMgr *yeShellManager)DhtGetProvider(key []byte, done chan interface{}) 
 		return sch.SchEnoDuplicated
 	}
 
-	req := sch.MsgDhtMgrGetValueReq{
+	req := sch.MsgDhtMgrGetProviderReq {
 		Key: key,
 	}
 	msg := sch.SchMessage{}
-	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
+	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetProviderReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		log.Debug("DhtGetProvider: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
@@ -497,7 +497,7 @@ func (yeShMgr *yeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 		return sch.SchEnoDuplicated
 	}
 
-	req := sch.MsgDhtPrdMgrAddProviderReq{
+	req := sch.MsgDhtPrdMgrAddProviderReq {
 		Key: key,
 		Prd: *provider,
 	}
