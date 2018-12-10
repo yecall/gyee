@@ -93,6 +93,7 @@ type YeShellConfig struct {
 	NodeDatabase		string									// node database
 	SubNetMaskBits		int										// mask bits for sub network identity
 	EvKeepTime			time.Duration							// duration for events kept by dht
+	DedupTime			time.Duration							// duration for deduplication cleanup timer
 }
 
 const (
