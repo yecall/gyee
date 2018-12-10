@@ -300,7 +300,9 @@ func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
 		SnidAdd: SnidAdd,
 		SnidDel: SnidDel,
 	}
+
 	msg := sch.SchMessage{}
+
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellReconfigReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		log.Debug("Reconfig: SchSendMessage failed, eno: %d", eno)
@@ -764,18 +766,26 @@ func (yeShMgr *yeShellManager)broadcastBk(msg *yep2p.Message) error {
 }
 
 func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
+	// if local node is a validator, the Tx should be broadcast over the
+	// validator-subnet; else the Tx should be broadcast over the
+	// dynamic-subnet.
 	return nil
 }
 
 func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
+	// the local node must be a validator, and the Ev should be broadcast
+	// over the validator-subnet. also, the Ev should be stored into DHT
+	// with a duration to be expired.
 	return nil
 }
 
 func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
+	// the Bh should be broadcast over the any-subnet
 	return nil
 }
 
 func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
+	// the Bk should be stored by DHT and no broadcasting over any subnet
 	return nil
 }
 
