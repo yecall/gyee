@@ -76,6 +76,7 @@ type yeShellManager struct {
 	dhtCsChan			chan *sch.MsgDhtConInstStatusInd		// dht connection status indication channel
 	subscribers      	*sync.Map								// subscribers for incoming messages
 	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
+	tmDedup				*dht.TimerManager						// deduplication timer manager
 }
 
 const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity

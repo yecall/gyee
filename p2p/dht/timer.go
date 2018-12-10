@@ -58,7 +58,7 @@ func (eno timerEno)Error() string {
 	return fmt.Sprintf("%d", eno)
 }
 
-type timerCallback = func(el *list.Element, data interface{})interface{}
+type TimerCallback = func(el *list.Element, data interface{})interface{}
 
 type timer struct {
 	s			int							// seconds remain
@@ -66,14 +66,14 @@ type timer struct {
 	h			int							// hours remain
 	d			int							// day remain
 	data		interface{}					// pointer passed to callback
-	tcb			timerCallback				// callback when timer expired
+	tcb			TimerCallback				// callback when timer expired
 	li			*list.List					// list pointer
 	el			*list.Element				// element pointer
 	to			time.Time					// absolute time moment to be expired
 	k			[]byte						// key attached to this timer
 }
 
-type timerManager struct {
+type TimerManager struct {
 	sp			int							// second pointer
 	mp			int							// minute pointer
 	hp			int							// hour pointer
@@ -84,11 +84,11 @@ type timerManager struct {
 	dTmList		[xdayCycle]*list.List		// day timer list
 }
 
-func NewTimerManager() *timerManager {
-	return &timerManager{}
+func NewTimerManager() *TimerManager {
+	return &TimerManager{}
 }
 
-func (mgr *timerManager)getTimer(dur time.Duration, dat interface{}, tcb timerCallback) (*timer, error) {
+func (mgr *TimerManager)GetTimer(dur time.Duration, dat interface{}, tcb TimerCallback) (interface{}, error) {
 	if dur < minDur {
 		return nil, TmEnoDurTooSmall
 	}
@@ -122,17 +122,20 @@ func (mgr *timerManager)getTimer(dur time.Duration, dat interface{}, tcb timerCa
 	return &tm, TmEnoNone
 }
 
-func (mgr *timerManager)setTimerHandler(tm *timer, tcb timerCallback) error {
+func (mgr *TimerManager)SetTimerHandler(ptm interface{}, tcb TimerCallback) error {
+	tm := ptm.(*timer)
 	tm.tcb = tcb
 	return TmEnoNone
 }
 
-func (mgr *timerManager)setTimerData(tm *timer, data interface{}) error {
+func (mgr *TimerManager)SetTimerData(ptm interface{}, data interface{}) error {
+	tm := ptm.(*timer)
 	tm.data = data
 	return TmEnoNone
 }
 
-func (mgr *timerManager)startTimer(tm *timer) error {
+func (mgr *TimerManager)StartTimer(ptm interface{}) error {
+	tm := ptm.(*timer)
 	if tm == nil {
 		return TmEnoPara
 	}
@@ -174,15 +177,22 @@ func (mgr *timerManager)startTimer(tm *timer) error {
 	return TmEnoNone
 }
 
-func (mgr *timerManager)killTimer(tm *timer) error {
-	if tm == nil || tm.li == nil || tm.el == nil {
+func (mgr *TimerManager)KillTimer(ptm interface{}) error {
+
+	if ptm == nil {
+		return TmEnoPara
+	}
+
+	tm := ptm.(*timer)
+	if tm.li == nil || tm.el == nil {
 		return TmEnoPara
 	}
 	tm.li.Remove(tm.el)
+
 	return TmEnoNone
 }
 
-func (mgr *timerManager)tickProc() error {
+func (mgr *TimerManager)TickProc() error {
 	if mgr.sp = (mgr.sp + 1) & (xsecondCycle - 1); mgr.sp == 0 {
 		if mgr.mp = (mgr.mp + 1) & (xminuteCycle - 1); mgr.mp == 0 {
 			if mgr.hp = (mgr.hp + 1) & (xhourCycle - 1); mgr.hp == 0 {
@@ -202,7 +212,7 @@ func (mgr *timerManager)tickProc() error {
 	return TmEnoNone
 }
 
-func (mgr *timerManager)spHandler(li *list.List) error {
+func (mgr *TimerManager)spHandler(li *list.List) error {
 	if li != nil {
 		for {
 			if el := li.Front(); el == nil {
@@ -237,7 +247,7 @@ func (mgr *timerManager)spHandler(li *list.List) error {
 	return TmEnoNone
 }
 
-func (mgr *timerManager)mpHandler(li *list.List) error {
+func (mgr *TimerManager)mpHandler(li *list.List) error {
 	if li != nil {
 		for {
 			if el := li.Front(); el == nil {
@@ -266,7 +276,7 @@ func (mgr *timerManager)mpHandler(li *list.List) error {
 	return TmEnoNone
 }
 
-func (mgr *timerManager)hpHandler(li *list.List) error {
+func (mgr *TimerManager)hpHandler(li *list.List) error {
 	if li != nil {
 		for {
 			if el := li.Front(); el == nil {
@@ -289,7 +299,7 @@ func (mgr *timerManager)hpHandler(li *list.List) error {
 	return TmEnoNone
 }
 
-func (mgr *timerManager)dpHandler(li *list.List) error {
+func (mgr *TimerManager)dpHandler(li *list.List) error {
 	if li != nil {
 		for {
 			if el := li.Front(); el == nil {

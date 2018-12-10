@@ -132,7 +132,7 @@ type DsMgr struct {
 	dsExp		Datastore				// data store for expired time
 	fdsCfg		FileDatastoreConfig		// file data store configuration
 	ldsCfg		LeveldbDatastoreConfig	// levelDB stat store configuration
-	tmMgr		*timerManager			// timer manager
+	tmMgr		*TimerManager			// timer manager
 	tidTick		int						// tick timer identity
 }
 
@@ -225,14 +225,15 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
 	if kt != DsMgrDurInf {
 
-		tm, eno := dsMgr.tmMgr.getTimer(kt, nil, nil)
+		ptm, eno := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 		if eno != TmEnoNone {
-			log.Debug("Put: getTimer failed, eno: %d", eno)
+			log.Debug("Put: GetTimer failed, eno: %d", eno)
 			return DhtEnoTimer
 		}
 
-		dsMgr.tmMgr.setTimerData(tm, tm)
-		dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+		tm := ptm.(*timer)
+		dsMgr.tmMgr.SetTimerData(tm, tm)
+		dsMgr.tmMgr.SetTimerHandler(tm, dsMgr.cleanUpTimerCb)
 
 		tm.to = time.Now().Add(kt)
 		ek := dsMgr.makeExpiredKey(k, tm.to)
@@ -241,8 +242,8 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 			return DhtEnoDatastore
 		}
 
-		if err := dsMgr.tmMgr.startTimer(tm); err != nil {
-			log.Debug("Put: startTimer failed, error: %s", err.Error())
+		if err := dsMgr.tmMgr.StartTimer(tm); err != nil {
+			log.Debug("Put: StartTimer failed, error: %s", err.Error())
 			dsMgr.ds.Delete(k)
 			dsMgr.dsExp.Delete(ek)
 			return DhtEnoTimer
@@ -367,8 +368,8 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 // tick timer handler
 //
 func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
-	if err := dsMgr.tmMgr.tickProc(); err != nil {
-		log.Debug("tickProc: error: %s", err.Error())
+	if err := dsMgr.tmMgr.TickProc(); err != nil {
+		log.Debug("TickProc: error: %s", err.Error())
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -810,15 +811,15 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 			} else {
 
 				kt := time.Second * time.Duration(secondes - time.Now().Unix())
-				tm, err := dsMgr.tmMgr.getTimer(kt, nil, nil)
+				tm, err := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 
 				if err != nil {
-					log.Debug("cleanUpReboot: getTimer failed, error: %s", err.Error())
+					log.Debug("cleanUpReboot: GetTimer failed, error: %s", err.Error())
 					continue
 				}
 
-				dsMgr.tmMgr.setTimerData(tm, tm)
-				dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+				dsMgr.tmMgr.SetTimerData(tm, tm)
+				dsMgr.tmMgr.SetTimerHandler(tm, dsMgr.cleanUpTimerCb)
 			}
 		}
 	} else {
@@ -855,7 +856,7 @@ func (dsMgr *DsMgr)startTickTimer() DhtErrno {
 //
 func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{} {
 
-	// notice: need not to call dsMgr.tmMgr.killTimer, since the timer would
+	// notice: need not to call dsMgr.tmMgr.KillTimer, since the timer would
 	// be removed by timer manager itself.
 
 	err := DhtErrno(DhtEnoNone)
