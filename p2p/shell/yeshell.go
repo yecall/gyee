@@ -42,6 +42,20 @@ const (
 	yesMaxPutProvider = 4										// max put provider commands in pending
 )
 
+var yesMtAtoi = map[string]int{
+	yep2p.MessageTypeTx:					sch.MSBR_MT_TX,
+	yep2p.MessageTypeEvent:					sch.MSBR_MT_EV,
+	yep2p.MessageTypeBlockHeader:			sch.MSBR_MT_BLKH,
+	yep2p.MessageTypeBlock:					sch.MSBR_MT_BLK,
+}
+
+var yesMidItoa = map[int] string {
+	int(pepb.MessageId_MID_TX):				yep2p.MessageTypeTx,
+	int(pepb.MessageId_MID_EVENT):			yep2p.MessageTypeEvent,
+	int(pepb.MessageId_MID_BLOCKHEADER):	yep2p.MessageTypeBlockHeader,
+	int(pepb.MessageId_MID_BLOCK):			yep2p.MessageTypeBlock,
+}
+
 type yesKey [yesKeyBytes]byte									// key type
 
 type yeShellManager struct {
@@ -77,6 +91,7 @@ type YeShellConfig struct {
 	NodeDataDir			string									// node data directory
 	NodeDatabase		string									// node database
 	SubNetMaskBits		int										// mask bits for sub network identity
+	EvKeepTime			time.Duration							// duration for events kept by dht
 }
 
 const (
@@ -338,9 +353,9 @@ func (yeShMgr *yeShellManager)BroadcastMessageOsn(message yep2p.Message) error {
 		err = yeShMgr.broadcastTxOsn(&message)
 	case yep2p.MessageTypeEvent:
 		err = yeShMgr.broadcastEvOsn(&message)
-	case yep2p.	MessageTypeBlockHeader:
+	case yep2p.MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBhOsn(&message)
-	case yep2p.	MessageTypeBlock:
+	case yep2p.MessageTypeBlock:
 		err = yeShMgr.broadcastBkOsn(&message)
 	default:
 		return errors.New(fmt.Sprintf("BroadcastMessageOsn: invalid type: %d", message.MsgType))
@@ -622,13 +637,6 @@ _csLoop:
 
 func (yeShMgr *yeShellManager)chainRxProc() {
 
-	mid2Str := map[int] string {
-		int(pepb.MessageId_MID_TX): yep2p.MessageTypeTx,
-		int(pepb.MessageId_MID_EVENT): yep2p.MessageTypeEvent,
-		int(pepb.MessageId_MID_BLOCKHEADER): yep2p.MessageTypeBlockHeader,
-		int(pepb.MessageId_MID_BLOCK): yep2p.MessageTypeBlock,
-	}
-
 _rxLoop:
 	for {
 		select {
@@ -641,7 +649,7 @@ _rxLoop:
 				log.Debug("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
 				continue
 			}
-			msgType := mid2Str[pkg.MsgId]
+			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 				subList.(*sync.Map).Range(func(key, value interface{}) bool {
 					msg := yep2p.Message {
@@ -767,25 +775,85 @@ func (yeShMgr *yeShellManager)broadcastBk(msg *yep2p.Message) error {
 
 func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
 	// if local node is a validator, the Tx should be broadcast over the
-	// validator-subnet; else the Tx should be broadcast over the
-	// dynamic-subnet.
+	// validator-subnet; else the Tx should be broadcast over the dynamic
+	// subnet. this is done in chain shell manager, and the message here
+	// would be dispatched to chain shell manager.
+	schMsg := sch.SchMessage{}
+	req := sch.MsgShellBroadcastReq {
+		MsgType: yesMtAtoi[msg.MsgType],
+		From: msg.From,
+		Data: msg.Data,
+	}
+	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
+	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Debug("broadcastTxOsn: SchSendMessage failed, eno: %d", eno)
+		return eno
+	}
 	return nil
 }
 
 func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
 	// the local node must be a validator, and the Ev should be broadcast
 	// over the validator-subnet. also, the Ev should be stored into DHT
-	// with a duration to be expired.
+	// with a duration to be expired. the message here would be dispatched
+	// to chain shell manager and DHT shell manager.
+	schMsg := sch.SchMessage{}
+	req := sch.MsgShellBroadcastReq {
+		MsgType: yesMtAtoi[msg.MsgType],
+		From: msg.From,
+		Data: msg.Data,
+	}
+	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
+	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
+		return eno
+	}
+
+	req2Dht := sch.MsgDhtMgrPutValueReq {
+		Key: msg.Key,
+		Val: msg.Data,
+		KeepTime: YeShellCfg.EvKeepTime,
+	}
+	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req2Dht)
+	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
+		return eno
+	}
+
 	return nil
 }
 
 func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
-	// the Bh should be broadcast over the any-subnet
+	// the Bh should be broadcast over the any-subnet. the message here
+	// would be dispatched to chain shell manager.
+	schMsg := sch.SchMessage{}
+	req := sch.MsgShellBroadcastReq {
+		MsgType: yesMtAtoi[msg.MsgType],
+		From: msg.From,
+		Data: msg.Data,
+	}
+	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
+	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Debug("broadcastBhOsn: SchSendMessage failed, eno: %d", eno)
+		return eno
+	}
 	return nil
 }
 
 func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
-	// the Bk should be stored by DHT and no broadcasting over any subnet
+	// the Bk should be stored by DHT and no broadcasting over any subnet.
+	// the message here would be dispatched to DHT shell manager.
+	schMsg := sch.SchMessage{}
+	req := sch.MsgDhtMgrPutValueReq {
+		Key: msg.Key,
+		Val: msg.Data,
+		KeepTime: dht.DsMgrDurInf,
+	}
+	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
+	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
+		return eno
+	}
 	return nil
 }
 

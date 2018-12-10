@@ -102,6 +102,8 @@ func (shMgr *shellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = shMgr.peerAskToCloseInd(msg.Body.(*sch.MsgShellPeerAskToCloseInd))
 	case sch.EvShellReconfigReq:
 		eno = shMgr.reconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
+	case sch.EvShellBroadcastReq:
+		eno = shMgr.broadcastReq(msg.Body.(*sch.MsgShellBroadcastReq))
 	default:
 		log.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -228,4 +230,8 @@ func (shMgr *shellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno
 	}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnTabMgr, sch.EvShellReconfigReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	return sch.SchEnoNone
 }

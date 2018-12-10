@@ -106,7 +106,16 @@ const (
 	dstLevelDB
 )
 
+//
+// data store type applying
+//
 var dsType = dstLevelDB
+
+//
+// infinite
+//
+const DsMgrDurInf = time.Duration(0)
+
 
 //
 // Data store manager
@@ -206,32 +215,38 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 //
 func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
-	tm, eno := dsMgr.tmMgr.getTimer(kt, nil, nil)
-	if eno != TmEnoNone {
-		log.Debug("Put: getTimer failed, eno: %d", eno)
-		return DhtEnoTimer
-	}
-
-	dsMgr.tmMgr.setTimerData(tm, tm)
-	dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
-
-	tm.to = time.Now().Add(kt)
-	ek := dsMgr.makeExpiredKey(k, tm.to)
-	if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
+	if eno := dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
 		log.Debug("Put: failed, eno: %d", eno)
 		return DhtEnoDatastore
 	}
 
-	if eno = dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
-		log.Debug("Put: failed, eno: %d", eno)
-		return DhtEnoDatastore
-	}
+	// notice following codes does not delete the [key, value] had been stored
+	// even timer failed to be startup.
 
-	if err := dsMgr.tmMgr.startTimer(tm); err != nil {
-		log.Debug("Put: startTimer failed, error: %s", err.Error())
-		dsMgr.ds.Delete(k)
-		dsMgr.dsExp.Delete(ek)
-		return DhtEnoTimer
+	if kt != DsMgrDurInf {
+
+		tm, eno := dsMgr.tmMgr.getTimer(kt, nil, nil)
+		if eno != TmEnoNone {
+			log.Debug("Put: getTimer failed, eno: %d", eno)
+			return DhtEnoTimer
+		}
+
+		dsMgr.tmMgr.setTimerData(tm, tm)
+		dsMgr.tmMgr.setTimerHandler(tm, dsMgr.cleanUpTimerCb)
+
+		tm.to = time.Now().Add(kt)
+		ek := dsMgr.makeExpiredKey(k, tm.to)
+		if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
+			log.Debug("Put: failed, eno: %d", eno)
+			return DhtEnoDatastore
+		}
+
+		if err := dsMgr.tmMgr.startTimer(tm); err != nil {
+			log.Debug("Put: startTimer failed, error: %s", err.Error())
+			dsMgr.ds.Delete(k)
+			dsMgr.dsExp.Delete(ek)
+			return DhtEnoTimer
+		}
 	}
 
 	return DhtEnoNone

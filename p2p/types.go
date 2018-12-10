@@ -30,5 +30,6 @@ const (
 type Message struct {
 	MsgType string
 	From    string
+	Key		[]byte
 	Data    []byte
 }
