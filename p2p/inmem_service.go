@@ -25,8 +25,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-
-	//"github.com/yeeco/gyee/utils/logging"
 )
 
 type InmemService struct {
