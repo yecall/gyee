@@ -80,6 +80,7 @@ const (
 	EvShellPeerCloseInd			= EvShellBase + 3
 	EvShellPeerAskToCloseInd	= EvShellBase + 4
 	EvShellReconfigReq			= EvShellBase + 5
+	EvShellBroadcastReq			= EvShellBase + 6
 )
 
 //
@@ -129,6 +130,22 @@ type MsgShellReconfigReq struct {
 	VSnidDel	[]config.SubNetworkID	// validator sub network identities to be deleted
 	SnidAdd		[]config.SubNetworkID	// common sub network identities to be added
 	SnidDel		[]config.SubNetworkID	// common sub network identities to be deleted
+}
+
+//
+// EvShellBroadcastReq
+//
+const (
+	MSBR_MT_TX		= iota				// tx type
+	MSBR_MT_EV							// event type
+	MSBR_MT_BLKH						// block header type
+	MSBR_MT_BLK							// block type
+)
+
+type MsgShellBroadcastReq struct {
+	MsgType		int						// message type, see above constants
+	From    	string					// from
+	Data    	[]byte					// payload bytes
 }
 
 //
@@ -920,8 +937,10 @@ type MsgDhtPrdMgrGetProviderReq struct {
 //
 // DHT data store manager event
 //
+const DhtDsMgrTickTimerId	= 0
 const (
 	EvDhtDsMgrBase				= 2700
+	EvDhtDsMgrTickTimer			= EvTimerBase	+ DhtDsMgrTickTimerId
 	EvDhtDsMgrAddValReq			= EvDhtDsMgrBase + 1
 	EvDhtDsMgrPutValReq			= EvDhtDsMgrBase + 2
 	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 3

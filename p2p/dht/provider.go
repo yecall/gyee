@@ -40,7 +40,7 @@ const PrdMgrName = sch.DhtPrdMgrName
 // Providers cache parameters
 //
 const (
-	prdCacheSize = 256					// cache size
+	prdCacheSize = 4096					// cache size
 	prdCleanupInterval = time.Hour * 1	// cleanup period
 	prdLifeCached = time.Hour * 24		// lifetime
 	prdDftKeepTime = time.Hour * 24		// default duration to keep [key, provider] pair
@@ -62,7 +62,7 @@ type PrdMgr struct {
 	lockStore	sync.Mutex				// sync with store
 	prdCache	*lru.Cache				// providers cache
 	lockCache	sync.Mutex				// sync with cache operations
-	tmMgr		*timerManager			// timer manager
+	tmMgr		*TimerManager			// timer manager
 }
 
 //
