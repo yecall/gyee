@@ -134,6 +134,12 @@ func (mgr *TimerManager)SetTimerData(ptm interface{}, data interface{}) error {
 	return TmEnoNone
 }
 
+func (mgr *TimerManager)SetTimerKey(ptm interface{}, key []byte) error {
+	tm := ptm.(*timer)
+	tm.k = key
+	return TmEnoNone
+}
+
 func (mgr *TimerManager)StartTimer(ptm interface{}) error {
 	tm := ptm.(*timer)
 	if tm == nil {

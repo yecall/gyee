@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"bytes"
+	"container/list"
 	yep2p "github.com/yeeco/gyee/p2p"
 	log "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
@@ -77,6 +78,7 @@ type yeShellManager struct {
 	subscribers      	*sync.Map								// subscribers for incoming messages
 	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
 	tmDedup				*dht.TimerManager						// deduplication timer manager
+	deDupMap			map[[yesKeyBytes]byte]bool				// map for keys of messages had been sent
 }
 
 const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity
@@ -780,6 +782,11 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
+	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+		log.Debug("broadcastTxOsn: error: %s", err.Error())
+		return err
+	}
+
 	schMsg := sch.SchMessage{}
 	req := sch.MsgShellBroadcastReq {
 		MsgType: yesMtAtoi[msg.MsgType],
@@ -799,6 +806,11 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
 	// to chain shell manager and DHT shell manager.
+	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+		log.Debug("broadcastEvOsn: error: %s", err.Error())
+		return err
+	}
+
 	schMsg := sch.SchMessage{}
 	req := sch.MsgShellBroadcastReq {
 		MsgType: yesMtAtoi[msg.MsgType],
@@ -828,6 +840,11 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
 func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
+	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+		log.Debug("broadcastBhOsn: error: %s", err.Error())
+		return err
+	}
+
 	schMsg := sch.SchMessage{}
 	req := sch.MsgShellBroadcastReq {
 		MsgType: yesMtAtoi[msg.MsgType],
@@ -845,6 +862,11 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
 func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
+	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+		log.Debug("broadcastBkOsn: error: %s", err.Error())
+		return err
+	}
+
 	schMsg := sch.SchMessage{}
 	req := sch.MsgDhtMgrPutValueReq {
 		Key: msg.Key,
@@ -873,4 +895,42 @@ func (yeShMgr *yeShellManager)getSubnetIdentity(maskBits int) (config.SubNetwork
 		byte(snw & 0xff),
 	}
 	return snid, nil
+}
+
+func (yeShMgr *yeShellManager)deDupTimerCb(el *list.Element, data interface{}) interface{} {
+	if key, ok := data.(*[yesKeyBytes]byte); !ok {
+		return errors.New("deDupTimerCb: invalid key")
+	} else {
+		delete(yeShMgr.deDupMap, *key)
+		return nil
+	}
+}
+
+func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
+	if len(key) != yesKeyBytes {
+		return errors.New("setDedupTimer: invalid key")
+	}
+
+	var k = [yesKeyBytes]byte{}
+	copy(k[0:], key)
+	if _, ok := yeShMgr.deDupMap[k]; ok {
+		log.Debug("setDedupTimer: duplicated")
+		return errors.New("setDedupTimer: duplicated")
+	}
+
+	tm, err := yeShMgr.tmDedup.GetTimer(YeShellCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
+	if err != nil {
+		log.Debug("setDedupTimer: GetTimer failed, error: %s", err.Error())
+		return err
+	}
+
+	yeShMgr.tmDedup.SetTimerData(tm, &k)
+
+	if err := yeShMgr.tmDedup.StartTimer(tm); err != nil {
+		log.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
+		return err
+	}
+
+	yeShMgr.deDupMap[k] = true
+	return nil
 }

@@ -233,6 +233,7 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
 		tm := ptm.(*timer)
 		dsMgr.tmMgr.SetTimerData(tm, tm)
+		dsMgr.tmMgr.SetTimerKey(tm, k)
 		dsMgr.tmMgr.SetTimerHandler(tm, dsMgr.cleanUpTimerCb)
 
 		tm.to = time.Now().Add(kt)
@@ -819,6 +820,7 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 				}
 
 				dsMgr.tmMgr.SetTimerData(tm, tm)
+				dsMgr.tmMgr.SetTimerKey(tm, k)
 				dsMgr.tmMgr.SetTimerHandler(tm, dsMgr.cleanUpTimerCb)
 			}
 		}

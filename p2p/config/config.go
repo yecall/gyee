@@ -85,7 +85,7 @@ const MaxProtocols = 32
 // Max peers
 const MaxPeers = 16
 
-// Max concurrecny inboudn and outbound
+// Max concurrency inboudn and outbound
 const MaxInbounds	= MaxPeers / 2 // +2
 const MaxOutbounds	= MaxPeers / 2 // +2
 
