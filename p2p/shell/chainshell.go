@@ -59,7 +59,7 @@ type shellManager struct {
 	ptnPeMgr		interface{}						// pointer to task node of peer manager
 	ptnTabMgr		interface{}						// pointer to task node of table manager
 	peerActived		map[shellPeerID]shellPeerInst	// active peers
-	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all intances
+	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all instances
 }
 
 //
@@ -233,5 +233,37 @@ func (shMgr *shellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno
 }
 
 func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	//
+	// MSBR_MT_EV(event):
+	// the local node must be a validator, and the Ev should be broadcast
+	// over the validator-subnet. also, the Ev should be stored into DHT
+	// with a duration to be expired. the message here would be dispatched
+	// to chain shell manager and DHT shell manager.
+	//
+	// MSBR_MT_EV(transaction):
+	// if local node is a validator, the Tx should be broadcast over the
+	// validator-subnet; else the Tx should be broadcast over the dynamic
+	// subnet. this is done in chain shell manager, and the message here
+	// would be dispatched to chain shell manager.
+	//
+	// MSBR_MT_BLKH(block header):
+	// the Bh should be broadcast over the any-subnet. the message here
+	// would be dispatched to chain shell manager.
+	//
+	// MSBR_MT_BLK(block):
+	// the Bk should be stored by DHT and no broadcasting over any subnet.
+	// the message here would be dispatched to DHT shell manager.
+	//
+
+	switch req.MsgType {
+	case sch.MSBR_MT_EV:
+	case sch.MSBR_MT_TX:
+	case sch.MSBR_MT_BLKH:
+	case sch.MSBR_MT_BLK:
+	default:
+		log.Debug("broadcastReq: invalid message type: %d", req.MsgType)
+		return sch.SchEnoParameter
+	}
+
 	return sch.SchEnoNone
 }
