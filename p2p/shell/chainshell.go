@@ -25,6 +25,7 @@ import (
 	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/peer"
+	"bytes"
 )
 
 const (
@@ -236,34 +237,63 @@ func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	//
 	// MSBR_MT_EV(event):
 	// the local node must be a validator, and the Ev should be broadcast
-	// over the validator-subnet. also, the Ev should be stored into DHT
-	// with a duration to be expired. the message here would be dispatched
-	// to chain shell manager and DHT shell manager.
+	// over the validator-subnet.
 	//
-	// MSBR_MT_EV(transaction):
+	// MSBR_MT_TX(transaction):
 	// if local node is a validator, the Tx should be broadcast over the
 	// validator-subnet; else the Tx should be broadcast over the dynamic
-	// subnet. this is done in chain shell manager, and the message here
-	// would be dispatched to chain shell manager.
+	// subnet.
 	//
 	// MSBR_MT_BLKH(block header):
-	// the Bh should be broadcast over the any-subnet. the message here
-	// would be dispatched to chain shell manager.
+	// the Bh should be broadcast over the any-subnet.
 	//
-	// MSBR_MT_BLK(block):
-	// the Bk should be stored by DHT and no broadcasting over any subnet.
-	// the message here would be dispatched to DHT shell manager.
+	// MSBR_MT_BLK(block): would not come here, blocks just needed to be
+	// backup into DHT.
 	//
 
 	switch req.MsgType {
+
 	case sch.MSBR_MT_EV:
+		for id, peer := range shMgr.peerActived {
+			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
+				shMgr.send2Peer(&peer, req)
+			}
+		}
+
 	case sch.MSBR_MT_TX:
+		for id, peer := range shMgr.peerActived {
+			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
+				shMgr.send2Peer(&peer, req)
+			} else if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
+				shMgr.send2Peer(&peer, req)
+			}
+		}
+
 	case sch.MSBR_MT_BLKH:
-	case sch.MSBR_MT_BLK:
+		for id, peer := range shMgr.peerActived {
+			if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
+				shMgr.send2Peer(&peer, req)
+			}
+		}
+
 	default:
 		log.Debug("broadcastReq: invalid message type: %d", req.MsgType)
 		return sch.SchEnoParameter
 	}
 
 	return sch.SchEnoNone
+}
+
+func (shMgr *shellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPackage {
+	return nil
+}
+
+func (shMgr *shellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	if pkg := shMgr.bcr2Package(req); pkg == nil {
+		log.Debug("send2Peer: bcr2Package failed")
+		return sch.SchEnoUserTask
+	} else {
+		peer.txChan<-pkg
+		return sch.SchEnoNone
+	}
 }
