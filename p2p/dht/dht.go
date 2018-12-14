@@ -452,7 +452,12 @@ func (dhtMgr *DhtMgr)getProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErr
 // put value request handler
 //
 func (dhtMgr *DhtMgr)putValueReq(msg *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
-	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrPutValueReq, msg)
+	req := sch.MsgDhtDsMgrAddValReq{
+		Key: msg.Key,
+		Val: msg.Val,
+		KT: msg.KeepTime,
+	}
+	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtDsMgrAddValReq, &req)
 }
 
 //

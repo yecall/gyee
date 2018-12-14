@@ -947,7 +947,7 @@ const (
 )
 
 //
-// EvDhtDsMgrGetValReq
+// EvDhtDsMgrAddValReq
 //
 const Keep4Ever = time.Duration(-1)
 type MsgDhtDsMgrAddValReq struct {
