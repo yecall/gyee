@@ -49,9 +49,17 @@ const (
 // Message identities
 //
 const (
+
+	// internal MID for PID_P2P
 	MID_HANDSHAKE	= pb.MessageId_MID_HANDSHAKE	// handshake
 	MID_PING		= pb.MessageId_MID_PING			// ping
 	MID_PONG		= pb.MessageId_MID_PONG			// pong
+
+	// external MID for PID_EXT
+	MID_TX			= pb.MessageId_MID_TX
+	MID_EVENT		= pb.MessageId_MID_EVENT
+	MID_BLOCKHEADER	= pb.MessageId_MID_BLOCKHEADER
+	MID_BLOCK		= pb.MessageId_MID_BLOCK
 )
 
 //
@@ -90,6 +98,7 @@ type Pingpong struct {
 type P2pPackage struct {
 	Pid				uint32	// protocol identity
 	Mid				uint32	// message identity
+	Key				[]byte	// key of message
 	PayloadLength	uint32	// payload length
 	Payload			[]byte	// payload
 }
@@ -504,6 +513,7 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 	*pbPkg.Pid = pb.ProtocolId(upkg.Pid)
 	pbPkg.ExtMid = new(pb.MessageId)
 	*pbPkg.ExtMid = pb.MessageId(upkg.Mid)
+	pbPkg.ExtKey = upkg.Key
 	pbPkg.PayloadLength = new(uint32)
 	*pbPkg.PayloadLength = uint32(upkg.PayloadLength)
 	pbPkg.Payload = append(pbPkg.Payload, upkg.Payload...)
@@ -583,6 +593,7 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 
 	upkg.Pid			= uint32(*pkg.Pid)
 	upkg.Mid			= uint32(*pkg.ExtMid)
+	upkg.Key			= append(upkg.Key[0:], pkg.ExtKey...)
 	upkg.PayloadLength	= *pkg.PayloadLength
 	upkg.Payload		= append(upkg.Payload, pkg.Payload ...)
 

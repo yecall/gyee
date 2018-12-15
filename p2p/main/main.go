@@ -267,11 +267,15 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 			tcb.txSeq,
 			fmt.Sprintf("%x", tcb.peerId.subNetId),
 			fmt.Sprintf("%x", id))
+
 		pkg.SubNetId = id.subNetId
 		pkg.IdList = make([]peer.PeerId, 0)
 		pkg.IdList = append(pkg.IdList, id.nodeId)
 		pkg.Payload = []byte(txString)
 		pkg.PayloadLength = len(pkg.Payload)
+
+		pkg.Key = append(pkg.Key, sha256.Sum256(pkg.Payload)[0:]...)
+		pkg.Mid = sch.MSBR_MT_TX
 	}
 
 	var tmHandler = func() {

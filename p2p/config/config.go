@@ -79,6 +79,9 @@ const NodeIDBytes	= NodeIDBits / 8
 // Node identity
 type NodeID [NodeIDBytes]byte
 
+// DHT key length
+const DhtKeyLength = 32
+
 // Max protocols
 const MaxProtocols = 32
 

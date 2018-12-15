@@ -36,7 +36,7 @@ import (
 //
 // Datastore key
 //
-const DsKeyLength = config.NodeIDBytes
+const DsKeyLength = config.DhtKeyLength
 type DsKey =  [DsKeyLength]byte
 
 //

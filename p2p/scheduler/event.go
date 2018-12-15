@@ -133,13 +133,13 @@ type MsgShellReconfigReq struct {
 }
 
 //
-// EvShellBroadcastReq
+// EvShellBroadcastReq, see tcpmsg.proto please.
 //
 const (
-	MSBR_MT_TX		= iota				// tx type
-	MSBR_MT_EV							// event type
-	MSBR_MT_BLKH						// block header type
-	MSBR_MT_BLK							// block type
+	MSBR_MT_TX		= 3					// tx type
+	MSBR_MT_EV		= 4					// event type
+	MSBR_MT_BLKH	= 5					// block header type
+	MSBR_MT_BLK		= 6					// block type
 )
 
 type MsgShellBroadcastReq struct {

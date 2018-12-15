@@ -2377,6 +2377,10 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 }
 
 func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
+	// this function exported for user to send messages to specific peers, please
+	// notice that it plays with the "messaging" based on scheduler. it's not the
+	// only method to send messages, since active peers are backup in shell manager
+	// of chain, see function shellManager.broadcastReq for details please.
 	if len(pkg.IdList) == 0 {
 		log.Debug("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
@@ -2392,6 +2396,8 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 	for _, pid := range pkg.IdList {
 		_pkg := new(P2pPackage)
 		_pkg.Pid = uint32(pkg.ProtoId)
+		_pkg.Mid = uint32(pkg.Mid)
+		_pkg.Key = pkg.Key
 		_pkg.PayloadLength = uint32(pkg.PayloadLength)
 		_pkg.Payload = append(_pkg.Payload, pkg.Payload...)
 		req := sch.MsgPeDataReq {
@@ -2434,7 +2440,7 @@ func piTx(inst *peerInstance) PeMgrErrno {
 
 txLoop:
 	for {
-		upkg, ok := <-(inst.txChan)
+		upkg, ok := <-inst.txChan
 		if !ok {
 			break txLoop
 		}

@@ -33,7 +33,6 @@ import (
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/dht"
 	"github.com/yeeco/gyee/p2p/peer"
-	pepb "github.com/yeeco/gyee/p2p/peer/pb"
 )
 
 const (
@@ -51,10 +50,10 @@ var yesMtAtoi = map[string]int{
 }
 
 var yesMidItoa = map[int] string {
-	int(pepb.MessageId_MID_TX):				yep2p.MessageTypeTx,
-	int(pepb.MessageId_MID_EVENT):			yep2p.MessageTypeEvent,
-	int(pepb.MessageId_MID_BLOCKHEADER):	yep2p.MessageTypeBlockHeader,
-	int(pepb.MessageId_MID_BLOCK):			yep2p.MessageTypeBlock,
+	int(sch.MSBR_MT_TX):					yep2p.MessageTypeTx,
+	int(sch.MSBR_MT_EV):					yep2p.MessageTypeEvent,
+	int(sch.MSBR_MT_BLKH):					yep2p.MessageTypeBlockHeader,
+	int(sch.MSBR_MT_BLK):					yep2p.MessageTypeBlock,
 }
 
 type yesKey [yesKeyBytes]byte									// key type
@@ -659,10 +658,31 @@ _rxLoop:
 					msg := yep2p.Message {
 						MsgType: msgType,
 						From: fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
+						Key: pkg.Key,
 						Data: pkg.Payload,
 					}
+
+					err := error(nil)
+					switch msg.MsgType {
+					case yep2p.MessageTypeTx:
+						err = yeShMgr.broadcastTxOsn(&msg)
+					case yep2p.MessageTypeEvent:
+						err = yeShMgr.broadcastEvOsn(&msg)
+					case yep2p.MessageTypeBlockHeader:
+						err = yeShMgr.broadcastBhOsn(&msg)
+					case yep2p.MessageTypeBlock:
+						err = yeShMgr.broadcastBkOsn(&msg)
+					default:
+						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
+					}
+
+					if err != nil {
+						log.Debug("chainRxProc: error: %s", err.Error())
+						return false
+					}
+
 					sub, _ := key.(*yep2p.Subscriber)
-					sub.MsgChan<-msg
+					sub.MsgChan <- msg
 					return true
 				})
 			}
@@ -911,8 +931,9 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 		return errors.New("setDedupTimer: invalid key")
 	}
 
-	var k = [yesKeyBytes]byte{}
+	var k [yesKeyBytes]byte
 	copy(k[0:], key)
+
 	if _, ok := yeShMgr.deDupMap[k]; ok {
 		log.Debug("setDedupTimer: duplicated")
 		return errors.New("setDedupTimer: duplicated")
@@ -925,7 +946,6 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 	}
 
 	yeShMgr.tmDedup.SetTimerData(tm, &k)
-
 	if err := yeShMgr.tmDedup.StartTimer(tm); err != nil {
 		log.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
 		return err

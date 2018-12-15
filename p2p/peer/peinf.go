@@ -32,6 +32,7 @@ type P2pPackageRx struct {
 	PeerInfo		*PeerInfo		// peer information
 	ProtoId			int				// protocol identity
 	MsgId			int				// message identity
+	Key				[]byte			// message key
 	PayloadLength	int				// bytes in payload buffer
 	Payload			[]byte			// payload buffer
 }
@@ -44,6 +45,8 @@ type P2pPackage2Peer struct {
 	SubNetId		SubNetworkID			// sub network identity
 	IdList			[]PeerId				// peer identity list
 	ProtoId			int						// protocol identity
+	Mid				int						// message identity
+	Key				[]byte					// message key
 	PayloadLength	int						// payload length
 	Payload			[]byte					// payload
 	Extra			interface{}				// extra info: user this field to tell p2p more about this message,
