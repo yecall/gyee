@@ -696,14 +696,14 @@ type MsgDhtQryMgrQueryStartRsp struct {
 // EvDhtQryMgrQueryStopReq
 //
 type MsgDhtQryMgrQueryStopReq struct {
-	Target		config.NodeID			// target node identity
+	Target		config.DsKey			// target node identity
 }
 
 //
 // EvDhtQryMgrQueryStopRsp
 //
 type MsgDhtQryMgrQueryStopRsp struct {
-	Target		config.NodeID			// target node identity
+	Target		config.DsKey			// target node identity
 	Eno			int						// result code
 }
 
@@ -736,7 +736,7 @@ const (
 // EvDhtQryInstStopReq
 //
 type MsgDhtQryInstStopReq struct {
-	Target		config.NodeID		// target to be looked up
+	Target		config.DsKey		// target to be looked up
 	Peer		config.NodeID		// peer to be queried
 	Eno			int					// why stop
 }
@@ -745,8 +745,8 @@ type MsgDhtQryInstStopReq struct {
 // EvDhtQryInstStatusInd
 //
 type MsgDhtQryInstStatusInd struct {
+	Target		config.DsKey		// target node identity
 	Peer		config.NodeID		// peer to be queried
-	Target		config.NodeID		// target node identity
 	Status		int					// status
 }
 
@@ -761,7 +761,7 @@ type Provider struct {
 
 type MsgDhtQryInstResultInd struct {
 	From		config.Node			// the peer who tells us
-	Target		config.NodeID		// target node identity
+	Target		config.DsKey		// target node identity
 	Latency		time.Duration		// latency about response to request
 	ForWhat		int					// what this indication for
 	Peers		[]*config.Node		// neighbors of target for find-node
@@ -775,7 +775,7 @@ type MsgDhtQryInstResultInd struct {
 //
 type MsgDhtQryInstStopRsp struct {
 	To			config.Node			// whom is queried by the instance
-	Target		config.NodeID		// target node identity
+	Target		config.DsKey		// target node identity
 }
 
 //

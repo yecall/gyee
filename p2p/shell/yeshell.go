@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	yesKeyBytes = 64											// key length in bytes
+	yesKeyBytes = config.DhtKeyLength											// key length in bytes
 	yesMaxFindNode = 4											// max find node commands in pending
 	yesMaxGetProvider = 4										// max get provider commands in pending
 	yesMaxPutProvider = 4										// max put provider commands in pending
@@ -56,7 +56,7 @@ var yesMidItoa = map[int] string {
 	int(sch.MSBR_MT_BLK):					yep2p.MessageTypeBlock,
 }
 
-type yesKey [yesKeyBytes]byte									// key type
+type yesKey = config.DsKey										// key type
 
 type yeShellManager struct {
 	chainInst			*sch.Scheduler							// chain scheduler pointer
@@ -69,7 +69,7 @@ type yeShellManager struct {
 	getValChan			chan []byte								// get value channel
 	putValKey			yesKey									// key of value to put
 	putValChan			chan bool								// put value channel
-	findNodeMap			map[config.NodeID]chan interface{}		// find node command map to channel
+	findNodeMap			map[yesKey]chan interface{}				// find node command map to channel
 	getProviderMap		map[yesKey]chan interface{}				// find node command map to channel
 	putProviderMap		map[yesKey]chan interface{}				// find node command map to channel
 	dhtEvChan			chan *sch.MsgDhtShEventInd				// dht event indication channel
@@ -238,7 +238,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 
 	yeShMgr.getValChan = make(chan []byte, 0)
 	yeShMgr.putValChan = make(chan bool, 0)
-	yeShMgr.findNodeMap = make(map[config.NodeID]chan interface{}, yesMaxFindNode)
+	yeShMgr.findNodeMap = make(map[yesKey]chan interface{}, yesMaxFindNode)
 	yeShMgr.getProviderMap = make(map[yesKey]chan interface{}, yesMaxGetProvider)
 	yeShMgr.putProviderMap = make(map[yesKey]chan interface{}, yesMaxPutProvider)
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
@@ -444,13 +444,14 @@ func (yeShMgr *yeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 		return sch.SchEnoResource
 	}
 
-	if _, ok := yeShMgr.findNodeMap[*target]; ok {
+	key := *(*yesKey)(dht.RutMgrNodeId2Hash(*target))
+	if _, ok := yeShMgr.findNodeMap[key]; ok {
 		log.Debug("DhtFindNode: duplicated")
 		return sch.SchEnoDuplicated
 	}
 
 	req := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		*target,
+		Target:		key,
 		Msg:		nil,
 		ForWhat:	dht.MID_FINDNODE,
 		Seq:		time.Now().Unix(),
@@ -463,7 +464,7 @@ func (yeShMgr *yeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 		return eno
 	}
 
-	yeShMgr.findNodeMap[*target] = done
+	yeShMgr.findNodeMap[key] = done
 	return nil
 }
 

@@ -128,7 +128,7 @@ type qryInstCtrlBlock struct {
 	ptnRutMgr	interface{}						// pointer to rute manager task node
 	status		int								// instance status
 	local		*config.Node					// pointer to local node specification
-	target		config.NodeID					// target is looking up
+	target		config.DsKey					// target is looking up
 	to			config.Node						// to whom the query message sent
 	qTid		int								// query timer identity
 	begTime		time.Time						// query begin time
@@ -169,7 +169,7 @@ func NewQryMgr() *QryMgr {
 	qryMgr := QryMgr{
 		name:		QryMgrName,
 		instSeq:	0,
-		qcbTab:		map[config.NodeID]*qryCtrlBlock{},
+		qcbTab:		map[config.DsKey]*qryCtrlBlock{},
 		qmCfg:		qmCfg,
 		qcbSeq:		0,
 	}
@@ -478,7 +478,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 			forWhat == MID_GETPROVIDER_REQ ||
 			forWhat == MID_GETVALUE_REQ {
 
-			if peer.node.ID == target {
+			if bytes.Compare(peer.hash[0:], target[0:]) == 0 {
 
 				log.Debug("rutNearestRsp: target found: %x", target)
 
@@ -826,7 +826,9 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 		for _, peer := range msg.Peers {
 
-			if peer.ID == target {
+			key := rutMgrNodeId2Hash(peer.ID)
+
+			if bytes.Compare((*key)[0:], target[0:]) == 0 {
 
 				qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), peer, msg.Value, msg.Provider)
 
@@ -1026,7 +1028,7 @@ const (
 	delQcb4InteralErrors			// internal errors while tring to query
 )
 
-func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
+func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 
 	event := sch.EvSchPoweroff
 
@@ -1119,7 +1121,7 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.NodeID) DhtErrno {
 //
 // Delete query instance control block
 //
-func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.NodeID, peer *config.NodeID) DhtErrno {
+func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.NodeID) DhtErrno {
 
 	if why != delQcb4QryInstDoneInd && why != delQcb4QryInstResultInd {
 		log.Debug("qryMgrDelIcb: why delete?! why: %d", why)

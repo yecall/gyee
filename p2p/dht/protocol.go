@@ -127,7 +127,7 @@ type Handshake struct {
 type FindNode struct {
 	From			config.Node				// source node
 	To				config.Node				// destination node
-	Target			config.NodeID			// target node identity
+	Target			config.DsKey			// target node identity
 	Id				int64					// message identity
 	Extra			[]byte					// extra info
 }

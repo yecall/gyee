@@ -1692,7 +1692,6 @@ func dhtTestBootstrapStart(dhtInstList []*sch.Scheduler) int {
 func dhtTestFindNode(dhtInstList []*sch.Scheduler) int {
 	rand.Seed(time.Now().Unix())
 	req := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		config.NodeID{},
 		Msg:		nil,
 		ForWhat:	dht.MID_FINDNODE,
 		Seq:		-1,
@@ -1703,7 +1702,8 @@ func dhtTestFindNode(dhtInstList []*sch.Scheduler) int {
 		for ; targetIdx == idx; {
 			targetIdx = rand.Intn(instNum)
 		}
-		req.Target = dhtInstList[targetIdx].SchGetP2pConfig().Local.ID
+		target := *(*dht.DsKey)(dht.RutMgrNodeId2Hash(dhtInstList[targetIdx].SchGetP2pConfig().Local.ID))
+		req.Target = target
 		req.Seq = time.Now().Unix()
 		dhtMgr := dhtInst.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 		dhtMgr.DhtCommand(sch.EvDhtMgrFindPeerReq, &req)

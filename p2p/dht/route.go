@@ -801,6 +801,13 @@ func rutMgrNodeId2Hash(id config.NodeID) *Hash {
 }
 
 //
+// Node identity to hash(sha) exported
+//
+func RutMgrNodeId2Hash(id config.NodeID) *Hash {
+	return rutMgrNodeId2Hash(id)
+}
+
+//
 // Sort peers with distance
 //
 func rutMgrSortPeer(ps []*rutMgrBucketNode, ds []int) {
