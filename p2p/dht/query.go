@@ -90,7 +90,7 @@ type qryCtrlBlock struct {
 	qryReq		*sch.MsgDhtQryMgrQueryStartReq			// original query request message
 	seq			int										// sequence number
 	forWhat		int										// what's the query control block for
-	target		config.NodeID							// target for looking up
+	target		config.DsKey							// target for looking up
 	status		QryStatus								// query status
 	qryHistory	map[config.NodeID]*qryPendingInfo		// history peers had been queried
 	qryPending	*list.List								// pending peers to be queried, with type qryPendingInfo
@@ -149,7 +149,7 @@ type QryMgr struct {
 	ptnRutMgr	interface{}						// pointer to task node of route manager
 	ptnDhtMgr	interface{}						// pointer to task node of dht manager
 	instSeq		int								// query instance sequence number
-	qcbTab		map[config.NodeID]*qryCtrlBlock	// query control blocks
+	qcbTab		map[config.DsKey]*qryCtrlBlock	// query control blocks
 	qmCfg		qryMgrCfg						// query manager configuration
 	qcbSeq		int								// query control block sequence number
 }

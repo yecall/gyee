@@ -69,8 +69,8 @@ type PrdMgr struct {
 // Provider set
 //
 type PrdSet struct {
-	set 	map[config.NodeID]config.Node	// provider set
-	addTime	map[config.NodeID]time.Time		// time for providers added
+	set 	map[DsKey]config.Node			// provider set
+	addTime	map[DsKey]time.Time		// time for providers added
 }
 
 //
@@ -209,7 +209,7 @@ func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 
 		if i, ok := c.Get(k); ok {
 
-			del := make([]config.NodeID, 0)
+			del := make([]DsKey, 0)
 			ps := i.(*PrdSet)
 
 			for id, t := range ps.addTime {
@@ -274,7 +274,7 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 	//
 
 	qry := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		config.NodeID(k),
+		Target:		k,
 		Msg:		msg,
 		ForWhat:	MID_PUTPROVIDER,
 		Seq:		time.Now().UnixNano(),
@@ -335,7 +335,7 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 	//
 
 	qry = sch.MsgDhtQryMgrQueryStartReq {
-		Target:		config.NodeID(dsk),
+		Target:		dsk,
 		Msg:		nil,
 		ForWhat:	MID_GETPROVIDER_REQ,
 		Seq:		time.Now().UnixNano(),
@@ -508,7 +508,7 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 
 	schMsg := sch.SchMessage{}
 	fnReq := sch.MsgDhtRutMgrNearestReq{
-		Target:		config.NodeID(dsk),
+		Target:		dsk,
 		Max:		rutMgrMaxNearest,
 		NtfReq:		false,
 		Task:		prdMgr.ptnMe,
@@ -698,15 +698,15 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 		prdMgr.lockCache.Lock()
 		defer prdMgr.lockCache.Unlock()
 
-		if _, dup := prdSet.set[config.NodeID(*k)]; !dup {
-			prdSet.append(prd, time.Now())
+		if _, dup := prdSet.set[*k]; !dup {
+			prdSet.append(*k, prd, time.Now())
 		}
 
 	} else {
 
 		newPrd := PrdSet{
-			set:     map[config.NodeID]config.Node{prd.ID: *prd},
-			addTime: map[config.NodeID]time.Time{prd.ID: time.Now()},
+			set:     map[DsKey]config.Node{*k: *prd},
+			addTime: map[DsKey]time.Time{*k: time.Now()},
 		}
 
 		prdMgr.lockCache.Lock()
@@ -721,10 +721,10 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 //
 // add new provider to set
 //
-func (prdSet *PrdSet)append(peerId *config.Node, addTime time.Time) {
-	if _, exist := prdSet.addTime[peerId.ID]; !exist {
-		prdSet.set[peerId.ID] = *peerId
+func (prdSet *PrdSet)append(key DsKey, peerId *config.Node, addTime time.Time) {
+	if _, exist := prdSet.addTime[key]; !exist {
+		prdSet.set[key] = *peerId
 	}
-	prdSet.addTime[peerId.ID] = addTime
+	prdSet.addTime[key] = addTime
 }
 

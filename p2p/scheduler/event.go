@@ -678,7 +678,7 @@ const (
 // EvDhtQryMgrQueryStartReq
 //
 type MsgDhtQryMgrQueryStartReq struct {
-	Target		config.NodeID			// target node identity or key
+	Target		config.DsKey			// can be config.NodeID or [config.DhtKeyLength]byte as a key
 	Msg			interface{}				// original request which results this query
 	ForWhat		int						// find-node; get-provider; get-value; put-value; ...
 	Seq			int64					// sequence number
@@ -688,7 +688,7 @@ type MsgDhtQryMgrQueryStartReq struct {
 // EvDhtQryMgrQueryStartRsp
 //
 type MsgDhtQryMgrQueryStartRsp struct {
-	Target		config.NodeID			// target node identity
+	Target		config.DsKey			// target node identity
 	Eno			int						// result code
 }
 
@@ -713,7 +713,7 @@ type MsgDhtQryMgrQueryStopRsp struct {
 type MsgDhtQryMgrQueryResultInd struct {
 	Eno			int						// result code. notice: when timeout, closests reported
 	ForWhat		int						// what's the original query for: find-node; get-value; get-provider; put-value; put provider; ...
-	Target		config.NodeID			// target or key to be looked up
+	Target		config.DsKey			// target or key to be looked up
 	Peers		[]*config.Node			// peers list, if target got, it always be the first one
 	Val			[]byte					// value
 	Prds		[]*config.Node			// providers
@@ -809,7 +809,7 @@ const (
 // EvDhtRutMgrNearestReq
 //
 type MsgDhtRutMgrNearestReq struct {
-	Target		config.NodeID		// target peer identity
+	Target		config.DsKey		// could be config.NodeID or [config.DhtKeyLength]byte as of key
 	Max			int					// max items returned could be
 	NtfReq		bool				// ask for notification when route updated
 	Task		interface{}			// task who loves the notification
@@ -823,7 +823,7 @@ type MsgDhtRutMgrNearestReq struct {
 type MsgDhtRutMgrNearestRsp struct {
 	Eno			int					// result code
 	ForWhat		int					// what for
-	Target		config.NodeID		// target peer identity
+	Target		config.DsKey		// target peer identity
 	Peers		interface{}			// nearest nodes table
 	Dists		interface{}			// distances of nearest nodes
 	Pcs			interface{}			// peer connection status table
@@ -844,7 +844,7 @@ type MsgDhtRutMgrUpdateReq struct {
 // EvDhtRutMgrNotificationInd
 //
 type MsgDhtRutMgrNotificationInd struct {
-	Target		config.NodeID		// target peer identity
+	Target		config.DsKey		// target peer identity
 	Peers		interface{}			// nearest nodes table
 	Dists		interface{}			// distances of nearest nodes
 }
@@ -861,7 +861,7 @@ type MsgDhtRutPeerRemovedInd struct {
 //
 type MsgDhtRutMgrStopNofiyReq struct {
 	Task		interface{}			// owner task of the notifee registered
-	Target		config.NodeID		// target peer identity
+	Target		config.DsKey		// target peer identity
 }
 
 //

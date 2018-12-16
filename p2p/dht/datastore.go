@@ -37,7 +37,7 @@ import (
 // Datastore key
 //
 const DsKeyLength = config.DhtKeyLength
-type DsKey =  [DsKeyLength]byte
+type DsKey =  config.DsKey
 
 //
 // Datastore value
@@ -404,7 +404,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	//
 
 	qry := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		config.NodeID(k),
+		Target:		k,
 		Msg:		msg,
 		ForWhat:	MID_PUTVALUE,
 		Seq:		time.Now().UnixNano(),
@@ -441,7 +441,7 @@ func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno 
 	//
 
 	qry := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		config.NodeID(k),
+		Target:		k,
 		Msg:		msg,
 		ForWhat:	MID_GETVALUE_REQ,
 		Seq:		time.Now().UnixNano(),
@@ -582,7 +582,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	schMsg := sch.SchMessage{}
 	fnReq := sch.MsgDhtRutMgrNearestReq{
-		Target:		config.NodeID(dsk),
+		Target:		dsk,
 		Max:		rutMgrMaxNearest,
 		NtfReq:		false,
 		Task:		dsMgr.ptnMe,

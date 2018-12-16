@@ -81,6 +81,7 @@ type NodeID [NodeIDBytes]byte
 
 // DHT key length
 const DhtKeyLength = 32
+type DsKey [DhtKeyLength]byte
 
 // Max protocols
 const MaxProtocols = 32

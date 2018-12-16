@@ -37,19 +37,19 @@ import (
 // Constants
 //
 const (
-	RutMgrName = sch.DhtRutMgrName		// Route manager name registered in scheduler
-	rutMgrMaxNearest = 8				// Max nearest peers can be retrieved for a time
-	rutMgrBucketSize = 32				// bucket size
-	HashByteLength = 32					// 32 bytes(256 bits) hash applied
-	HashBitLength = HashByteLength * 8	// hash bits
-	rutMgrMaxLatency = time.Second * 60	// max latency in metric
-	rutMgrMaxNofifee = 128				// max notifees could be
-	rutMgrUpdate4Handshake = 0			// update for handshaking
-	rutMgrUpdate4Closed = 1				// update for connection instance closed
-	rutMgrUpdate4Query = 2				// update for query result
-	rutMgrMaxFails2Del = 3				// max fails to be deleted
-	rutMgrEwmaHisSize = 8				// history sample number
-	rutMgrEwmaMF = 0.1					// memorize factor for EWMA filter
+	RutMgrName = sch.DhtRutMgrName			// Route manager name registered in scheduler
+	rutMgrMaxNearest = 8					// Max nearest peers can be retrieved for a time
+	rutMgrBucketSize = 32					// bucket size
+	HashByteLength = config.DhtKeyLength	// 32 bytes(256 bits) hash applied
+	HashBitLength = HashByteLength * 8		// hash bits
+	rutMgrMaxLatency = time.Second * 60		// max latency in metric
+	rutMgrMaxNofifee = 128					// max notifees could be
+	rutMgrUpdate4Handshake = 0				// update for handshaking
+	rutMgrUpdate4Closed = 1					// update for connection instance closed
+	rutMgrUpdate4Query = 2					// update for query result
+	rutMgrMaxFails2Del = 3					// max fails to be deleted
+	rutMgrEwmaHisSize = 8					// history sample number
+	rutMgrEwmaMF = 0.1						// memorize factor for EWMA filter
 )
 
 //
@@ -94,7 +94,7 @@ type rutMgrRouteTable struct {
 
 type rutMgrNotifeeId struct {
 	task			interface{}			// destionation task
-	target			config.NodeID		// target aimed at
+	target			config.DsKey		// target aimed at
 }
 
 type rutMgrNotifee struct {
@@ -115,8 +115,8 @@ type RutMgr struct {
 	ptnQryMgr		interface{}								// pointer to query manager task node
 	ptnConMgr		interface{}								// pointer to connection manager task node
 	bpCfg			bootstrapPolicy							// bootstrap policy configuration
-	bpTid			int										// bootstrap timer identity
-	bpTargets		map[config.NodeID] interface{}			// targets in bootstrapping
+	bpTid			int										// bootstrap policy timer identity
+	bsTargets		map[config.DsKey] interface{}			// targets in bootstrapping
 	distLookupTab	[]int									// log2 distance lookup table for a xor byte
 	localNodeId		config.NodeID							// local node identity
 	rutTab			rutMgrRouteTable						// route table
@@ -145,7 +145,7 @@ func NewRutMgr() *RutMgr {
 		name:			RutMgrName,
 		bpCfg:			defautBspCfg,
 		bpTid:			sch.SchInvalidTid,
-		bpTargets:		map[config.NodeID] interface{}{},
+		bsTargets:		map[config.DsKey] interface{}{},
 		distLookupTab:	make([]int, 256),
 		localNodeId:	config.NodeID{},
 		rutTab:			rutMgrRouteTable{},
@@ -296,7 +296,7 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 
 	log.Debug("bootstarpTimerHandler: bootstrap will be carried out ...")
 
-	if len(rutMgr.bpTargets) != 0 {
+	if len(rutMgr.bsTargets) != 0 {
 		log.Debug("bootstarpTimerHandler: the previous is not completed")
 		return sch.SchEnoNone
 	}
@@ -304,16 +304,17 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 	sdl := rutMgr.sdl
 
 	for loop := 0; loop < rutMgr.bpCfg.randomQryNum; loop++ {
-
-		var msg = sch.SchMessage{}
-		var req = sch.MsgDhtQryMgrQueryStartReq {
-			Target:		rutMgrRandomPeerId(),
+		msg := sch.SchMessage{}
+		target := rutMgrRandomPeerId()
+		key := (*DsKey)(rutMgrNodeId2Hash(target))
+		req := sch.MsgDhtQryMgrQueryStartReq {
+			Target:		*key,
 			Msg:		nil,
 			ForWhat:	MID_FINDNODE,
 			Seq:		time.Now().UnixNano(),
 		}
 
-		rutMgr.bpTargets[req.Target] = &req.Target
+		rutMgr.bsTargets[*key] = &req.Target
 		log.Debug("bootstarpTimerHandler: query will be start, target: %x", req.Target)
 
 		sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
@@ -337,7 +338,7 @@ func (rutMgr *RutMgr)queryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchEr
 		"bootstrap startup response, eno: %d, target: %x",
 		msg.Eno, msg.Target)
 
-	if _, exist := rutMgr.bpTargets[msg.Target]; !exist {
+	if _, exist := rutMgr.bsTargets[msg.Target]; !exist {
 		log.Debug("queryStartRsp: not a bootstrap target: %x", msg.Target)
 		return sch.SchEnoMismatched
 	}
@@ -365,7 +366,7 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 		"bootstrap result indication, eno: %d, target: %x",
 		msg.Eno, msg.Target)
 
-	if _, ok := rutMgr.bpTargets[msg.Target]; !ok {
+	if _, ok := rutMgr.bsTargets[msg.Target]; !ok {
 		log.Debug("queryResultInd: not a bootstrap target: %x", msg.Target)
 		return sch.SchEnoMismatched
 	}
@@ -375,24 +376,23 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	// let others know us.
 	//
 
-	if delete(rutMgr.bpTargets, msg.Target); len(rutMgr.bpTargets) == 0 {
+	if delete(rutMgr.bsTargets, msg.Target); len(rutMgr.bsTargets) == 0 {
 
-		if bytes.Compare(rutMgr.localNodeId[0:], msg.Target[0:]) != 0 {
-
-			var msg= sch.SchMessage{}
-			var req = sch.MsgDhtQryMgrQueryStartReq{
-				Target:  rutMgr.localNodeId,
-				Msg:     nil,
-				ForWhat: MID_FINDNODE,
-				Seq:     time.Now().UnixNano(),
-			}
-
-			rutMgr.bpTargets[req.Target] = &req.Target
-
-			rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
-			rutMgr.sdl.SchSendMessage(&msg)
-
+		msg := sch.SchMessage{}
+		target := rutMgr.localNodeId
+		key := (*DsKey)(rutMgrNodeId2Hash(target))
+		req := sch.MsgDhtQryMgrQueryStartReq{
+			Target:  *key,
+			Msg:     nil,
+			ForWhat: MID_FINDNODE,
+			Seq:     time.Now().UnixNano(),
 		}
+
+		rutMgr.bsTargets[*key] = &req.Target
+
+		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
+		rutMgr.sdl.SchSendMessage(&msg)
+
 	}
 
 	rutMgr.showRoute("bootstrap-round-completed")
@@ -1081,7 +1081,7 @@ func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
 //
 func (rutMgr *RutMgr)rutMgrNotifeeReg(
 	task	interface{},
-	id		*config.NodeID,
+	id		*config.DsKey,
 	max		int,
 	bns		[]*rutMgrBucketNode,
 	ds		[]int) DhtErrno {
@@ -1163,7 +1163,7 @@ func (rutMgr *RutMgr)rutMgrNotify() DhtErrno {
 //
 // Get nearest peers for target
 //
-func (rutMgr *RutMgr)rutMgrNearest(target *config.NodeID, size int) (DhtErrno, []*rutMgrBucketNode, []int){
+func (rutMgr *RutMgr)rutMgrNearest(target *config.DsKey, size int) (DhtErrno, []*rutMgrBucketNode, []int){
 
 	var nearest = make([]*rutMgrBucketNode, 0, rutMgrMaxNearest)
 	var nearestDist = make([]int, 0, rutMgrMaxNearest)
@@ -1177,7 +1177,7 @@ func (rutMgr *RutMgr)rutMgrNearest(target *config.NodeID, size int) (DhtErrno, [
 	// to the tail. see function rutMgr.split pls.
 	//
 
-	ht := rutMgrNodeId2Hash(*target)
+	ht := (*Hash)(target)
 	dt := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, ht)
 	if dt >= len(rutMgr.rutTab.bucketTab) {
 		dt = len(rutMgr.rutTab.bucketTab) - 1
