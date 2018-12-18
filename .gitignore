@@ -14,7 +14,8 @@
 .glide/
 
 # ide
-.idea/
+.idea/*
+!.idea/copyright/
 
 # .iml file created by IDEA for module 
 *.iml
