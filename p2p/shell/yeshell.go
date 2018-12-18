@@ -92,7 +92,7 @@ type YeShellConfig struct {
 	Name				string									// node name
 	Validator			bool									// validator flag
 	BootstrapNode		bool									// bootstrap node flag
-	BootstrapNodes		[]*config.Node							// bootstrap nodes
+	BootstrapNodes		[]string								// bootstrap nodes
 	NodeDataDir			string									// node data directory
 	NodeDatabase		string									// node database
 	SubNetMaskBits		int										// mask bits for sub network identity
@@ -104,6 +104,22 @@ const (
 	ChainCfgIdx = 0
 	DhtCfgIdx = 1
 )
+
+// Default yee shell configuration for convenience
+var DefaultYeShellConfig = YeShellConfig{
+	AppType:		config.P2P_TYPE_ALL,
+	Name:			"test",
+	Validator:		true,
+	BootstrapNode:	false,
+	BootstrapNodes: []string {
+		"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.191:30303:30303",
+	},
+	NodeDataDir:	config.P2pDefaultDataDir(true),
+	NodeDatabase:	"nodes",
+	SubNetMaskBits:	0,
+	EvKeepTime:		time.Minute * 8,
+	DedupTime:		time.Second * 60,
+}
 
 // Global shell configuration: this var is set when function YeShellConfigToP2pCfg called,
 // the p2p user should not change those fields other than "Validator" and "SubNetMaskBits"
@@ -128,9 +144,9 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	dhtCfg := (*config.Config)(nil)
 
 	if yesCfg.BootstrapNode {
-		chainCfg = config.P2pDefaultBootstrapConfig()
+		chainCfg = config.P2pDefaultBootstrapConfig(yesCfg.BootstrapNodes)
 	} else {
-		chainCfg = config.P2pDefaultConfig()
+		chainCfg = config.P2pDefaultConfig(yesCfg.BootstrapNodes)
 	}
 
 	if config.P2pSetupLocalNodeId(chainCfg) != config.PcfgEnoNone {
@@ -994,4 +1010,8 @@ func (yeShMgr *yeShellManager)deDupTickerProc(){
 		}
 	}
 	log.Debug("deDupTickerProc: exit")
+}
+
+func (yeShMgr *yeShellManager)GetLocalNode() *config.Node {
+	return nil
 }

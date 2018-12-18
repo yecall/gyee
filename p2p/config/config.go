@@ -319,7 +319,7 @@ var config = make(map[string] *Config)
 
 // Get default non-bootstrap node config
 var dftDatDir = P2pDefaultDataDir(true)
-func P2pDefaultConfig() *Config {
+func P2pDefaultConfig(bsUrls []string) *Config {
 	var defaultConfig = Config {
 		//
 		// Chain application part
@@ -377,11 +377,16 @@ func P2pDefaultConfig() *Config {
 			Sync:				true,
 		},
 	}
+
+	if bsUrls != nil {
+		defaultConfig.BootstrapNodes = P2pSetupBootstrapNodes(bsUrls)
+	}
+
 	return &defaultConfig
 }
 
 // Get default bootstrap node config
-func P2pDefaultBootstrapConfig() *Config {
+func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 	var defaultConfig = Config {
 		//
 		// Chain application part
@@ -437,6 +442,11 @@ func P2pDefaultBootstrapConfig() *Config {
 			Sync:				true,
 		},
 	}
+
+	if bsUrls != nil {
+		defaultConfig.BootstrapNodes = P2pSetupBootstrapNodes(bsUrls)
+	}
+
 	return &defaultConfig
 }
 

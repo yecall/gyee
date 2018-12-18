@@ -42,6 +42,7 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/dht"
+	yep2p "github.com/yeeco/gyee/p2p"
 )
 
 //
@@ -148,6 +149,11 @@ var testCaseTable = []testCase{
 		name:			"testCase7",
 		description:	"stop dht instance",
 		entry:			testCase7,
+	},
+	{
+		name:			"testCase8",
+		description:	"yee chain test with single shell",
+		entry:			testCase8,
 	},
 }
 
@@ -474,7 +480,7 @@ func testCase0(tc *testCase) {
 	log.Debug("testCase0: going to start ycp2p...")
 
 	// fetch default from underlying
-	dftCfg := shell.ShellDefaultConfig()
+	dftCfg := shell.ShellDefaultConfig(nil)
 	if dftCfg == nil {
 		log.Debug("testCase0: ShellDefaultConfig failed")
 		return
@@ -542,7 +548,7 @@ func testCase1(tc *testCase) {
 	for loop := 0; loop < p2pInstNum; loop++ {
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.Debug("testCase1: handling configuration:%s ...", cfgName)
-		dftCfg := shell.ShellDefaultConfig()
+		dftCfg := shell.ShellDefaultConfig(nil)
 		if dftCfg == nil {
 			log.Debug("testCase1: ShellDefaultConfig failed")
 			return
@@ -630,7 +636,7 @@ func testCase2(tc *testCase) {
 		cfgName = fmt.Sprintf("p2pInst%d", loop)
 		log.Debug("testCase2: prepare node identity: %s ...", cfgName)
 
-		dftCfg := shell.ShellDefaultConfig()
+		dftCfg := shell.ShellDefaultConfig(nil)
 		if dftCfg == nil {
 			log.Debug("testCase2: ShellDefaultConfig failed")
 			return
@@ -664,7 +670,7 @@ func testCase2(tc *testCase) {
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.Debug("testCase2: handling configuration:%s ...", cfgName)
 
-		dftCfg := shell.ShellDefaultConfig()
+		dftCfg := shell.ShellDefaultConfig(nil)
 		if dftCfg == nil {
 			log.Debug("testCase2: ShellDefaultConfig failed")
 			return
@@ -760,12 +766,12 @@ func testCase3(tc *testCase) {
 		var dftCfg *config.Config = nil
 
 		if loop == 0 {
-			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
+			if dftCfg = shell.ShellDefaultBootstrapConfig(nil); dftCfg == nil {
 				log.Debug("testCase3: ShellDefaultBootstrapConfig failed")
 				return
 			}
 		} else {
-			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+			if dftCfg = shell.ShellDefaultConfig(nil); dftCfg == nil {
 				log.Debug("testCase3: ShellDefaultConfig failed")
 				return
 			}
@@ -834,7 +840,7 @@ func testCase3(tc *testCase) {
 					bootstrapUdp,
 					bootstrapTcp),
 			}
-			bootstrapNodes = append(bootstrapNodes,config.P2pSetupBootstrapNodes(url)...)
+			bootstrapNodes = append(bootstrapNodes, config.P2pSetupBootstrapNodes(url)...)
 		}
 
 		p2pInst, eno := shell.P2pCreateInstance(p2pName2Cfg[cfgName])
@@ -890,7 +896,7 @@ func testCase4(tc *testCase) {
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.Debug("testCase4: prepare node identity: %s ...", cfgName)
 
-		dftCfg := shell.ShellDefaultConfig()
+		dftCfg := shell.ShellDefaultConfig(nil)
 		if dftCfg == nil {
 			log.Debug("testCase4: ShellDefaultConfig failed")
 			return
@@ -927,12 +933,12 @@ func testCase4(tc *testCase) {
 		var dftCfg *config.Config = nil
 
 		if loop == 0 {
-			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
+			if dftCfg = shell.ShellDefaultBootstrapConfig(nil); dftCfg == nil {
 				log.Debug("testCase4: ShellDefaultBootstrapConfig failed")
 				return
 			}
 		} else {
-			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+			if dftCfg = shell.ShellDefaultConfig(nil); dftCfg == nil {
 				log.Debug("testCase4: ShellDefaultConfig failed")
 				return
 			}
@@ -1096,7 +1102,7 @@ func testCase5(tc *testCase) {
 		cfgName := fmt.Sprintf("p2pInst%d", loop)
 		log.Debug("testCase5: prepare node identity: %s ...", cfgName)
 
-		dftCfg := shell.ShellDefaultConfig()
+		dftCfg := shell.ShellDefaultConfig(nil)
 		if dftCfg == nil {
 			log.Debug("testCase5: ShellDefaultConfig failed")
 			return
@@ -1134,12 +1140,12 @@ func testCase5(tc *testCase) {
 		var dftCfg *config.Config = nil
 
 		if loop == 0 {
-			if dftCfg = shell.ShellDefaultBootstrapConfig(); dftCfg == nil {
+			if dftCfg = shell.ShellDefaultBootstrapConfig(nil); dftCfg == nil {
 				log.Debug("testCase5: ShellDefaultBootstrapConfig failed")
 				return
 			}
 		} else {
-			if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+			if dftCfg = shell.ShellDefaultConfig(nil); dftCfg == nil {
 				log.Debug("testCase5: ShellDefaultConfig failed")
 				return
 			}
@@ -1305,8 +1311,6 @@ _waitStop:
 		time.Sleep(time.Second * 1)
 	}
 	golog.Printf("testCase5: it's the end")
-
-	waitInterrupt()
 }
 
 //
@@ -1327,7 +1331,7 @@ func testCase6(tc *testCase) {
 
 		var dftCfg *config.Config = nil
 
-		if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+		if dftCfg = shell.ShellDefaultConfig(nil); dftCfg == nil {
 			log.Debug("testCase6: ShellDefaultConfig failed")
 			return
 		}
@@ -1409,7 +1413,7 @@ func testCase7(tc *testCase) {
 
 		var dftCfg *config.Config = nil
 
-		if dftCfg = shell.ShellDefaultConfig(); dftCfg == nil {
+		if dftCfg = shell.ShellDefaultConfig(nil); dftCfg == nil {
 			log.Debug("testCase7: ShellDefaultConfig failed")
 			return
 		}
@@ -1481,7 +1485,6 @@ _waitStop:
 		}
 	}
 	golog.Printf("testCase7: it's the end")
-	waitInterrupt()
 }
 
 //
@@ -2072,4 +2075,129 @@ func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interfac
 	log.Debug("dhtTestConInstRxDataCallback: instance: %s, pid: %d, length: %d, data: %x",
 		cfgName, pid, len(data), data)
 	return 0
+}
+
+//
+// testCase8
+//
+func testCase8(tc *testCase) {
+	
+	yesCfg := shell.DefaultYeShellConfig
+	//yesCfg.BootstrapNode = true
+	yeShMgr := shell.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+
+	localNode := yeShMgr.GetLocalNode()
+	localId := fmt.Sprintf("%x", localNode.ID)
+
+	ev := yep2p.Message{
+		MsgType:	yep2p.MessageTypeEvent,
+		From:		localId,
+	}
+
+	tx := yep2p.Message{
+		MsgType:	yep2p.MessageTypeTx,
+		From:		localId,
+	}
+
+	bh := yep2p.Message{
+		MsgType:	yep2p.MessageTypeBlockHeader,
+		From:		localId,
+	}
+
+	bk := yep2p.Message{
+		MsgType:	yep2p.MessageTypeBlock,
+		From:		localId,
+	}
+
+	subEv := yep2p.Subscriber {
+	 	MsgChan:	make(chan yep2p.Message, 64),
+	 	MsgType:	yep2p.MessageTypeEvent,
+	 }
+
+	subTx := yep2p.Subscriber {
+		MsgChan:	make(chan yep2p.Message, 64),
+		MsgType:	yep2p.MessageTypeTx,
+	}
+
+	subBh := yep2p.Subscriber {
+		MsgChan:	make(chan yep2p.Message, 64),
+		MsgType:	yep2p.MessageTypeBlockHeader,
+	}
+
+	yeShMgr.Register(&subEv)
+	yeShMgr.Register(&subTx)
+	yeShMgr.Register(&subBh)
+
+	go func() {
+		count := 0
+		for {
+			select {
+			case ev, ok := <-subEv.MsgChan:
+				if !ok {
+					break
+				}
+				count++
+				log.Debug("count: %d, ev: %x", count, ev.Key)
+			}
+		}
+	}()
+
+	go func() {
+		count := 0
+		for {
+			select {
+			case tx, ok := <-subTx.MsgChan:
+				if !ok {
+					break
+				}
+				count++
+				log.Debug("count: %d, tx: %x", count, tx.Key)
+			}
+		}
+	}()
+
+	go func() {
+		count := 0
+		for {
+			select {
+			case bh, ok := <-subBh.MsgChan:
+				if !ok {
+					break
+				}
+				count++
+				log.Debug("count: %d, bh: %x", count, bh.Key)
+			}
+		}
+	}()
+
+	for {
+		now := time.Now().Unix()
+
+		data := []byte(fmt.Sprintf("ev: %d", now))
+		key := sha256.Sum256(data)
+		ev.Data = data
+		ev.Key = key[0:]
+		yeShMgr.BroadcastMessageOsn(ev)
+
+		data = []byte(fmt.Sprintf("tx: %d", now))
+		key = sha256.Sum256(data)
+		tx.Data = data
+		tx.Key = key[0:]
+		yeShMgr.BroadcastMessageOsn(tx)
+
+		data = []byte(fmt.Sprintf("bh: %d", now))
+		key = sha256.Sum256(data)
+		bh.Data = data
+		bh.Key = key[0:]
+		yeShMgr.BroadcastMessageOsn(bh)
+
+		data = []byte(fmt.Sprintf("bk: %d", now))
+		key = sha256.Sum256(data)
+		bk.Data = data
+		bk.Key = key[0:]
+		yeShMgr.BroadcastMessageOsn(bk)
+
+		time.Sleep(time.Millisecond * 10)
+	}
 }

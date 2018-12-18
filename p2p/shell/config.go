@@ -28,15 +28,15 @@ import (
 //
 // Get default configuration
 //
-func ShellDefaultConfig() *config.Config {
-	return config.P2pDefaultConfig()
+func ShellDefaultConfig(bsUrls []string) *config.Config {
+	return config.P2pDefaultConfig(bsUrls)
 }
 
 //
 // get default bootstrap node configuration
 //
-func ShellDefaultBootstrapConfig() *config.Config {
-	return config.P2pDefaultBootstrapConfig()
+func ShellDefaultBootstrapConfig(bsUrls []string) *config.Config {
+	return config.P2pDefaultBootstrapConfig(bsUrls)
 }
 
 //
