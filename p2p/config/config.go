@@ -298,7 +298,7 @@ const dftName = "test"
 const (
 	dftUdpPort = 30303
 	dftTcpPort = 30303
-	dftDhtPort = 80808
+	dftDhtPort = 40404
 )
 var dftLocal = Node {
 	IP:		P2pGetLocalIpAddr(),

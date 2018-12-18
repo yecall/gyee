@@ -212,7 +212,7 @@ func (mgr *TimerManager)TickProc() error {
 	herr := mgr.hpHandler(mgr.hTmList[mgr.hp])
 	derr := mgr.dpHandler(mgr.dTmList[mgr.dp])
 
-	if serr, merr, herr, derr != nil, nil, nil, nil {
+	if serr != nil || merr != nil || herr != nil || derr != nil {
 		return TmEnoInternal
 	}
 

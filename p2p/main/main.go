@@ -160,7 +160,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase7"
+var tgtCase = "testCase8"
 
 //
 // port base
@@ -280,7 +280,8 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 		pkg.Payload = []byte(txString)
 		pkg.PayloadLength = len(pkg.Payload)
 
-		pkg.Key = append(pkg.Key, sha256.Sum256(pkg.Payload)[0:]...)
+		k := sha256.Sum256(pkg.Payload)
+		pkg.Key = append(pkg.Key, k[0:]...)
 		pkg.Mid = sch.MSBR_MT_TX
 	}
 

@@ -65,6 +65,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: sch.PeerMgrName,		Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.ShMgrName,		Tep: NewShellMgr(),			MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
 	} else if what == config.P2P_TYPE_DHT {
@@ -77,6 +78,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 			{Name: dht.QryMgrName,		Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: dht.RutMgrName,		Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: dht.ConMgrName,		Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.DhtShMgrName,	Tep: NewDhtShellMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 	}
 
@@ -98,6 +100,7 @@ var taskStaticPoweronOrder4Chain = []string {
 	tab.TabMgrName,
 	sch.PeerMgrName,
 	peer.PeerLsnMgrName,
+	sch.ShMgrName,
 }
 
 //
@@ -106,6 +109,7 @@ var taskStaticPoweronOrder4Chain = []string {
 // to modify this table if necessary.
 //
 var taskStaticPoweroffOrder4Chain = []string {
+	sch.ShMgrName,
 	dcv.DcvMgrName,
 	tab.NdbcName,
 	sch.PeerMgrName,
@@ -128,6 +132,7 @@ var taskStaticPoweronOrder4Dht = [] string {
 	dht.PrdMgrName,
 	dht.RutMgrName,
 	dht.LsnMgrName,
+	sch.DhtShMgrName,
 }
 
 //
@@ -136,6 +141,7 @@ var taskStaticPoweronOrder4Dht = [] string {
 // to modify this table if necessary.
 //
 var taskStaticPoweroffOrder4Dht = [] string {
+	sch.DhtShMgrName,
 	dht.DhtMgrName,
 	dht.DsMgrName,
 	dht.ConMgrName,

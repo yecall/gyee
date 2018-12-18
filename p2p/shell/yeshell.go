@@ -204,9 +204,8 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 }
 
 func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
-	yeShMgr := yeShellManager{}
 	var eno sch.SchErrno
-	var ok bool
+	yeShMgr := yeShellManager{}
 
 	cfg := YeShellConfigToP2pCfg(yesCfg)
 	if cfg == nil || len(cfg) != 2 {
@@ -225,33 +224,52 @@ func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 		return nil
 	}
 
-	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
-	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
-		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
-		return nil
-	}
-
-	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*shellManager)
-	if !ok || yeShMgr.ptChainShMgr == nil {
-		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
-		return nil
-	}
-
 	yeShMgr.dhtInst, eno = P2pCreateInstance(cfg[DhtCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
 		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
+	return &yeShMgr
+}
+
+func (yeShMgr *yeShellManager)Start() error {
+	var eno sch.SchErrno
+	var ok bool
+
+	if eno = P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		return eno
+	}
+
+	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
+	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*shellManager)
+	if !ok || yeShMgr.ptChainShMgr == nil {
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
+	if eno := P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
+		stopCh := make(chan bool, 0)
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		P2pStop(yeShMgr.dhtInst, stopCh)
+		return eno
+	}
+
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
-		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*dhtShellManager)
 	if !ok || yeShMgr.ptDhtShMgr == nil {
-		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
@@ -266,22 +284,6 @@ func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 	yeShMgr.chainRxChan = yeShMgr.ptChainShMgr.GetRxChan()
 	yeShMgr.deDupTiker = time.NewTicker(dht.OneTick)
 	yeShMgr.ddtChan = make(chan bool, 1)
-
-	return &yeShMgr
-}
-
-func (yeShMgr *yeShellManager)Start() error {
-	if eno := P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
-		return eno
-	}
-
-	if eno := P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
-		stopCh := make(chan bool, 0)
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
-		P2pStop(yeShMgr.dhtInst, stopCh)
-		return eno
-	}
 
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()

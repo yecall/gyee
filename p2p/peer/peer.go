@@ -1488,9 +1488,11 @@ func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 
 func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
 	peMgr.reCfgTid = sch.SchInvalidTid
-	for del, _, := range peMgr.reCfg.delList {
+	for del, _ := range peMgr.reCfg.delList {
 		wks, ok := peMgr.workers[del]
-		if !ok { continue }
+		if !ok {
+			continue
+		}
 		msg := sch.SchMessage{}
 		for _, peerInst := range wks {
 			req := sch.MsgPeCloseReq {
