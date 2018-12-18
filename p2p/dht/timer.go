@@ -28,6 +28,7 @@ import (
 
 const (
 	oneTick			= time.Second					// unit tick to driver the timer manager
+	OneTick			= oneTick
 	xsecondBits		= 6
 	xsecondCycle	= 1 << xsecondBits				// x-second cycle in tick
 	xminuteBits		= 6

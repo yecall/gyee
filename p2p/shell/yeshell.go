@@ -76,8 +76,11 @@ type yeShellManager struct {
 	dhtCsChan			chan *sch.MsgDhtConInstStatusInd		// dht connection status indication channel
 	subscribers      	*sync.Map								// subscribers for incoming messages
 	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
+	deDupLock			sync.Mutex								// lock for deduplication timer manager
 	tmDedup				*dht.TimerManager						// deduplication timer manager
 	deDupMap			map[[yesKeyBytes]byte]bool				// map for keys of messages had been sent
+	deDupTiker			*time.Ticker							// deduplication ticker
+	ddtChan				chan bool								// deduplication ticker channel
 }
 
 const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity
@@ -245,10 +248,8 @@ func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
 	yeShMgr.subscribers = new(sync.Map)
 	yeShMgr.chainRxChan = yeShMgr.ptChainShMgr.GetRxChan()
-
-	go yeShMgr.dhtEvProc()
-	go yeShMgr.dhtCsProc()
-	go yeShMgr.chainRxProc()
+	yeShMgr.deDupTiker = time.NewTicker(dht.OneTick)
+	yeShMgr.ddtChan = make(chan bool, 1)
 
 	return &yeShMgr
 }
@@ -266,13 +267,29 @@ func (yeShMgr *yeShellManager)Start() error {
 		return eno
 	}
 
+	go yeShMgr.dhtEvProc()
+	go yeShMgr.dhtCsProc()
+	go yeShMgr.chainRxProc()
+	go yeShMgr.deDupTickerProc()
+
 	return nil
 }
 
 func (yeShMgr *yeShellManager)Stop() {
-	stopCh := make(chan bool, 0)
+	stopCh := make(chan bool, 1)
+
+	log.Debug("Stop: close deduplication ticker")
+	close(yeShMgr.ddtChan)
+
+	log.Debug("Stop: stop chain")
 	P2pStop(yeShMgr.dhtInst, stopCh)
+	<-stopCh
+	log.Debug("Stop: chain stopped")
+
+	log.Debug("Stop: stop dht")
 	P2pStop(yeShMgr.chainInst, stopCh)
+	<-stopCh
+	log.Debug("Stop: dht stopped")
 }
 
 func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
@@ -919,6 +936,9 @@ func (yeShMgr *yeShellManager)getSubnetIdentity(maskBits int) (config.SubNetwork
 }
 
 func (yeShMgr *yeShellManager)deDupTimerCb(el *list.Element, data interface{}) interface{} {
+	yeShMgr.deDupLock.Lock()
+	defer yeShMgr.deDupLock.Unlock()
+
 	if key, ok := data.(*[yesKeyBytes]byte); !ok {
 		return errors.New("deDupTimerCb: invalid key")
 	} else {
@@ -928,6 +948,9 @@ func (yeShMgr *yeShellManager)deDupTimerCb(el *list.Element, data interface{}) i
 }
 
 func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
+	yeShMgr.deDupLock.Lock()
+	defer yeShMgr.deDupLock.Unlock()
+
 	if len(key) != yesKeyBytes {
 		return errors.New("setDedupTimer: invalid key")
 	}
@@ -954,4 +977,21 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 
 	yeShMgr.deDupMap[k] = true
 	return nil
+}
+
+func (yeShMgr *yeShellManager)deDupTickerProc(){
+	defer yeShMgr.deDupTiker.Stop()
+	for {
+		select {
+		case <-yeShMgr.deDupTiker.C:
+
+			yeShMgr.deDupLock.Lock()
+			yeShMgr.tmDedup.TickProc()
+			yeShMgr.deDupLock.Unlock()
+
+		case <-yeShMgr.ddtChan:
+			break
+		}
+	}
+	log.Debug("deDupTickerProc: exit")
 }
