@@ -1015,5 +1015,6 @@ func (yeShMgr *yeShellManager)deDupTickerProc(){
 }
 
 func (yeShMgr *yeShellManager)GetLocalNode() *config.Node {
-	return nil
+	cfg := yeShMgr.chainInst.SchGetP2pConfig()
+	return &cfg.Local
 }
