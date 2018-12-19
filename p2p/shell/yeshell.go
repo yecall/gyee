@@ -98,6 +98,7 @@ type YeShellConfig struct {
 	SubNetMaskBits		int										// mask bits for sub network identity
 	EvKeepTime			time.Duration							// duration for events kept by dht
 	DedupTime			time.Duration							// duration for deduplication cleanup timer
+	localSnid			[]byte									// local sut network identity
 }
 
 const (
@@ -178,6 +179,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		byte((snw >> 8) & 0xff),
 		byte(snw & 0xff),
 	}
+	YeShellCfg.localSnid = append(YeShellCfg.localSnid, snid[0:]...)
 	chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, snid)
 	chainCfg.SubNetMaxPeers[snid] = config.MaxPeers
 	chainCfg.SubNetMaxOutbounds[snid] = config.MaxOutbounds
@@ -195,7 +197,8 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		chainCfg = config.P2pGetConfig(chCfgName)
 	}
 
-	dhtCfg = chainCfg
+	dhtCfg = new(config.Config)
+	*dhtCfg = *chainCfg
 	dhtCfg.AppType = config.P2P_TYPE_DHT
 	cfg[ChainCfgIdx] = chainCfg
 	cfg[DhtCfgIdx] = dhtCfg
@@ -242,14 +245,14 @@ func (yeShMgr *yeShellManager)Start() error {
 		return eno
 	}
 
-	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
-	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
+	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
+	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
-	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*shellManager)
-	if !ok || yeShMgr.ptChainShMgr == nil {
+	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*dhtShellManager)
+	if !ok || yeShMgr.ptDhtShMgr == nil {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
@@ -261,14 +264,14 @@ func (yeShMgr *yeShellManager)Start() error {
 		return eno
 	}
 
-	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
-	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
+	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
+	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
-	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*dhtShellManager)
-	if !ok || yeShMgr.ptDhtShMgr == nil {
+	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*shellManager)
+	if !ok || yeShMgr.ptChainShMgr == nil {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
@@ -282,6 +285,8 @@ func (yeShMgr *yeShellManager)Start() error {
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
 	yeShMgr.subscribers = new(sync.Map)
 	yeShMgr.chainRxChan = yeShMgr.ptChainShMgr.GetRxChan()
+	yeShMgr.tmDedup = dht.NewTimerManager()
+	yeShMgr.deDupMap = make(map[[yesKeyBytes]byte]bool, 0)
 	yeShMgr.deDupTiker = time.NewTicker(dht.OneTick)
 	yeShMgr.ddtChan = make(chan bool, 1)
 
@@ -848,6 +853,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
 		MsgType: yesMtAtoi[msg.MsgType],
 		From: msg.From,
 		Data: msg.Data,
+		LocalSnid: YeShellCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -872,6 +878,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
 		MsgType: yesMtAtoi[msg.MsgType],
 		From: msg.From,
 		Data: msg.Data,
+		LocalSnid: YeShellCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -906,6 +913,7 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
 		MsgType: yesMtAtoi[msg.MsgType],
 		From: msg.From,
 		Data: msg.Data,
+		LocalSnid: YeShellCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -982,13 +990,13 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 	}
 
 	tm, err := yeShMgr.tmDedup.GetTimer(YeShellCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
-	if err != nil {
+	if err != dht.TmEnoNone {
 		log.Debug("setDedupTimer: GetTimer failed, error: %s", err.Error())
 		return err
 	}
 
 	yeShMgr.tmDedup.SetTimerData(tm, &k)
-	if err := yeShMgr.tmDedup.StartTimer(tm); err != nil {
+	if err := yeShMgr.tmDedup.StartTimer(tm); err != dht.TmEnoNone {
 		log.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
 		return err
 	}

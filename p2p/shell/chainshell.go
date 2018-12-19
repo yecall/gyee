@@ -264,8 +264,8 @@ func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 		for id, peer := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
 				shMgr.send2Peer(&peer, req)
-			} else if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
-				shMgr.send2Peer(&peer, req)
+			} else if bytes.Compare(id.snid[0:], req.LocalSnid) == 0 {
+				 shMgr.send2Peer(&peer, req)
 			}
 		}
 

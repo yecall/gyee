@@ -2173,7 +2173,7 @@ func testCase8(tc *testCase) {
 	}()
 
 	for {
-		now := time.Now().Unix()
+		now := time.Now().UnixNano()
 
 		data := []byte(fmt.Sprintf("ev: %d", now))
 		key := sha256.Sum256(data)

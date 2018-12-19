@@ -29,13 +29,13 @@ import (
 const (
 	oneTick			= time.Second					// unit tick to driver the timer manager
 	OneTick			= oneTick
-	xsecondBits		= 6
+	xsecondBits		= 5
 	xsecondCycle	= 1 << xsecondBits				// x-second cycle in tick
-	xminuteBits		= 6
+	xminuteBits		= 5
 	xminuteCycle	= 1 << xminuteBits				// x-minute cycle in x-second
-	xhourBits		= 6
+	xhourBits		= 5
 	xhourCycle		= 1 << xhourBits				// x-hour cycle in x-minute
-	xdayBits		= 6
+	xdayBits		= 5
 	xdayCycle		= 1 << xdayBits					// x-day cycle in x-hour
 
 	// min and max duration
