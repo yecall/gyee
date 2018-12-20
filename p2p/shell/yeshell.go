@@ -33,6 +33,7 @@ import (
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/dht"
 	"github.com/yeeco/gyee/p2p/peer"
+	"math/rand"
 )
 
 const (
@@ -81,6 +82,8 @@ type yeShellManager struct {
 	deDupMap			map[[yesKeyBytes]byte]bool				// map for keys of messages had been sent
 	deDupTiker			*time.Ticker							// deduplication ticker
 	ddtChan				chan bool								// deduplication ticker channel
+	bsTicker			*time.Ticker							// bootstrap ticker
+	dhtBsChan			chan bool								// bootstrap ticker channel
 }
 
 const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity
@@ -93,12 +96,15 @@ type YeShellConfig struct {
 	Validator			bool									// validator flag
 	BootstrapNode		bool									// bootstrap node flag
 	BootstrapNodes		[]string								// bootstrap nodes
+	DhtBootstrapNodes	[]string								// bootstrap nodes for dht
 	NodeDataDir			string									// node data directory
 	NodeDatabase		string									// node database
 	SubNetMaskBits		int										// mask bits for sub network identity
 	EvKeepTime			time.Duration							// duration for events kept by dht
 	DedupTime			time.Duration							// duration for deduplication cleanup timer
+	BootstrapTime		time.Duration							// duration for bootstrap blind connection
 	localSnid			[]byte									// local sut network identity
+	dhtBootstrapNodes	[]*config.Node							// dht bootstarp nodes
 }
 
 const (
@@ -108,18 +114,22 @@ const (
 
 // Default yee shell configuration for convenience
 var DefaultYeShellConfig = YeShellConfig{
-	AppType:		config.P2P_TYPE_ALL,
-	Name:			"test",
-	Validator:		true,
-	BootstrapNode:	false,
-	BootstrapNodes: []string {
+	AppType:			config.P2P_TYPE_ALL,
+	Name:				"test",
+	Validator:			true,
+	BootstrapNode:		false,
+	BootstrapNodes:		[]string {
 		"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.191:30303:30303",
 	},
-	NodeDataDir:	config.P2pDefaultDataDir(true),
-	NodeDatabase:	"nodes",
-	SubNetMaskBits:	0,
-	EvKeepTime:		time.Minute * 8,
-	DedupTime:		time.Second * 60,
+	DhtBootstrapNodes:	[]string {
+		"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.191:40404:40404",
+	},
+	NodeDataDir:		config.P2pDefaultDataDir(true),
+	NodeDatabase:		"nodes",
+	SubNetMaskBits:		0,
+	EvKeepTime:			time.Minute * 8,
+	DedupTime:			time.Second * 60,
+	BootstrapTime:		time.Second * 4,
 }
 
 // Global shell configuration: this var is set when function YeShellConfigToP2pCfg called,
@@ -199,6 +209,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 
 	dhtCfg = new(config.Config)
 	*dhtCfg = *chainCfg
+	YeShellCfg.dhtBootstrapNodes = config.P2pSetupBootstrapNodes(YeShellCfg.DhtBootstrapNodes)
 	dhtCfg.AppType = config.P2P_TYPE_DHT
 	cfg[ChainCfgIdx] = chainCfg
 	cfg[DhtCfgIdx] = dhtCfg
@@ -289,9 +300,12 @@ func (yeShMgr *yeShellManager)Start() error {
 	yeShMgr.deDupMap = make(map[[yesKeyBytes]byte]bool, 0)
 	yeShMgr.deDupTiker = time.NewTicker(dht.OneTick)
 	yeShMgr.ddtChan = make(chan bool, 1)
+	yeShMgr.bsTicker = time.NewTicker(YeShellCfg.BootstrapTime)
+	yeShMgr.dhtBsChan = make(chan bool, 1)
 
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
+	go yeShMgr.dhtBootstrapProc()
 	go yeShMgr.chainRxProc()
 	go yeShMgr.deDupTickerProc()
 
@@ -732,8 +746,41 @@ _rxLoop:
 	log.Debug("chainRxProc: exit")
 }
 
+func (yeShMgr *yeShellManager)dhtBootstrapProc() {
+	defer yeShMgr.bsTicker.Stop()
+_bootstarp:
+	for {
+		select {
+		case <-yeShMgr.bsTicker.C:
+			if len(YeShellCfg.dhtBootstrapNodes) <= 0 {
+				log.Debug("dhtBootstrapProc: none of bootstarp nodes")
+			} else {
+				r := rand.Int31n(int32(len(YeShellCfg.dhtBootstrapNodes)))
+				req := sch.MsgDhtBlindConnectReq{
+					Peer: YeShellCfg.dhtBootstrapNodes[r],
+				}
+				msg := sch.SchMessage{}
+				yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtBlindConnectReq, &req)
+				yeShMgr.dhtInst.SchSendMessage(&msg)
+			}
+		case <-yeShMgr.dhtBsChan:
+			break _bootstarp
+		}
+	}
+	log.Debug("dhtBootstrapProc: exit")
+}
+
 func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	log.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
+	for _, bsn := range YeShellCfg.dhtBootstrapNodes {
+		if msg.Eno == dht.DhtEnoNone.GetEno() {
+			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
+				log.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
+				close(yeShMgr.dhtBsChan)
+				break
+			}
+		}
+	}
 	return sch.SchEnoNone
 }
 
@@ -1007,6 +1054,7 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 
 func (yeShMgr *yeShellManager)deDupTickerProc(){
 	defer yeShMgr.deDupTiker.Stop()
+_dedup:
 	for {
 		select {
 		case <-yeShMgr.deDupTiker.C:
@@ -1016,7 +1064,7 @@ func (yeShMgr *yeShellManager)deDupTickerProc(){
 			yeShMgr.deDupLock.Unlock()
 
 		case <-yeShMgr.ddtChan:
-			break
+			break _dedup
 		}
 	}
 	log.Debug("deDupTickerProc: exit")
