@@ -2172,7 +2172,8 @@ func testCase8(tc *testCase) {
 		}
 	}()
 
-	for {
+
+	for false {
 		now := time.Now().UnixNano()
 
 		data := []byte(fmt.Sprintf("ev: %d", now))
@@ -2201,4 +2202,6 @@ func testCase8(tc *testCase) {
 
 		time.Sleep(time.Millisecond * 10)
 	}
+
+	waitInterrupt()
 }

@@ -369,7 +369,7 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 // tick timer handler
 //
 func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
-	if err := dsMgr.tmMgr.TickProc(); err != nil {
+	if err := dsMgr.tmMgr.TickProc(); err != TmEnoNone {
 		log.Debug("TickProc: error: %s", err.Error())
 		return sch.SchEnoUserTask
 	}
