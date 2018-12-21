@@ -315,7 +315,7 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 			Seq:		time.Now().UnixNano(),
 		}
 
-		rutMgr.bsTargets[*key] = &req.Target
+		rutMgr.bsTargets[*key] = target
 		log.Debug("bootstarpTimerHandler: query will be start, target: %x", req.Target)
 
 		sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
@@ -328,19 +328,19 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 //
 // Query startup response(for bootstrap) handler
 //
-func (rutMgr *RutMgr)queryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+func (rutMgr *RutMgr)queryStartRsp(rsp *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 
-	if msg == nil {
+	if rsp == nil {
 		log.Debug("queryStartRsp: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
 	log.Debug("queryStartRsp: " +
 		"bootstrap startup response, eno: %d, target: %x",
-		msg.Eno, msg.Target)
+		rsp.Eno, rsp.Target)
 
-	if _, exist := rutMgr.bsTargets[msg.Target]; !exist {
-		log.Debug("queryStartRsp: not a bootstrap target: %x", msg.Target)
+	if _, exist := rutMgr.bsTargets[rsp.Target]; !exist {
+		log.Debug("queryStartRsp: not a bootstrap target: %x", rsp.Target)
 		return sch.SchEnoMismatched
 	}
 
@@ -350,7 +350,7 @@ func (rutMgr *RutMgr)queryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchEr
 //
 // Query result indication(for bootstrap) handler
 //
-func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+func (rutMgr *RutMgr)queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 
 	//
 	// do not care the result, since the bootstrap procedure is just for keeping
@@ -358,26 +358,29 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	// a specific peer but just created randomly).
 	//
 
-	if msg == nil {
+	if ind == nil {
 		log.Debug("queryResultInd: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
 	log.Debug("queryResultInd: " +
 		"bootstrap result indication, eno: %d, target: %x",
-		msg.Eno, msg.Target)
+		ind.Eno, ind.Target)
 
-	if _, ok := rutMgr.bsTargets[msg.Target]; !ok {
-		log.Debug("queryResultInd: not a bootstrap target: %x", msg.Target)
+	ptrNodeId, ok := rutMgr.bsTargets[ind.Target]
+	if !ok {
+		log.Debug("queryResultInd: not a bootstrap target: %x", ind.Target)
 		return sch.SchEnoMismatched
 	}
+	nodeId, _ := ptrNodeId.(config.NodeID)
 
 	//
 	// when a bootstrap round is completed, we publish ourselves to outside world to
 	// let others know us.
 	//
 
-	if delete(rutMgr.bsTargets, msg.Target); len(rutMgr.bsTargets) == 0 {
+	if delete(rutMgr.bsTargets, ind.Target); len(rutMgr.bsTargets) == 0 &&
+		bytes.Compare(nodeId[0:], rutMgr.localNodeId[0:]) != 0 {
 
 		msg := sch.SchMessage{}
 		target := rutMgr.localNodeId
@@ -389,7 +392,7 @@ func (rutMgr *RutMgr)queryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 			Seq:     time.Now().UnixNano(),
 		}
 
-		rutMgr.bsTargets[*key] = &req.Target
+		rutMgr.bsTargets[*key] = target
 
 		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		rutMgr.sdl.SchSendMessage(&msg)
@@ -586,11 +589,11 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 //
 // Stop notify request handler
 //
-func (rutMgr *RutMgr)stopNotifyReq(msg *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErrno {
+func (rutMgr *RutMgr)stopNotifyReq(req *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErrno {
 
 	var nfi = rutMgrNotifeeId {
-		task:	msg.Task,
-		target:	msg.Target,
+		task:	req.Task,
+		target:	req.Target,
 	}
 
 	if _, exist := rutMgr.ntfTab[nfi]; exist == false {
@@ -628,7 +631,7 @@ func (rutMgr *RutMgr)rutMgrGetRouteConfig() DhtErrno {
 func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 
 	if rutMgr.bootstrapNode {
-		log.Debug("rutMgrStartBspTimer: no bootstrap timer for a bootstrap node")
+		log.Debug("rutMgrStartBspTimer: no bootstrap timer for a bot")
 		return DhtEnoNone
 	}
 

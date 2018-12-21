@@ -440,7 +440,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	log.Debug("handshakeRsp: all ok, try to update route manager, " +
 		"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
-		dht, ci.name, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+		dht, ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
 	update := sch.MsgDhtRutMgrUpdateReq {
 		Why:	rutMgrUpdate4Handshake,
