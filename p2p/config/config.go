@@ -917,14 +917,14 @@ func P2pConfig4Protocols(name string) *Cfg4Protocols {
 
 // Get configuration for dht route manager
 func P2pConfig4DhtRouteManager(name string) *Cfg4DhtRouteManager {
-	config[name].DhtRutCfg.NodeId = config[name].Local.ID
+	config[name].DhtRutCfg.NodeId = config[name].DhtLocal.ID
 	config[name].DhtRutCfg.BootstrapNode = config[name].BootstrapNode
 	return &config[name].DhtRutCfg
 }
 
 // Get configuration for dht query manager
 func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
-	config[name].DhtQryCfg.Local = &config[name].Local
+	config[name].DhtQryCfg.Local = &config[name].DhtLocal
 	return &config[name].DhtQryCfg
 }
 
@@ -947,11 +947,11 @@ func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 
 // Get configuration for dht connection manager
 func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
-	config[name].DhtConCfg.Local = &config[name].Local
+	config[name].DhtConCfg.Local = &config[name].DhtLocal
 	return &config[name].DhtConCfg
 }
 
-// by yeeco, alias Ethereum's S256 to elliptic.P256
+// elliptic.P256
 func S256() elliptic.Curve {
 	return elliptic.P256()
 }
