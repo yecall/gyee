@@ -535,10 +535,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		return name, PcfgEnoNodeId
 	}
 
-	if cfg.AppType == P2P_TYPE_DHT  || cfg.AppType == P2P_TYPE_ALL {
-		cfg.DhtLocal.ID = cfg.Local.ID
-	}
-
+	cfg.DhtLocal.ID = cfg.Local.ID
 	config[name] = cfg
 
 	return name, PcfgEnoNone
