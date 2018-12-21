@@ -313,10 +313,13 @@ func (yeShMgr *yeShellManager)Start() error {
 }
 
 func (yeShMgr *yeShellManager)Stop() {
-	stopCh := make(chan bool, 1)
+	log.Debug("Stop: close dht bootstrap timer")
+	close(yeShMgr.dhtBsChan)
 
 	log.Debug("Stop: close deduplication ticker")
 	close(yeShMgr.ddtChan)
+
+	stopCh := make(chan bool, 1)
 
 	log.Debug("Stop: stop chain")
 	P2pStop(yeShMgr.dhtInst, stopCh)
@@ -776,7 +779,7 @@ func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 		if msg.Eno == dht.DhtEnoNone.GetEno() {
 			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
 				log.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
-				close(yeShMgr.dhtBsChan)
+				yeShMgr.dhtBsChan<-true
 				break
 			}
 		}
