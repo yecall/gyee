@@ -368,6 +368,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 			QryInstExpired:		time.Second * 16,
 		},
 		DhtConCfg: Cfg4DhtConManager {
+			Local:				&dhtLocal,
 			MaxCon:				512,
 			HsTimeout:			time.Second * 16,
 		},
@@ -534,10 +535,8 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		return name, PcfgEnoNodeId
 	}
 
-	if cfg.AppType == P2P_TYPE_DHT {
-		cfg.DhtRutCfg.NodeId = cfg.DhtLocal.ID
-		cfg.DhtQryCfg.Local = &cfg.DhtLocal
-		cfg.DhtConCfg.Local = &cfg.DhtLocal
+	if cfg.AppType == P2P_TYPE_DHT  || cfg.AppType == P2P_TYPE_ALL {
+		cfg.DhtLocal.ID = cfg.Local.ID
 	}
 
 	config[name] = cfg
