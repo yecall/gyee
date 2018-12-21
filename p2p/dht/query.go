@@ -574,7 +574,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 	}
 
 	if qcb.status != qsInited {
-		log.Debug("rutNotificationInd: query not inited yet for target: %s", target)
+		log.Debug("rutNotificationInd: query not inited yet for target: %x", target)
 		return sch.SchEnoUserTask
 	}
 
