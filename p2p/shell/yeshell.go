@@ -300,12 +300,16 @@ func (yeShMgr *yeShellManager)Start() error {
 	yeShMgr.deDupMap = make(map[[yesKeyBytes]byte]bool, 0)
 	yeShMgr.deDupTiker = time.NewTicker(dht.OneTick)
 	yeShMgr.ddtChan = make(chan bool, 1)
-	yeShMgr.bsTicker = time.NewTicker(YeShellCfg.BootstrapTime)
-	yeShMgr.dhtBsChan = make(chan bool, 1)
 
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
-	go yeShMgr.dhtBootstrapProc()
+
+	if YeShellCfg.BootstrapNode == false {
+		yeShMgr.bsTicker = time.NewTicker(YeShellCfg.BootstrapTime)
+		yeShMgr.dhtBsChan = make(chan bool, 1)
+		go yeShMgr.dhtBootstrapProc()
+	}
+
 	go yeShMgr.chainRxProc()
 	go yeShMgr.deDupTickerProc()
 
@@ -313,8 +317,10 @@ func (yeShMgr *yeShellManager)Start() error {
 }
 
 func (yeShMgr *yeShellManager)Stop() {
-	log.Debug("Stop: close dht bootstrap timer")
-	close(yeShMgr.dhtBsChan)
+	if YeShellCfg.BootstrapNode == false {
+		log.Debug("Stop: close dht bootstrap timer")
+		close(yeShMgr.dhtBsChan)
+	}
 
 	log.Debug("Stop: close deduplication ticker")
 	close(yeShMgr.ddtChan)

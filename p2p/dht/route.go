@@ -118,6 +118,7 @@ type RutMgr struct {
 	bpTid			int										// bootstrap policy timer identity
 	bsTargets		map[config.DsKey] interface{}			// targets in bootstrapping
 	distLookupTab	[]int									// log2 distance lookup table for a xor byte
+	bootstrapNode	bool									// bootstrap node flag
 	localNodeId		config.NodeID							// local node identity
 	rutTab			rutMgrRouteTable						// route table
 	ntfTab			map[rutMgrNotifeeId]*rutMgrNotifee		// notifee table
@@ -613,6 +614,7 @@ func (rutMgr *RutMgr)rutMgrGetRouteConfig() DhtErrno {
 
 	cfgName := rutMgr.sdl.SchGetP2pCfgName()
 	rutCfg := config.P2pConfig4DhtRouteManager(cfgName)
+	rutMgr.bootstrapNode = rutCfg.BootstrapNode
 	rutMgr.localNodeId = rutCfg.NodeId
 	rutMgr.bpCfg.randomQryNum = rutCfg.RandomQryNum
 	rutMgr.bpCfg.period = rutCfg.Period
@@ -624,6 +626,11 @@ func (rutMgr *RutMgr)rutMgrGetRouteConfig() DhtErrno {
 // Start bootstrap timer
 //
 func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
+
+	if rutMgr.bootstrapNode {
+		log.Debug("rutMgrStartBspTimer: no bootstrap timer for a bootstrap node")
+		return DhtEnoNone
+	}
 
 	var td = sch.TimerDescription {
 		Name:	"dhtRutBspTimer",
