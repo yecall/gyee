@@ -59,6 +59,12 @@ enum MessageId {
     MID_EVENT       = 4;
     MID_BLOCKHEADER = 5;
     MID_BLOCK       = 6;
+
+    //
+    // invalid MID
+    //
+
+    MID_INVALID     = -1;
 }
 
 //

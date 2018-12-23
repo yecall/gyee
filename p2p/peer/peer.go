@@ -208,7 +208,7 @@ type PeerManager struct {
 
 func NewPeerMgr() *PeerManager {
 	var peMgr = PeerManager {
-		debug__:		true,
+		debug__:		false,
 		name:        	sch.PeerMgrName,
 		inited:      	make(chan PeMgrErrno, 1),
 		cfg:         	peMgrConfig{},
@@ -482,6 +482,7 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 
 	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
+		log.Debug("peMgrPoweroff: inst: %s", peMgr.sdl.SchGetTaskName(peerInst.ptnMe))
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
 		peMgr.sdl.SchSendMessage(&powerOff)
 	}
@@ -1183,10 +1184,12 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {
+		log.Debug("peMgrCloseReq: worker not found")
 		return PeMgrEnoNotfound
 	}
 
 	if inst.state == peInstStateKilling {
+		log.Debug("peMgrCloseReq: worker already in killing")
 		return PeMgrEnoDuplicated
 	}
 
@@ -1763,9 +1766,9 @@ const (
 
 type peerInstState int	// instance state type
 
-const PeInstDirNull			= -1			// null, so connection should be nil
-const PeInstDirInbound		= 0				// inbound connection
-const PeInstDirOutbound		= 1				// outbound connection
+const PeInstDirNull			= -1				// null, so connection should be nil
+const PeInstDirInbound		= 0					// inbound connection
+const PeInstDirOutbound		= 1					// outbound connection
 
 const PeInstMailboxSize 	= 512				// mailbox size
 const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
@@ -1886,7 +1889,7 @@ func (pi *peerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if pi.debug__ && pi.sdl != nil {
 		sdl := pi.sdl.SchGetP2pCfgName()
-		log.Debug("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, pi.name, msg.Id)
+		log.Debug("peerInstProc: sdl: %s, name: %s, msg.Id: %d", sdl, pi.name, msg.Id)
 	}
 
 	var eno PeMgrErrno
@@ -1924,6 +1927,11 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = PeMgrEnoParameter
 	}
 
+	if pi.debug__ && pi.sdl != nil {
+		sdl := pi.sdl.SchGetP2pCfgName()
+		log.Debug("peerInstProc: get out, sdl: %s, name: %s, msg.Id: %d", sdl, pi.name, msg.Id)
+	}
+
 	if eno != PeMgrEnoNone {
 		return sch.SchEnoUserTask
 	}
@@ -1947,8 +1955,14 @@ func (pi *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 		sdl, pi.sdl.SchGetTaskName(pi.ptnMe), pi.state)
 
 	if pi.rxtxRuning {
+
 		if pi.txChan != nil {
 			close(pi.txChan)
+		}
+
+		if pi.conn != nil {
+			pi.conn.Close()
+			pi.conn = nil
 		}
 
 		if pi.rxDone != nil {
@@ -1959,11 +1973,6 @@ func (pi *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 		if pi.rxChan != nil {
 			close(pi.rxChan)
 		}
-	}
-
-	if pi.conn != nil {
-		pi.conn.Close()
-		pi.conn = nil
 	}
 
 	pi.state = peInstStateKilled
@@ -2144,11 +2153,18 @@ func (pi *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 		if pi.txChan != nil {
 			close(pi.txChan)
 		}
+
+		if pi.conn != nil {
+			pi.conn.Close()
+			pi.conn = nil
+		}
+
 		pi.rxDone <- PeMgrEnoNone
 		<-pi.rxDone
 		if pi.rxChan != nil {
 			close(pi.rxChan)
 		}
+
 		pi.rxtxRuning = false
 	}
 
@@ -2439,11 +2455,11 @@ func piTx(pi *peerInstance) PeMgrErrno {
 	// would then exit for "txChan" closed.
 	sdl := pi.sdl.SchGetP2pCfgName()
 
-txLoop:
+_txLoop:
 	for {
 		upkg, ok := <-pi.txChan
 		if !ok {
-			break txLoop
+			break _txLoop
 		}
 		pi.txPendNum -= 1
 		pi.txSeq += 1
@@ -2509,7 +2525,7 @@ func piRx(pi *peerInstance) PeMgrErrno {
 	var peerInfo = PeerInfo{}
 	var pkgCb = P2pPackageRx{}
 
-rxLoop:
+_rxLoop:
 	for {
 		// check if we are done
 		select {
@@ -2522,25 +2538,26 @@ rxLoop:
 				close(pi.rxDone)
 			}
 
-			break rxLoop
+			break _rxLoop
 
 		default:
 		}
 
-		// try reading the peer
+		// if in errors, sleep then continue to check done
 		if pi.rxEno != PeMgrEnoNone {
 			time.Sleep(time.Microsecond * 100)
 			continue
 		}
 
+		// try reading the peer
 		upkg := new(P2pPackage)
 		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
 
-			// 1) if failed, callback to the user, so he can close this peer seems in troubles,
-			// we will be done then.
+			// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
+			// and we will be done then;
 			// 2) it is possible that, while we are blocked here in reading and the connection
 			// is closed for some reasons(for example the user close the peer), in this case,
-			// we would get an error.
+			// we would get an error;
 
 			pi.rxEno = eno
 			hs := Handshake {

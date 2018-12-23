@@ -61,6 +61,9 @@ const (
 	MID_EVENT		= pb.MessageId_MID_EVENT
 	MID_BLOCKHEADER	= pb.MessageId_MID_BLOCKHEADER
 	MID_BLOCK		= pb.MessageId_MID_BLOCK
+
+	// invalid MID
+	MID_INVALID		= pb.MessageId_MID_INVALID
 )
 
 //
@@ -320,6 +323,8 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 	pbPkg := new(pb.P2PPackage)
 	pbPkg.Pid = new(pb.ProtocolId)
 	*pbPkg.Pid = pb.ProtocolId_PID_P2P
+	pbPkg.ExtMid = new(pb.MessageId)
+	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.PayloadLength = new(uint32)
 	*pbPkg.PayloadLength = uint32(len(payload))
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
@@ -329,7 +334,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 	// done in calling of gw.WriteMsg, see bellow.
 	//
 
-	if inst.hto != 0 {
+	if inst.hto != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.hto))
 	} else {
 		inst.conn.SetWriteDeadline(time.Time{})
@@ -371,7 +376,7 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 		Pong:		nil,
 	}
 
-	*pbPing.Mid = pb.MessageId_MID_PING
+	*pbPing.Mid = MID_PING
 	pbPing.Ping.Extra = append(pbPing.Ping.Extra, ping.Extra...)
 
 	payload, err := pbPing.Marshal()
@@ -387,19 +392,21 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 
 	pbPkg := pb.P2PPackage {
 		Pid:			new(pb.ProtocolId),
+		ExtMid:			new(pb.MessageId),
 		PayloadLength:	new(uint32),
 		Payload:		make([]byte, 0),
 	}
 
 	*pbPkg.PayloadLength = uint32(len(payload))
 	*pbPkg.Pid = pb.ProtocolId_PID_P2P
+	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 
 	//
 	// Set deadline
 	//
 
-	if inst.hto != 0 {
+	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
 	} else {
 		inst.conn.SetWriteDeadline(time.Time{})
@@ -442,7 +449,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 		},
 	}
 
-	*pbPong.Mid = pb.MessageId_MID_PONG
+	*pbPong.Mid = MID_PONG
 	pbPong.Pong.Extra = append(pbPong.Pong.Extra, pong.Extra...)
 
 	payload, err := pbPong.Marshal()
@@ -458,19 +465,21 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 
 	pbPkg := pb.P2PPackage {
 		Pid:			new(pb.ProtocolId),
+		ExtMid:			new(pb.MessageId),
 		PayloadLength:	new(uint32),
 		Payload:		make([]byte, 0),
 	}
 
 	*pbPkg.PayloadLength = uint32(len(payload))
 	*pbPkg.Pid = pb.ProtocolId_PID_P2P
+	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 
 	//
 	// Set deadline
 	//
 
-	if inst.hto != 0 {
+	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
 	} else {
 		inst.conn.SetWriteDeadline(time.Time{})

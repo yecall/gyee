@@ -2132,11 +2132,12 @@ func testCase8(tc *testCase) {
 
 	go func() {
 		count := 0
+_evloop:
 		for {
 			select {
 			case ev, ok := <-subEv.MsgChan:
 				if !ok {
-					break
+					break _evloop
 				}
 				count++
 				log.Debug("count: %d, ev: %x", count, ev.Key)
@@ -2146,11 +2147,12 @@ func testCase8(tc *testCase) {
 
 	go func() {
 		count := 0
+_txloop:
 		for {
 			select {
 			case tx, ok := <-subTx.MsgChan:
 				if !ok {
-					break
+					break _txloop
 				}
 				count++
 				log.Debug("count: %d, tx: %x", count, tx.Key)
@@ -2160,11 +2162,12 @@ func testCase8(tc *testCase) {
 
 	go func() {
 		count := 0
+_bhloop:
 		for {
 			select {
 			case bh, ok := <-subBh.MsgChan:
 				if !ok {
-					break
+					break _bhloop
 				}
 				count++
 				log.Debug("count: %d, bh: %x", count, bh.Key)
@@ -2172,8 +2175,12 @@ func testCase8(tc *testCase) {
 		}
 	}()
 
+	cnt := 0
+	cnt_max := 10
 
-	for false {
+	for cnt < cnt_max {
+
+		cnt++
 		now := time.Now().UnixNano()
 
 		data := []byte(fmt.Sprintf("ev: %d", now))
@@ -2200,8 +2207,15 @@ func testCase8(tc *testCase) {
 		bk.Key = key[0:]
 		yeShMgr.BroadcastMessageOsn(bk)
 
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 1000)
 	}
 
-	waitInterrupt()
+	close(subEv.MsgChan)
+	yeShMgr.UnRegister(&subEv)
+	close(subTx.MsgChan)
+	yeShMgr.UnRegister(&subTx)
+	close(subBh.MsgChan)
+	yeShMgr.UnRegister(&subBh)
+
+	yeShMgr.Stop()
 }

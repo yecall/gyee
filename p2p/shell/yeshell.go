@@ -327,15 +327,15 @@ func (yeShMgr *yeShellManager)Stop() {
 
 	stopCh := make(chan bool, 1)
 
-	log.Debug("Stop: stop chain")
+	log.Debug("Stop: stop dht")
 	P2pStop(yeShMgr.dhtInst, stopCh)
 	<-stopCh
-	log.Debug("Stop: chain stopped")
+	log.Debug("Stop: dht stopped")
 
-	log.Debug("Stop: stop dht")
+	log.Debug("Stop: stop chain")
 	P2pStop(yeShMgr.chainInst, stopCh)
 	<-stopCh
-	log.Debug("Stop: dht stopped")
+	log.Debug("Stop: chain stopped")
 }
 
 func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
