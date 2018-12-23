@@ -230,9 +230,6 @@ func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *S
 }
 
 func (sdl *Scheduler)SchSendMessage(msg *SchMessage) SchErrno {
-	if msg.Id == EvPeCloseReq {
-		log.Debug("SchSendMessage: sch.EvPeCloseReq")
-	}
 	return sdl.schSendMsg((*schMessage)(msg))
 }
 
