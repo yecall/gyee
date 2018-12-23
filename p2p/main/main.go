@@ -2176,7 +2176,7 @@ _bhloop:
 	}()
 
 	cnt := 0
-	cnt_max := 10
+	cnt_max := 100
 
 	for cnt < cnt_max {
 
