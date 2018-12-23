@@ -30,6 +30,7 @@ import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/onsi/ginkgo/integration/_fixtures/watch_fixtures/D"
 )
 
 
@@ -201,6 +202,9 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = dsMgr.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
+
+	case sch.EvDhtQryMgrQueryStartRsp:
+		eno = dsMgr.qryStartRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStartRsp))
 
 	default:
 		eno = sch.SchEnoParameter
@@ -650,6 +654,13 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	schMsg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstTxDataReq, &txReq)
 	return dsMgr.sdl.SchSendMessage(&schMsg)
+}
+
+func (dsMgr *DsMgr)qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	if msg.Eno != DhtEnoNone.GetEno() {
+		log.Debug("qryStartRsp: errors reported, eno: %d", msg.Eno)
+	}
+	return sch.SchEnoNone
 }
 
 //

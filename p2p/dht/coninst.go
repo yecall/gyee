@@ -498,9 +498,13 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 	var dhtMsg = DhtMessage {
 		Mid: MID_UNKNOWN,
 	}
-
 	var nodes []*config.Node
-	bns := msg.Peers.([]*rutMgrBucketNode)
+	bns, ok := msg.Peers.([]*rutMgrBucketNode)
+	if !ok {
+		log.Debug("rutMgrNearestRsp: invalid parameters")
+		return sch.SchEnoParameter
+	}
+
 	for idx := 0; idx < len(bns); idx++ {
 		nodes = append(nodes, &bns[idx].node)
 	}
