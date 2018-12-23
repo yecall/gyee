@@ -87,7 +87,7 @@ type PeerInfo Handshake
 
 // Peer manager parameters
 const (
-	defaultConnectTimeout = 15 * time.Second		// default dial outbound timeout value, currently
+	defaultConnectTimeout = 16 * time.Second		// default dial outbound timeout value, currently
 													// it's a fixed value here than can be configurated
 													// by other module.
 
@@ -95,9 +95,9 @@ const (
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-	defaultActivePeerTimeout = 15 * time.Second		// default read/write operation timeout after a peer
+	defaultActivePeerTimeout = 0 * time.Second		// default read/write operation timeout after a peer
 													// connection is activaged in working.
-	maxTcpmsgSize = 1024*1024*4						// max size of a tcpmsg package could be, currently
+	maxTcpmsgSize = 1024 * 1024 * 4					// max size of a tcpmsg package could be, currently
 													// it's a fixed value here than can be configurated
 													// by other module.
 
@@ -1823,6 +1823,7 @@ var peerInstDefault = peerInstance {
 	state:		peInstStateNull,
 	cto:		0,
 	hto:		0,
+	ato:		0,
 	dir:		PeInstDirNull,
 	node:		config.Node{},
 	maxPkgSize:	maxTcpmsgSize,
