@@ -1148,7 +1148,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		ind2Sh := sch.MsgShellPeerActiveInd{
 			TxChan: inst.txChan,
 			RxChan: inst.rxChan,
-			PeerInfo: &i.PeerInfo,
+			PeerInfo: i.PeerInfo,
 		}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerActiveInd, &ind2Sh)
 		peMgr.sdl.SchSendMessage(&schMsg)
