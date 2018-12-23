@@ -1005,16 +1005,25 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		return PeMgrEnoResource
 	}
 
+	idEx.Dir = PeInstDirInbound
+	if _, dup := peMgr.workers[snid][idEx]; dup {
+		if _, dup := peMgr.workers[snid][idEx]; dup {
+			peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+			return PeMgrEnoDuplicated
+		}
+	}
+
+	idEx.Dir = PeInstDirOutbound
+	if _, dup := peMgr.workers[snid][idEx]; dup {
+		if _, dup := peMgr.workers[snid][idEx]; dup {
+			peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+			return PeMgrEnoDuplicated
+		}
+	}
+
 	if inst.dir == PeInstDirInbound {
 
-		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstDirInbound}
-
 		if peMgr.isStaticSubNetId(snid) {
-
-			if _, dup := peMgr.workers[snid][idEx]; dup {
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-				return PeMgrEnoDuplicated
-			}
 
 			peMgr.workers[snid][idEx] = inst
 
@@ -1025,11 +1034,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				return PeMgrEnoResource
 			}
 
-			if _, dup := peMgr.workers[snid][idEx]; dup {
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-				return PeMgrEnoDuplicated
-			}
-
+			idEx.Dir = PeInstDirOutbound
 			if _, dup := peMgr.nodes[snid][idEx]; dup {
 				// this case, both instances are not in working, we kill one instance local,
 				// but the peer might kill another, then two connections are lost, we need a
@@ -1047,13 +1052,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	} else if inst.dir == PeInstDirOutbound {
 
-		idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:PeInstDirOutbound}
 		if peMgr.isStaticSubNetId(snid) {
-
-			if _, dup := peMgr.workers[snid][idEx]; dup {
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-				return PeMgrEnoDuplicated
-			}
 
 			peMgr.workers[snid][idEx] = inst
 
@@ -1064,11 +1063,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				return PeMgrEnoResource
 			}
 
-			if _, dup := peMgr.workers[snid][idEx]; dup {
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-				return PeMgrEnoDuplicated
-			}
-
+			idEx.Dir = PeInstDirInbound
 			if _, dup := peMgr.nodes[snid][idEx]; dup {
 				// this case, both instances are not in working, we kill one instance local,
 				// but the peer might kill another, then two connections are lost, we need a
@@ -1077,10 +1072,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
 				return PeMgrEnoDuplicated
 			}
+
+			idEx.Dir = PeInstDirOutbound
+			peMgr.workers[snid][idEx] = inst
+			peMgr.updateStaticStatus(snid, idEx, peerActivated)
 		}
-		idEx.Dir = PeInstDirOutbound
-		peMgr.workers[snid][idEx] = inst
-		peMgr.updateStaticStatus(snid, idEx, peerActivated)
 	}
 
 	schMsg := sch.SchMessage{}

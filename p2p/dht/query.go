@@ -1141,9 +1141,12 @@ func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.No
 	}
 
 	if why == delQcb4QryInstResultInd {
-		po := sch.SchMessage{}
-		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
-		icb.sdl.SchSendMessage(&po)
+		eno, ptn := icb.sdl.SchGetUserTaskNode(icb.name)
+		if eno == sch.SchEnoNone && ptn != nil && ptn == icb.ptnInst {
+			po := sch.SchMessage{}
+			icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
+			icb.sdl.SchSendMessage(&po)
+		}
 	}
 
 	delete(qcb.qryActived, *peer)
