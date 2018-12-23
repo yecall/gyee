@@ -291,7 +291,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 	}
 
 	dsMgr.ptnMe = ptn
-	_, dsMgr.ptnDhtMgr = sdl.SchGetUserTaskNode(DsMgrName)
+	_, dsMgr.ptnDhtMgr = sdl.SchGetUserTaskNode(DhtMgrName)
 	_, dsMgr.ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName)
 	_, dsMgr.ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName)
 

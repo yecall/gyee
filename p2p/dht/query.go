@@ -445,9 +445,10 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	qryOk2Sender := func(peer *config.Node) {
 		var schMsg = sch.SchMessage{}
 		var ind = sch.MsgDhtQryMgrQueryResultInd{
-			Eno:	DhtEnoNone.GetEno(),
-			Target:	target,
-			Peers:	[]*config.Node{peer},
+			Eno:		DhtEnoNone.GetEno(),
+			ForWhat:	msg.ForWhat,
+			Target:		target,
+			Peers:		[]*config.Node{peer},
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 		qryMgr.sdl.SchSendMessage(&schMsg)
@@ -1425,11 +1426,12 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 
 	var msg = sch.SchMessage{}
 	var ind = sch.MsgDhtQryMgrQueryResultInd{
-		Eno:	eno,
-		Target:	qcb.target,
-		Val:	val,
-		Prds:	nil,
-		Peers:	nil,
+		Eno:		eno,
+		ForWhat:	qcb.forWhat,
+		Target:		qcb.target,
+		Val:		val,
+		Prds:		nil,
+		Peers:		nil,
 	}
 
 	if prd != nil {
