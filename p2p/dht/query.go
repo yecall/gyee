@@ -1177,7 +1177,7 @@ func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) DhtErrno {
 
 	if len(nodes) == 0 || size <= 0 {
-		log.Debug("qryMgrQcbPutPending: invalid parameters")
+		log.Debug("qryMgrQcbPutPending: no pendings to be put")
 		return DhtEnoParameter
 	}
 

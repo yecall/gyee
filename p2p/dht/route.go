@@ -396,7 +396,6 @@ func (rutMgr *RutMgr)queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 
 		rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &req)
 		rutMgr.sdl.SchSendMessage(&msg)
-
 	}
 
 	rutMgr.showRoute("bootstrap-round-completed")

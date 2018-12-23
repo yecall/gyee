@@ -157,6 +157,7 @@ type peMgrConfig struct {
 
 // peer manager
 type PeerManager struct {
+	debug__			bool							// if in debuging
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// name
 	inited			chan PeMgrErrno					// result of initialization
@@ -206,7 +207,8 @@ type PeerManager struct {
 }
 
 func NewPeerMgr() *PeerManager {
-	var peMgr = PeerManager{
+	var peMgr = PeerManager {
+		_debug:			true,
 		name:        	sch.PeerMgrName,
 		inited:      	make(chan PeMgrErrno, 1),
 		cfg:         	peMgrConfig{},
@@ -239,7 +241,7 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 }
 
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if sch.Debug__ && peMgr.sdl != nil {
+	if peMgr.debug__ && peMgr.sdl != nil {
 		sdl := peMgr.sdl.SchGetP2pCfgName()
 		log.Debug("peerMgrProc: sdl: %s, name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
 	}
@@ -316,7 +318,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = PeMgrEnoParameter
 	}
 
-	if sch.Debug__ && peMgr.sdl != nil {
+	if peMgr.debug__ && peMgr.sdl != nil {
 		sdl := peMgr.sdl.SchGetP2pCfgName()
 		log.Debug("peerMgrProc: get out, sdl: %s, name: %s, msg.Id: %d", sdl, peMgr.name, msg.Id)
 	}
@@ -1114,7 +1116,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 
 		if tabEno != tab.TabMgrEnoNone {
-			if sch.Debug__ {
+			if peMgr.debug__ {
 				log.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, eno: %d, snid: %x, node: %s",
 					tabEno, snid, fmt.Sprintf("%+v", *rsp.peNode))
 			}
@@ -1122,7 +1124,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
-			if sch.Debug__ {
+			if peMgr.debug__ {
 				log.Debug("peMgrHandshakeRsp: TabUpdateNode failed, eno: %d, snid: %x, node: %s",
 					tabEno, snid, fmt.Sprintf("%+v", *rsp.peNode))
 			}
@@ -1382,7 +1384,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 
 func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
 
-	if sch.Debug__ {
+	if peMgr.debug__ {
 		log.Debug("peMgrKillInst: sdl: %s, task: %s",
 			peMgr.sdl.SchGetP2pCfgName(), peMgr.sdl.SchGetTaskName(ptn))
 	}
@@ -1696,7 +1698,7 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&schMsg)
 		timerName = sch.PeerMgrName + "_DcvFindNode"
 
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("peMgrAsk4More: "+
 				"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
 				peMgr.cfg.cfgName,
@@ -1740,7 +1742,7 @@ func (peMgr *PeerManager)peMgrIndEnque(ind interface{}) PeMgrErrno {
 	if len(peMgr.indChan) >= cap(peMgr.indChan) {
 		panic("peMgrIndEnque: system overload")
 	}
-	if sch.Debug__ {
+	if peMgr.debug__ {
 		log.Debug("peMgrIndEnque: sdl: %s", peMgr.sdl.SchGetP2pCfgName())
 	}
 	peMgr.indChan<-ind
@@ -1883,7 +1885,7 @@ func (pi *peerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 }
 
 func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if sch.Debug__ && pi.sdl != nil {
+	if peMgr.debug__ && pi.sdl != nil {
 		sdl := pi.sdl.SchGetP2pCfgName()
 		log.Debug("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, pi.name, msg.Id)
 	}
@@ -1992,7 +1994,7 @@ func (inst *peerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 	inst.dialer.Timeout = inst.cto
 
 	if conn, err = inst.dialer.Dial("tcp", addr.String()); err != nil {
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			// Notice "local" not the address used to connect to peer but the address listened in local
 			log.Debug("piConnOutReq: dial failed, local: %s, to: %s, err: %s",
 				fmt.Sprintf("%s:%d", inst.peMgr.cfg.ip.String(), inst.peMgr.cfg.port),
@@ -2005,7 +2007,7 @@ func (inst *peerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 		inst.raddr = conn.RemoteAddr().(*net.TCPAddr)
 		inst.state = peInstStateConnected
 
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("piConnOutReq: dial ok, laddr: %s, raddr: %s",
 				inst.laddr.String(),
 				inst.raddr.String())
@@ -2053,7 +2055,7 @@ func (inst *peerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 		eno = PeMgrEnoInternal
 	}
 
-	if sch.Debug__ {
+	if peMgr.debug__ {
 		log.Debug("piHandshakeReq: handshake result: %d, dir: %d, laddr: %s, raddr: %s, peer: %s",
 					eno,
 					inst.dir,
@@ -2279,7 +2281,7 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	var hs *Handshake
 
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("piHandshakeInbound: read inbound Handshake message failed, eno: %d", eno)
 		}
 		return eno
@@ -2311,7 +2313,7 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	hs.ProtoNum = pi.peMgr.cfg.protoNum
 	hs.Protocols = pi.peMgr.cfg.protocols
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
 		}
 		return eno
@@ -2337,7 +2339,7 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 	hs.Protocols = append(hs.Protocols, pi.peMgr.cfg.protocols ...)
 
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
 		}
 		return eno
@@ -2345,7 +2347,7 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 
 	// read inbound handshake from remote peer
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("piHandshakeOutbound: read inbound Handshake message failed, eno: %d", eno)
 		}
 		return eno
@@ -2389,7 +2391,7 @@ func SendPackage(pkg *P2pPackage2Peer) (PeMgrErrno){
 	}
 	pem := pkg.P2pInst.SchGetTaskObject(sch.PeerMgrName)
 	if pem == nil {
-		if sch.Debug__ {
+		if peMgr.debug__ {
 			log.Debug("SendPackage: nil peer manager, might be in power off stage")
 		}
 		return PeMgrEnoNotfound
@@ -2515,7 +2517,7 @@ rxLoop:
 		// check if we are done
 		select {
 		case done, ok = <-inst.rxDone:
-			if sch.Debug__ {
+			if peMgr.debug__ {
 				log.Debug("piRx: sdl: %s, inst: %s, done with: %d", sdl, inst.name, done)
 			}
 

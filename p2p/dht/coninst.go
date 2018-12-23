@@ -126,6 +126,7 @@ type conInstHandshakeInfo struct {
 //
 type conInstTxPkg struct {
 	task		interface{}			// pointer to owner task node
+	taskName	string				// task name
 
 	responsed	chan bool			// wait response from peer signal. notice: this chan is not applied for
 									// syncing as a signal really in current implement, instead, it is used
@@ -721,6 +722,12 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Elemen
 
 	if txPkg != nil {
 
+		txPkg.taskName = conInst.sdl.SchGetTaskName(txPkg.task)
+		if len(txPkg.taskName) == 0 {
+			log.Debug("txSetPending: task without name")
+			panic("txSetPending: task without name")
+		}
+
 		conInst.ptnSrcTskBackup = conInst.ptnSrcTsk
 		conInst.ptnSrcTsk = txPkg.task
 		el = conInst.txWaitRsp.PushBack(txPkg)
@@ -841,31 +848,33 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 				conInst.sdl.SchKillTimer(conInst.ptnMe, txPkg.txTid)
 			}
 
-			if txPkg.task != nil {
+			//
+			// check if task still lived to confirm it
+			//
 
-				//
-				// tell the package owner task about timeout
-				//
+			eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
+			if eno == sch.SchEnoNone && ptn != nil && ptn == txPkg.task {
 
-				schMsg := sch.SchMessage{}
-				ind := sch.MsgDhtConInstTxInd {
-					Eno:		DhtEnoTimeout.GetEno(),
-					WaitMid:	txPkg.waitMid,
-					WaitSeq:	txPkg.waitSeq,
+				if txPkg.task != nil {
+
+					schMsg := sch.SchMessage{}
+					ind := sch.MsgDhtConInstTxInd {
+						Eno:     DhtEnoTimeout.GetEno(),
+						WaitMid: txPkg.waitMid,
+						WaitSeq: txPkg.waitSeq,
+					}
+
+					conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtConInstTxInd, &ind)
+					conInst.sdl.SchSendMessage(&schMsg)
 				}
-
-				conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtConInstTxInd, &ind)
-				conInst.sdl.SchSendMessage(&schMsg)
 			}
 
+			//
+			// close responsed channel if needed
+			//
+
 			if txPkg.responsed != nil {
-
-				//
-				// see comments about field "responsed" pls
-				//
-
 				close(txPkg.responsed)
-				txPkg.responsed = nil
 			}
 		}
 
