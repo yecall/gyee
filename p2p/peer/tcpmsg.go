@@ -26,11 +26,12 @@ import (
 	"net"
 	ggio "github.com/gogo/protobuf/io"
 	config "github.com/yeeco/gyee/p2p/config"
-	pb		"github.com/yeeco/gyee/p2p/peer/pb"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	pb "github.com/yeeco/gyee/p2p/peer/pb"
 	log	"github.com/yeeco/gyee/p2p/logger"
 )
 
+
+var debug__ = true
 
 //
 // Max protocols supported
@@ -134,7 +135,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
 
-		if sch.Debug__ {
+		if debug__ {
 			log.Debug("getHandshakeInbound: "+
 				"ReadMsg faied, err: %s",
 				err.Error())
@@ -339,7 +340,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		if sch.Debug__ {
+		if debug__ {
 			log.Debug("putHandshakeOutbound: "+
 				"Write failed, err: %s",
 				err.Error())
@@ -410,7 +411,7 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		if sch.Debug__ {
+		if debug__ {
 			log.Debug("ping:"+
 				"Write failed, err: %s",
 				err.Error())
@@ -481,7 +482,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		if sch.Debug__ {
+		if debug__ {
 			log.Debug("pong:"+
 				"Write failed, err: %s",
 				err.Error())
@@ -537,7 +538,7 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
-		if sch.Debug__ {
+		if debug__ {
 			log.Debug("SendPackage: "+
 				"Write failed, err: %s",
 				err.Error())
@@ -577,7 +578,7 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
 
-		if sch.Debug__ {
+		if debug__ {
 			log.Debug("RecvPackage: "+
 				"ReadMsg faied, err: %s",
 				err.Error())

@@ -68,7 +68,7 @@ enum MessageId {
 message P2PPackage {
     required ProtocolId Pid         = 1;    // protocol identity
     optional MessageId ExtMid       = 2;    // required for "Pid" whch is not PID_P2P
-    required bytes ExtKey           = 3;    // key of message packaged
+    optional bytes ExtKey           = 3;    // key of message packaged
     required uint32 PayloadLength   = 4;    // payload length
     optional bytes Payload          = 5;    // payload
 }
