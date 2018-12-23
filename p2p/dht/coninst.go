@@ -48,8 +48,17 @@ type ConInst struct {
 	ptnDsMgr		interface{}				// pointer to data store manager task node
 	ptnPrdMgr		interface{}				// pointer to provider manager task node
 	ptnConMgr		interface{}				// pointer to connection manager task node
+
+	//
+	// Notice: this is the pointer to the task which asks to establish this connection instance,
+	// but this owner task might have been done while the connection instance might be still alived,
+	// in current implement, before handshake is completed, this pointer is to the owner task, and
+	// after that, this pointer is senseless.
+	//
+
+	srcTaskName		string					// name of the owner source task
 	ptnSrcTsk		interface{}				// for outbound, the source task requests the connection
-	ptnSrcTskBackup	interface{}				// backup for ptnSrcTsk
+
 	status			conInstStatus			// instance status
 	hsTimeout		time.Duration			// handshake timeout value
 	cid				conInstIdentity			// connection instance identity
@@ -695,28 +704,8 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 // Set current Tx pending
 //
 func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Element){
-
-	//
-	// notice txPkg passed in can be nil
-	//
-
-	dht := conInst.sdl.SchGetP2pCfgName()
-
-	if txPkg != nil {
-		log.Debug("txSetPending: dht: %s, inst: %s, hsInfo: %+v, txPkg: %+v",
-			dht, conInst.name, conInst.hsInfo, *txPkg)
-	} else {
-		log.Debug("txSetPending: dht: %s, inst: %s, hsInfo: %+v, txPkg: nil",
-			dht, conInst.name, conInst.hsInfo)
-	}
-
 	conInst.txLock.Lock()
 	defer conInst.txLock.Unlock()
-
-	//
-	// notice: the conInst.ptnSrcTsk will be backuped and then modified to
-	// the pending package's owner task node pointer.
-	//
 
 	var el *list.Element = nil
 
@@ -728,24 +717,7 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Elemen
 			panic("txSetPending: task without name")
 		}
 
-		conInst.ptnSrcTskBackup = conInst.ptnSrcTsk
-		conInst.ptnSrcTsk = txPkg.task
 		el = conInst.txWaitRsp.PushBack(txPkg)
-
-	} else {
-
-		//
-		// seems no switching is needed: a connection instance might live for a long time,
-		// while the original source task (the original owner of this connection) might havd
-		// been done for some reasons. so this field "conInst.ptnSrcTsk" is used as the current
-		// owner task of the tx-package wait need response from peer.
-		//
-		// when "txPkg" passed in is nil, means the current tx-packet does not want to wait
-		// response from peeer, and the tx routine would continue, we just set the owner nil.
-		//
-
-		//conInst.ptnSrcTsk = conInst.ptnSrcTskBackup
-		conInst.ptnSrcTsk = nil
 	}
 
 	return DhtEnoNone, el
@@ -1262,14 +1234,9 @@ _txLoop:
 		//
 
 		if txPkg.responsed != nil {
-
 			if eno, el := conInst.txSetPending(txPkg); eno == DhtEnoNone && el != nil {
 				conInst.txSetTimer(el)
 			}
-
-		} else {
-
-			conInst.txSetPending(nil)
 		}
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {

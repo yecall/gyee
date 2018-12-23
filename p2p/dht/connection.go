@@ -288,14 +288,17 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		log.Debug("handshakeRsp: handshake failed, dht: %s, inst: %s", dht, ci.name)
 
 		if ci.isBlind && ci.dir == ConInstDirOutbound {
-			rsp := sch.MsgDhtBlindConnectRsp {
-				Eno:	msg.Eno,
-				Peer:	msg.Peer,
-				Ptn:	ci.ptnMe,
+			eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
+			if eno == sch.SchEnoNone && ptn != nil && ptn == ci.ptnSrcTsk {
+				rsp := sch.MsgDhtBlindConnectRsp{
+					Eno:  msg.Eno,
+					Peer: msg.Peer,
+					Ptn:  ci.ptnMe,
+				}
+				schMsg := sch.SchMessage{}
+				ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
+				ci.sdl.SchSendMessage(&schMsg)
 			}
-			schMsg := sch.SchMessage{}
-			ci.sdl.SchMakeMessage(&schMsg, ci.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
-			ci.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -330,13 +333,16 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 			// connect-response to source task
 			//
 
-			rsp := sch.MsgDhtConMgrConnectRsp {
-				Eno:	msg.Eno,
-				Peer:	msg.Peer,
+			eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
+			if eno == sch.SchEnoNone && ptn != nil && ptn == ci.ptnSrcTsk {
+				rsp := sch.MsgDhtConMgrConnectRsp{
+					Eno:  msg.Eno,
+					Peer: msg.Peer,
+				}
+				schMsg := sch.SchMessage{}
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
+				conMgr.sdl.SchSendMessage(&schMsg)
 			}
-			schMsg := sch.SchMessage{}
-			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
-			conMgr.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -373,32 +379,36 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	} else {
 
-		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
-			log.Debug("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
-			return sch.SchEnoUserTask
-		}
+		eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
+		if eno == sch.SchEnoNone && ptn != nil && ptn == ci.ptnSrcTsk {
 
-		//
-		// connect-response to source task
-		//
+			if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
+				log.Debug("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
+				return sch.SchEnoUserTask
+			}
 
-		if ci.isBlind {
-			rsp := sch.MsgDhtBlindConnectRsp {
-				Eno:	DhtEnoNone.GetEno(),
-				Ptn:	ci.ptnMe,
-				Peer:	msg.Peer,
+			//
+			// connect-response to source task
+			//
+
+			if ci.isBlind {
+				rsp := sch.MsgDhtBlindConnectRsp{
+					Eno:  DhtEnoNone.GetEno(),
+					Ptn:  ci.ptnMe,
+					Peer: msg.Peer,
+				}
+				schMsg := sch.SchMessage{}
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
+				conMgr.sdl.SchSendMessage(&schMsg)
+			} else {
+				rsp := sch.MsgDhtConMgrConnectRsp{
+					Eno:  msg.Eno,
+					Peer: msg.Peer,
+				}
+				schMsg := sch.SchMessage{}
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
+				conMgr.sdl.SchSendMessage(&schMsg)
 			}
-			schMsg := sch.SchMessage{}
-			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
-			conMgr.sdl.SchSendMessage(&schMsg)
-		} else {
-			rsp := sch.MsgDhtConMgrConnectRsp {
-				Eno:	msg.Eno,
-				Peer:	msg.Peer,
-			}
-			schMsg := sch.SchMessage{}
-			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
-			conMgr.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -952,8 +962,13 @@ func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node, msg interface{}) DhtErrno {
 
 	ci.sdl = conMgr.sdl
-	ci.local = conMgr.cfg.local
 	ci.ptnSrcTsk = srcTask
+	if ci.srcTaskName = ci.sdl.SchGetTaskName(srcTask); len(ci.srcTaskName) == 0 {
+		log.Debug("setupConInst: source task without name")
+		return DhtEnoNotFound
+	}
+
+	ci.local = conMgr.cfg.local
 	ci.ptnConMgr = conMgr.ptnMe
 	_, ci.ptnDhtMgr = conMgr.sdl.SchGetUserTaskNode(DhtMgrName)
 	_, ci.ptnRutMgr = conMgr.sdl.SchGetUserTaskNode(RutMgrName)
