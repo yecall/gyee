@@ -379,18 +379,18 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	} else {
 
+
+		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
+			log.Debug("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
+			return sch.SchEnoUserTask
+		}
+
+		//
+		// connect-response to source task
+		//
+
 		eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
 		if eno == sch.SchEnoNone && ptn != nil && ptn == ci.ptnSrcTsk {
-
-			if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
-				log.Debug("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
-				return sch.SchEnoUserTask
-			}
-
-			//
-			// connect-response to source task
-			//
-
 			if ci.isBlind {
 				rsp := sch.MsgDhtBlindConnectRsp{
 					Eno:  DhtEnoNone.GetEno(),
