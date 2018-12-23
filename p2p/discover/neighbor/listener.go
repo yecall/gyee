@@ -344,7 +344,7 @@ _loop:
 	return eno
 }
 
-func (rd *UdpReaderTask) canErrIgnored(err error) bool {
+func (udpReader *UdpReaderTask) canErrIgnored(err error) bool {
 	const WSAEMSGSIZE = syscall.Errno(10040)
 	if opErr, ok := err.(*net.OpError); ok {
 		if opErr.Temporary() {
@@ -359,24 +359,24 @@ func (rd *UdpReaderTask) canErrIgnored(err error) bool {
 	return false
 }
 
-func (rd *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch.SchErrno {
+func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch.SchErrno {
 	var msg sch.SchMessage
 	var eno umsg.UdpMsgErrno
-	if eno := rd.udpMsg.SetRawMessage(pbuf, len, from); eno != umsg.UdpMsgEnoNone {
+	if eno := udpReader.udpMsg.SetRawMessage(pbuf, len, from); eno != umsg.UdpMsgEnoNone {
 		return sch.SchEnoUserTask
 	}
-	if eno = rd.udpMsg.Decode(); eno != umsg.UdpMsgEnoNone {
+	if eno = udpReader.udpMsg.Decode(); eno != umsg.UdpMsgEnoNone {
 		return sch.SchEnoUserTask
 	}
 	udpMsgInd := UdpMsgInd {
-		msgType:rd.udpMsg.GetDecodedMsgType(),
-		msgBody:rd.udpMsg.GetDecodedMsg(),
+		msgType:udpReader.udpMsg.GetDecodedMsgType(),
+		msgBody:udpReader.udpMsg.GetDecodedMsg(),
 	}
-	if rd.udpMsg.CheckUdpMsgFromPeer(from) != true {
+	if udpReader.udpMsg.CheckUdpMsgFromPeer(from) != true {
 		return sch.SchEnoUserTask
 	}
-	rd.sdl.SchMakeMessage(&msg, rd.ptnMe, rd.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
-	rd.sdl.SchSendMessage(&msg)
+	udpReader.sdl.SchMakeMessage(&msg, udpReader.ptnMe, udpReader.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
+	udpReader.sdl.SchSendMessage(&msg)
 	return sch.SchEnoNone
 }
 

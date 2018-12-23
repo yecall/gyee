@@ -314,7 +314,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 		dsMgr.ds = NewFileDatastore(&fdc)
 
-		fdcExp := fdc;
+		fdcExp := fdc
 		fdcExp.path = path.Join(fdcExp.path, "expired")
 		dsMgr.dsExp = NewFileDatastore(&fdcExp)
 
@@ -328,7 +328,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 		dsMgr.ds = NewLeveldbDatastore(&ldc)
 
-		ldcExp := ldc;
+		ldcExp := ldc
 		ldcExp.Path = path.Join(ldcExp.Path, "expired")
 		dsMgr.dsExp = NewLeveldbDatastore(&ldcExp)
 

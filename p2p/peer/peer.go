@@ -1491,7 +1491,7 @@ func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 
 func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
 	peMgr.reCfgTid = sch.SchInvalidTid
-	for del, _ := range peMgr.reCfg.delList {
+	for del := range peMgr.reCfg.delList {
 		wks, ok := peMgr.workers[del]
 		if !ok {
 			continue
@@ -1597,8 +1597,8 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	for _, del := range delList {
 		wks, ok := peMgr.workers[del]
 		if !ok { continue }
-		wkNum := len(wks);
-		count := 0;
+		wkNum := len(wks)
+		count := 0
 		schMsg := sch.SchMessage{}
 		for _, peerInst := range wks {
 			if count++; count >= wkNum / 2 {
@@ -1650,10 +1650,10 @@ func (peMgr *PeerManager)peMgrRecfg2DcvMgr() PeMgrErrno {
 		DelList: make(map[config.SubNetworkID]interface{}, 0),
 		AddList: make(map[config.SubNetworkID]interface{}, 0),
 	}
-	for del, _ := range peMgr.reCfg.delList {
+	for del := range peMgr.reCfg.delList {
 		req.DelList[del] = nil
 	}
-	for add, _ := range peMgr.reCfg.addList {
+	for add := range peMgr.reCfg.addList {
 		req.AddList[add] = nil
 	}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvReconfigReq, &req)
@@ -1934,46 +1934,45 @@ func (pi *peerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	return sch.SchEnoNone
 }
 
-func (inst *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
-	sdl := inst.sdl.SchGetP2pCfgName()
-
-	if inst.state == peInstStateKilling {
+func (pi *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
+	sdl := pi.sdl.SchGetP2pCfgName()
+	if pi.state == peInstStateKilling {
 		log.Debug("piPoweroff: already in killing, done at once, sdl: %s, name: %s",
-			sdl, inst.sdl.SchGetTaskName(inst.ptnMe))
+			sdl, pi.sdl.SchGetTaskName(pi.ptnMe))
 
-		if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
+		if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 			return PeMgrEnoScheduler
 		}
 
 		return PeMgrEnoNone
 	}
 	log.Debug("piPoweroff: task will be done, sdl: %s, name: %s, state: %d",
-		sdl, inst.sdl.SchGetTaskName(inst.ptnMe), inst.state)
+		sdl, pi.sdl.SchGetTaskName(pi.ptnMe), pi.state)
 
-	if inst.rxtxRuning {
-		if inst.txChan != nil {
-			close(inst.txChan)
+	if pi.rxtxRuning {
+		if pi.txChan != nil {
+			close(pi.txChan)
 		}
 
-		if inst.rxDone != nil {
-			inst.rxDone <- PeMgrEnoNone
-			<-inst.rxDone
+		if pi.rxDone != nil {
+			pi.rxDone <- PeMgrEnoNone
+			<-pi.rxDone
 		}
 
-		if inst.rxChan != nil {
-			close(inst.rxChan)
+		if pi.rxChan != nil {
+			close(pi.rxChan)
 		}
 	}
 
-	if inst.conn != nil {
-		inst.conn.Close()
-		inst.conn = nil
+	if pi.conn != nil {
+		pi.conn.Close()
+		pi.conn = nil
 	}
 
-	inst.state = peInstStateKilled
-	inst.rxtxRuning = false
+	pi.state = peInstStateKilled
+	pi.rxtxRuning = false
 
-	if inst.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
+	if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
 

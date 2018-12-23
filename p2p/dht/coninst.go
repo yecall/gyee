@@ -1419,7 +1419,7 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 	log.Debug("dispatch: try to dispatch message from peer, " +
 		"dht: %s, inst: %s, local: %+v, msg: %+v", dht, conInst.name, *conInst.local, *msg)
 
-	var eno DhtErrno = DhtEnoUnknown
+	var eno = DhtEnoUnknown
 
 	switch msg.Mid {
 

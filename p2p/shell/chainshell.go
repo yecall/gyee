@@ -21,11 +21,11 @@
 package shell
 
 import (
+	"bytes"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/peer"
-	"bytes"
 )
 
 const (
@@ -234,6 +234,7 @@ func (shMgr *shellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno
 }
 
 func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	
 	//
 	// MSBR_MT_EV(event):
 	// the local node must be a validator, and the Ev should be broadcast
@@ -254,25 +255,25 @@ func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	switch req.MsgType {
 
 	case sch.MSBR_MT_EV:
-		for id, peer := range shMgr.peerActived {
+		for id, pe := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
-				shMgr.send2Peer(&peer, req)
+				shMgr.send2Peer(&pe, req)
 			}
 		}
 
 	case sch.MSBR_MT_TX:
-		for id, peer := range shMgr.peerActived {
+		for id, pe := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
-				shMgr.send2Peer(&peer, req)
+				shMgr.send2Peer(&pe, req)
 			} else if bytes.Compare(id.snid[0:], req.LocalSnid) == 0 {
-				 shMgr.send2Peer(&peer, req)
+				 shMgr.send2Peer(&pe, req)
 			}
 		}
 
 	case sch.MSBR_MT_BLKH:
-		for id, peer := range shMgr.peerActived {
+		for id, pe := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
-				shMgr.send2Peer(&peer, req)
+				shMgr.send2Peer(&pe, req)
 			}
 		}
 

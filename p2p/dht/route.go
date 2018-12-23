@@ -660,7 +660,7 @@ func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 //
 func (rutMgr *RutMgr)rutMgrStopBspTimer() DhtErrno {
 
-	var dhtEno DhtErrno = DhtEnoNone
+	var dhtEno = DhtEnoNone
 
 	if rutMgr.bpTid != sch.SchInvalidTid {
 		if eno := rutMgr.sdl.SchKillTimer(rutMgr.ptnMe, rutMgr.bpTid); eno != sch.SchEnoNone {
@@ -1185,7 +1185,7 @@ func (rutMgr *RutMgr)rutMgrNearest(target *config.DsKey, size int) (DhtErrno, []
 	var nearestDist = make([]int, 0, rutMgrMaxNearest)
 
 	var count = 0
-	var dhtEno DhtErrno = DhtEnoNone
+	var dhtEno = DhtEnoNone
 
 	//
 	// please notice that distance from target to local might more closer than
