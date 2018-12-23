@@ -30,7 +30,6 @@ import (
 	log "github.com/yeeco/gyee/p2p/logger"
 	sch	"github.com/yeeco/gyee/p2p/scheduler"
 	config "github.com/yeeco/gyee/p2p/config"
-	"github.com/onsi/ginkgo/integration/_fixtures/watch_fixtures/D"
 )
 
 
