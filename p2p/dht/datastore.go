@@ -484,7 +484,7 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 	// we are requested to put value from remote peer
 	//
 
-	pv := msg.Msg.(PutValue)
+	pv, _ := msg.Msg.(*PutValue)
 	dsk := DsKey{}
 
 	for _, v := range pv.Values {
@@ -508,7 +508,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	// we are requested to get value for remote peer
 	//
 
-	gvReq := msg.Msg.(GetValueReq)
+	gvReq, _ := msg.Msg.(*GetValueReq)
 	conInst := msg.ConInst.(*ConInst)
 	gvRsp := GetValueRsp {
 		From:		*conInst.local,
@@ -618,8 +618,8 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		nodes = append(nodes, &bns[idx].node)
 	}
 
-	ci := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).ConInst.(*ConInst)
-	req := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).Msg.(*GetValueReq)
+	ci, _ := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).ConInst.(*ConInst)
+	req, _ := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).Msg.(*GetValueReq)
 	rsp := GetValueRsp {
 		From:		*ci.local,
 		To:			ci.hsInfo.peer,
