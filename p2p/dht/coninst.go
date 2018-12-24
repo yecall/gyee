@@ -134,8 +134,8 @@ type conInstHandshakeInfo struct {
 // Outcoming package
 //
 type conInstTxPkg struct {
-	task		interface{}			// pointer to owner task node
 	taskName	string				// task name
+	task		interface{}			// pointer to owner task node
 
 	responsed	chan bool			// wait response from peer signal. notice: this chan is not applied for
 									// syncing as a signal really in current implement, instead, it is used
@@ -1545,17 +1545,25 @@ func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
 		return eno
 	}
 
-	msg := sch.SchMessage{}
-	ind := sch.MsgDhtQryInstProtoMsgInd {
-		From:		&nbs.From,
-		Msg:		nbs,
-		ForWhat:	sch.EvDhtConInstNeighbors,
+	if eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName);
+
+		eno != sch.SchEnoNone || ptn == nil || ptn != txPkg.task {
+		log.Debug("neighbors: target task not found")
+		return DhtEnoNotFound
+
+	} else {
+
+		msg := sch.SchMessage{}
+		ind := sch.MsgDhtQryInstProtoMsgInd{
+			From:    &nbs.From,
+			Msg:     nbs,
+			ForWhat: sch.EvDhtConInstNeighbors,
+		}
+
+		conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
+		conInst.sdl.SchSendMessage(&msg)
+		return DhtEnoNone
 	}
-
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
-	conInst.sdl.SchSendMessage(&msg)
-
-	return DhtEnoNone
 }
 
 //

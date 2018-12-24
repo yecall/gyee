@@ -398,7 +398,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	}
 
 	if (msg.Eno == DhtEnoNone.GetEno()) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
-		log.Debug("rutNearestRsp: invalid parameter")
+		log.Debug("rutNearestRsp: empty nearest reported")
 		return sch.SchEnoParameter
 	}
 

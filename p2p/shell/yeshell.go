@@ -1067,11 +1067,7 @@ _dedup:
 	for {
 		select {
 		case <-yeShMgr.deDupTiker.C:
-
-			yeShMgr.deDupLock.Lock()
 			yeShMgr.tmDedup.TickProc()
-			yeShMgr.deDupLock.Unlock()
-
 		case <-yeShMgr.ddtChan:
 			break _dedup
 		}
