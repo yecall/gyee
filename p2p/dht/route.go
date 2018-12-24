@@ -435,7 +435,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		Pcs:		nil,
 		Msg:		req.Msg,
 	}
-	var schMsg sch.SchMessage
+	var schMsg = sch.SchMessage{}
 
 	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
 	if dhtEno != DhtEnoNone {
@@ -463,12 +463,11 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 			fails: 0,
 			pcs: 0,
 		}
-
 		nearest = []*rutMgrBucketNode{&bn}
 		nearestDist = []int{bn.dist}
 	}
 
-	var pcsTab []int
+	pcsTab := []int{}
 	rsp.Peers = nearest
 	rsp.Dists = nearestDist
 	for _, p := range nearest {
