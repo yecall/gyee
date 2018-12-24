@@ -1372,7 +1372,10 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	if target.mailbox.que == nil {
 		log.Debug("schSendMsg: mailbox of target is empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
-		panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
+		// we have a BUG currently not be solved, when come here, it's most possible that the target
+		// task had been killed from the scheduler.
+		//panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
+		return SchEnoInternal
 	}
 
 	if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {

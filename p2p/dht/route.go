@@ -344,6 +344,10 @@ func (rutMgr *RutMgr)queryStartRsp(rsp *sch.MsgDhtQryMgrQueryStartRsp) sch.SchEr
 		return sch.SchEnoMismatched
 	}
 
+	if rsp.Eno != DhtEnoNone.GetEno() {
+		delete(rutMgr.bsTargets, rsp.Target)
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -413,13 +417,8 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		return sch.SchEnoParameter
 	}
 
-	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
-	if dhtEno != DhtEnoNone {
-		log.Debug("nearestReq: rutMgrNearest failed, eno: %d", dhtEno)
-	}
-
 	var rsp = sch.MsgDhtRutMgrNearestRsp {
-		Eno:		int(dhtEno),
+		Eno:		int(DhtEnoUnknown),
 		ForWhat:	req.ForWhat,
 		Target:		req.Target,
 		Peers:		nil,
@@ -429,22 +428,32 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 	}
 	var schMsg sch.SchMessage
 
-	if dhtEno == DhtEnoNone && len(nearest) > 0 {
-		rsp.Peers = nearest
-		rsp.Dists = nearestDist
-		var pcsTab []int
-		for _, p := range nearest {
-			pcsTab = append(pcsTab, p.pcs)
-		}
-		rsp.Pcs = pcsTab
+	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
+	if dhtEno != DhtEnoNone {
+		log.Debug("nearestReq: rutMgrNearest failed, eno: %d", dhtEno)
+		rsp.Eno = int(dhtEno)
+		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
+		return rutMgr.sdl.SchSendMessage(&schMsg)
 	}
 
+	if dhtEno == DhtEnoNone && len(nearest) <= 0 {
+		log.Debug("nearestReq: empty nearest set")
+		rsp.Eno = int(DhtEnoNotFound)
+		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
+		return rutMgr.sdl.SchSendMessage(&schMsg)
+	}
+
+	var pcsTab []int
+	rsp.Peers = nearest
+	rsp.Dists = nearestDist
+	for _, p := range nearest {
+		pcsTab = append(pcsTab, p.pcs)
+	}
+
+	rsp.Eno = int(DhtEnoNone)
+	rsp.Pcs = pcsTab
 	rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
 	rutMgr.sdl.SchSendMessage(&schMsg)
-
-	if dhtEno != DhtEnoNone  {
-		return sch.SchEnoUserTask
-	}
 
 	if req.NtfReq == true {
 		if dhtEno = rutMgr.rutMgrNotifeeReg(tskSender, &req.Target, req.Max, nil, nil); dhtEno != DhtEnoNone {

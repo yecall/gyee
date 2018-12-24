@@ -397,23 +397,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoMismatched
 	}
 
-	if (msg.Eno == DhtEnoNone.GetEno()) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
-		log.Debug("rutNearestRsp: empty nearest reported")
-		return sch.SchEnoParameter
-	}
-
-	var dhtEno = DhtErrno(DhtEnoNone)
-
 	forWhat := msg.ForWhat
 	target := msg.Target
-
-	peers := msg.Peers.([]*rutMgrBucketNode)
-	pcs := msg.Pcs.([]int)
-	dists := msg.Dists.([]int)
-	if (msg.Eno == DhtEnoNone.GetEno()) && (len(peers) != len(pcs) || len(peers) != len(dists)) {
-		log.Debug("rutNearestRsp: invalid parameter")
-		return sch.SchEnoParameter
-	}
 
 	qcb, ok := qryMgr.qcbTab[target]
 	if !ok {
@@ -433,8 +418,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	}
 
 	qryFailed2Sender := func (eno DhtErrno) {
-		var schMsg = sch.SchMessage{}
-		var rsp = sch.MsgDhtQryMgrQueryStartRsp{
+		schMsg := sch.SchMessage{}
+		rsp := sch.MsgDhtQryMgrQueryStartRsp{
 			Target:	msg.Target,
 			Eno:	int(eno),
 		}
@@ -443,8 +428,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	}
 
 	qryOk2Sender := func(peer *config.Node) {
-		var schMsg = sch.SchMessage{}
-		var ind = sch.MsgDhtQryMgrQueryResultInd{
+		schMsg := sch.SchMessage{}
+		ind := sch.MsgDhtQryMgrQueryResultInd{
 			Eno:		DhtEnoNone.GetEno(),
 			ForWhat:	msg.ForWhat,
 			Target:		target,
@@ -460,10 +445,28 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoNone
 	}
 
-	if len(peers) == 0 {
+	if (msg.Eno == DhtEnoNone.GetEno()) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
+		log.Debug("rutNearestRsp: invalid empty nearest set reported")
 		qryFailed2Sender(DhtEnoRoute)
 		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
-		return sch.SchEnoNone
+		return sch.SchEnoParameter
+	}
+
+	peers := msg.Peers.([]*rutMgrBucketNode)
+	pcs := msg.Pcs.([]int)
+	dists := msg.Dists.([]int)
+	if (msg.Eno == DhtEnoNone.GetEno()) && (len(peers) != len(pcs) || len(peers) != len(dists)) {
+		log.Debug("rutNearestRsp: invalid nearest set reported")
+		qryFailed2Sender(DhtEnoRoute)
+		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
+		return sch.SchEnoParameter
+	}
+
+	if len(peers) == 0 {
+		log.Debug("rutNearestRsp: invalid empty nearest set reported")
+		qryFailed2Sender(DhtEnoRoute)
+		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
+		return sch.SchEnoParameter
 	}
 
 	//
@@ -474,19 +477,13 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	qcb.qryResult = list.New()
 
 	for idx, peer := range peers {
-
 		if forWhat == MID_FINDNODE ||
 			forWhat == MID_GETPROVIDER_REQ ||
 			forWhat == MID_GETVALUE_REQ {
-
 			if bytes.Compare(peer.hash[0:], target[0:]) == 0 {
-
 				log.Debug("rutNearestRsp: target found: %x", target)
-
 				qryOk2Sender(&peer.node)
-
 				qryMgr.qryMgrDelQcb(delQcb4TargetInLocal, target)
-
 				return sch.SchEnoNone
 			}
 		}
@@ -496,7 +493,6 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 			pcs:	pcs[idx],
 			dist:	dists[idx],
 		}
-
 		qcb.qcbUpdateResult(&qri)
 	}
 
@@ -509,32 +505,27 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 
 	pendInfo := make([]*qryPendingInfo, 0)
 	for idx := 0; idx < len(peers); idx++ {
-		var pi = qryPendingInfo{
+		pi := qryPendingInfo{
 			rutMgrBucketNode:*peers[idx],
 			depth: 0,
 		}
 		pendInfo = append(pendInfo, &pi)
 	}
 
+	var dhtEno = DhtErrno(DhtEnoNone)
 	if dhtEno = qcb.qryMgrQcbPutPending(pendInfo, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
-
-		if dhtEno, _ = qryMgr.qryMgrQcbPutActived(qcb); dhtEno == DhtEnoNone {
-
-			if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
-
-				qcb.status = qsInited
-
-				return sch.SchEnoNone
-			}
+		if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
+			qryMgr.qryMgrQcbPutActived(qcb)
+			qcb.status = qsInited
+			return sch.SchEnoNone
 		}
 	}
 
-	log.Debug("rutNearestRsp: failed, dhtEno: %d", dhtEno)
-
+	log.Debug("rutNearestRsp: qryMgrQcbPutPending failed, eno: %d", dhtEno)
 	qryFailed2Sender(dhtEno)
-	qryMgr.qryMgrDelQcb(delQcb4InteralErrors, target)
+	qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
+	return sch.SchEnoResource
 
-	return sch.SchEnoUserTask
 }
 
 //
@@ -861,42 +852,47 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		qcb.depth = depth
 	}
 
-	if qcb.depth > qryMgrQryMaxDepth || len(qcb.qryHistory) >= qryMgrQryMaxWidth {
+	if msg.ForWhat == sch.EvDhtConInstNeighbors &&
+		msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
+		msg.ForWhat == sch.EvDhtConInstGetValRsp {
 
-		log.Debug("instResultInd: limited to stop query, depth: %d, width: %d", qcb.depth, len(qcb.qryHistory))
+		if qcb.depth > qryMgrQryMaxDepth || len(qcb.qryHistory) >= qryMgrQryMaxWidth {
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-			log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
-			return sch.SchEnoUserTask
+			log.Debug("instResultInd: limited to stop query, depth: %d, width: %d", qcb.depth, len(qcb.qryHistory))
+
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+				log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+				return sch.SchEnoUserTask
+			}
+
+			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
+				log.Debug("instResultInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+				return sch.SchEnoUserTask
+			}
+
+			return sch.SchEnoNone
 		}
 
-		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
-			log.Debug("instResultInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
-			return sch.SchEnoUserTask
+		//
+		// put peers reported in the message into query control block pending queue,
+		// and try to active more query instances after that.
+		//
+
+		for idx, peer := range msg.Peers {
+			var qpi = qryPendingInfo{
+				rutMgrBucketNode: rutMgrBucketNode{
+					node: *peer,
+					hash: *hashList[idx],
+					dist: distList[idx],
+				},
+				depth: depth + 1,
+			}
+			qpiList = append(qpiList, &qpi)
 		}
 
-		return sch.SchEnoNone
+		qcb.qryMgrQcbPutPending(qpiList, qryMgr.qmCfg.maxPendings)
+		qryMgr.qryMgrQcbPutActived(qcb)
 	}
-
-	//
-	// put peers reported in the message into query control block pending queue,
-	// and try to active more query instances after that.
-	//
-
-	for idx, peer := range msg.Peers {
-		var qpi = qryPendingInfo {
-			rutMgrBucketNode: rutMgrBucketNode {
-				node: *peer,
-				hash: *hashList[idx],
-				dist: distList[idx],
-			},
-			depth: depth + 1,
-		}
-		qpiList = append(qpiList, &qpi)
-	}
-
-	qcb.qryMgrQcbPutPending(qpiList, qryMgr.qmCfg.maxPendings)
-	qryMgr.qryMgrQcbPutActived(qcb)
 
 	//
 	// check against abnormal cases
@@ -914,9 +910,16 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-			log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
-			return sch.SchEnoUserTask
+		if msg.ForWhat == sch.EvDhtConInstNeighbors &&
+			msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
+			msg.ForWhat == sch.EvDhtConInstGetValRsp {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+				log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			}
+		} else {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+				log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			}
 		}
 
 		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
