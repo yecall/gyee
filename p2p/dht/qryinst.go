@@ -479,7 +479,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	//
 	// for "put-value" or "put-provider", we should send indication to query manager
-	// as following, since no responses is expected from peer in this cases.
+	// as following, since no responses are expected from peer in these cases.
 	// notice: the dht package might still not be sent at this moment, firstly it will
 	// be put into pending queue of a connection instance.
 	//

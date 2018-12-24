@@ -1083,13 +1083,30 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 		dir:	ConInstDir(msg.Dir),
 	}
 
-	//
-	// only one instance should be returned after lookup
-	//
+	sdl := conMgr.sdl
+
+	rutUpdate := func(node *config.Node) sch.SchErrno {
+		schMsg := sch.SchMessage{}
+		update := sch.MsgDhtRutMgrUpdateReq {
+			Why:	rutMgrUpdate4Closed,
+			Eno:	DhtEnoNone.GetEno(),
+			Seens:	[]config.Node {
+				*node,
+			},
+			Duras:	[]time.Duration {
+				-1,
+			},
+		}
+		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
+		return sdl.SchSendMessage(&schMsg)
+	}
 
 	cis := conMgr.lookupConInst(&cid)
 	for _, ci := range cis {
 		if ci != nil {
+			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
+				log.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
+			}
 			po := sch.SchMessage{}
 			conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 			conMgr.sdl.SchSendMessage(&po)
