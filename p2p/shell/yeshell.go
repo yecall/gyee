@@ -27,13 +27,13 @@ import (
 	"fmt"
 	"bytes"
 	"container/list"
+	"math/rand"
 	yep2p "github.com/yeeco/gyee/p2p"
 	log "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/dht"
 	"github.com/yeeco/gyee/p2p/peer"
-	"math/rand"
 )
 
 const (
@@ -210,6 +210,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	dhtCfg = new(config.Config)
 	*dhtCfg = *chainCfg
 	YeShellCfg.dhtBootstrapNodes = config.P2pSetupBootstrapNodes(YeShellCfg.DhtBootstrapNodes)
+	dht.SetBootstrapNodes(YeShellCfg.dhtBootstrapNodes)
 	dhtCfg.AppType = config.P2P_TYPE_DHT
 	cfg[ChainCfgIdx] = chainCfg
 	cfg[DhtCfgIdx] = dhtCfg

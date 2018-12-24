@@ -23,6 +23,7 @@ package dht
 import (
 	"time"
 	"crypto/rand"
+	mrand "math/rand"
 	"container/list"
 	"crypto/sha256"
 	"bytes"
@@ -135,6 +136,14 @@ type bootstrapPolicy struct {
 var defautBspCfg = bootstrapPolicy {
 	randomQryNum:	2,
 	period:			time.Minute * 1,
+}
+
+//
+// Reference to external bootstrap nodes
+//
+var bootstrapNodes []*config.Node = nil
+func SetBootstrapNodes(bsn []*config.Node) {
+	bootstrapNodes = bsn
 }
 
 //
@@ -437,10 +446,26 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 	}
 
 	if dhtEno == DhtEnoNone && len(nearest) <= 0 {
-		log.Debug("nearestReq: empty nearest set")
-		rsp.Eno = int(DhtEnoNotFound)
-		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
-		return rutMgr.sdl.SchSendMessage(&schMsg)
+		log.Debug("nearestReq: empty nearest set from buckets, bootstrap node applied")
+		if bootstrapNodes == nil {
+			rsp.Eno = int(DhtEnoNotFound)
+			rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
+			return rutMgr.sdl.SchSendMessage(&schMsg)
+		}
+
+		idx := mrand.Int31n(int32(len(bootstrapNodes)))
+		node := bootstrapNodes[idx]
+		hash := rutMgrNodeId2Hash(node.ID)
+		bn := rutMgrBucketNode {
+			node: *node,
+			hash: *hash,
+			dist: rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, hash),
+			fails: 0,
+			pcs: 0,
+		}
+
+		nearest = []*rutMgrBucketNode{&bn}
+		nearestDist = []int{bn.dist}
 	}
 
 	var pcsTab []int
@@ -520,7 +545,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout.GetEno() {
 
-		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoTimeout", dht)
+		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: %d", dht, eno)
 
 		//
 		// query peer time out, check fail counter
@@ -532,7 +557,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			log.Debug("updateReq: not found, dht: %s, eno: %d", dht, eno)
+			log.Debug("updateReq: not found, dht: %s, eno: DhtEnoTimeout", dht)
 			return sch.SchEnoUserTask
 		}
 
