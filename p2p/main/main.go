@@ -2175,6 +2175,9 @@ _bhloop:
 		}
 	}()
 
+
+	waitInterrupt()
+
 	cnt := 0
 	cnt_max := 100
 

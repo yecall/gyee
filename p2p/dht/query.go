@@ -1413,20 +1413,6 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 	// with this event when it's received in the owner task of the "qcb".
 	//
 
-	if eno != DhtEnoNone.GetEno() {
-		if peer != nil || val != nil || prd != nil {
-			log.Debug("qryMgrResultReport: invalid parameters, " +
-				"eno: %d, peer: %p, val: %p, prd: %p", eno, peer, &val, prd)
-			return DhtEnoParameter
-		}
-	} else {
-		if peer == nil && val == nil && prd == nil {
-			log.Debug("qryMgrResultReport: invalid parameters, " +
-				"eno: %d, peer: %p, val: %p, prd: %p", eno, peer, &val, prd)
-			return DhtEnoParameter
-		}
-	}
-
 	var msg = sch.SchMessage{}
 	var ind = sch.MsgDhtQryMgrQueryResultInd{
 		Eno:		eno,

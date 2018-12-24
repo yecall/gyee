@@ -225,6 +225,9 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 	case sch.EvDhtConInstTxTimer:
 		eno = conInst.txTimerHandler(msg.Body.(*list.Element))
 
+	case sch.EvDhtQryInstProtoMsgInd:
+		eno = conInst.protoMsgInd(msg.Body.(*sch.MsgDhtQryInstProtoMsgInd))
+
 	default:
 		log.Debug("conInstProc: unknown event: %d", msg.Id)
 		return sch.SchEnoParameter
@@ -699,6 +702,42 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 		log.Debug("txTimerHandler: invalid parameter, dht: %s, inst: %s, eno: %d, hsInfo: %+v, local: %+v",
 			dht, conInst.name, eno, conInst.hsInfo, *conInst.local)
 		return eno
+	}
+
+	return sch.SchEnoNone
+}
+
+func (conInst *ConInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErrno {
+
+	var eno DhtErrno
+	var txPkg *conInstTxPkg
+	var schMsg = sch.SchMessage{}
+
+	switch msg.ForWhat {
+
+	case sch.EvDhtConInstNeighbors:
+		nbs, _ := msg.Msg.(*Neighbors)
+		eno, txPkg = conInst.checkTxWaitResponse(MID_NEIGHBORS, int64(nbs.Id))
+
+	case sch.EvDhtConInstGetProviderRsp:
+		gpr, _ := msg.Msg.(*GetProviderRsp)
+		eno, txPkg = conInst.checkTxWaitResponse(MID_GETPROVIDER_RSP, int64(gpr.Id))
+
+	case sch.EvDhtConInstGetValRsp:
+		gvr, _ := msg.Msg.(*GetValueRsp)
+		eno, txPkg = conInst.checkTxWaitResponse(MID_GETVALUE_RSP, int64(gvr.Id))
+
+	default:
+		log.Debug("protoMsgInd: invalid indication, for: %d", msg.ForWhat)
+		return sch.SchEnoParameter
+	}
+
+	if eno == DhtEnoNone && txPkg != nil {
+		_, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
+		if ptn != nil && ptn == txPkg.task {
+			conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, msg)
+			conInst.sdl.SchSendMessage(&schMsg)
+		}
 	}
 
 	return sch.SchEnoNone
@@ -1537,33 +1576,15 @@ func (conInst *ConInst)findNode(fn *FindNode) DhtErrno {
 // Handler for "MID_NEIGHBORS" from peer
 //
 func (conInst *ConInst)neighbors(nbs *Neighbors) DhtErrno {
-
-	eno, txPkg := conInst.checkTxWaitResponse(MID_NEIGHBORS, int64(nbs.Id))
-
-	if eno != DhtEnoNone || txPkg == nil {
-		log.Debug("neighbors: checkTxWaitResponse failed, eno: %d, txPkg: %p", eno, txPkg)
-		return eno
+	msg := sch.SchMessage{}
+	ind := sch.MsgDhtQryInstProtoMsgInd{
+		From:    &nbs.From,
+		Msg:     nbs,
+		ForWhat: sch.EvDhtConInstNeighbors,
 	}
-
-	if eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName);
-
-		eno != sch.SchEnoNone || ptn == nil || ptn != txPkg.task {
-		log.Debug("neighbors: target task not found")
-		return DhtEnoNotFound
-
-	} else {
-
-		msg := sch.SchMessage{}
-		ind := sch.MsgDhtQryInstProtoMsgInd{
-			From:    &nbs.From,
-			Msg:     nbs,
-			ForWhat: sch.EvDhtConInstNeighbors,
-		}
-
-		conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
-		conInst.sdl.SchSendMessage(&msg)
-		return DhtEnoNone
-	}
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchSendMessage(&msg)
+	return DhtEnoNone
 }
 
 //
@@ -1598,24 +1619,14 @@ func (conInst *ConInst)getValueReq(gvr *GetValueReq) DhtErrno {
 // Handler for "MID_GETVALUE_RSP" from peer
 //
 func (conInst *ConInst)getValueRsp(gvr *GetValueRsp) DhtErrno {
-
-	eno, txPkg := conInst.checkTxWaitResponse(MID_GETVALUE_RSP, int64(gvr.Id))
-
-	if eno != DhtEnoNone || txPkg == nil {
-		log.Debug("getValueRsp: checkTxWaitResponse failed, eno: %d, txPkg: %p", eno, txPkg)
-		return eno
-	}
-
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
 		From:		&gvr.From,
 		Msg:		gvr,
 		ForWhat:	sch.EvDhtConInstGetValRsp,
 	}
-
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
-
 	return DhtEnoNone
 }
 
@@ -1651,24 +1662,14 @@ func (conInst *ConInst)getProviderReq(gpr *GetProviderReq) DhtErrno {
 // Handler for "MID_GETPROVIDER_RSP" from peer
 //
 func (conInst *ConInst)getProviderRsp(gpr *GetProviderRsp) DhtErrno {
-
-	eno, txPkg := conInst.checkTxWaitResponse(MID_GETPROVIDER_RSP, int64(gpr.Id))
-
-	if eno != DhtEnoNone || txPkg == nil {
-		log.Debug("getProviderRsp: checkTxWaitResponse failed, eno: %d", eno)
-		return eno
-	}
-
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd {
 		From:		&gpr.From,
 		Msg:		gpr,
 		ForWhat:	sch.EvDhtConInstGetProviderRsp,
 	}
-
-	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, &ind)
+	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
-
 	return DhtEnoNone
 }
 

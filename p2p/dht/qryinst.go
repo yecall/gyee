@@ -200,7 +200,7 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 	}
 
 	log.Debug("startReq: ask connection manager for peer, " +
-		"inst: %s, req: %+v", qryInst.icb.name, req)
+		"inst: %s, to: %+v", qryInst.icb.name, *req.Peer)
 
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
 	icb.sdl.SchSendMessage(&msg)
@@ -387,7 +387,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		return sch.SchEnoParameter
 	}
 
-	log.Debug("connectRsp: msg: %+v", *msg)
+	log.Debug("connectRsp: eno: %d, peer: %+v", msg.Eno, *msg.Peer)
 
 	icb := qryInst.icb
 	sdl := icb.sdl
