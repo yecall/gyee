@@ -946,6 +946,7 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 	bucket := rt.bucketTab[dist]
 
 	if eno, el := rutMgr.find(bn.node.ID, dist); eno == DhtEnoNone && el != nil {
+		*el.Value.(*rutMgrBucketNode) = *bn
 		bucket.MoveToFront(el)
 		return DhtEnoNone
 	}
