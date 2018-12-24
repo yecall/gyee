@@ -812,8 +812,8 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	// check if target found: if true, query should be ended, report the result
 	//
 
-	if msg.ForWhat == sch.EvDhtConInstNeighbors &&
-		msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
+	if msg.ForWhat == sch.EvDhtConInstNeighbors ||
+		msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
 		msg.ForWhat == sch.EvDhtConInstGetValRsp {
 
 		for _, peer := range msg.Peers {
@@ -852,8 +852,8 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		qcb.depth = depth
 	}
 
-	if msg.ForWhat == sch.EvDhtConInstNeighbors &&
-		msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
+	if msg.ForWhat == sch.EvDhtConInstNeighbors ||
+		msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
 		msg.ForWhat == sch.EvDhtConInstGetValRsp {
 
 		if qcb.depth > qryMgrQryMaxDepth || len(qcb.qryHistory) >= qryMgrQryMaxWidth {
@@ -910,8 +910,8 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 
-		if msg.ForWhat == sch.EvDhtConInstNeighbors &&
-			msg.ForWhat == sch.EvDhtConInstGetProviderRsp &&
+		if msg.ForWhat == sch.EvDhtConInstNeighbors ||
+			msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
 			msg.ForWhat == sch.EvDhtConInstGetValRsp {
 			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 				log.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
