@@ -578,13 +578,20 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		log.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
 
 		//
-		// this case the latency about a specific individual peer should be update,
-		// should be only one peer in "req.Seens".
+		// query ok, apply latency sample and clear fail counter
 		//
 
 		for idx, n := range req.Seens {
 			dur := req.Duras[idx]
 			rutMgr.rutMgrMetricSample(n.ID, dur)
+
+			p := n.ID
+			h := rutMgrNodeId2Hash(p)
+			d := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, h)
+			if eno, el := rutMgr.find(p, d); eno == DhtEnoNone {
+				bn := el.Value.(*rutMgrBucketNode)
+				bn.fails = 0
+			}
 		}
 
 	} else if why == rutMgrUpdate4Closed {
