@@ -639,7 +639,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	var peInst = new(peerInstance)
 
 	*peInst				= peerInstDefault
-	peInst.debug__		= false
+	peInst.debug__		= true
 	peInst.sdl			= peMgr.sdl
 	peInst.peMgr		= peMgr
 	peInst.tep			= peInst.peerInstProc
@@ -1329,7 +1329,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	var peInst = new(peerInstance)
 
 	*peInst				= peerInstDefault
-	peInst.debug__		= false
+	peInst.debug__		= true
 	peInst.sdl			= peMgr.sdl
 	peInst.peMgr		= peMgr
 	peInst.tep			= peInst.peerInstProc

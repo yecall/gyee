@@ -22,7 +22,7 @@ package shell
 
 import (
 	"bytes"
-	"github.com/ethereum/go-ethereum/log"
+	log "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/peer"
@@ -59,7 +59,7 @@ type shellManager struct {
 	ptnMe			interface{}						// pointer to task node of myself
 	ptnPeMgr		interface{}						// pointer to task node of peer manager
 	ptnTabMgr		interface{}						// pointer to task node of table manager
-	peerActived		map[shellPeerID]shellPeerInst	// active peers
+	peerActived		map[shellPeerID]*shellPeerInst	// active peers
 	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all instances
 }
 
@@ -69,7 +69,7 @@ type shellManager struct {
 func NewShellMgr() *shellManager  {
 	shMgr := shellManager {
 		name: ShMgrName,
-		peerActived: make(map[shellPeerID]shellPeerInst, 0),
+		peerActived: make(map[shellPeerID]*shellPeerInst, 0),
 		rxChan: make(chan *peer.P2pPackageRx, rxChanSize),
 	}
 	shMgr.tep = shMgr.shMgrProc
@@ -145,14 +145,16 @@ func (shMgr *shellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 		log.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
 		return sch.SchEnoUserTask
 	}
-	shMgr.peerActived[peerId] = peerInst
+	shMgr.peerActived[peerId] = &peerInst
+
+	log.Debug("peerActiveInd: peer info: %+v", *peerInfo)
 
 	go func() {
 		for {
 			select {
 			case rxPkg, ok := <-peerInst.rxChan:
 				if !ok {
-					log.Debug("exit for rxChan closed")
+					log.Debug("peerActiveInd: exit for rxChan closed, peer info: %+v", *peerInfo)
 					return
 				}
 				shMgr.rxChan<-rxPkg
@@ -175,10 +177,11 @@ func (shMgr *shellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 	} else if peerInst.status != pisClosing {
 		log.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
+	} else {
+		log.Debug("peerCloseCfm: peer info: %+v", *peerInst.hsInfo)
+		delete(shMgr.peerActived, peerId)
+		return sch.SchEnoNone
 	}
-	log.Debug("peerCloseCfm: peerId: %+v", peerId)
-	delete(shMgr.peerActived, peerId)
-	return sch.SchEnoNone
 }
 
 func (shMgr *shellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
@@ -202,8 +205,8 @@ func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 		log.Debug("peerAskToCloseInd : status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
-		log.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager...")
-		var req = sch.MsgPeCloseReq {
+		log.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager, peer info: %+v", *peerInst.hsInfo)
+		req := sch.MsgPeCloseReq {
 			Ptn: nil,
 			Snid: peerId.snid,
 			Node: config.Node{
@@ -257,23 +260,23 @@ func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	case sch.MSBR_MT_EV:
 		for id, pe := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
-				shMgr.send2Peer(&pe, req)
+				shMgr.send2Peer(pe, req)
 			}
 		}
 
 	case sch.MSBR_MT_TX:
 		for id, pe := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
-				shMgr.send2Peer(&pe, req)
+				shMgr.send2Peer(pe, req)
 			} else if bytes.Compare(id.snid[0:], req.LocalSnid) == 0 {
-				 shMgr.send2Peer(&pe, req)
+				 shMgr.send2Peer(pe, req)
 			}
 		}
 
 	case sch.MSBR_MT_BLKH:
 		for id, pe := range shMgr.peerActived {
 			if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
-				shMgr.send2Peer(&pe, req)
+				shMgr.send2Peer(pe, req)
 			}
 		}
 
