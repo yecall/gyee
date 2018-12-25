@@ -77,7 +77,8 @@ package tetris
 8. 网络层面：group dht
    group包含成员validators，向group发送dht数据。搞一个group id？子网广播
 
-9. 需解决的工程问题：1）点火问题。2）区块同步效率问题。3）成员替换时的know清单问题。4）内存释放问题。5）fork检测后操作问题。
+9. 需解决的工程问题：1）点火问题。2）区块同步效率问题。3）成员替换时的know清单问题。4）内存释放问题。5）fork检测后操作问题。6)调速问题。
+   7）metrics。8）块确认时中断问题。9）crash-recovery处理。10）上层协议member rotation
 
 */
 
@@ -115,9 +116,10 @@ type Tetris struct {
 	witness       []map[uint]*Event
 	eventCache    *utils.LRU
 	txsCache      *utils.LRU
-	PendingTxs    map[string]map[uint]uint64 //交易在哪个member的哪个高度出现过
-	CommittedTxs  *utils.LRU
-	currentEvent Event
+	pendingTxs    map[string]map[uint]uint64 //交易在哪个member的哪个高度出现过
+	committedTxs  *utils.LRU
+	currentEvent  Event
+	heartBeat     *HeartBeat
 
 	EventCh       chan Event
 	ParentEventCh chan Event
@@ -130,7 +132,7 @@ type Tetris struct {
 	//params
 	params Params
 
-	pendingSync bool
+	//pendingSync bool
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -153,7 +155,6 @@ type Tetris struct {
 }
 
 func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid string) (*Tetris, error) {
-	//logging.Logger.Info("Create new Tetris")
 	tetris := Tetris{
 		core:      core,
 		membersID: members,
@@ -168,8 +169,8 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 		memberHeight:  make(map[uint]uint64, len(members)),
 		pendingEvents: utils.NewLRU(10000, nil),
 		eventRequest:  make(map[string]SyncRequest), //TODO:memroy consumption optimize
-		PendingTxs:    make(map[string]map[uint]uint64),
-		CommittedTxs:  utils.NewLRU(100000, nil),
+		pendingTxs:    make(map[string]map[uint]uint64),
+		committedTxs:  utils.NewLRU(100000, nil),
 
 		EventCh:       make(chan Event, 100),
 		ParentEventCh: make(chan Event, 100),
@@ -205,12 +206,15 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 	//	tetris.params.maxTxPerEvent = 500
 	//}
 
-	tetris.pendingSync = true
+	//tetris.pendingSync = true
 	tetris.currentEvent = NewEvent(tetris.h, tetris.m, tetris.n)
-	//tetris.currentEvent.appendEvent("")
 	tetris.prepare()
 
 	return &tetris, nil
+}
+
+func (c *Tetris) MemberRotate(joins []string, quits []string) {
+
 }
 
 func (t *Tetris) Start() error {
@@ -240,20 +244,8 @@ func (t *Tetris) loop() {
 			//logging.Logger.Info("Tetris loop end.")
 			return
 		case event := <-t.EventCh:
-			event.know = make(map[uint]uint64)
-			event.parents = make(map[uint]*Event)
-			event.round = ROUND_UNDECIDED
-			event.witness = false
-			event.vote = 0
-			event.committable = COMMITTABLE_UNDECIDED
 			t.receiveEvent(&event)
 		case event := <-t.ParentEventCh:
-			event.know = make(map[uint]uint64)
-			event.parents = make(map[uint]*Event)
-			event.round = ROUND_UNDECIDED
-			event.witness = false
-			event.vote = 0
-			event.committable = COMMITTABLE_UNDECIDED
 			t.receiveParentEvent(&event)
 		case tx := <-t.TxsCh:
 			t.receiveTx(tx)
@@ -336,12 +328,15 @@ func (t *Tetris) receiveEvent(event *Event) {
 	//		"pending": t.pendingEvents.Len(),
 	//	}).Info("Event count")
 	//}
+
 	if t.eventCache.Contains(event.Hex()) {
+		/*
 		logging.Logger.WithFields(logrus.Fields{
 			"event": event.Hex(),
 			"m":     event.Body.M,
 			"n":     event.Body.N,
 		}).Debug("Recevie already existed event")
+		*/
 		return
 	}
 
@@ -366,12 +361,15 @@ func (t *Tetris) receiveEvent(event *Event) {
 
 func (t *Tetris) receiveParentEvent(event *Event) {
 	t.parentCountRaw++
+
 	if t.eventCache.Contains(event.Hex()) {
+		/*
 		logging.Logger.WithFields(logrus.Fields{
 			"event": event.Hex(),
 			"m":     event.Body.M,
 			"n":     event.Body.N,
 		}).Debug("Recevie already existed event")
+		*/
 		return
 	}
 	//logging.Logger.WithFields(logrus.Fields{
@@ -404,6 +402,13 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		}
 		return
 	}
+
+	event.know = make(map[uint]uint64)
+	event.parents = make(map[uint]*Event)
+	event.round = ROUND_UNDECIDED
+	event.witness = false
+	event.vote = 0
+	event.committable = COMMITTABLE_UNDECIDED
 
 	/*
 		新来一个event，可能是request来的，也可能是pending的
@@ -789,25 +794,25 @@ func (t *Tetris) consensusComputing() {
 		if w.committable == 1 {
 			c = append(c, int(w.Body.M))
 			for _, tx := range w.Body.Tx {
-				if t.CommittedTxs.Contains(tx) {
+				if t.committedTxs.Contains(tx) {
 					continue
 				}
-				txm := t.PendingTxs[tx]
+				txm := t.pendingTxs[tx]
 				if txm == nil {
 					txm = make(map[uint]uint64)
-					t.PendingTxs[tx] = txm
+					t.pendingTxs[tx] = txm
 				}
 				txm[w.Body.M] = w.Body.N
 				if len(txm) > t.params.f {
 					txc = append(txc, tx)
-					t.CommittedTxs.Add(tx, true)
-					delete(t.PendingTxs, tx)
+					t.committedTxs.Add(tx, true)
+					delete(t.pendingTxs, tx)
 				}
 			}
 		}
 	}
 
-    //fmt.Println("pending tx:", len(t.PendingTxs))
+	//fmt.Println("pending tx:", len(t.PendingTxs))
 
 	if len(txc) == 0 {
 		for _, w := range t.witness[0] {
