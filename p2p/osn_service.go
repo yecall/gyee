@@ -35,6 +35,45 @@ type OsnService struct {
 }
 
 func OsnServiceConfig(cfg *p2psh.YeShellConfig) error {
+	//
+	// 在本函数进行服务参数配置。一般而言，可先取了P2P中缺省的配置之后进行适当的修改，即调用本函数，见下面的
+	// NewOsnService函数。下面是对目前各个可配参数的说明：
+	//
+	// 名称					类型					描述
+	//-------------------------------------------------------------------------------------
+	// AppType				config.P2pAppType	P2P包含两大部分，peer和dht，是可以单独
+	//											使用的。而对我们项目的具体应用，是必须两个
+	//											一起使用；
+	//
+	// Name					string				本次运行的P2P实例，即由函数NewOsnService
+	//
+	//											生成的对象的名称；
+	//
+	// Validator			bool				是否为验证器；
+	//
+	// BootstrapNode		bool				是否为bootstrap节点，目前peer和dht的bootstrap
+	//											节点身份不加区分，即一个节点要么同时是这两部分的
+	//											bootstrap节点，要么都不是；
+	//
+	// BootstrapNodes		[]string			peer部分的bootstrap节点列表；
+	//
+	// DhtBootstrapNodes	[]string			dht部分的bootstrap节点列表；
+	//
+	// NodeDataDir			string				本次实例的数据目录；
+	//
+	// NodeDatabase			string				本次实例的leveldb数据库名称（数据库所在目录）；
+	//
+	// SubNetMaskBits		int					子网所使用的掩码的比特数，0-15；
+	//
+	// EvKeepTime			time.Duration		event在dht中保留的时长；
+	//
+	// DedupTime			time.Duration		去重时钟管理器进行清理的周期时长；
+	//
+	// BootstrapTime		time.Duration		dht盲连接周期。在本实例不是bootstrap节点的情况下，
+	//											周期性的从BootstrapNodes中随机挑选节点进行连接，
+	//											连接成功之后，该时钟停止。
+	//
+
 	return nil
 }
 
