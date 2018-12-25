@@ -46,7 +46,6 @@ func OsnServiceConfig(cfg *p2psh.YeShellConfig) error {
 	//											一起使用；
 	//
 	// Name					string				本次运行的P2P实例，即由函数NewOsnService
-	//
 	//											生成的对象的名称；
 	//
 	// Validator			bool				是否为验证器；
