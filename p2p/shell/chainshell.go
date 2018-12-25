@@ -52,7 +52,7 @@ const (
 	pisClosing				// in-closing status
 )
 
-type shellManager struct {
+type ShellManager struct {
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// my name
 	tep				sch.SchUserTaskEp				// task entry
@@ -66,8 +66,8 @@ type shellManager struct {
 //
 // Create shell manager
 //
-func NewShellMgr() *shellManager  {
-	shMgr := shellManager {
+func NewShellMgr() *ShellManager  {
+	shMgr := ShellManager {
 		name: ShMgrName,
 		peerActived: make(map[shellPeerID]*shellPeerInst, 0),
 		rxChan: make(chan *peer.P2pPackageRx, rxChanSize),
@@ -79,14 +79,14 @@ func NewShellMgr() *shellManager  {
 //
 // Entry point exported to scheduler
 //
-func (shMgr *shellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (shMgr *ShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return shMgr.tep(ptn, msg)
 }
 
 //
 // Shell manager entry
 //
-func (shMgr *shellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
 	case sch.EvSchPoweron:
@@ -112,7 +112,7 @@ func (shMgr *shellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	return eno
 }
 
-func (shMgr *shellManager)powerOn(ptn interface{}) sch.SchErrno {
+func (shMgr *ShellManager)powerOn(ptn interface{}) sch.SchErrno {
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
 	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName)
@@ -120,12 +120,12 @@ func (shMgr *shellManager)powerOn(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-func (shMgr *shellManager)powerOff(ptn interface{}) sch.SchErrno {
+func (shMgr *ShellManager)powerOff(ptn interface{}) sch.SchErrno {
 	log.Debug("powerOff: task will be done ...")
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
 }
 
-func (shMgr *shellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchErrno {
+func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchErrno {
 	txChan, _ := ind.TxChan.(chan *peer.P2pPackage)
 	rxChan, _ := ind.RxChan.(chan *peer.P2pPackageRx)
 	peerInfo, _ := ind.PeerInfo.(*peer.Handshake)
@@ -165,7 +165,7 @@ func (shMgr *shellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 	return sch.SchEnoNone
 }
 
-func (shMgr *shellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErrno {
+func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErrno {
 	peerId := shellPeerID {
 		snid: cfm.Snid,
 		nodeId: cfm.PeerId,
@@ -184,7 +184,7 @@ func (shMgr *shellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 	}
 }
 
-func (shMgr *shellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
+func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErrno {
 	// this would never happen since a peer instance would never kill himself in
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
@@ -192,7 +192,7 @@ func (shMgr *shellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErr
 	return sch.SchEnoInternal
 }
 
-func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
+func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
 	peerId := shellPeerID {
 		snid: ind.Snid,
 		nodeId: ind.PeerId,
@@ -222,11 +222,11 @@ func (shMgr *shellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 	}
 }
 
-func (shMgr *shellManager)GetRxChan() chan *peer.P2pPackageRx {
+func (shMgr *ShellManager)GetRxChan() chan *peer.P2pPackageRx {
 	return shMgr.rxChan
 }
 
-func (shMgr *shellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno {
+func (shMgr *ShellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnPeMgr, sch.EvShellReconfigReq, req)
 	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
@@ -236,7 +236,7 @@ func (shMgr *shellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
+func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
 	
 	//
 	// MSBR_MT_EV(event):
@@ -288,11 +288,11 @@ func (shMgr *shellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	return sch.SchEnoNone
 }
 
-func (shMgr *shellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPackage {
+func (shMgr *ShellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPackage {
 	return nil
 }
 
-func (shMgr *shellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
+func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
 	if pkg := shMgr.bcr2Package(req); pkg == nil {
 		log.Debug("send2Peer: bcr2Package failed")
 		return sch.SchEnoUserTask

@@ -1,24 +1,23 @@
 /*
- *  Copyright (C) 2017 gyee authors
+ * Copyright (C) 2018 gyee authors
  *
- *  This file is part of the gyee library.
+ * This file is part of the gyee library.
  *
- *  the gyee library is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
+ * The gyee library is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *  the gyee library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * The gyee library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
- *
+ * You should have received a copy of the GNU General Public License
+ * along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package shell
+package p2p
 
 import (
 	"sync"
@@ -28,12 +27,12 @@ import (
 	"bytes"
 	"container/list"
 	"math/rand"
-	yep2p "github.com/yeeco/gyee/p2p"
 	log "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	"github.com/yeeco/gyee/p2p/dht"
 	"github.com/yeeco/gyee/p2p/peer"
+	p2psh "github.com/yeeco/gyee/p2p/shell"
 )
 
 const (
@@ -44,17 +43,17 @@ const (
 )
 
 var yesMtAtoi = map[string]int{
-	yep2p.MessageTypeTx:					sch.MSBR_MT_TX,
-	yep2p.MessageTypeEvent:					sch.MSBR_MT_EV,
-	yep2p.MessageTypeBlockHeader:			sch.MSBR_MT_BLKH,
-	yep2p.MessageTypeBlock:					sch.MSBR_MT_BLK,
+	MessageTypeTx:					sch.MSBR_MT_TX,
+	MessageTypeEvent:				sch.MSBR_MT_EV,
+	MessageTypeBlockHeader:			sch.MSBR_MT_BLKH,
+	MessageTypeBlock:				sch.MSBR_MT_BLK,
 }
 
 var yesMidItoa = map[int] string {
-	int(sch.MSBR_MT_TX):					yep2p.MessageTypeTx,
-	int(sch.MSBR_MT_EV):					yep2p.MessageTypeEvent,
-	int(sch.MSBR_MT_BLKH):					yep2p.MessageTypeBlockHeader,
-	int(sch.MSBR_MT_BLK):					yep2p.MessageTypeBlock,
+	int(sch.MSBR_MT_TX):					MessageTypeTx,
+	int(sch.MSBR_MT_EV):					MessageTypeEvent,
+	int(sch.MSBR_MT_BLKH):					MessageTypeBlockHeader,
+	int(sch.MSBR_MT_BLK):					MessageTypeBlock,
 }
 
 type yesKey = config.DsKey										// key type
@@ -62,10 +61,10 @@ type yesKey = config.DsKey										// key type
 type yeShellManager struct {
 	chainInst			*sch.Scheduler							// chain scheduler pointer
 	ptnChainShell		interface{}								// chain shell manager task node pointer
-	ptChainShMgr		*shellManager							// chain shell manager object
+	ptChainShMgr		*p2psh.ShellManager							// chain shell manager object
 	dhtInst				*sch.Scheduler							// dht scheduler pointer
 	ptnDhtShell			interface{}								// dht shell manager task node pointer
-	ptDhtShMgr			*dhtShellManager						// dht shell manager object
+	ptDhtShMgr			*p2psh.DhtShellManager						// dht shell manager object
 	getValKey			yesKey									// key of value to get
 	getValChan			chan []byte								// get value channel
 	putValKey			yesKey									// key of value to put
@@ -233,13 +232,13 @@ func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 		return nil
 	}
 
-	yeShMgr.chainInst, eno = P2pCreateInstance(cfg[ChainCfgIdx])
+	yeShMgr.chainInst, eno = p2psh.P2pCreateInstance(cfg[ChainCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.chainInst == nil {
 		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
-	yeShMgr.dhtInst, eno = P2pCreateInstance(cfg[DhtCfgIdx])
+	yeShMgr.dhtInst, eno = p2psh.P2pCreateInstance(cfg[DhtCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
 		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
@@ -252,7 +251,7 @@ func (yeShMgr *yeShellManager)Start() error {
 	var eno sch.SchErrno
 	var ok bool
 
-	if eno = P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
+	if eno = p2psh.P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
@@ -263,16 +262,16 @@ func (yeShMgr *yeShellManager)Start() error {
 		return nil
 	}
 
-	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*dhtShellManager)
+	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*p2psh.DhtShellManager)
 	if !ok || yeShMgr.ptDhtShMgr == nil {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
-	if eno := P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
+	if eno := p2psh.P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
 		stopCh := make(chan bool, 0)
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
-		P2pStop(yeShMgr.dhtInst, stopCh)
+		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
 
@@ -282,7 +281,7 @@ func (yeShMgr *yeShellManager)Start() error {
 		return nil
 	}
 
-	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*shellManager)
+	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*p2psh.ShellManager)
 	if !ok || yeShMgr.ptChainShMgr == nil {
 		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
@@ -329,17 +328,17 @@ func (yeShMgr *yeShellManager)Stop() {
 	stopCh := make(chan bool, 1)
 
 	log.Debug("Stop: stop dht")
-	P2pStop(yeShMgr.dhtInst, stopCh)
+	p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 	<-stopCh
 	log.Debug("Stop: dht stopped")
 
 	log.Debug("Stop: stop chain")
-	P2pStop(yeShMgr.chainInst, stopCh)
+	p2psh.P2pStop(yeShMgr.chainInst, stopCh)
 	<-stopCh
 	log.Debug("Stop: chain stopped")
 }
 
-func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
+func (yeShMgr *yeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	if reCfg == nil {
 		log.Debug("Reconfig: invalid parameter")
 		return errors.New("nil reconfigurate command")
@@ -394,18 +393,18 @@ func (yeShMgr *yeShellManager)Reconfig(reCfg *yep2p.RecfgCommand) error {
 	return nil
 }
 
-func (yeShMgr *yeShellManager)BroadcastMessage(message yep2p.Message) error {
+func (yeShMgr *yeShellManager)BroadcastMessage(message Message) error {
 	// Notice: the function is not supported in fact, see handler function
 	// in each case please.
 	var err error = nil
 	switch message.MsgType {
-	case yep2p.MessageTypeTx:
+	case MessageTypeTx:
 		err = yeShMgr.broadcastTx(&message)
-	case yep2p.MessageTypeEvent:
+	case MessageTypeEvent:
 		err = yeShMgr.broadcastEv(&message)
-	case yep2p.	MessageTypeBlockHeader:
+	case 	MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBh(&message)
-	case yep2p.	MessageTypeBlock:
+	case 	MessageTypeBlock:
 		err = yeShMgr.broadcastBk(&message)
 	default:
 		return errors.New(fmt.Sprintf("BroadcastMessage: invalid type: %d", message.MsgType))
@@ -413,16 +412,16 @@ func (yeShMgr *yeShellManager)BroadcastMessage(message yep2p.Message) error {
 	return err
 }
 
-func (yeShMgr *yeShellManager)BroadcastMessageOsn(message yep2p.Message) error {
+func (yeShMgr *yeShellManager)BroadcastMessageOsn(message Message) error {
 	var err error = nil
 	switch message.MsgType {
-	case yep2p.MessageTypeTx:
+	case MessageTypeTx:
 		err = yeShMgr.broadcastTxOsn(&message)
-	case yep2p.MessageTypeEvent:
+	case MessageTypeEvent:
 		err = yeShMgr.broadcastEvOsn(&message)
-	case yep2p.MessageTypeBlockHeader:
+	case MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBhOsn(&message)
-	case yep2p.MessageTypeBlock:
+	case MessageTypeBlock:
 		err = yeShMgr.broadcastBkOsn(&message)
 	default:
 		return errors.New(fmt.Sprintf("BroadcastMessageOsn: invalid type: %d", message.MsgType))
@@ -430,13 +429,13 @@ func (yeShMgr *yeShellManager)BroadcastMessageOsn(message yep2p.Message) error {
 	return err
 }
 
-func (yeShMgr *yeShellManager)Register(subscriber *yep2p.Subscriber) {
+func (yeShMgr *yeShellManager)Register(subscriber *Subscriber) {
 	t := subscriber.MsgType
 	m, _ := yeShMgr.subscribers.LoadOrStore(t, new(sync.Map))
 	m.(*sync.Map).Store(subscriber, true)
 }
 
-func (yeShMgr *yeShellManager)UnRegister(subscriber *yep2p.Subscriber) {
+func (yeShMgr *yeShellManager)UnRegister(subscriber *Subscriber) {
 	t := subscriber.MsgType
 	m, _ := yeShMgr.subscribers.Load(t)
 	if m == nil {
@@ -720,7 +719,7 @@ _rxLoop:
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 				subList.(*sync.Map).Range(func(key, value interface{}) bool {
-					msg := yep2p.Message {
+					msg := Message {
 						MsgType: msgType,
 						From: fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
 						Key: pkg.Key,
@@ -729,13 +728,13 @@ _rxLoop:
 
 					err := error(nil)
 					switch msg.MsgType {
-					case yep2p.MessageTypeTx:
+					case MessageTypeTx:
 						err = yeShMgr.broadcastTxOsn(&msg)
-					case yep2p.MessageTypeEvent:
+					case MessageTypeEvent:
 						err = yeShMgr.broadcastEvOsn(&msg)
-					case yep2p.MessageTypeBlockHeader:
+					case MessageTypeBlockHeader:
 						err = yeShMgr.broadcastBhOsn(&msg)
-					case yep2p.MessageTypeBlock:
+					case MessageTypeBlock:
 						err = yeShMgr.broadcastBkOsn(&msg)
 					default:
 						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
@@ -746,7 +745,7 @@ _rxLoop:
 						return false
 					}
 
-					sub, _ := key.(*yep2p.Subscriber)
+					sub, _ := key.(*Subscriber)
 					sub.MsgChan <- msg
 					return true
 				})
@@ -879,23 +878,23 @@ func (yeShMgr *yeShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) s
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *yeShellManager)broadcastTx(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastTx(msg *Message) error {
 	return errors.New("broadcastTx: not supported")
 }
 
-func (yeShMgr *yeShellManager)broadcastEv(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastEv(msg *Message) error {
 	return errors.New("broadcastEv: not supported")
 }
 
-func (yeShMgr *yeShellManager)broadcastBh(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastBh(msg *Message) error {
 	return errors.New("broadcastBh: not supported")
 }
 
-func (yeShMgr *yeShellManager)broadcastBk(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastBk(msg *Message) error {
 	return errors.New("broadcastBk: not supported")
 }
 
-func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	// if local node is a validator, the Tx should be broadcast over the
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
@@ -920,7 +919,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *yep2p.Message) error {
 	return nil
 }
 
-func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	// the local node must be a validator, and the Ev should be broadcast
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
@@ -957,7 +956,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *yep2p.Message) error {
 	return nil
 }
 
-func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
 	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
@@ -980,7 +979,7 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *yep2p.Message) error {
 	return nil
 }
 
-func (yeShMgr *yeShellManager)broadcastBkOsn(msg *yep2p.Message) error {
+func (yeShMgr *yeShellManager)broadcastBkOsn(msg *Message) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
 	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {

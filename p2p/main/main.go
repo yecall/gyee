@@ -2083,9 +2083,9 @@ func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interfac
 //
 func testCase8(tc *testCase) {
 	
-	yesCfg := shell.DefaultYeShellConfig
+	yesCfg := yep2p.DefaultYeShellConfig
 	//yesCfg.BootstrapNode = true
-	yeShMgr := shell.NewYeShellManager(&yesCfg)
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 
 	localNode := yeShMgr.GetLocalNode()

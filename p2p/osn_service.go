@@ -26,15 +26,14 @@ package p2p
 
 import (
 	"github.com/pkg/errors"
-	p2psh "github.com/yeeco/gyee/p2p/shell"
 )
 
 type OsnService struct {
-	yeShCfg		p2psh.YeShellConfig
+	yeShCfg		YeShellConfig
 	yeShMgr		Service
 }
 
-func OsnServiceConfig(cfg *p2psh.YeShellConfig) error {
+func OsnServiceConfig(cfg *YeShellConfig) error {
 	//
 	// 在本函数进行服务参数配置。一般而言，可先取了P2P中缺省的配置之后进行适当的修改，即调用本函数，见下面的
 	// NewOsnService函数。下面是对目前各个可配参数的说明：
@@ -78,10 +77,10 @@ func OsnServiceConfig(cfg *p2psh.YeShellConfig) error {
 
 func NewOsnService()(*OsnService, error) {
 	osns := OsnService{
-		yeShCfg: p2psh.DefaultYeShellConfig,
+		yeShCfg: DefaultYeShellConfig,
 	}
 	OsnServiceConfig(&osns.yeShCfg)
-	if osns.yeShMgr = p2psh.NewYeShellManager(&osns.yeShCfg); osns.yeShMgr == nil {
+	if osns.yeShMgr = NewYeShellManager(&osns.yeShCfg); osns.yeShMgr == nil {
 		return nil, errors.New("NewOsnService: NewYeShellManager failed")
 	}
 	return &osns, nil
