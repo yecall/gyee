@@ -756,6 +756,9 @@ _rxLoop:
 				yesLog.Debug("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
 				continue
 			}
+
+			yesLog.Debug("chainRxProc: peer: %+v, packeage received: %+v", *pkg.PeerInfo, *pkg)
+
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 				subList.(*sync.Map).Range(func(key, value interface{}) bool {
