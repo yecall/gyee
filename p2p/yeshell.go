@@ -944,7 +944,14 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
-	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+
+	k := [yesKeyBytes]byte{}
+	copy(k[0:], msg.Key)
+	if _, ok := yeShMgr.deDupMap[k]; ok {
+		return errors.New("broadcastTxOsn: duplicated")
+	}
+
+	if err := yeShMgr.setDedupTimer(k); err != nil {
 		yesLog.Debug("broadcastTxOsn: error: %s", err.Error())
 		return err
 	}
@@ -970,7 +977,13 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
 	// to chain shell manager and DHT shell manager.
-	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+	k := [yesKeyBytes]byte{}
+	copy(k[0:], msg.Key)
+	if _, ok := yeShMgr.deDupMap[k]; ok {
+		return errors.New("broadcastEvOsn: duplicated")
+	}
+
+	if err := yeShMgr.setDedupTimer(k); err != nil {
 		yesLog.Debug("broadcastEvOsn: error: %s", err.Error())
 		return err
 	}
@@ -1006,7 +1019,13 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
-	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+	k := [yesKeyBytes]byte{}
+	copy(k[0:], msg.Key)
+	if _, ok := yeShMgr.deDupMap[k]; ok {
+		return errors.New("broadcastBhOsn: duplicated")
+	}
+
+	if err := yeShMgr.setDedupTimer(k); err != nil {
 		yesLog.Debug("broadcastBhOsn: error: %s", err.Error())
 		return err
 	}
@@ -1030,7 +1049,13 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 func (yeShMgr *yeShellManager)broadcastBkOsn(msg *Message) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
-	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
+	k := [yesKeyBytes]byte{}
+	copy(k[0:], msg.Key)
+	if _, ok := yeShMgr.deDupMap[k]; ok {
+		return errors.New("broadcastBkOsn: duplicated")
+	}
+
+	if err := yeShMgr.setDedupTimer(k); err != nil {
 		yesLog.Debug("broadcastBkOsn: error: %s", err.Error())
 		return err
 	}
@@ -1077,20 +1102,12 @@ func (yeShMgr *yeShellManager)deDupTimerCb(el *list.Element, data interface{}) i
 	}
 }
 
-func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
+func (yeShMgr *yeShellManager)setDedupTimer(key [yesKeyBytes]byte) error {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
 
 	if len(key) != yesKeyBytes {
 		return errors.New(fmt.Sprintf("setDedupTimer: invalid key length: %d", len(key)))
-	}
-
-	var k [yesKeyBytes]byte
-	copy(k[0:], key)
-
-	if _, ok := yeShMgr.deDupMap[k]; ok {
-		yesLog.Debug("setDedupTimer: duplicated")
-		return errors.New("setDedupTimer: duplicated")
 	}
 
 	tm, err := yeShMgr.tmDedup.GetTimer(YeShellCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
@@ -1099,13 +1116,13 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 		return err
 	}
 
-	yeShMgr.tmDedup.SetTimerData(tm, &k)
+	yeShMgr.tmDedup.SetTimerData(tm, &key)
 	if err := yeShMgr.tmDedup.StartTimer(tm); err != dht.TmEnoNone {
 		yesLog.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
 		return err
 	}
 
-	yeShMgr.deDupMap[k] = true
+	yeShMgr.deDupMap[key] = true
 	return nil
 }
 
