@@ -97,7 +97,7 @@ func Debug(format string, args ... interface{}) {
 		msg := fmt.Sprintf(format, args...)
 		GlobalLogger.Info(msg)
 	} else {
-		_, file, line, _ := runtime.Caller(1)
+		_, file, line, _ := runtime.Caller(2)
 		text := fmt.Sprintf(format, args...)
 		fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
 		textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)

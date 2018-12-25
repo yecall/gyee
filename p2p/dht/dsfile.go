@@ -34,7 +34,7 @@ type dsfLogger struct {
 }
 
 var dsfLog = dsfLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log dsfLogger)Debug(fmt string, args ... interface{}) {

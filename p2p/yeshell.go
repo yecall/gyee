@@ -61,7 +61,7 @@ type staticTaskLogger struct {
 }
 
 var stLog = staticTaskLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log staticTaskLogger)Debug(fmt string, args ... interface{}) {
@@ -947,6 +947,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	req := sch.MsgShellBroadcastReq {
 		MsgType: yesMtAtoi[msg.MsgType],
 		From: msg.From,
+		Key: msg.Key,
 		Data: msg.Data,
 		LocalSnid: YeShellCfg.localSnid,
 	}
@@ -972,6 +973,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	req := sch.MsgShellBroadcastReq {
 		MsgType: yesMtAtoi[msg.MsgType],
 		From: msg.From,
+		Key: msg.Key,
 		Data: msg.Data,
 		LocalSnid: YeShellCfg.localSnid,
 	}
@@ -1007,6 +1009,7 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	req := sch.MsgShellBroadcastReq {
 		MsgType: yesMtAtoi[msg.MsgType],
 		From: msg.From,
+		Key: msg.Key,
 		Data: msg.Data,
 		LocalSnid: YeShellCfg.localSnid,
 	}

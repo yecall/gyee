@@ -34,7 +34,7 @@ type dsmemLogger struct {
 }
 
 var dsmemLog = dsmemLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log dsmemLogger)Debug(fmt string, args ... interface{}) {

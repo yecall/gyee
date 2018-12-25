@@ -43,7 +43,7 @@ type staticTaskLogger struct {
 }
 
 var stLog = staticTaskLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log staticTaskLogger)Debug(fmt string, args ... interface{}) {

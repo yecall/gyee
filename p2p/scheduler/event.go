@@ -145,6 +145,7 @@ const (
 type MsgShellBroadcastReq struct {
 	MsgType		int						// message type, see above constants
 	From    	string					// from
+	Key			[]byte					// key
 	Data    	[]byte					// payload bytes
 	LocalSnid	[]byte					// local sut network identity
 }

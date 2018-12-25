@@ -38,7 +38,7 @@ type protoLogger struct {
 }
 
 var protoLog = protoLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log protoLogger)Debug(fmt string, args ... interface{}) {

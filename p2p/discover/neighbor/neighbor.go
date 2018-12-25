@@ -41,7 +41,7 @@ type ngbLogger struct {
 }
 
 var ngbLog = ngbLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log ngbLogger)Debug(fmt string, args ... interface{}) {

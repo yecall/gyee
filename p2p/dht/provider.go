@@ -40,7 +40,7 @@ type prdMgrLogger struct {
 }
 
 var prdLog = prdMgrLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log prdMgrLogger)Debug(fmt string, args ... interface{}) {

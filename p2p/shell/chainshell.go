@@ -310,7 +310,13 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 }
 
 func (shMgr *ShellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPackage {
-	return nil
+	pkg := new(peer.P2pPackage)
+	pkg.Pid = uint32(peer.PID_EXT)
+	pkg.Mid = uint32(req.MsgType)
+	pkg.Key = req.Key
+	pkg.PayloadLength = uint32(len(req.Data))
+	pkg.Payload = req.Data
+	return pkg
 }
 
 func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
