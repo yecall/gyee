@@ -21,11 +21,54 @@
 package dht
 
 import (
+	"time"
+)
+
+type FileDatastoreConfig struct {
+	path				string				// data store path
+	shardFuncName		string				// shard function name
+	padLength			int					// padding length
+	sync				bool				// sync file store flag
+}
+
+type FileDatastore struct {}
+
+func NewFileDatastore(cfg *FileDatastoreConfig) *FileDatastore {
+	return (*FileDatastore)(nil)
+}
+
+func (fds *FileDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+	return DhtEnoNotSup
+}
+
+func (fds *FileDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
+	return DhtEnoNotSup, nil
+}
+
+func (fds *FileDatastore)Delete(k []byte) DhtErrno {
+	return DhtEnoNotSup
+}
+
+func (fds *FileDatastore)Close() DhtErrno {
+	return DhtEnoNotSup
+}
+
+
+/*****************************************************************************
+ *
+ * The following codes implement a data store based on ipfs/go-ds-flatfs, and
+ * would not be applied in the yeechain project. to make the codes looked more
+ * simple, we comment the implement, and make a "unsupported" data store as
+ * shown above.
+ *
+ *
+
+import (
 	"fmt"
+	"time"
 	ipfsds "github.com/ipfs/go-datastore"
 	ipfsfs "github.com/ipfs/go-ds-flatfs"
 	log "github.com/yeeco/gyee/p2p/logger"
-	"time"
 )
 
 //
@@ -150,3 +193,7 @@ func (fds *FileDatastore)Close() DhtErrno {
 	}
 	return DhtEnoNone
 }
+
+*
+*
+****************************************************************************/

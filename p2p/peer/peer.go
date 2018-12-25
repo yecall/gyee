@@ -196,7 +196,7 @@ type PeerManager struct {
 	// should solve this issue later, the "accepter" pointer is the same case.
 	//
 
-	tabMgr			*tab.TableManager				// pointer to table manager
+	tabMgr			*tab.TableManager							// pointer to table manager
 
 	ibInstSeq		int											// inbound instance sequence number
 	obInstSeq		int											// outbound instance sequence number
