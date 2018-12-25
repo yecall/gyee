@@ -34,9 +34,31 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
-	log "github.com/yeeco/gyee/p2p/logger"
-	"github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	config "github.com/yeeco/gyee/p2p/config"
 )
+
+
+//
+// debug
+//
+type ndbLogger struct {
+	debug__		bool
+}
+
+var ndbLog = ndbLogger {
+	debug__:	false,
+}
+
+func (log ndbLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// node database
+//
 
 var (
 	nodeDBNodeExpiration = 24 * time.Hour // Time for node to be expired
@@ -165,7 +187,7 @@ func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
 	}
 	node := new(Node)
 	if err := DecodeBytes(blob, node, nil); err != nil {
-		log.Debug("node: DecodeBytes failed")
+		ndbLog.Debug("node: DecodeBytes failed")
 		return nil
 	}
 	node.sha = *TabNodeId2Hash(id)
@@ -343,7 +365,7 @@ func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 		var n Node
 		var snid = AnySubNet
 		if err := DecodeBytes(it.Value(), &n, &snid); err != nil {
-			log.Debug("nextNode: DecodeBytes failed")
+			ndbLog.Debug("nextNode: DecodeBytes failed")
 			continue
 		}
 		return &n, &snid

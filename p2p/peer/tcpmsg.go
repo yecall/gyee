@@ -42,8 +42,8 @@ var tcpmsgLog = tcpmsgLogger {
 }
 
 func (log tcpmsgLogger)Debug(fmt string, args ... interface{}) {
-	if tcpmsgLog.debug__ {
-		p2plog.Debug(fmt, args)
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
 	}
 }
 

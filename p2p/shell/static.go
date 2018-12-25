@@ -24,15 +24,33 @@ package shell
 import (
 	"time"
 	"fmt"
-	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
-	"github.com/yeeco/gyee/p2p/peer"
-	"github.com/yeeco/gyee/p2p/dht"
-	log		"github.com/yeeco/gyee/p2p/logger"
+	peer	"github.com/yeeco/gyee/p2p/peer"
+	dht		"github.com/yeeco/gyee/p2p/dht"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
+
+
+//
+// debug
+//
+type staticTaskLogger struct {
+	debug__		bool
+}
+
+var stLog = staticTaskLogger {
+	debug__:	true,
+}
+
+func (log staticTaskLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
 
 //
 // watch dog is not implemented
@@ -82,7 +100,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 		}
 	}
 
-	log.Debug("P2pCreateStaticTaskTab: invalid type: %d", what)
+	stLog.Debug("P2pCreateStaticTaskTab: invalid type: %d", what)
 
 	return nil
 }
@@ -180,16 +198,16 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		eno, _ = sdl.SchSchedulerStart(P2pCreateStaticTaskTab(what), taskStaticPoweronOrder4Dht)
 
 	case config.P2P_TYPE_ALL:
-		log.Debug("P2pStart: not supported type: %d", what)
+		stLog.Debug("P2pStart: not supported type: %d", what)
 		return sch.SchEnoNotImpl
 
 	default:
-		log.Debug("P2pStart: invalid application type: %d", what)
+		stLog.Debug("P2pStart: invalid application type: %d", what)
 		return sch.SchEnoParameter
 	}
 
 	if eno != sch.SchEnoNone {
-		log.Debug("P2pStart: failed, eno: %d", eno)
+		stLog.Debug("P2pStart: failed, eno: %d", eno)
 		return eno
 	}
 
@@ -206,7 +224,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		pmEno = peMgr.PeMgrInited()
 
 		if pmEno != peer.PeMgrEnoNone {
-			log.Debug("P2pStart: pmEno: %d", pmEno)
+			stLog.Debug("P2pStart: pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 
@@ -217,7 +235,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		pmEno = peMgr.PeMgrStart()
 
 		if pmEno != peer.PeMgrEnoNone {
-			log.Debug("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
+			stLog.Debug("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -238,7 +256,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	//
 
 	p2pInstName := sdl.SchGetP2pCfgName()
-	log.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	stLog.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
 
 	var staticTasks = make([]string, 0)
 	appType := sdl.SchGetAppType()
@@ -253,7 +271,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
 	} else {
 
-		log.Debug("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
+		stLog.Debug("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}
 
@@ -267,22 +285,22 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
-			log.Debug("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
+			stLog.Debug("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
 			continue
 		}
 
-		log.Debug("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
+		stLog.Debug("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
 			p2pInstName, taskName)
 
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
 
-			log.Debug("P2pStop: inst: %s, " +
+			stLog.Debug("P2pStop: inst: %s, " +
 				"SchSendMessageByName failed, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
 		} else {
 
-			log.Debug("P2pStop: inst: %s, " +
+			stLog.Debug("P2pStop: inst: %s, " +
 				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
 				p2pInstName, eno, taskName)
 
@@ -292,16 +310,16 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 			//
 
 			for sdl.SchTaskExist(taskName) {
-				log.Debug("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
+				stLog.Debug("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
 				time.Sleep(time.Millisecond * 500)
 			}
 
-			log.Debug("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
+			stLog.Debug("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
 		}
 	}
 
-	log.Debug("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
-	log.Debug("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
+	stLog.Debug("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	stLog.Debug("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
 	// Notice:
@@ -320,7 +338,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			log.Debug("P2pStop: inst: %s, all tasks are done", p2pInstName)
+			stLog.Debug("P2pStop: inst: %s, all tasks are done", p2pInstName)
 			break
 		}
 
@@ -334,7 +352,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 			}
 		}
 
-		log.Debug("P2pStop: " +
+		stLog.Debug("P2pStop: " +
 			"inst: %s, wait seconds: %d, remain tasks: %d, names: %s",
 			p2pInstName, seconds, tasks, strNames)
 	}

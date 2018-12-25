@@ -27,11 +27,28 @@ import (
 	"strings"
 	"container/list"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	log "github.com/yeeco/gyee/p2p/logger"
-	sch	"github.com/yeeco/gyee/p2p/scheduler"
-	config "github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
+
+//
+// debug
+//
+type dsLogger struct {
+	debug__		bool
+}
+
+var dsLog = dsLogger {
+	debug__:	true,
+}
+
+func (log dsLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
 
 //
 // Datastore key
@@ -167,7 +184,7 @@ func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.
 func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		log.Debug("dsMgrProc: invalid parameters")
+		dsLog.Debug("dsMgrProc: invalid parameters")
 		return sch.SchEnoParameter
 	}
 
@@ -207,7 +224,7 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 
 	default:
 		eno = sch.SchEnoParameter
-		log.Debug("dsMgrProc: unknown message: %d", msg.Id)
+		dsLog.Debug("dsMgrProc: unknown message: %d", msg.Id)
 	}
 
 	return eno
@@ -219,7 +236,7 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
 	if eno := dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
-		log.Debug("Put: failed, eno: %d", eno)
+		dsLog.Debug("Put: failed, eno: %d", eno)
 		return DhtEnoDatastore
 	}
 
@@ -230,7 +247,7 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
 		ptm, eno := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 		if eno != TmEnoNone {
-			log.Debug("Put: GetTimer failed, eno: %d", eno)
+			dsLog.Debug("Put: GetTimer failed, eno: %d", eno)
 			return DhtEnoTimer
 		}
 
@@ -242,12 +259,12 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 		tm.to = time.Now().Add(kt)
 		ek := dsMgr.makeExpiredKey(k, tm.to)
 		if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
-			log.Debug("Put: failed, eno: %d", eno)
+			dsLog.Debug("Put: failed, eno: %d", eno)
 			return DhtEnoDatastore
 		}
 
 		if err := dsMgr.tmMgr.StartTimer(tm); err != nil {
-			log.Debug("Put: StartTimer failed, error: %s", err.Error())
+			dsLog.Debug("Put: StartTimer failed, error: %s", err.Error())
 			dsMgr.ds.Delete(k)
 			dsMgr.dsExp.Delete(ek)
 			return DhtEnoTimer
@@ -279,14 +296,14 @@ func (dsMgr *DsMgr)Delete(k []byte) DhtErrno {
 func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	if ptn == nil {
-		log.Debug("poweron: invalid ptn")
+		dsLog.Debug("poweron: invalid ptn")
 		return sch.SchEnoInternal
 	}
 
 	sdl := sch.SchGetScheduler(ptn)
 	dsMgr.sdl = sdl
 	if sdl == nil {
-		log.Debug("poweron: invalid sdl")
+		dsLog.Debug("poweron: invalid sdl")
 		return sch.SchEnoInternal
 	}
 
@@ -298,7 +315,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 	if dsMgr.ptnDhtMgr == nil ||
 		dsMgr.ptnQryMgr == nil ||
 		dsMgr.ptnRutMgr == nil {
-		log.Debug("poweron: invalid ptn")
+		dsLog.Debug("poweron: invalid ptn")
 		return sch.SchEnoInternal
 	}
 
@@ -311,7 +328,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 		fdc := FileDatastoreConfig{}
 		if eno := dsMgr.getFileDatastoreConfig(&fdc); eno != DhtEnoNone {
-			log.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			dsLog.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -325,7 +342,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 
 		ldc := LeveldbDatastoreConfig{}
 		if eno := dsMgr.getLeveldbDatastoreConfig(&ldc); eno != DhtEnoNone {
-			log.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			dsLog.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -336,22 +353,22 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 		dsMgr.dsExp = NewLeveldbDatastore(&ldcExp)
 
 	} else {
-		log.Debug("poweron: invalid datastore type: %d", dsType)
+		dsLog.Debug("poweron: invalid datastore type: %d", dsType)
 		return sch.SchEnoNotImpl
 	}
 
 	if dsMgr.ds == nil {
-		log.Debug("poweron: nil datastore")
+		dsLog.Debug("poweron: nil datastore")
 		return sch.SchEnoUserTask
 	}
 
 	if eno := dsMgr.cleanUpReboot(); eno != DhtEnoNone {
-		log.Debug("poweron: cleanUp failed, eno: %d", eno)
+		dsLog.Debug("poweron: cleanUp failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
 	if eno := dsMgr.startTickTimer(); eno != DhtEnoNone {
-		log.Debug("poweron: startTickTimer failed, eno: %d", eno)
+		dsLog.Debug("poweron: startTickTimer failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -362,7 +379,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 // poweroff handler
 //
 func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
-	log.Debug("poweroff: task will be done ...")
+	dsLog.Debug("poweroff: task will be done ...")
 	dsMgr.ds.Close()
 	dsMgr.dsExp.Close()
 	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
@@ -373,7 +390,7 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
 	if err := dsMgr.tmMgr.TickProc(); err != TmEnoNone {
-		log.Debug("TickProc: error: %s", err.Error())
+		dsLog.Debug("TickProc: error: %s", err.Error())
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -385,7 +402,7 @@ func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
 func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		log.Debug("localAddValReq: invalid key length")
+		dsLog.Debug("localAddValReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -397,7 +414,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	//
 
 	if eno := dsMgr.store(&k, msg.Val, msg.KT); eno != DhtEnoNone {
-		log.Debug("localAddValReq: store failed, eno: %d", eno)
+		dsLog.Debug("localAddValReq: store failed, eno: %d", eno)
 		dsMgr.localAddValRsp(k[0:], nil, eno)
 		return sch.SchEnoUserTask
 	}
@@ -424,7 +441,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		log.Debug("localGetValueReq: invalid key length")
+		dsLog.Debug("localGetValueReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -469,7 +486,7 @@ func (dsMgr *DsMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch
 		return dsMgr.localGetValRsp(msg.Target[0:], msg.Val, DhtErrno(msg.Eno))
 
 	} else {
-		log.Debug("qryMgrQueryResultInd: unknown what's for")
+		dsLog.Debug("qryMgrQueryResultInd: unknown what's for")
 	}
 
 	return sch.SchEnoMismatched
@@ -492,7 +509,7 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 		copy(dsk[0:], v.Key)
 
 		if eno := dsMgr.ds.Put(dsk[0:], v.Val, pv.KT); eno != DhtEnoNone {
-			log.Debug("putValReq: put failed, eno: %d", eno)
+			dsLog.Debug("putValReq: put failed, eno: %d", eno)
 		}
 	}
 
@@ -532,7 +549,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 		dhtPkg := DhtPackage{}
 		if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-			log.Debug("getValReq: GetPackage failed, eno: %d", eno)
+			dsLog.Debug("getValReq: GetPackage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -567,7 +584,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	prdMgr, ok := dsMgr.sdl.SchGetTaskObject(PrdMgrName).(*PrdMgr)
 	if !ok || prdMgr == nil {
-		log.Debug("getValReq: get provider manager failed")
+		dsLog.Debug("getValReq: get provider manager failed")
 		return sch.SchEnoInternal
 	}
 
@@ -608,7 +625,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	//
 
 	if msg == nil {
-		log.Debug("rutMgrNearestRsp: invalid message")
+		dsLog.Debug("rutMgrNearestRsp: invalid message")
 		return sch.SchEnoParameter
 	}
 
@@ -638,7 +655,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 
 	dhtPkg := DhtPackage{}
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		log.Debug("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		dsLog.Debug("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -657,7 +674,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 
 func (dsMgr *DsMgr)qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 	if msg.Eno != DhtEnoNone.GetEno() {
-		log.Debug("qryStartRsp: errors reported, eno: %d", msg.Eno)
+		dsLog.Debug("qryStartRsp: errors reported, eno: %d", msg.Eno)
 	}
 	return sch.SchEnoNone
 }
@@ -684,7 +701,7 @@ func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 	}
 
 	if eno := ddsr.DecDsRecord(&dsr); eno != DhtEnoNone {
-		log.Debug("fromStore: DecDsRecord failed, eno: %d", eno)
+		dsLog.Debug("fromStore: DecDsRecord failed, eno: %d", eno)
 		return nil
 	}
 
@@ -704,7 +721,7 @@ func (dsMgr *DsMgr)store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 
 	dsr := new(DsRecord)
 	if eno := ddsr.EncDsRecord(dsr); eno != DhtEnoNone {
-		log.Debug("store: EncDsRecord failed, eno: %d", eno)
+		dsLog.Debug("store: EncDsRecord failed, eno: %d", eno)
 		return eno
 	}
 
@@ -810,7 +827,7 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 			secondes, err := strconv.ParseInt(string(t), 10, 64)
 
 			if err != nil {
-				log.Debug("cleanUpReboot: invalid time string: %s", string(t))
+				dsLog.Debug("cleanUpReboot: invalid time string: %s", string(t))
 				continue
 			}
 
@@ -825,7 +842,7 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 				tm, err := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 
 				if err != nil {
-					log.Debug("cleanUpReboot: GetTimer failed, error: %s", err.Error())
+					dsLog.Debug("cleanUpReboot: GetTimer failed, error: %s", err.Error())
 					continue
 				}
 
@@ -836,7 +853,7 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 		}
 	} else {
 
-		log.Debug("cleanUpReboot: unknown data store type: %d", dsType)
+		dsLog.Debug("cleanUpReboot: unknown data store type: %d", dsType)
 		return DhtEnoDatastore
 	}
 
@@ -854,7 +871,7 @@ func (dsMgr *DsMgr)startTickTimer() DhtErrno {
 
 	eno, tid := dsMgr.sdl.SchSetTimer(dsMgr.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		log.Debug("startTickTimer: SchSetTimer failed, eno: %d", eno)
+		dsLog.Debug("startTickTimer: SchSetTimer failed, eno: %d", eno)
 		return DhtEnoScheduler
 	}
 
@@ -874,7 +891,7 @@ func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{}
 	err := DhtErrno(DhtEnoNone)
 	tm, ok := data.(*timer)
 	if !ok {
-		log.Debug("cleanUpTimerCb: invalid timer")
+		dsLog.Debug("cleanUpTimerCb: invalid timer")
 		return DhtEnoMismatched
 	}
 
@@ -892,7 +909,7 @@ func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{}
 _cleanUpfailed:
 
 	if err != DhtEnoNone {
-		log.Debug("cleanUpTimerCb: Delete failed, error: %s", err.Error())
+		dsLog.Debug("cleanUpTimerCb: Delete failed, error: %s", err.Error())
 		return err
 	}
 

@@ -24,8 +24,26 @@ import (
 	"time"
 	"fmt"
 	"container/list"
-	"github.com/ethereum/go-ethereum/log"
+	p2plog	"github.com/ethereum/go-ethereum/log"
 )
+
+
+//
+// debug
+//
+type tmMgrLogger struct {
+	debug__		bool
+}
+
+var tmLog = tmMgrLogger  {
+	debug__:	true,
+}
+
+func (log tmMgrLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
 
 const (
 	oneTick			= time.Second					// unit tick to driver the timer manager
@@ -214,7 +232,7 @@ func (mgr *TimerManager)TickProc() error {
 	derr := mgr.dpHandler(mgr.dTmList[mgr.dp])
 
 	if serr != TmEnoNone || merr != TmEnoNone || herr != TmEnoNone || derr != TmEnoNone {
-		log.Debug("TickProc: serr: %s, merr: %s, herr: %s, derr: %s",
+		tmLog.Debug("TickProc: serr: %s, merr: %s, herr: %s, derr: %s",
 			serr.Error(), merr.Error(), herr.Error(), derr.Error())
 		return TmEnoInternal
 	}

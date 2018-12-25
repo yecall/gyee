@@ -27,13 +27,52 @@ import (
 	"bytes"
 	"container/list"
 	"math/rand"
-	log "github.com/yeeco/gyee/p2p/logger"
-	"github.com/yeeco/gyee/p2p/config"
-	sch "github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/p2p/dht"
-	"github.com/yeeco/gyee/p2p/peer"
-	p2psh "github.com/yeeco/gyee/p2p/shell"
+	config	"github.com/yeeco/gyee/p2p/config"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	dht		"github.com/yeeco/gyee/p2p/dht"
+	peer	"github.com/yeeco/gyee/p2p/peer"
+	p2psh	"github.com/yeeco/gyee/p2p/shell"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
+
+
+//
+// debug
+//
+type yesLogger struct {
+	debug__		bool
+}
+
+var yesLog = yesLogger {
+	debug__:	true,
+}
+
+func (log yesLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// debug
+//
+type staticTaskLogger struct {
+	debug__		bool
+}
+
+var stLog = staticTaskLogger {
+	debug__:	true,
+}
+
+func (log staticTaskLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// yee shell (both for peer and dht)
+//
 
 const (
 	yesKeyBytes = config.DhtKeyLength											// key length in bytes
@@ -138,12 +177,12 @@ var YeShellCfg = YeShellConfig{}
 
 func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	if yesCfg == nil {
-		log.Debug("YeShellConfigToP2pCfg: nil configuration")
+		yesLog.Debug("YeShellConfigToP2pCfg: nil configuration")
 		return nil
 	}
 
 	if yesCfg.AppType != config.P2P_TYPE_ALL {
-		log.Debug("YeShellConfigToP2pCfg: P2P_TYPE_ALL needed")
+		yesLog.Debug("YeShellConfigToP2pCfg: P2P_TYPE_ALL needed")
 		return nil
 	}
 
@@ -160,7 +199,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	}
 
 	if config.P2pSetupLocalNodeId(chainCfg) != config.PcfgEnoNone {
-		log.Debug("YeShellConfigToP2pCfg: P2pSetupLocalNodeId failed")
+		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetupLocalNodeId failed")
 		return nil
 	}
 
@@ -177,7 +216,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	}
 
 	if yesCfg.SubNetMaskBits > MaxSubNetMaskBits {
-		log.Debug("YeShellConfigToP2pCfg: too big, SubNetMaskBits: %d", yesCfg.SubNetMaskBits)
+		yesLog.Debug("YeShellConfigToP2pCfg: too big, SubNetMaskBits: %d", yesCfg.SubNetMaskBits)
 		return nil
 	}
 	end := len(chainCfg.Local.ID) - 1
@@ -200,7 +239,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	chainCfg.SubNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
 
 	if chCfgName, eno := config.P2pSetConfig("chain", chainCfg); eno != config.PcfgEnoNone {
-		log.Debug("YeShellConfigToP2pCfg: P2pSetConfig failed")
+		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetConfig failed")
 		return nil
 	} else {
 		chainCfg = config.P2pGetConfig(chCfgName)
@@ -223,24 +262,24 @@ func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 
 	cfg := YeShellConfigToP2pCfg(yesCfg)
 	if cfg == nil || len(cfg) != 2 {
-		log.Debug("NewYeShellManager: YeShellConfigToP2pCfg failed")
+		yesLog.Debug("NewYeShellManager: YeShellConfigToP2pCfg failed")
 		return nil
 	}
 
 	if cfg[0] == nil || cfg[1] == nil {
-		log.Debug("NewYeShellManager: nil configuration")
+		yesLog.Debug("NewYeShellManager: nil configuration")
 		return nil
 	}
 
 	yeShMgr.chainInst, eno = p2psh.P2pCreateInstance(cfg[ChainCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.chainInst == nil {
-		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.dhtInst, eno = p2psh.P2pCreateInstance(cfg[DhtCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
-		log.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
@@ -252,38 +291,38 @@ func (yeShMgr *yeShellManager)Start() error {
 	var ok bool
 
 	if eno = p2psh.P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptDhtShMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtShMgrName).(*p2psh.DhtShellManager)
 	if !ok || yeShMgr.ptDhtShMgr == nil {
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	if eno := p2psh.P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
 		stopCh := make(chan bool, 0)
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
 
 	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*p2psh.ShellManager)
 	if !ok || yeShMgr.ptChainShMgr == nil {
-		log.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
@@ -318,34 +357,34 @@ func (yeShMgr *yeShellManager)Start() error {
 
 func (yeShMgr *yeShellManager)Stop() {
 	if YeShellCfg.BootstrapNode == false {
-		log.Debug("Stop: close dht bootstrap timer")
+		yesLog.Debug("Stop: close dht bootstrap timer")
 		close(yeShMgr.dhtBsChan)
 	}
 
-	log.Debug("Stop: close deduplication ticker")
+	yesLog.Debug("Stop: close deduplication ticker")
 	close(yeShMgr.ddtChan)
 
 	stopCh := make(chan bool, 1)
 
-	log.Debug("Stop: stop dht")
+	yesLog.Debug("Stop: stop dht")
 	p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 	<-stopCh
-	log.Debug("Stop: dht stopped")
+	yesLog.Debug("Stop: dht stopped")
 
-	log.Debug("Stop: stop chain")
+	yesLog.Debug("Stop: stop chain")
 	p2psh.P2pStop(yeShMgr.chainInst, stopCh)
 	<-stopCh
-	log.Debug("Stop: chain stopped")
+	yesLog.Debug("Stop: chain stopped")
 }
 
 func (yeShMgr *yeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	if reCfg == nil {
-		log.Debug("Reconfig: invalid parameter")
+		yesLog.Debug("Reconfig: invalid parameter")
 		return errors.New("nil reconfigurate command")
 	}
 
 	if reCfg.SubnetMaskBits <= 0 || reCfg.SubnetMaskBits > MaxSubNetMaskBits {
-		log.Debug("")
+		yesLog.Debug("")
 		return errors.New(fmt.Sprintf("too much mask bits: %d", reCfg.SubnetMaskBits))
 	}
 
@@ -363,12 +402,12 @@ func (yeShMgr *yeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	if reCfg.SubnetMaskBits != YeShellCfg.SubNetMaskBits {
 		oldSnid, err := yeShMgr.getSubnetIdentity(YeShellCfg.SubNetMaskBits)
 		if err != nil {
-			log.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
+			yesLog.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
 			return err
 		}
 		newSnid, err := yeShMgr.getSubnetIdentity(reCfg.SubnetMaskBits)
 		if err != nil {
-			log.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
+			yesLog.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
 			return err
 		}
 		SnidAdd = append(SnidAdd, newSnid)
@@ -386,7 +425,7 @@ func (yeShMgr *yeShellManager)Reconfig(reCfg *RecfgCommand) error {
 
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellReconfigReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		log.Debug("Reconfig: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("Reconfig: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
 
@@ -446,7 +485,7 @@ func (yeShMgr *yeShellManager)UnRegister(subscriber *Subscriber) {
 
 func (yeShMgr *yeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 	if len(key) != yesKeyBytes {
-		log.Debug("DhtGetValue: invalid key: %x", key)
+		yesLog.Debug("DhtGetValue: invalid key: %x", key)
 		return nil, sch.SchEnoParameter
 	}
 
@@ -456,7 +495,7 @@ func (yeShMgr *yeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		log.Debug("DhtGetValue: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtGetValue: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil, eno
 	}
 
@@ -469,7 +508,7 @@ func (yeShMgr *yeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 
 func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
 	if len(key) != yesKeyBytes || len(value) == 0 {
-		log.Debug("DhtSetValue: invalid (key, value) pair, key: %x, length of value: %d", key, len(value))
+		yesLog.Debug("DhtSetValue: invalid (key, value) pair, key: %x, length of value: %d", key, len(value))
 		return sch.SchEnoParameter
 	}
 
@@ -481,7 +520,7 @@ func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		log.Debug("DhtSetValue: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtSetValue: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
@@ -498,18 +537,18 @@ func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
 
 func (yeShMgr *yeShellManager)DhtFindNode(target *config.NodeID, done chan interface{}) error {
 	if target == nil || done == nil {
-		log.Debug("DhtFindNode: invalid parameters")
+		yesLog.Debug("DhtFindNode: invalid parameters")
 		return sch.SchEnoParameter
 	}
 
 	if len(yeShMgr.findNodeMap) >= yesMaxFindNode {
-		log.Debug("DhtFindNode: too much, max: %d", yesMaxFindNode)
+		yesLog.Debug("DhtFindNode: too much, max: %d", yesMaxFindNode)
 		return sch.SchEnoResource
 	}
 
 	key := *(*yesKey)(dht.RutMgrNodeId2Hash(*target))
 	if _, ok := yeShMgr.findNodeMap[key]; ok {
-		log.Debug("DhtFindNode: duplicated")
+		yesLog.Debug("DhtFindNode: duplicated")
 		return sch.SchEnoDuplicated
 	}
 
@@ -523,7 +562,7 @@ func (yeShMgr *yeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrFindPeerReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		log.Debug("DhtFindNode: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtFindNode: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
@@ -533,18 +572,18 @@ func (yeShMgr *yeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 
 func (yeShMgr *yeShellManager)DhtGetProvider(key []byte, done chan interface{}) error {
 	if len(key) != yesKeyBytes {
-		log.Debug("DhtGetProvider: invalid key: %x", key)
+		yesLog.Debug("DhtGetProvider: invalid key: %x", key)
 		return sch.SchEnoParameter
 	}
 	if done == nil {
-		log.Debug("DhtGetProvider: invalid done channel")
+		yesLog.Debug("DhtGetProvider: invalid done channel")
 		return sch.SchEnoParameter
 	}
 
 	var yk yesKey
 	copy(yk[0:], key)
 	if _, ok := yeShMgr.getProviderMap[yk]; ok {
-		log.Debug("DhtGetProvider: duplicated")
+		yesLog.Debug("DhtGetProvider: duplicated")
 		return sch.SchEnoDuplicated
 	}
 
@@ -554,7 +593,7 @@ func (yeShMgr *yeShellManager)DhtGetProvider(key []byte, done chan interface{}) 
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetProviderReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		log.Debug("DhtGetProvider: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtGetProvider: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
@@ -564,18 +603,18 @@ func (yeShMgr *yeShellManager)DhtGetProvider(key []byte, done chan interface{}) 
 
 func (yeShMgr *yeShellManager)DhtSetProvider(key []byte, provider *config.Node, done chan interface{}) error {
 	if len(key) != yesKeyBytes {
-		log.Debug("DhtSetProvider: invalid key: %x", key)
+		yesLog.Debug("DhtSetProvider: invalid key: %x", key)
 		return sch.SchEnoParameter
 	}
 	if provider == nil || done == nil {
-		log.Debug("DhtSetProvider: invalid parameters")
+		yesLog.Debug("DhtSetProvider: invalid parameters")
 		return sch.SchEnoParameter
 	}
 
 	var yk yesKey
 	copy(yk[0:], key)
 	if _, ok := yeShMgr.getProviderMap[yk]; ok {
-		log.Debug("DhtSetProvider: duplicated")
+		yesLog.Debug("DhtSetProvider: duplicated")
 		return sch.SchEnoDuplicated
 	}
 
@@ -586,7 +625,7 @@ func (yeShMgr *yeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutProviderReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		log.Debug("DhtSetProvider: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtSetProvider: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
@@ -631,7 +670,7 @@ func (yeShMgr *yeShellManager)dhtEvProc() {
 			eno = yeShMgr.dhtConMgrCloseRsp(evi.Msg.(*sch.MsgDhtConMgrCloseRsp))
 
 		default:
-			log.Debug("evHandler: invalid event: %d", evi.Evt)
+			yesLog.Debug("evHandler: invalid event: %d", evi.Evt)
 			eno = sch.SchEnoParameter
 		}
 
@@ -645,12 +684,12 @@ _evLoop:
 			if ok {
 				evHandler(evi)
 			} else {
-				log.Debug("dhtEvProc: channel closed")
+				yesLog.Debug("dhtEvProc: channel closed")
 				break _evLoop
 			}
 		}
 	}
-	log.Debug("dhtEvProc: exit")
+	yesLog.Debug("dhtEvProc: exit")
 }
 
 func (yeShMgr *yeShellManager)dhtCsProc() {
@@ -659,31 +698,31 @@ func (yeShMgr *yeShellManager)dhtCsProc() {
 		switch csi.Status {
 
 		case dht.CisNull:
-			log.Debug("dhtCsProc: CisNull, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisNull, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisConnecting:
-			log.Debug("dhtCsProc: CisConnecting, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisConnecting, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisConnected:
-			log.Debug("dhtCsProc: CisConnected, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisConnected, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisAccepted:
-			log.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisInHandshaking:
-			log.Debug("dhtCsProc: CisInHandshaking, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisInHandshaking, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisHandshaked:
-			log.Debug("dhtCsProc: CisHandshaked, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisHandshaked, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisInService:
-			log.Debug("dhtCsProc: CisInService, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisInService, dir: %d, peer: %x", *csi.Peer)
 
 		case dht.CisClosed:
-			log.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
 
 		default:
-			log.Debug("dhtCsProc: invalid connection status: %d", csi.Status)
+			yesLog.Debug("dhtCsProc: invalid connection status: %d", csi.Status)
 		}
 	}
 
@@ -694,12 +733,12 @@ _csLoop:
 			if ok {
 				csHandler(csi)
 			} else {
-				log.Debug("dhtCsProc: channel closed")
+				yesLog.Debug("dhtCsProc: channel closed")
 				break _csLoop
 			}
 		}
 	}
-	log.Debug("dhtCsProc: exit")
+	yesLog.Debug("dhtCsProc: exit")
 }
 
 func (yeShMgr *yeShellManager)chainRxProc() {
@@ -709,11 +748,11 @@ _rxLoop:
 		select {
 		case pkg, ok := <-yeShMgr.chainRxChan:
 			if !ok {
-				log.Debug("chainRxProc: channel closed")
+				yesLog.Debug("chainRxProc: channel closed")
 				break _rxLoop
 			}
 			if pkg.ProtoId != int(peer.PID_EXT) {
-				log.Debug("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
+				yesLog.Debug("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
 				continue
 			}
 			msgType := yesMidItoa[pkg.MsgId]
@@ -741,7 +780,7 @@ _rxLoop:
 					}
 
 					if err != nil {
-						log.Debug("chainRxProc: error: %s", err.Error())
+						yesLog.Debug("chainRxProc: error: %s", err.Error())
 						return false
 					}
 
@@ -752,7 +791,7 @@ _rxLoop:
 			}
 		}
 	}
-	log.Debug("chainRxProc: exit")
+	yesLog.Debug("chainRxProc: exit")
 }
 
 func (yeShMgr *yeShellManager)dhtBootstrapProc() {
@@ -762,7 +801,7 @@ _bootstarp:
 		select {
 		case <-yeShMgr.bsTicker.C:
 			if len(YeShellCfg.dhtBootstrapNodes) <= 0 {
-				log.Debug("dhtBootstrapProc: none of bootstarp nodes")
+				yesLog.Debug("dhtBootstrapProc: none of bootstarp nodes")
 			} else {
 				r := rand.Int31n(int32(len(YeShellCfg.dhtBootstrapNodes)))
 				req := sch.MsgDhtBlindConnectReq{
@@ -776,15 +815,15 @@ _bootstarp:
 			break _bootstarp
 		}
 	}
-	log.Debug("dhtBootstrapProc: exit")
+	yesLog.Debug("dhtBootstrapProc: exit")
 }
 
 func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
-	log.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
 	for _, bsn := range YeShellCfg.dhtBootstrapNodes {
 		if msg.Eno == dht.DhtEnoNone.GetEno() {
 			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
-				log.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
+				yesLog.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
 				yeShMgr.dhtBsChan<-true
 				break
 			}
@@ -794,7 +833,7 @@ func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 }
 
 func (yeShMgr *yeShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
-	log.Debug("dhtMgrFindPeerRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtMgrFindPeerRsp: msg: %+v", *msg)
 	if done, ok := yeShMgr.findNodeMap[msg.Target]; ok {
 		done<-msg
 		delete(yeShMgr.findNodeMap, msg.Target)
@@ -803,22 +842,22 @@ func (yeShMgr *yeShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResult
 }
 
 func (yeShMgr *yeShellManager)dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
-	log.Debug("dhtQryMgrQueryStartRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtQryMgrQueryStartRsp: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
 func (yeShMgr *yeShellManager)dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
-	log.Debug("dhtQryMgrQueryStopRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtQryMgrQueryStopRsp: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
 func (yeShMgr *yeShellManager)dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
-	log.Debug("dhtConMgrSendCfm: msg: %+v", *msg)
+	yesLog.Debug("dhtConMgrSendCfm: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
 func (yeShMgr *yeShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
-	log.Debug("dhtMgrPutProviderRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtMgrPutProviderRsp: msg: %+v", *msg)
 	if len(msg.Key) != yesKeyBytes {
 		return sch.SchEnoParameter
 	}
@@ -832,7 +871,7 @@ func (yeShMgr *yeShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProvi
 }
 
 func (yeShMgr *yeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
-	log.Debug("dhtMgrGetProviderRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtMgrGetProviderRsp: msg: %+v", *msg)
 	if len(msg.Key) != yesKeyBytes {
 		return sch.SchEnoParameter
 	}
@@ -846,9 +885,9 @@ func (yeShMgr *yeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvider
 }
 
 func (yeShMgr *yeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
-	log.Debug("dhtMgrPutValueRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtMgrPutValueRsp: msg: %+v", *msg)
 	if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
-		log.Debug("dhtMgrPutValueRsp: key mismatched")
+		yesLog.Debug("dhtMgrPutValueRsp: key mismatched")
 		return sch.SchEnoMismatched
 	}
 	if msg.Eno == dht.DhtEnoNone.GetEno() {
@@ -860,9 +899,9 @@ func (yeShMgr *yeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) s
 }
 
 func (yeShMgr *yeShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
-	log.Debug("dhtMgrGetValueRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtMgrGetValueRsp: msg: %+v", *msg)
 	if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
-		log.Debug("dhtMgrGetValueRsp: key mismatched")
+		yesLog.Debug("dhtMgrGetValueRsp: key mismatched")
 		return sch.SchEnoMismatched
 	}
 	if msg.Eno == dht.DhtEnoNone.GetEno() {
@@ -874,7 +913,7 @@ func (yeShMgr *yeShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) s
 }
 
 func (yeShMgr *yeShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
-	log.Debug("dhtConMgrCloseRsp: msg: %+v", *msg)
+	yesLog.Debug("dhtConMgrCloseRsp: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
@@ -900,7 +939,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
 	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
-		log.Debug("broadcastTxOsn: error: %s", err.Error())
+		yesLog.Debug("broadcastTxOsn: error: %s", err.Error())
 		return err
 	}
 
@@ -913,7 +952,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Debug("broadcastTxOsn: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("broadcastTxOsn: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
 	return nil
@@ -925,7 +964,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	// with a duration to be expired. the message here would be dispatched
 	// to chain shell manager and DHT shell manager.
 	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
-		log.Debug("broadcastEvOsn: error: %s", err.Error())
+		yesLog.Debug("broadcastEvOsn: error: %s", err.Error())
 		return err
 	}
 
@@ -938,7 +977,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
 
@@ -949,7 +988,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	}
 	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req2Dht)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
 
@@ -960,7 +999,7 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
 	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
-		log.Debug("broadcastBhOsn: error: %s", err.Error())
+		yesLog.Debug("broadcastBhOsn: error: %s", err.Error())
 		return err
 	}
 
@@ -973,7 +1012,7 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Debug("broadcastBhOsn: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("broadcastBhOsn: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
 	return nil
@@ -983,7 +1022,7 @@ func (yeShMgr *yeShellManager)broadcastBkOsn(msg *Message) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
 	if err := yeShMgr.setDedupTimer(msg.Key); err != nil {
-		log.Debug("broadcastBkOsn: error: %s", err.Error())
+		yesLog.Debug("broadcastBkOsn: error: %s", err.Error())
 		return err
 	}
 
@@ -995,7 +1034,7 @@ func (yeShMgr *yeShellManager)broadcastBkOsn(msg *Message) error {
 	}
 	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
 	return nil
@@ -1041,19 +1080,19 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 	copy(k[0:], key)
 
 	if _, ok := yeShMgr.deDupMap[k]; ok {
-		log.Debug("setDedupTimer: duplicated")
+		yesLog.Debug("setDedupTimer: duplicated")
 		return errors.New("setDedupTimer: duplicated")
 	}
 
 	tm, err := yeShMgr.tmDedup.GetTimer(YeShellCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
 	if err != dht.TmEnoNone {
-		log.Debug("setDedupTimer: GetTimer failed, error: %s", err.Error())
+		yesLog.Debug("setDedupTimer: GetTimer failed, error: %s", err.Error())
 		return err
 	}
 
 	yeShMgr.tmDedup.SetTimerData(tm, &k)
 	if err := yeShMgr.tmDedup.StartTimer(tm); err != dht.TmEnoNone {
-		log.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
+		yesLog.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
 		return err
 	}
 
@@ -1072,7 +1111,7 @@ _dedup:
 			break _dedup
 		}
 	}
-	log.Debug("deDupTickerProc: exit")
+	yesLog.Debug("deDupTickerProc: exit")
 }
 
 func (yeShMgr *yeShellManager)GetLocalNode() *config.Node {

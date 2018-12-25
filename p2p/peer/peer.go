@@ -46,7 +46,7 @@ var peerLog = peerLogger {
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
-	if peerLog.debug__ {
+	if log.debug__ {
 		p2plog.Debug(fmt, args ...)
 	}
 }

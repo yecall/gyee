@@ -26,8 +26,30 @@ import (
 	"fmt"
 	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	log		"github.com/yeeco/gyee/p2p/logger"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
+
+
+//
+// debug
+//
+type lsnMgrLogger struct {
+	debug__		bool
+}
+
+var lsnLog = lsnMgrLogger  {
+	debug__:	true,
+}
+
+func (log lsnMgrLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// peer listen manager
+//
 
 const PeerLsnMgrName = sch.PeerLsnMgrName
 
@@ -68,7 +90,7 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	case sch.EvPeLsnStopReq:
 		eno = lsnMgr.lsnMgrStop()
 	default:
-		log.Debug("LsnMgrProc: invalid message: %d", msg.Id)
+		lsnLog.Debug("LsnMgrProc: invalid message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -79,7 +101,7 @@ func (lsnMgr *ListenerManager)lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	// if does not accept inbound, done this task
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchGetP2pConfig().NoAccept == true {
-		log.Debug("lsnMgrPoweron: do not accept, done ...")
+		lsnLog.Debug("lsnMgrPoweron: do not accept, done ...")
 		return sdl.SchTaskDone(ptn, sch.SchEnoNone)
 	}
 
@@ -105,16 +127,16 @@ func (lsnMgr *ListenerManager)lsnMgrSetupListener() sch.SchErrno {
 	var err error
 	lsnAddr := fmt.Sprintf("%s:%d", lsnMgr.cfg.IP.String(), lsnMgr.cfg.Port)
 	if lsnMgr.listener, err = net.Listen("tcp", lsnAddr); err != nil {
-		log.Debug("lsnMgrSetupListener: listen failed, addr: %s, err: %s", lsnAddr, err.Error())
+		lsnLog.Debug("lsnMgrSetupListener: listen failed, addr: %s, err: %s", lsnAddr, err.Error())
 		return sch.SchEnoOS
 	}
 	lsnMgr.listenAddr = lsnMgr.listener.Addr().(*net.TCPAddr)
-	log.Debug("lsnMgrSetupListener: task inited ok, listening address: %s", lsnMgr.listenAddr.String())
+	lsnLog.Debug("lsnMgrSetupListener: task inited ok, listening address: %s", lsnMgr.listenAddr.String())
 	return sch.SchEnoNone
 }
 
 func (lsnMgr *ListenerManager)lsnMgrPoweroff(ptn interface{}) sch.SchErrno {
-	log.Debug("lsnMgrPoweroff: task will be done, name: %s", lsnMgr.sdl.SchGetTaskName(ptn))
+	lsnLog.Debug("lsnMgrPoweroff: task will be done, name: %s", lsnMgr.sdl.SchGetTaskName(ptn))
 	lsnMgr.lsnMgrStop()
 	return lsnMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
@@ -131,7 +153,7 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 	if eno := lsnMgr.lsnMgrSetupListener(); eno != sch.SchEnoNone {
-		log.Debug("lsnMgrStart: setup listener failed, eno: %d", eno)
+		lsnLog.Debug("lsnMgrStart: setup listener failed, eno: %d", eno)
 		return eno
 	}
 	var accepter = acceptTskCtrlBlock {
@@ -149,7 +171,7 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 		Flag:		sch.SchCreatedGo,
 	}
 	if eno, ptn := lsnMgr.sdl.SchCreateTask(&tskDesc); eno != sch.SchEnoNone {
-		log.Debug("lsnMgrStart: SchCreateTask failed, eno: %d, ptn: %X",
+		lsnLog.Debug("lsnMgrStart: SchCreateTask failed, eno: %d, ptn: %X",
 			eno, ptn.(*interface{}))
 		return sch.SchEnoInternal
 	}
@@ -157,17 +179,17 @@ func (lsnMgr *ListenerManager)lsnMgrStart() sch.SchErrno {
 }
 
 func (lsnMgr *ListenerManager)lsnMgrStop() sch.SchErrno {
-	log.Debug("lsnMgrStop: listner will be closed")
+	lsnLog.Debug("lsnMgrStop: listner will be closed")
 	if lsnMgr.accepter == nil {
-		log.Debug("lsnMgrStop: nil accepter")
+		lsnLog.Debug("lsnMgrStop: nil accepter")
 		return sch.SchEnoMismatched
 	}
 	if len(lsnMgr.accepter.stopCh) > 0 {
-		log.Debug("lsnMgrStop: stop channel is not empty")
+		lsnLog.Debug("lsnMgrStop: stop channel is not empty")
 		return sch.SchEnoMismatched
 	}
 	if lsnMgr.listener == nil {
-		log.Debug("lsnMgrStop: nil listener")
+		lsnLog.Debug("lsnMgrStop: nil listener")
 		return sch.SchEnoUserTask
 	}
 	// notice: here we fire the channel to ask the accepter to stop and close
@@ -207,25 +229,25 @@ func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMes
 	sdl := accepter.sdl.SchGetP2pCfgName()
 	_, accepter.ptnLsnMgr = accepter.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 	if accepter.ptnLsnMgr == nil {
-		log.Debug("PeerAcceptProc: sdl: %s, invalid listener manager task pointer", sdl)
+		lsnLog.Debug("PeerAcceptProc: sdl: %s, invalid listener manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	_, accepter.ptnPeMgr = accepter.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	if accepter.ptnPeMgr == nil {
-		log.Debug("PeerAcceptProc: sdl: %s, invalid peer manager task pointer", sdl)
+		lsnLog.Debug("PeerAcceptProc: sdl: %s, invalid peer manager task pointer", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.listener = accepter.lsnMgr.listener
 	if accepter.listener == nil {
-		log.Debug("PeerAcceptProc: sdl: %s, invalid listener, done accepter", sdl)
+		lsnLog.Debug("PeerAcceptProc: sdl: %s, invalid listener, done accepter", sdl)
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
-	log.Debug("PeerAcceptProc: sdl, %s, inited ok, tring to accept ...", sdl)
+	lsnLog.Debug("PeerAcceptProc: sdl, %s, inited ok, tring to accept ...", sdl)
 
 	stop := false
 
@@ -234,7 +256,7 @@ acceptLoop:
 		select {
 			case stop = <-accepter.stopCh:
 				if stop {
-					log.Debug("PeerAcceptProc: sdl: %s, break the loop to stop on command", sdl)
+					lsnLog.Debug("PeerAcceptProc: sdl: %s, break the loop to stop on command", sdl)
 					break acceptLoop
 				}
 			default:
@@ -242,23 +264,23 @@ acceptLoop:
 
 		listener := accepter.listener
 		if listener == nil {
-			log.Debug("PeerAcceptProc: sdl: %s, break the loop for nil listener", sdl)
+			lsnLog.Debug("PeerAcceptProc: sdl: %s, break the loop for nil listener", sdl)
 			break acceptLoop
 		}
 
 		conn, err := listener.Accept()
 		if sch.Debug__ {
-			log.Debug("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
+			lsnLog.Debug("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
 		}
 
 		if err != nil && !err.(net.Error).Temporary() {
-			log.Debug("PeerAcceptProc: sdl: %s, break loop for non-temporary error while " +
+			lsnLog.Debug("PeerAcceptProc: sdl: %s, break loop for non-temporary error while " +
 				"accepting, err: %s", sdl, err.Error())
 			break acceptLoop
 		}
 
 		if conn == nil {
-			log.Debug("PeerAcceptProc: sdl: %s, break loop for null connection accepted " +
+			lsnLog.Debug("PeerAcceptProc: sdl: %s, break loop for null connection accepted " +
 				"without errors", sdl)
 			break acceptLoop
 		}
@@ -273,8 +295,9 @@ acceptLoop:
 		accepter.sdl.SchSendMessage(&msg)
 	}
 
-	if stop {
-		return accepter.sdl.SchTaskDone(ptn, sch.SchEnoNone)
+	doneFor := sch.SchEnoNone
+	if !stop {
+		doneFor = sch.SchEnoUnknown
 	}
-	return accepter.sdl.SchTaskDone(ptn, sch.SchEnoUnknown)
+	return accepter.sdl.SchTaskDone(ptn, doneFor)
 }

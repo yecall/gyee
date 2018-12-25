@@ -23,8 +23,30 @@ package dht
 import (
 	"time"
 	"github.com/yeeco/gyee/persistent"
-	log "github.com/yeeco/gyee/p2p/logger"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
+
+
+//
+// debug
+//
+type dsdbLogger struct {
+	debug__		bool
+}
+
+var dsdbLog = dsdbLogger  {
+	debug__:	true,
+}
+
+func (log dsdbLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// leveldb datastore
+//
 
 type LeveldbDatastoreConfig struct {
 	Path					string
@@ -45,7 +67,7 @@ func NewLeveldbDatastore(cfg *LeveldbDatastoreConfig) *LeveldbDatastore {
 	}
 	ls, err := persistent.NewLevelStorage(cfg.Path)
 	if err != nil {
-		log.Debug("NewLeveldbDatastore: failed, error: %s", err.Error())
+		dsdbLog.Debug("NewLeveldbDatastore: failed, error: %s", err.Error())
 		return  nil
 	}
 	ds.ls = ls
@@ -54,7 +76,7 @@ func NewLeveldbDatastore(cfg *LeveldbDatastoreConfig) *LeveldbDatastore {
 
 func (lds *LeveldbDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	if err := lds.ls.Put(k[0:], v.([]byte)); err != nil {
-		log.Debug("Put: failed, error: %s", err.Error())
+		dsdbLog.Debug("Put: failed, error: %s", err.Error())
 		return DhtEnoDatastore
 	}
 	return DhtEnoNone
@@ -64,7 +86,7 @@ func (lds *LeveldbDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
 	err := error(nil)
 	value, err = lds.ls.Get(k[0:])
 	if err != nil {
-		log.Debug("Get: failed, error: %s", err.Error())
+		dsdbLog.Debug("Get: failed, error: %s", err.Error())
 		eno = DhtEnoDatastore
 		value = nil
 	} else {
@@ -75,7 +97,7 @@ func (lds *LeveldbDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
 
 func (lds *LeveldbDatastore)Delete(k []byte) DhtErrno {
 	if err := lds.ls.Del(k[0:]); err != nil {
-		log.Debug("Delete: failed, error: %s", err.Error())
+		dsdbLog.Debug("Delete: failed, error: %s", err.Error())
 		return DhtEnoDatastore
 	}
 	return DhtEnoNone
@@ -83,7 +105,7 @@ func (lds *LeveldbDatastore)Delete(k []byte) DhtErrno {
 
 func (lds *LeveldbDatastore)Close() DhtErrno {
 	if err := lds.ls.Close(); err != nil {
-		log.Debug("Close: failed, error: %s", err.Error())
+		dsdbLog.Debug("Close: failed, error: %s", err.Error())
 		return DhtEnoDatastore
 	}
 	return DhtEnoNone

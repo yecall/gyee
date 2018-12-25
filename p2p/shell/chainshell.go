@@ -22,11 +22,32 @@ package shell
 
 import (
 	"bytes"
-	log "github.com/yeeco/gyee/p2p/logger"
-	"github.com/yeeco/gyee/p2p/config"
-	sch "github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/p2p/peer"
+	config	"github.com/yeeco/gyee/p2p/config"
+	peer	"github.com/yeeco/gyee/p2p/peer"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
+
+//
+// debug
+//
+type chainShellLogger struct {
+	debug__		bool
+}
+
+var chainLog = chainShellLogger {
+	debug__:	true,
+}
+
+func (log chainShellLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// chain shell
+//
 
 const (
 	ShMgrName = sch.ShMgrName					// name registered in scheduler
@@ -106,7 +127,7 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	case sch.EvShellBroadcastReq:
 		eno = shMgr.broadcastReq(msg.Body.(*sch.MsgShellBroadcastReq))
 	default:
-		log.Debug("shMgrProc: unknown event: %d", msg.Id)
+		chainLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 	return eno
@@ -121,7 +142,7 @@ func (shMgr *ShellManager)powerOn(ptn interface{}) sch.SchErrno {
 }
 
 func (shMgr *ShellManager)powerOff(ptn interface{}) sch.SchErrno {
-	log.Debug("powerOff: task will be done ...")
+	chainLog.Debug("powerOff: task will be done ...")
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
 }
 
@@ -142,19 +163,19 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 		status: pisActive,
 	}
 	if _, dup := shMgr.peerActived[peerId]; dup {
-		log.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
+		chainLog.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
 		return sch.SchEnoUserTask
 	}
 	shMgr.peerActived[peerId] = &peerInst
 
-	log.Debug("peerActiveInd: peer info: %+v", *peerInfo)
+	chainLog.Debug("peerActiveInd: peer info: %+v", *peerInfo)
 
 	go func() {
 		for {
 			select {
 			case rxPkg, ok := <-peerInst.rxChan:
 				if !ok {
-					log.Debug("peerActiveInd: exit for rxChan closed, peer info: %+v", *peerInfo)
+					chainLog.Debug("peerActiveInd: exit for rxChan closed, peer info: %+v", *peerInfo)
 					return
 				}
 				shMgr.rxChan<-rxPkg
@@ -172,13 +193,13 @@ func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 		dir: cfm.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		log.Debug("peerCloseCfm: peer not found, peerId: %+v", peerId)
+		chainLog.Debug("peerCloseCfm: peer not found, peerId: %+v", peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisClosing {
-		log.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		chainLog.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
-		log.Debug("peerCloseCfm: peer info: %+v", *peerInst.hsInfo)
+		chainLog.Debug("peerCloseCfm: peer info: %+v", *peerInst.hsInfo)
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
 	}
@@ -199,13 +220,13 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 		dir: ind.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		log.Debug("peerAskToCloseInd: peer not found, peerId: %+v", peerId)
+		chainLog.Debug("peerAskToCloseInd: peer not found, peerId: %+v", peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		log.Debug("peerAskToCloseInd : status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		chainLog.Debug("peerAskToCloseInd : status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
-		log.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager, peer info: %+v", *peerInst.hsInfo)
+		chainLog.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager, peer info: %+v", *peerInst.hsInfo)
 		req := sch.MsgPeCloseReq {
 			Ptn: nil,
 			Snid: peerId.snid,
@@ -281,7 +302,7 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 		}
 
 	default:
-		log.Debug("broadcastReq: invalid message type: %d", req.MsgType)
+		chainLog.Debug("broadcastReq: invalid message type: %d", req.MsgType)
 		return sch.SchEnoParameter
 	}
 
@@ -294,7 +315,7 @@ func (shMgr *ShellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPa
 
 func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
 	if pkg := shMgr.bcr2Package(req); pkg == nil {
-		log.Debug("send2Peer: bcr2Package failed")
+		chainLog.Debug("send2Peer: bcr2Package failed")
 		return sch.SchEnoUserTask
 	} else {
 		peer.txChan<-pkg

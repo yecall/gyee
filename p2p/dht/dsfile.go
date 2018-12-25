@@ -22,7 +22,30 @@ package dht
 
 import (
 	"time"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
+
+
+//
+// debug
+//
+type dsfLogger struct {
+	debug__		bool
+}
+
+var dsfLog = dsfLogger {
+	debug__:	true,
+}
+
+func (log dsfLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+//
+// file data store, empty and "unsupported"
+//
 
 type FileDatastoreConfig struct {
 	path				string				// data store path

@@ -21,11 +21,27 @@
 package shell
 
 import (
-	"github.com/ethereum/go-ethereum/log"
-	sch "github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/p2p/dht"
+	sch 	"github.com/yeeco/gyee/p2p/scheduler"
+	dht		"github.com/yeeco/gyee/p2p/dht"
+	p2plog	"github.com/ethereum/go-ethereum/log"
 )
 
+//
+// debug
+//
+type dhtShellLogger struct {
+	debug__		bool
+}
+
+var dhtLog = dhtShellLogger {
+	debug__:	true,
+}
+
+func (log dhtShellLogger)Debug(fmt string, args ... interface{}) {
+	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
 
 const (
 	dhtShMgrName = sch.DhtShMgrName						// name registered in scheduler
@@ -99,7 +115,7 @@ func (shMgr *DhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 		eno = shMgr.dhtShPutProviderReq(msg.Body.(*sch.MsgDhtPrdMgrAddProviderReq))
 
 	default:
-		log.Debug("shMgrProc: unknown event: %d", msg.Id)
+		dhtLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -111,14 +127,14 @@ func (shMgr *DhtShellManager)poweron(ptn interface{}) sch.SchErrno {
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
 	if eno, shMgr.ptnDhtMgr = shMgr.sdl.SchGetUserTaskNode(sch.DhtMgrName); eno != sch.SchEnoNone {
-		log.Debug("poweron: dht manager task not found")
+		dhtLog.Debug("poweron: dht manager task not found")
 		return eno
 	}
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)poweroff(ptn interface{}) sch.SchErrno {
-	log.Debug("poweroff: task will be done...")
+	dhtLog.Debug("poweroff: task will be done...")
 	close(shMgr.evChan)
 	close(shMgr.csChan)
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
@@ -166,7 +182,7 @@ func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 		return shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
 
 	default:
-		log.Debug("dhtTestEventCallback: unknown event type: %d", evt)
+		dhtLog.Debug("dhtTestEventCallback: unknown event type: %d", evt)
 		return sch.SchEnoParameter
 	}
 
@@ -222,31 +238,31 @@ func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 	switch msg.Status {
 
 	case dht.CisNull:
-		log.Debug("dhtConInstStatusInd: CisNull")
+		dhtLog.Debug("dhtConInstStatusInd: CisNull")
 
 	case dht.CisConnecting:
-		log.Debug("dhtConInstStatusInd: CisConnecting")
+		dhtLog.Debug("dhtConInstStatusInd: CisConnecting")
 
 	case dht.CisConnected:
-		log.Debug("dhtConInstStatusInd: CisConnected")
+		dhtLog.Debug("dhtConInstStatusInd: CisConnected")
 
 	case dht.CisAccepted:
-		log.Debug("dhtTestConInstStatusInd: CisAccepted")
+		dhtLog.Debug("dhtTestConInstStatusInd: CisAccepted")
 
 	case dht.CisInHandshaking:
-		log.Debug("dhtTestConInstStatusInd: CisInHandshaking")
+		dhtLog.Debug("dhtTestConInstStatusInd: CisInHandshaking")
 
 	case dht.CisHandshaked:
-		log.Debug("dhtTestConInstStatusInd: CisHandshaked")
+		dhtLog.Debug("dhtTestConInstStatusInd: CisHandshaked")
 
 	case dht.CisInService:
-		log.Debug("dhtTestConInstStatusInd: CisInService")
+		dhtLog.Debug("dhtTestConInstStatusInd: CisInService")
 
 	case dht.CisClosed:
-		log.Debug("dhtTestConInstStatusInd: CisClosed")
+		dhtLog.Debug("dhtTestConInstStatusInd: CisClosed")
 
 	default:
-		log.Debug("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
+		dhtLog.Debug("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
 		return sch.SchEnoParameter
 	}
 

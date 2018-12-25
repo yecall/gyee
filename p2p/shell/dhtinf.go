@@ -22,9 +22,8 @@
 package shell
 
 import (
-	log "github.com/yeeco/gyee/p2p/logger"
+	dht	"github.com/yeeco/gyee/p2p/dht"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/p2p/dht"
 )
 
 //
@@ -32,12 +31,12 @@ import (
 //
 func DhtGetManager(sdl *sch.Scheduler) *dht.DhtMgr {
 	if sdl == nil {
-		log.Debug("DhtGetManager: nil scheduler pointer")
+		dhtLog.Debug("DhtGetManager: nil scheduler pointer")
 		return nil
 	}
 	dhtMgr, ok := sdl.SchGetTaskObject(dht.DhtMgrName).(*dht.DhtMgr)
 	if !ok {
-		log.Debug("DhtGetManager: dht manager task not exist")
+		dhtLog.Debug("DhtGetManager: dht manager task not exist")
 		return nil
 	}
 
@@ -49,7 +48,7 @@ func DhtGetManager(sdl *sch.Scheduler) *dht.DhtMgr {
 //
 func DhtInstallCallback(dhtMgr *dht.DhtMgr, cbf dht.DhtCallback) dht.DhtErrno {
 	if dhtMgr == nil {
-		log.Debug("DhtInstallCallback: nil dht manager")
+		dhtLog.Debug("DhtInstallCallback: nil dht manager")
 		return dht.DhtEnoParameter
 	}
 	return dhtMgr.InstallEventCallback(cbf)
@@ -60,7 +59,7 @@ func DhtInstallCallback(dhtMgr *dht.DhtMgr, cbf dht.DhtCallback) dht.DhtErrno {
 //
 func DhtRemoveCallback(dhtMgr *dht.DhtMgr) dht.DhtErrno {
 	if dhtMgr == nil {
-		log.Debug("DhtRemoveCallback: nil dht manager")
+		dhtLog.Debug("DhtRemoveCallback: nil dht manager")
 		return dht.DhtEnoParameter
 	}
 	return DhtInstallCallback(dhtMgr, nil)
@@ -71,7 +70,7 @@ func DhtRemoveCallback(dhtMgr *dht.DhtMgr) dht.DhtErrno {
 //
 func DhtCommand(dhtMgr *dht.DhtMgr, cmd int, msg interface{}) sch.SchErrno {
 	if dhtMgr == nil {
-		log.Debug("DhtCommand: nil dht manager")
+		dhtLog.Debug("DhtCommand: nil dht manager")
 		return sch.SchEnoParameter
 	}
 	return dhtMgr.DhtCommand(cmd, msg)
