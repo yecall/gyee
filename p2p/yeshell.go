@@ -781,7 +781,7 @@ _rxLoop:
 					}
 
 					if err != nil {
-						yesLog.Debug("chainRxProc: error: %s", err.Error())
+						yesLog.Debug("chainRxProc: MsgType: %s, error: %s", msg.MsgType, err.Error())
 						return false
 					}
 
@@ -1082,7 +1082,7 @@ func (yeShMgr *yeShellManager)setDedupTimer(key []byte) error {
 	defer yeShMgr.deDupLock.Unlock()
 
 	if len(key) != yesKeyBytes {
-		return errors.New("setDedupTimer: invalid key")
+		return errors.New(fmt.Sprintf("setDedupTimer: invalid key length: %d", len(key)))
 	}
 
 	var k [yesKeyBytes]byte
