@@ -757,7 +757,13 @@ _rxLoop:
 				continue
 			}
 
-			yesLog.Debug("chainRxProc: peer: %+v, packeage received: %+v", *pkg.PeerInfo, *pkg)
+			k := [yesKeyBytes]byte{}
+			copy(k[0:], pkg.Key)
+			if _, ok := yeShMgr.deDupMap[k]; ok {
+				continue
+			}
+
+			yesLog.Debug("chainRxProc: peer info: %+v, pkg: %+v", *pkg.PeerInfo, *pkg)
 
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
@@ -784,7 +790,6 @@ _rxLoop:
 					}
 
 					if err != nil {
-						yesLog.Debug("chainRxProc: MsgType: %s, error: %s", msg.MsgType, err.Error())
 						return false
 					}
 
