@@ -121,7 +121,7 @@ func (inst *neighborInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 
 func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if sch.Debug__ && inst.sdl != nil {
+	if ngbLog.debug__ && inst.sdl != nil {
 		sdl := inst.sdl.SchGetP2pCfgName()
 		ngbLog.Debug("ngbProtoProc: sdl: %s, inst.name: %s, msg.Id: %d", sdl, inst.name, msg.Id)
 	}
@@ -359,7 +359,7 @@ func (ngbMgr *NeighborManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 }
 
 func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if sch.Debug__ && ngbMgr.sdl != nil{
+	if ngbLog.debug__ && ngbMgr.sdl != nil{
 		sdl := ngbMgr.sdl.SchGetP2pCfgName()
 		ngbLog.Debug("ngbProtoProc: sdl: %s, ngbMgr.name: %s, msg.Id: %d", sdl, ngbMgr.name, msg.Id)
 	}

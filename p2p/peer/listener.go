@@ -269,7 +269,7 @@ acceptLoop:
 		}
 
 		conn, err := listener.Accept()
-		if sch.Debug__ {
+		if lsnLog.debug__ {
 			lsnLog.Debug("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
 		}
 

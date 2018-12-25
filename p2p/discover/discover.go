@@ -87,7 +87,7 @@ func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 }
 
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if sch.Debug__ {
+	if dcvLog.debug__ {
 		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
 		dcvLog.Debug("dcvMgrProc: sdl: %s, msg: %d", sdl, msg.Id)
 	}
@@ -109,7 +109,7 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		return sch.SchEnoUserTask
 	}
 
-	if sch.Debug__ {
+	if dcvLog.debug__ {
 		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
 		dcvLog.Debug("dcvMgrProc: get out, sdl: %s, msg: %d", sdl, msg.Id)
 	}

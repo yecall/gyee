@@ -25,8 +25,7 @@ import(
 	"fmt"
 	"time"
 	"sync"
-	"github.com/yeeco/gyee/p2p/config"
-	log		"github.com/yeeco/gyee/p2p/logger"
+	config	"github.com/yeeco/gyee/p2p/config"
 )
 
 // Scheduler interface errnos
@@ -197,7 +196,7 @@ func (sdl *Scheduler)SchStartTaskEx(ptn interface{}) SchErrno {
 // Stop a single task by task node pointer
 func (sdl *Scheduler)SchStopTask(ptn interface{}) SchErrno {
 	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
-		log.Debug("SchStopTask: SchTaskDone failed, eno: %d", eno)
+		schLog.Debug("SchStopTask: SchTaskDone failed, eno: %d", eno)
 		return eno
 	}
 	return SchEnoNone
@@ -308,7 +307,7 @@ func (sdl *Scheduler)SchSetUserDataArea(ptn interface{}, uda interface{}) SchErr
 
 // Set the power off stage flag to tell the scheduler it's going to be turn off
 func (sdl *Scheduler)SchSetPoweroffStage() SchErrno {
-	log.Debug("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
+	schLog.Debug("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
 	return sdl.schSetPoweroffStage()
 }
 
