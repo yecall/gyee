@@ -106,7 +106,7 @@ type yeShellManager struct {
 	ptDhtShMgr			*p2psh.DhtShellManager						// dht shell manager object
 	getValKey			yesKey									// key of value to get
 	getValChan			chan []byte								// get value channel
-	putValKey			yesKey									// key of value to put
+	putValKey			[]byte									// key of value to put
 	putValChan			chan bool								// put value channel
 	findNodeMap			map[yesKey]chan interface{}				// find node command map to channel
 	getProviderMap		map[yesKey]chan interface{}				// find node command map to channel
@@ -524,8 +524,9 @@ func (yeShMgr *yeShellManager)DhtSetValue(key []byte, value []byte) error {
 		return eno
 	}
 
-	copy(yeShMgr.putValKey[0:], key)
+	copy(yeShMgr.putValKey, key)
 	result, ok := <-yeShMgr.putValChan
+	yeShMgr.putValKey = nil
 	if !ok {
 		return errors.New("DhtSetValue: failed, channel closed")
 	}
@@ -885,15 +886,20 @@ func (yeShMgr *yeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvider
 }
 
 func (yeShMgr *yeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	// Notice: only when function DhtSetValue called, put value key would be set
+	// and called would be in a blocked mode, we check this case to feed the signal
+	// into the channel which the caller is pending for, else nothing done.
 	yesLog.Debug("dhtMgrPutValueRsp: msg: %+v", *msg)
-	if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
-		yesLog.Debug("dhtMgrPutValueRsp: key mismatched")
-		return sch.SchEnoMismatched
-	}
-	if msg.Eno == dht.DhtEnoNone.GetEno() {
-		yeShMgr.putValChan<-true
-	} else {
-		yeShMgr.putValChan<-false
+	if yeShMgr.putValKey != nil && len(yeShMgr.putValKey) == yesKeyBytes {
+		if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
+			yesLog.Debug("dhtMgrPutValueRsp: key mismatched")
+			return sch.SchEnoMismatched
+		}
+		if msg.Eno == dht.DhtEnoNone.GetEno() {
+			yeShMgr.putValChan <- true
+		} else {
+			yeShMgr.putValChan <- false
+		}
 	}
 	return sch.SchEnoNone
 }
