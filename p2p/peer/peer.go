@@ -2597,6 +2597,7 @@ _rxLoop:
 				pkgCb.PeerInfo = &peerInfo
 				pkgCb.ProtoId = int(upkg.Pid)
 				pkgCb.MsgId = int(upkg.Mid)
+				pkgCb.Key = upkg.Key
 				pkgCb.PayloadLength = int(upkg.PayloadLength)
 				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
 				pi.rxChan <- &pkgCb
