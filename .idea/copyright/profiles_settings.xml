@@ -1,3 +1,7 @@
 <component name="CopyrightManager">
-  <settings default="gyee" />
+  <settings default="gyee">
+    <LanguageOptions name="__TEMPLATE__">
+      <option name="block" value="false" />
+    </LanguageOptions>
+  </settings>
 </component>
