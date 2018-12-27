@@ -952,10 +952,9 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
-
-	k := [yesKeyBytes]byte{}
+	k := yesKey{}
 	copy(k[0:], msg.Key)
-	if _, ok := yeShMgr.deDupMap[k]; ok {
+	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastTxOsn: duplicated")
 	}
 
@@ -985,9 +984,9 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
 	// to chain shell manager and DHT shell manager.
-	k := [yesKeyBytes]byte{}
+	k := yesKey{}
 	copy(k[0:], msg.Key)
-	if _, ok := yeShMgr.deDupMap[k]; ok {
+	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastEvOsn: duplicated")
 	}
 
@@ -1027,9 +1026,9 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
-	k := [yesKeyBytes]byte{}
+	k := yesKey{}
 	copy(k[0:], msg.Key)
-	if _, ok := yeShMgr.deDupMap[k]; ok {
+	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastBhOsn: duplicated")
 	}
 
@@ -1057,9 +1056,9 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 func (yeShMgr *yeShellManager)broadcastBkOsn(msg *Message) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
-	k := [yesKeyBytes]byte{}
+	k := yesKey{}
 	copy(k[0:], msg.Key)
-	if _, ok := yeShMgr.deDupMap[k]; ok {
+	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastBkOsn: duplicated")
 	}
 
@@ -1151,4 +1150,11 @@ _dedup:
 func (yeShMgr *yeShellManager)GetLocalNode() *config.Node {
 	cfg := yeShMgr.chainInst.SchGetP2pConfig()
 	return &cfg.Local
+}
+
+func (yeShMgr *yeShellManager)checkDupKey(k yesKey) bool {
+	yeShMgr.deDupLock.Lock()
+	defer yeShMgr.deDupLock.Unlock()
+	_, dup := yeShMgr.deDupMap[k]
+	return dup
 }
