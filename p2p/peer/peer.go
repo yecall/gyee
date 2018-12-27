@@ -2570,6 +2570,9 @@ _rxLoop:
 				peerInfo.Protocols = nil
 				peerInfo.Snid = pi.snid
 				peerInfo.NodeId = pi.node.ID
+				peerInfo.IP = pi.node.IP
+				peerInfo.TCP = uint32(pi.node.TCP)
+				peerInfo.UDP = uint32(pi.node.UDP)
 				peerInfo.ProtoNum = pi.protoNum
 				peerInfo.Protocols = append(peerInfo.Protocols, pi.protocols...)
 				pkgCb.Ptn = pi.ptnMe
