@@ -962,11 +962,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 
 		if inst.dir == PeInstDirOutbound {
-
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
 			peMgr.sdl.SchSendMessage(&schMsg)
-
 		}
 
 		return PeMgrEnoNone
@@ -1011,18 +1009,17 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	idEx.Dir = PeInstDirInbound
 	if _, dup := peMgr.workers[snid][idEx]; dup {
-		if _, dup := peMgr.workers[snid][idEx]; dup {
-			peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-			return PeMgrEnoDuplicated
-		}
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		return PeMgrEnoDuplicated
 	}
 
 	idEx.Dir = PeInstDirOutbound
 	if _, dup := peMgr.workers[snid][idEx]; dup {
-		if _, dup := peMgr.workers[snid][idEx]; dup {
-			peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
-			return PeMgrEnoDuplicated
-		}
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		schMsg := sch.SchMessage{}
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
+		peMgr.sdl.SchSendMessage(&schMsg)
+		return PeMgrEnoDuplicated
 	}
 
 	if inst.dir == PeInstDirInbound {
@@ -1074,6 +1071,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				// protection for this.
 				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
 				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
+				schMsg := sch.SchMessage{}
+				peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
+				peMgr.sdl.SchSendMessage(&schMsg)
 				return PeMgrEnoDuplicated
 			}
 
@@ -2292,14 +2292,15 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	inst.node.UDP = uint16(hs.UDP)
 
 	// write outbound handshake to remote peer
-	hs.Snid = inst.snid
-	hs.NodeId = pi.peMgr.cfg.nodeId
-	hs.IP = append(hs.IP, pi.peMgr.cfg.ip ...)
-	hs.UDP = uint32(pi.peMgr.cfg.udp)
-	hs.TCP = uint32(pi.peMgr.cfg.port)
-	hs.ProtoNum = pi.peMgr.cfg.protoNum
-	hs.Protocols = pi.peMgr.cfg.protocols
-	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
+	hs2peer := Handshake{}
+	hs2peer.Snid = inst.snid
+	hs2peer.NodeId = pi.peMgr.cfg.nodeId
+	hs2peer.IP = append(hs2peer.IP, pi.peMgr.cfg.ip ...)
+	hs2peer.UDP = uint32(pi.peMgr.cfg.udp)
+	hs2peer.TCP = uint32(pi.peMgr.cfg.port)
+	hs2peer.ProtoNum = pi.peMgr.cfg.protoNum
+	hs2peer.Protocols = pi.peMgr.cfg.protocols
+	if eno = pkg.putHandshakeOutbound(inst, &hs2peer); eno != PeMgrEnoNone {
 		peerLog.Debug("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
