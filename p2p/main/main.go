@@ -2153,7 +2153,8 @@ _bhloop:
 		}
 	}()
 
-	waitInterrupt()
+	//waitInterrupt()
+	time.Sleep(time.Minute + time.Second * 2)
 
 	cnt := 0
 	cnt_max := 100 * 100 * 100

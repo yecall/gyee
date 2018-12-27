@@ -759,7 +759,7 @@ _rxLoop:
 
 			k := [yesKeyBytes]byte{}
 			copy(k[0:], pkg.Key)
-			if _, ok := yeShMgr.deDupMap[k]; ok {
+			if yeShMgr.checkDupKey(k) {
 				continue
 			}
 
