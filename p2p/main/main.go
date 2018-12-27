@@ -2192,7 +2192,7 @@ _bhloop:
 		bk.Key = key[0:]
 		yeShMgr.BroadcastMessageOsn(bk)
 
-		time.Sleep(time.Millisecond * 1000)
+		time.Sleep(time.Millisecond * 20/*1000*/)
 	}
 
 	close(subEv.MsgChan)

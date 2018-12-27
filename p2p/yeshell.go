@@ -165,7 +165,7 @@ var DefaultYeShellConfig = YeShellConfig{
 	NodeDataDir:		config.P2pDefaultDataDir(true),
 	NodeDatabase:		"nodes",
 	SubNetMaskBits:		0,
-	EvKeepTime:			time.Minute * 8,
+	EvKeepTime:			time.Minute * 1/*8*/,
 	DedupTime:			time.Second * 60,
 	BootstrapTime:		time.Second * 4,
 }

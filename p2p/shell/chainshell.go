@@ -280,14 +280,18 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 
 	case sch.MSBR_MT_EV:
 		for id, pe := range shMgr.peerActived {
-			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
+			if pe.status != pisActive {
+				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
+			} else if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
 				shMgr.send2Peer(pe, req)
 			}
 		}
 
 	case sch.MSBR_MT_TX:
 		for id, pe := range shMgr.peerActived {
-			if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
+			if pe.status != pisActive {
+				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
+			} else if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
 				shMgr.send2Peer(pe, req)
 			} else if bytes.Compare(id.snid[0:], req.LocalSnid) == 0 {
 				 shMgr.send2Peer(pe, req)
@@ -296,7 +300,9 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 
 	case sch.MSBR_MT_BLKH:
 		for id, pe := range shMgr.peerActived {
-			if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
+			if pe.status != pisActive {
+				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
+			} else if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
 				shMgr.send2Peer(pe, req)
 			}
 		}
