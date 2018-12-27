@@ -2489,8 +2489,6 @@ func piRx(pi *peerInstance) PeMgrErrno {
 	// would then exit.
 	var done PeMgrErrno = PeMgrEnoNone
 	var ok = true
-	var peerInfo = PeerInfo{}
-	var pkgCb = P2pPackageRx{}
 
 _rxLoop:
 	for {
@@ -2567,8 +2565,11 @@ _rxLoop:
 				peerLog.Debug("piRx: rx queue full, snid: %x, dir: %d, pi: %s, peer: %x",
 					pi.snid, pi.dir, pi.name, pi.node.ID)
 			} else {
+				peerInfo := PeerInfo{}
+				pkgCb := P2pPackageRx{}
 				peerInfo.Protocols = nil
 				peerInfo.Snid = pi.snid
+				peerInfo.Dir = pi.dir
 				peerInfo.NodeId = pi.node.ID
 				peerInfo.IP = pi.node.IP
 				peerInfo.TCP = uint32(pi.node.TCP)
