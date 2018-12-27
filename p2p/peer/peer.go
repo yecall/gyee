@@ -2425,13 +2425,21 @@ func piTx(pi *peerInstance) PeMgrErrno {
 	// would then exit for "txChan" closed.
 _txLoop:
 	for {
+		// check if done
 		upkg, ok := <-pi.txChan
 		if !ok {
 			break _txLoop
 		}
+
+		// if in errors, sleep then check done
+		if pi.txEno != PeMgrEnoNone {
+			time.Sleep(time.Millisecond * 10)
+			continue
+		}
+
+		// carry out Tx
 		pi.txPendNum -= 1
 		pi.txSeq += 1
-		// carry out Tx
 		if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
 			pi.txOkCnt += 1
 		} else {
@@ -2506,13 +2514,14 @@ _rxLoop:
 
 		// if in errors, sleep then continue to check done
 		if pi.rxEno != PeMgrEnoNone {
-			time.Sleep(time.Microsecond * 100)
+			time.Sleep(time.Microsecond * 10)
 			continue
 		}
 
 		// try reading the peer
 		upkg := new(P2pPackage)
-		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
+		if eno := upkg.RecvPackage(pi); eno == PeMgrEnoNone {
+		} else {
 
 			// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
 			// and we will be done then;
