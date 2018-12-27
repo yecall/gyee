@@ -88,8 +88,7 @@ func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 
 func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if dcvLog.debug__ {
-		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
-		dcvLog.Debug("dcvMgrProc: sdl: %s, msg: %d", sdl, msg.Id)
+		dcvLog.Debug("dcvMgrProc: msg: %d", msg.Id)
 	}
 
 	var eno DcvMgrErrno
@@ -110,8 +109,7 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	}
 
 	if dcvLog.debug__ {
-		sdl := sch.SchGetScheduler(ptn).SchGetP2pCfgName()
-		dcvLog.Debug("dcvMgrProc: get out, sdl: %s, msg: %d", sdl, msg.Id)
+		dcvLog.Debug("dcvMgrProc: get out, msg: %d", msg.Id)
 	}
 
 	if eno != DcvMgrEnoNone {

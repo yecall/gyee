@@ -289,7 +289,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 
 	var ci *ConInst = nil
-	var dht = conMgr.sdl.SchGetP2pCfgName()
 
 	if msg.Eno != DhtEnoNone.GetEno() {
 
@@ -299,11 +298,11 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		//
 
 		if ci = msg.Inst.(*ConInst); ci == nil {
-			connLog.Debug("handshakeRsp: nil connection instance, dht: %s", dht)
+			connLog.Debug("handshakeRsp: nil connection instance")
 			return sch.SchEnoInternal
 		}
 
-		connLog.Debug("handshakeRsp: handshake failed, dht: %s, inst: %s", dht, ci.name)
+		connLog.Debug("handshakeRsp: handshake failed, inst: %s", ci.name)
 
 		if ci.isBlind && ci.dir == ConInstDirOutbound {
 			eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
@@ -373,7 +372,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		return conMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	connLog.Debug("handshakeRsp: ok responsed, dht: %s, msg: %+v", dht, *msg)
+	connLog.Debug("handshakeRsp: ok responsed, msg: %+v", *msg)
 
 	cid := conInstIdentity{
 		nid: msg.Peer.ID,
@@ -399,7 +398,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 
 		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
-			connLog.Debug("handshakeRsp: not found, dht: %s, id: %x", dht, msg.Peer.ID)
+			connLog.Debug("handshakeRsp: not found, id: %x", msg.Peer.ID)
 			return sch.SchEnoUserTask
 		}
 
@@ -467,8 +466,8 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 
 	connLog.Debug("handshakeRsp: all ok, try to update route manager, " +
-		"dht: %s, inst: %s, dir: %d, local: %s, remote: %s",
-		dht, ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+		"inst: %s, dir: %d, local: %s, remote: %s",
+		ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
 	update := sch.MsgDhtRutMgrUpdateReq {
 		Why:	rutMgrUpdate4Handshake,

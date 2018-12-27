@@ -318,14 +318,11 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 		return sch.SchEnoParameter
 	}
 
-	dht := qryInst.icb.sdl.SchGetP2pCfgName()
-
 	qiLog.Debug("icbTimerHandler: " +
-		"query instance timer expired, dht: %s, inst: %s",
-		dht, qryInst.icb.name)
+		"query instance timer expired, inst: %s", qryInst.icb.name)
 
 	if qryInst != msg {
-		qiLog.Debug("icbTimerHandler: dht: %s, instance pointer mismatched", dht)
+		qiLog.Debug("icbTimerHandler: instance pointer mismatched")
 		return sch.SchEnoMismatched
 	}
 
@@ -339,9 +336,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 
 	if (icb.status != qisWaitConnect && icb.status != qisWaitResponse) || icb.qTid == sch.SchInvalidTid {
-		qiLog.Debug("icbTimerHandler:" +
-			"mismatched, dht: %s, status: %d, qTid: %d",
-			dht, icb.status, icb.qTid)
+		qiLog.Debug("icbTimerHandler: mismatched, dht: %s, status: %d, qTid: %d", icb.status, icb.qTid)
 		return sch.SchEnoMismatched
 	}
 
@@ -691,12 +686,11 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 // Tx status indication handler
 //
 func (qryInst *QryInst)conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
-	dht := qryInst.icb.sdl.SchGetP2pCfgName()
 	if msg == nil {
-		qiLog.Debug("conInstTxInd： invalid parameter, dht: %s, inst: %s", dht, qryInst.icb.name)
+		qiLog.Debug("conInstTxInd： invalid parameter, inst: %s", qryInst.icb.name)
 		return sch.SchEnoParameter
 	}
-	qiLog.Debug("conInstTxInd： dht: %s, inst: %s, msg: %+v", dht, qryInst.icb.name, *msg)
+	qiLog.Debug("conInstTxInd：inst: %s, msg: %+v", qryInst.icb.name, *msg)
 	return sch.SchEnoNone
 }
 

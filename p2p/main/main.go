@@ -257,7 +257,6 @@ func appendTcb2List(instList []*sch.Scheduler) {
 }
 
 func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.P2pPackageRx) {
-	sdl := p2pInst.SchGetP2pCfgName()
 	pkg := peer.P2pPackage2Peer {
 		P2pInst:		p2pInst,
 		IdList: 		make([]peer.PeerId, 0),
@@ -290,14 +289,14 @@ func txrxProc(p2pInst *sch.Scheduler, tcb *testCaseCtrlBlock, rxChan chan *peer.
 			id := &tcb.peerId
 			setupPkg(id)
 			if eno := shell.P2pSendPackage(&pkg); eno != shell.P2pEnoNone {
-				log.Debug("txrxProc: P2pSendPackage failed, eno: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
-					eno, sdl, id.dir,
+				log.Debug("txrxProc: P2pSendPackage failed, eno: %d, dir: %d, subnet: %s, id: %s",
+					eno, id.dir,
 					fmt.Sprintf("%x", id.subNetId),
 					fmt.Sprintf("%x", id.nodeId))
 			}
 			if tcb.txSeq++; tcb.txSeq & 0x0f == 0 {
-				log.Debug("txrxProc: txSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
-					tcb.rxSeq, sdl, id.dir,
+				log.Debug("txrxProc: txSeq: %d, dir: %d, subnet: %s, id: %s",
+					tcb.rxSeq, id.dir,
 					fmt.Sprintf("%x", id.subNetId),
 					fmt.Sprintf("%x", id.nodeId))
 			}
@@ -315,8 +314,8 @@ txrxLoop:
 	for {
 		select {
 		case _, doneOk = <-tcb.done:
-			log.Debug("txrxProc: it's done, sdl: %s, dir: %d, subnet: %s, id: %s",
-				sdl, tcb.peerId.dir,
+			log.Debug("txrxProc: it's done, dir: %d, subnet: %s, id: %s",
+				tcb.peerId.dir,
 				fmt.Sprintf("%x", tcb.peerId.subNetId),
 				fmt.Sprintf("%x", tcb.peerId.nodeId))
 			done4Done = true
@@ -327,8 +326,8 @@ txrxLoop:
 			}
 		case _, ok := <-rxChan:
 			if !ok {
-				log.Debug("txrxProc: rxChan closed, break loop, sdl: %s, dir: %d, subnet: %s, id: %s",
-					sdl, tcb.peerId.dir,
+				log.Debug("txrxProc: rxChan closed, break loop, dir: %d, subnet: %s, id: %s",
+					tcb.peerId.dir,
 					fmt.Sprintf("%x", tcb.peerId.subNetId),
 					fmt.Sprintf("%x", tcb.peerId.nodeId))
 				done4RxChan = true
@@ -336,8 +335,8 @@ txrxLoop:
 			}
 			tcb.rxSeq += 1
 			if tcb.rxSeq & 0x0f == 0 {
-				log.Debug("txrxProc: rxSeq: %d, sdl: %s, dir: %d, subnet: %s, id: %s",
-					tcb.rxSeq, sdl, tcb.peerId.dir,
+				log.Debug("txrxProc: rxSeq: %d, dir: %d, subnet: %s, id: %s",
+					tcb.rxSeq, tcb.peerId.dir,
 					fmt.Sprintf("%x", tcb.peerId.subNetId),
 					fmt.Sprintf("%x", tcb.peerId.nodeId))
 			}
@@ -355,8 +354,8 @@ txrxLoop:
 		log.Debug("txrxProc: impossible loop broken")
 	}
 
-	log.Debug("txrxProc: exit, sdl: %s, dir: %d, subnet: %s, id: %s",
-		sdl, tcb.peerId.dir,
+	log.Debug("txrxProc: exit, dir: %d, subnet: %s, id: %s",
+		tcb.peerId.dir,
 		fmt.Sprintf("%x", tcb.peerId.subNetId),
 		fmt.Sprintf("%x", tcb.peerId.nodeId))
 }
@@ -366,7 +365,6 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 	case shell.P2pIndPeerActivated:
 		pap := para.(*peer.P2pIndPeerActivatedPara)
 		p2pInst := pap.P2pInst
-		sdl := p2pInst.SchGetP2pCfgName()
 		snid := pap.PeerInfo.Snid
 		peerId := pap.PeerInfo.NodeId
 		dir := pap.PeerInfo.Dir
@@ -379,30 +377,24 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 
 		cud, ok := userData.(*cbUserData)
 		if !ok {
-			log.Debug("p2pIndProc: invalid user data, sdl: %s, dir: %d, snid: %x, peer: %x",
-				sdl, dir, snid, peerId)
+			log.Debug("p2pIndProc: invalid user data, dir: %d, snid: %x, peer: %x", dir, snid, peerId)
 			return nil
 		}
 		tcbList := cud.tcbList
 		if _, dup := tcbList[idEx]; dup {
-			log.Debug("p2pIndProc: duplicated, sdl: %s, dir: %d, snid: %x, peer: %x",
-				sdl, dir, snid, peerId)
+			log.Debug("p2pIndProc: duplicated, dir: %d, snid: %x, peer: %x", dir, snid, peerId)
 			return nil
 		}
 
 		tcb := newTcb(tgtCase, idEx, tcbList, cud.lock)
 		tcbList[idEx] = tcb
 
-		log.Debug("p2pIndProc: start tx/rx, sdl: %s, dir: %d, snid: %x, peer: %x",
-			sdl, dir, snid, peerId)
+		log.Debug("p2pIndProc: start tx/rx, dir: %d, snid: %x, peer: %x", dir, snid, peerId)
 
 		go txrxProc(p2pInst, tcb, pap.RxChan)
 
 	case shell.P2pIndPeerClosed:
 		pcp := para.(*peer.P2pIndPeerClosedPara)
-		p2pInst := pcp.P2pInst
-		sdl := p2pInst.SchGetP2pCfgName()
-
 		idEx := peerIdEx {
 			subNetId: pcp.Snid,
 			nodeId: pcp.PeerId,
@@ -411,8 +403,8 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 
 		cud, ok := userData.(*cbUserData)
 		if !ok {
-			log.Debug("p2pIndProc: invalid user data, sdl: %s, dir: %d, snid: %x, peer: %x",
-				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
+			log.Debug("p2pIndProc: invalid user data, dir: %d, snid: %x, peer: %x",
+				idEx.dir, idEx.subNetId, idEx.nodeId)
 			return nil
 		}
 		tcbList := cud.tcbList
@@ -428,11 +420,11 @@ func p2pIndProc(what int, para interface{}, userData interface{}) interface{} {
 		tcbListsLock.Unlock()
 
 		if !need2Kill {
-			log.Debug("p2pIndProc: already in killing, sdl: %s, dir: %d, snid: %x, peer: %x",
-				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
+			log.Debug("p2pIndProc: already in killing, dir: %d, snid: %x, peer: %x",
+				idEx.dir, idEx.subNetId, idEx.nodeId)
 		} else {
-			log.Debug("p2pIndProc: try to kill, sdl: %s, dir: %d, snid: %x, peer: %x",
-				sdl, idEx.dir, idEx.subNetId, idEx.nodeId)
+			log.Debug("p2pIndProc: try to kill, dir: %d, snid: %x, peer: %x",
+				idEx.dir, idEx.subNetId, idEx.nodeId)
 			tcb.done<-true
 			<-tcb.done
 			tcbListsLock.Lock()
@@ -1072,8 +1064,7 @@ func testCase4(tc *testCase) {
 			return
 		}
 
-		cfgName := p2pInst.SchGetP2pCfgName()
-		log.Debug("testCase4: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase4: ycp2p started")
 	}
 
 	waitInterrupt()
@@ -1279,8 +1270,7 @@ func testCase5(tc *testCase) {
 			return
 		}
 
-		cfgName := p2pInst.SchGetP2pCfgName()
-		log.Debug("testCase5: ycp2p started, cofig: %s", cfgName)
+		log.Debug("testCase5: ycp2p started")
 	}
 
 	//
@@ -1857,8 +1847,7 @@ func dhtTestBlindConnectRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtBlindConnectRsp) int
 		log.Debug("dhtTestBlindConnectRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestBlindConnectRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestBlindConnectRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1872,8 +1861,7 @@ func dhtTestMgrFindPeerRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryResultInd)
 		log.Debug("dhtTestMgrFindPeerRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestMgrFindPeerRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestMgrFindPeerRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1887,8 +1875,7 @@ func dhtTestQryMgrQueryStartRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStart
 		log.Debug("dhtTestQryMgrQueryStartRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestQryMgrQueryStartRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestQryMgrQueryStartRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1902,8 +1889,7 @@ func dhtTestQryMgrQueryStopRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtQryMgrQueryStopRs
 		log.Debug("dhtTestQryMgrQueryStopRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestQryMgrQueryStopRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestQryMgrQueryStopRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1917,8 +1903,7 @@ func dhtTestConMgrSendCfm(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrSendCfm) int {
 		log.Debug("dhtTestConMgrSendCfm: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestConMgrSendCfm: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestConMgrSendCfm: msg: %v", *msg)
 	return 0
 }
 
@@ -1932,8 +1917,7 @@ func dhtTestMgrPutProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtPrdMgrAddProviderR
 		log.Debug("dhtTestMgrPutProviderRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestMgrPutProviderRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestMgrPutProviderRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1947,8 +1931,7 @@ func dhtTestMgrGetProviderRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetProviderRsp)
 		log.Debug("dhtTestMgrGetProviderRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestMgrGetProviderRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestMgrGetProviderRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1962,8 +1945,7 @@ func dhtTestMgrPutValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrPutValueRsp) int {
 		log.Debug("dhtTestMgrPutValueRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestMgrPutValueRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestMgrPutValueRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1977,8 +1959,7 @@ func dhtTestMgrGetValueRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtMgrGetValueRsp) int {
 		log.Debug("dhtTestMgrGetValueRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestMgrGetValueRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestMgrGetValueRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -1992,8 +1973,7 @@ func dhtTestConMgrCloseRsp(mgr *dht.DhtMgr, msg *sch.MsgDhtConMgrCloseRsp) int {
 		log.Debug("dhtTestConMgrCloseRsp: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestConMgrCloseRsp: instance: %s, msg: %v", cfgName, *msg)
+	log.Debug("dhtTestConMgrCloseRsp: msg: %v", *msg)
 	return 0
 }
 
@@ -2072,9 +2052,7 @@ func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interfac
 		log.Debug("dhtTestConInstRxDataCallback: nil scheduler")
 		return -1
 	}
-	cfgName := sdl.SchGetP2pCfgName()
-	log.Debug("dhtTestConInstRxDataCallback: instance: %s, pid: %d, length: %d, data: %x",
-		cfgName, pid, len(data), data)
+	log.Debug("dhtTestConInstRxDataCallback: pid: %d, length: %d, data: %x", pid, len(data), data)
 	return 0
 }
 
@@ -2179,7 +2157,7 @@ _bhloop:
 	waitInterrupt()
 
 	cnt := 0
-	cnt_max := 100
+	cnt_max := 100 * 100 * 100
 
 	for cnt < cnt_max {
 

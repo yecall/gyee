@@ -512,10 +512,8 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 //
 func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
-	dht := rutMgr.sdl.SchGetP2pCfgName()
-
 	if req == nil || len(req.Seens) != len(req.Duras) || len(req.Seens) == 0 {
-		rutLog.Debug("updateReq: invalid prameter, dht: %s", dht)
+		rutLog.Debug("updateReq: invalid prameter")
 		return sch.SchEnoUserTask
 	}
 
@@ -528,7 +526,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone.GetEno() {
 
-		rutLog.Debug("updateReq: dht: %s, why: rutMgrUpdate4Handshake, eno: DhtEnoNone", dht)
+		rutLog.Debug("updateReq: why: rutMgrUpdate4Handshake, eno: DhtEnoNone")
 
 		//
 		// new peer picked ok
@@ -556,13 +554,13 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
-			rutLog.Debug("updateReq: dht: %s, rutMgrNotify failed, eno: %d", dht, dhtEno)
+			rutLog.Debug("updateReq: rutMgrNotify failed, eno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout.GetEno() {
 
-		rutLog.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: %d", dht, eno)
+		rutLog.Debug("updateReq: why: rutMgrUpdate4Query, eno: %d", eno)
 
 		//
 		// query peer time out, check fail counter
@@ -574,7 +572,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			rutLog.Debug("updateReq: not found, dht: %s, eno: DhtEnoTimeout", dht)
+			rutLog.Debug("updateReq: not found, eno: DhtEnoTimeout")
 			return sch.SchEnoUserTask
 		}
 
@@ -583,7 +581,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 			if eno := rutMgr.delete(p); eno != DhtEnoNone {
 
-				rutLog.Debug("updateReq: delete failed, dht: %s, eno: %d, id: %x", dht, eno, p)
+				rutLog.Debug("updateReq: delete failed, eno: %d, id: %x", eno, p)
 				return sch.SchEnoUserTask
 			}
 
@@ -593,7 +591,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone.GetEno() {
 
-		rutLog.Debug("updateReq: dht: %s, why: rutMgrUpdate4Query, eno: DhtEnoNone", dht)
+		rutLog.Debug("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoNone")
 
 		//
 		// query ok, apply latency sample and clear fail counter
@@ -614,7 +612,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Closed {
 
-		rutLog.Debug("updateReq: dht: %s, why: rutMgrUpdate4Closed", dht)
+		rutLog.Debug("updateReq: why: rutMgrUpdate4Closed")
 
 		//
 		// update peer connection status to be CisClosed, but do not remove it from
@@ -627,7 +625,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		eno, el := rutMgr.find(p, d)
 		if eno != DhtEnoNone {
-			rutLog.Debug("updateReq: not found, dht: %s, eno: %d", dht, eno)
+			rutLog.Debug("updateReq: not found, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -635,7 +633,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else {
 
-		rutLog.Debug("updateReq: dht: %s, invalid (why:%d, eno:%d)", dht, why, eno)
+		rutLog.Debug("updateReq: invalid (why:%d, eno:%d)", why, eno)
 		return sch.SchEnoMismatched
 	}
 

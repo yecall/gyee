@@ -226,28 +226,27 @@ func (accepter *acceptTskCtrlBlock)TaskProc4Scheduler(ptn interface{}, msg *sch.
 }
 
 func (accepter *acceptTskCtrlBlock)peerAcceptProc(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
-	sdl := accepter.sdl.SchGetP2pCfgName()
 	_, accepter.ptnLsnMgr = accepter.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 	if accepter.ptnLsnMgr == nil {
-		lsnLog.Debug("PeerAcceptProc: sdl: %s, invalid listener manager task pointer", sdl)
+		lsnLog.Debug("PeerAcceptProc: invalid listener manager task pointer")
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	_, accepter.ptnPeMgr = accepter.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	if accepter.ptnPeMgr == nil {
-		lsnLog.Debug("PeerAcceptProc: sdl: %s, invalid peer manager task pointer", sdl)
+		lsnLog.Debug("PeerAcceptProc: invalid peer manager task pointer")
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.listener = accepter.lsnMgr.listener
 	if accepter.listener == nil {
-		lsnLog.Debug("PeerAcceptProc: sdl: %s, invalid listener, done accepter", sdl)
+		lsnLog.Debug("PeerAcceptProc: invalid listener, done accepter")
 		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
-	lsnLog.Debug("PeerAcceptProc: sdl, %s, inited ok, tring to accept ...", sdl)
+	lsnLog.Debug("PeerAcceptProc: inited ok, tring to accept ...")
 
 	stop := false
 
@@ -256,7 +255,7 @@ acceptLoop:
 		select {
 			case stop = <-accepter.stopCh:
 				if stop {
-					lsnLog.Debug("PeerAcceptProc: sdl: %s, break the loop to stop on command", sdl)
+					lsnLog.Debug("PeerAcceptProc: break the loop to stop on command")
 					break acceptLoop
 				}
 			default:
@@ -264,24 +263,23 @@ acceptLoop:
 
 		listener := accepter.listener
 		if listener == nil {
-			lsnLog.Debug("PeerAcceptProc: sdl: %s, break the loop for nil listener", sdl)
+			lsnLog.Debug("PeerAcceptProc: break the loop for nil listener")
 			break acceptLoop
 		}
 
 		conn, err := listener.Accept()
 		if lsnLog.debug__ {
-			lsnLog.Debug("PeerAcceptProc: sdl: %s, get out from Accept()", sdl)
+			lsnLog.Debug("PeerAcceptProc: get out from Accept()")
 		}
 
 		if err != nil && !err.(net.Error).Temporary() {
-			lsnLog.Debug("PeerAcceptProc: sdl: %s, break loop for non-temporary error while " +
-				"accepting, err: %s", sdl, err.Error())
+			lsnLog.Debug("PeerAcceptProc: break loop for non-temporary error while " +
+				"accepting, err: %s", err.Error())
 			break acceptLoop
 		}
 
 		if conn == nil {
-			lsnLog.Debug("PeerAcceptProc: sdl: %s, break loop for null connection accepted " +
-				"without errors", sdl)
+			lsnLog.Debug("PeerAcceptProc: break loop for null connection")
 			break acceptLoop
 		}
 
