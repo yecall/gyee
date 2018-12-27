@@ -830,7 +830,7 @@ _bootstarp:
 func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
 	for _, bsn := range YeShellCfg.dhtBootstrapNodes {
-		if msg.Eno == dht.DhtEnoNone.GetEno() {
+		if msg.Eno == dht.DhtEnoNone.GetEno() || msg.Eno == dht.DhtEnoDuplicated.GetEno() {
 			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
 				yesLog.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
 				yeShMgr.dhtBsChan<-true
