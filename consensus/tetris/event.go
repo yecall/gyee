@@ -39,6 +39,7 @@ type EventBody struct {
 	Tx []string //Transactions List
 	E  []string //Parents Events, 0 for self parent
 	F  []string //Fork Events, as Invalid
+	p  bool     //HeartBeat Pulse
 }
 
 type Event struct {
@@ -79,6 +80,20 @@ func NewEvent(height uint64, member uint, sequenceNumber uint64) Event {
 	}
 
 	event.know[member] = sequenceNumber
+	return event
+}
+
+func NewPulse(member uint) Event{
+	body := EventBody{
+		M: member,
+		T: time.Now().UnixNano(),
+		p: true,
+	}
+
+	event := Event{
+		Body: body,
+	}
+
 	return event
 }
 

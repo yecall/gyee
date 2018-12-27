@@ -60,6 +60,9 @@ package tetris
    h = 当前区块高度
    m = member id
    n = sequence number, n>=parents.n && n > selfParent.n
+   如果心跳还没有majority，则不发event
+   如果心跳majority时间超过T，怀疑网络分区，减慢event发送间隔
+   如果已经没有需要处理的tx，减慢event发送间隔。只要有一个，就按maxtime。
    发送规则：num>max && time>=min || time > max && num >= min
 
 
@@ -107,7 +110,7 @@ type Tetris struct {
 	n uint64 //Current Sequence Number for processing
 
 	membersID   map[string]uint //[address] -> id
-	membersAddr map[int]string  //[id] -> address
+	membersAddr map[uint]string //[id] -> address
 
 	memberEvents  map[uint]map[uint64]*Event
 	memberHeight  map[uint]uint64
@@ -119,7 +122,7 @@ type Tetris struct {
 	pendingTxs    map[string]map[uint]uint64 //交易在哪个member的哪个高度出现过
 	committedTxs  *utils.LRU
 	currentEvent  Event
-	heartBeat     *HeartBeat
+	heartBeat     map[uint]time.Time
 
 	EventCh       chan Event
 	ParentEventCh chan Event
@@ -130,7 +133,7 @@ type Tetris struct {
 	RequestEventCh chan string
 
 	//params
-	params Params
+	params *Params
 
 	//pendingSync bool
 
@@ -171,6 +174,7 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 		eventRequest:  make(map[string]SyncRequest), //TODO:memroy consumption optimize
 		pendingTxs:    make(map[string]map[uint]uint64),
 		committedTxs:  utils.NewLRU(100000, nil),
+		heartBeat:     make(map[uint]time.Time),
 
 		EventCh:       make(chan Event, 100),
 		ParentEventCh: make(chan Event, 100),
@@ -190,7 +194,7 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 		tetris.memberHeight[value] = 0
 	}
 
-	tetris.params = Params{
+	tetris.params = &Params{
 		f:                 (len(members) - 1) / 3,
 		superMajority:     2*len(members)/3 + 1,
 		maxTxPerEvent:     2000,
@@ -211,6 +215,24 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 	tetris.prepare()
 
 	return &tetris, nil
+}
+
+func (c *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
+    if len(c.heartBeat) < c.params.superMajority {
+    	return false, 0
+	}
+
+    var times []time.Time
+    for _, time := range c.heartBeat {
+    	times = append(times, time)
+	}
+
+	sort.Slice(times, func(i,j int) bool{
+		return times[i].Before(times[j])
+	})
+
+	now := time.Now()
+	return true, now.Sub(times[c.params.superMajority-1])
 }
 
 func (c *Tetris) MemberRotate(joins []string, quits []string) {
@@ -331,11 +353,11 @@ func (t *Tetris) receiveEvent(event *Event) {
 
 	if t.eventCache.Contains(event.Hex()) {
 		/*
-		logging.Logger.WithFields(logrus.Fields{
-			"event": event.Hex(),
-			"m":     event.Body.M,
-			"n":     event.Body.N,
-		}).Debug("Recevie already existed event")
+			logging.Logger.WithFields(logrus.Fields{
+				"event": event.Hex(),
+				"m":     event.Body.M,
+				"n":     event.Body.N,
+			}).Debug("Recevie already existed event")
 		*/
 		return
 	}
@@ -364,11 +386,11 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 
 	if t.eventCache.Contains(event.Hex()) {
 		/*
-		logging.Logger.WithFields(logrus.Fields{
-			"event": event.Hex(),
-			"m":     event.Body.M,
-			"n":     event.Body.N,
-		}).Debug("Recevie already existed event")
+			logging.Logger.WithFields(logrus.Fields{
+				"event": event.Hex(),
+				"m":     event.Body.M,
+				"n":     event.Body.N,
+			}).Debug("Recevie already existed event")
 		*/
 		return
 	}
