@@ -2430,7 +2430,7 @@ _txLoop:
 		}
 
 		// if in errors, sleep then check done
-		if pi.txEno != PeMgrEnoNone {
+		if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
 			time.Sleep(time.Millisecond * 10)
 			continue
 		}
@@ -2511,7 +2511,7 @@ _rxLoop:
 		}
 
 		// if in errors, sleep then continue to check done
-		if pi.rxEno != PeMgrEnoNone {
+		if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
 			time.Sleep(time.Microsecond * 10)
 			continue
 		}
