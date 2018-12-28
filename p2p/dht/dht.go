@@ -78,6 +78,7 @@ const (
 	DhtEnoNotSup				// not supported
 	DhtEnoDatastore				// data store errors
 	DhtEnoTimer					// timer errors
+	DhtEnoBootstrapNode			// bootstarp node related
 	DhtEnoUnknown				// unknown
 )
 

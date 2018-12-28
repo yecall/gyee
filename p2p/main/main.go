@@ -2060,7 +2060,7 @@ func dhtTestConInstRxDataCallback (conInst interface{}, pid uint32, msg interfac
 // testCase8
 //
 func testCase8(tc *testCase) {
-	
+
 	yesCfg := yep2p.DefaultYeShellConfig
 	//yesCfg.BootstrapNode = true
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
@@ -2153,47 +2153,54 @@ _bhloop:
 		}
 	}()
 
-	//waitInterrupt()
-	time.Sleep(time.Minute + time.Second * 2)
+	yeChainProc := func() {
+		cnt := 0
+		cnt_max := 100 * 100 * 100
 
-	cnt := 0
-	cnt_max := 100 * 100 * 100
+		for cnt < cnt_max {
+			cnt++
+			now := time.Now().UnixNano()
 
-	for cnt < cnt_max {
+			log.Debug("testCase8: cnt: %d, ev BroadcastMessageOsn", cnt)
+			data := []byte(fmt.Sprintf("ev: %d", now))
+			key := sha256.Sum256(data)
+			ev.Data = data
+			ev.Key = key[0:]
+			yeShMgr.BroadcastMessageOsn(ev)
 
-		cnt++
-		now := time.Now().UnixNano()
+			log.Debug("testCase8: cnt: %d, tx BroadcastMessageOsn", cnt)
+			data = []byte(fmt.Sprintf("tx: %d", now))
+			key = sha256.Sum256(data)
+			tx.Data = data
+			tx.Key = key[0:]
+			yeShMgr.BroadcastMessageOsn(tx)
 
-		log.Debug("testCase8: cnt: %d, ev BroadcastMessageOsn", cnt)
-		data := []byte(fmt.Sprintf("ev: %d", now))
-		key := sha256.Sum256(data)
-		ev.Data = data
-		ev.Key = key[0:]
-		yeShMgr.BroadcastMessageOsn(ev)
+			log.Debug("testCase8: cnt: %d, bh BroadcastMessageOsn", cnt)
+			data = []byte(fmt.Sprintf("bh: %d", now))
+			key = sha256.Sum256(data)
+			bh.Data = data
+			bh.Key = key[0:]
+			yeShMgr.BroadcastMessageOsn(bh)
 
-		log.Debug("testCase8: cnt: %d, tx BroadcastMessageOsn", cnt)
-		data = []byte(fmt.Sprintf("tx: %d", now))
-		key = sha256.Sum256(data)
-		tx.Data = data
-		tx.Key = key[0:]
-		yeShMgr.BroadcastMessageOsn(tx)
+			log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
+			data = []byte(fmt.Sprintf("bk: %d", now))
+			key = sha256.Sum256(data)
+			bk.Data = data
+			bk.Key = key[0:]
+			yeShMgr.BroadcastMessageOsn(bk)
 
-		log.Debug("testCase8: cnt: %d, bh BroadcastMessageOsn", cnt)
-		data = []byte(fmt.Sprintf("bh: %d", now))
-		key = sha256.Sum256(data)
-		bh.Data = data
-		bh.Key = key[0:]
-		yeShMgr.BroadcastMessageOsn(bh)
-
-		log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
-		data = []byte(fmt.Sprintf("bk: %d", now))
-		key = sha256.Sum256(data)
-		bk.Data = data
-		bk.Key = key[0:]
-		yeShMgr.BroadcastMessageOsn(bk)
-
-		time.Sleep(time.Millisecond * 20/*1000*/)
+			time.Sleep(time.Millisecond * 20 /*1000*/)
+		}
 	}
+
+	waitInterrupt()
+
+	if false {
+		time.Sleep(time.Minute + time.Second * 2)
+		yeChainProc()
+	}
+
+	waitInterrupt()
 
 	close(subEv.MsgChan)
 	yeShMgr.UnRegister(&subEv)

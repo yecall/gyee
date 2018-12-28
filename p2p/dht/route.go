@@ -546,6 +546,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 				node:	n,
 				hash:	*hash,
 				dist:	dist,
+				fails:	0,
 				pcs:	int(conInstStatus2PCS(CisHandshaked)),
 			}
 
@@ -556,6 +557,37 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
 			rutLog.Debug("updateReq: rutMgrNotify failed, eno: %d", dhtEno)
 			return sch.SchEnoUserTask
+		}
+
+	} else if why == rutMgrUpdate4Handshake && eno != DhtEnoNone.GetEno() {
+
+		rutLog.Debug("updateReq: why: rutMgrUpdate4Handshake, eno: %d", eno)
+
+		//
+		// handshake failed for outbound, check fail counter
+		//
+
+		p := req.Seens[0].ID
+		h := rutMgrNodeId2Hash(p)
+		d := rutMgr.rutMgrLog2Dist(&rutMgr.rutTab.shaLocal, h)
+
+		eno, el := rutMgr.find(p, d)
+		if eno != DhtEnoNone {
+			rutLog.Debug("updateReq: not found, eno: DhtEnoTimeout")
+			return sch.SchEnoUserTask
+		}
+
+		bn := el.Value.(*rutMgrBucketNode)
+		if bn.fails++; bn.fails >= rutMgrMaxFails2Del {
+
+			if eno := rutMgr.delete(p); eno != DhtEnoNone {
+
+				rutLog.Debug("updateReq: delete failed, eno: %d, id: %x", eno, p)
+				return sch.SchEnoUserTask
+			}
+
+			rutMgr.rutMgrRmvNotify(bn)
+			rutMgr.showRoute("handshake.outbound-failed-delete")
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout.GetEno() {
@@ -636,7 +668,6 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		rutLog.Debug("updateReq: invalid (why:%d, eno:%d)", why, eno)
 		return sch.SchEnoMismatched
 	}
-
 
 	return sch.SchEnoNone
 }

@@ -32,6 +32,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 
@@ -58,6 +59,7 @@ func (log coninstLogger)Debug(fmt string, args ... interface{}) {
 type ConInst struct {
 	sdl				*sch.Scheduler			// pointer to scheduler
 	name			string					// task name
+	bootstrapNode	bool					// bootstrap node flag
 	tep				sch.SchUserTaskEp		// task entry
 	local			*config.Node			// pointer to local node specification
 	ptnMe			interface{}				// pointer to myself task node
@@ -785,7 +787,7 @@ func (conInst *ConInst)txTaskStart() DhtErrno {
 		ciLog.Debug("txTaskStart: non-nil chan for done")
 		return DhtEnoMismatched
 	}
-	conInst.txDone = make(chan int, 1)
+	conInst.txDone = make(chan int)
 
 	if conInst.txChan != nil {
 		ciLog.Debug("txTaskStart: non-nil chan for txChan")
@@ -806,7 +808,7 @@ func (conInst *ConInst)rxTaskStart() DhtErrno {
 		ciLog.Debug("rxTaskStart: non-nil chan for done")
 		return DhtEnoMismatched
 	}
-	conInst.rxDone = make(chan int, 1)
+	conInst.rxDone = make(chan int)
 	go conInst.rxProc()
 	return DhtEnoNone
 }
@@ -818,12 +820,17 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 
 	if conInst.txDone != nil {
 
+		close(conInst.txChan)
+		conInst.txChan = nil
+
+		if conInst.con != nil {
+			conInst.con.Close()
+		}
+
 		conInst.txDone<-why
 		done := <-conInst.txDone
 		close(conInst.txDone)
 		conInst.txDone = nil
-		close(conInst.txChan)
-		conInst.txChan = nil
 
 		return DhtErrno(done)
 	}
@@ -837,6 +844,10 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 
 	if conInst.rxDone != nil {
+
+		if conInst.con != nil {
+			conInst.con.Close()
+		}
 
 		conInst.rxDone<-why
 		done := <-conInst.rxDone
@@ -903,11 +914,6 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 		}
 
 		que.Remove(el)
-	}
-
-	if conInst.con != nil {
-		conInst.con.Close()
-		conInst.con = nil
 	}
 
 	return DhtEnoNone
@@ -1210,6 +1216,14 @@ func (conInst *ConInst)txProc() {
 	// longlong loop in a blocked mode
 	//
 
+	defer func() {
+		if err := recover(); err != nil {
+			log.Debug("txProc: exception raised, wait done...")
+			<-conInst.txDone
+			conInst.txDone<-DhtEnoOs.GetEno()
+		}
+	}()
+
 	conInst.con.SetDeadline(time.Time{})
 	errUnderlying := false
 	isDone := false
@@ -1338,6 +1352,14 @@ func (conInst *ConInst)rxProc() {
 	//
 	// longlong loop in a blocked mode
 	//
+
+	defer func() {
+		if err := recover(); err != nil {
+			log.Debug("rxProc: exception raised, wait done...")
+			<-conInst.rxDone
+			conInst.rxDone<-DhtEnoOs.GetEno()
+		}
+	}()
 
 	conInst.con.SetDeadline(time.Time{})
 	errUnderlying := false
@@ -1474,12 +1496,26 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_PUTVALUE:
 
+		if conInst.bootstrapNode {
+			ciLog.Debug("dispatch: MID_PUTVALUE discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
+				conInst.name, *conInst.local, *msg.GetValueReq)
+			eno = DhtEnoBootstrapNode
+			break
+		}
+
 		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_PUTVALUE from peer: %+v",
 			conInst.name, *conInst.local, *msg.PutValue)
 
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
+
+		if conInst.bootstrapNode {
+			ciLog.Debug("dispatch: MID_GETVALUE_REQ discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
+				conInst.name, *conInst.local, *msg.GetValueReq)
+			eno = DhtEnoBootstrapNode
+			break
+		}
 
 		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
 			conInst.name, *conInst.local, *msg.GetValueReq)
@@ -1488,12 +1524,26 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_GETVALUE_RSP:
 
+		if conInst.bootstrapNode {
+			ciLog.Debug("dispatch: MID_GETVALUE_RSP discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
+				conInst.name, *conInst.local, *msg.GetValueReq)
+			eno = DhtEnoBootstrapNode
+			break
+		}
+
 		ciLog.Debug("dispatch:  inst: local: %+v, %s, MID_GETVALUE_REQ from peer: %+v",
 			conInst.name, *conInst.local, *msg.GetValueRsp)
 
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
+
+		if conInst.bootstrapNode {
+			ciLog.Debug("dispatch: MID_PUTPROVIDER discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
+				conInst.name, *conInst.local, *msg.GetValueReq)
+			eno = DhtEnoBootstrapNode
+			break
+		}
 
 		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_PUTPROVIDER from peer: %+v",
 			conInst.name, *conInst.local, *msg.PutProvider)
@@ -1502,12 +1552,26 @@ func (conInst *ConInst)dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_GETPROVIDER_REQ:
 
+		if conInst.bootstrapNode {
+			ciLog.Debug("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
+				conInst.name, *conInst.local, *msg.GetValueReq)
+			eno = DhtEnoBootstrapNode
+			break
+		}
+
 		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_GETPROVIDER_REQ from peer: %+v",
 			conInst.name, *conInst.local, *msg.GetProviderReq)
 
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
+
+		if conInst.bootstrapNode {
+			ciLog.Debug("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
+				conInst.name, *conInst.local, *msg.GetValueReq)
+			eno = DhtEnoBootstrapNode
+			break
+		}
 
 		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_GETPROVIDER_RSP from peer: %+v",
 			conInst.name, *conInst.local, *msg.GetProviderRsp)

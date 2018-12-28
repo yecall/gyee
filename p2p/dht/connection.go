@@ -70,6 +70,7 @@ const (
 //
 type conMgrCfg struct {
 	local			*config.Node					// pointer to local node specification
+	bootstarpNode	bool							// bootstrap node flag
 	maxCon			int								// max number of connection
 	hsTimeout		time.Duration					// handshake timeout duration
 }
@@ -315,19 +316,16 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		}
 
 		//
-		// remove temp map for inbound connection instance
-		//
-
-		if ci.dir == ConInstDirInbound {
-			delete(conMgr.ibInstTemp, ci.name)
-		}
-
-		//
+		// remove temp map for inbound connection instance, and for outbounds,
 		// we just remove outbound instance from the map table(for outbounds). notice that
 		// inbound instance still not be mapped into ciTab and no tx data should be pending.
 		//
 
-		if msg.Dir == ConInstDirOutbound {
+		if ci.dir == ConInstDirInbound {
+
+			delete(conMgr.ibInstTemp, ci.name)
+
+		} else if msg.Dir == ConInstDirOutbound {
 
 			cid := conInstIdentity{
 				nid: msg.Peer.ID,
@@ -356,6 +354,25 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
 				conMgr.sdl.SchSendMessage(&schMsg)
 			}
+
+			//
+			// update route manager
+			//
+
+			update := sch.MsgDhtRutMgrUpdateReq {
+				Why:	rutMgrUpdate4Handshake,
+				Eno:	msg.Eno,
+				Seens:	[]config.Node {
+					*msg.Peer,
+				},
+				Duras:	[]time.Duration {
+					0,
+				},
+			}
+
+			schMsg := sch.SchMessage{}
+			conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
+			conMgr.sdl.SchSendMessage(&schMsg)
 		}
 
 		//
@@ -392,7 +409,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	} else {
 
-
 		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
 			connLog.Debug("handshakeRsp: not found, id: %x", msg.Peer.ID)
 			return sch.SchEnoUserTask
@@ -415,7 +431,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				conMgr.sdl.SchSendMessage(&schMsg)
 			} else {
 				rsp := sch.MsgDhtConMgrConnectRsp{
-					Eno:  msg.Eno,
+					Eno:  DhtEnoNone.GetEno(),
 					Peer: msg.Peer,
 				}
 				schMsg := sch.SchMessage{}
@@ -425,7 +441,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		}
 
 		//
-		// submit the pending package for outbound instance if any
+		// submit the pending packages for outbound instance if any
 		//
 
 		if li, ok := conMgr.txQueTab[cid]; ok {
@@ -910,6 +926,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 func (conMgr *ConMgr)getConfig() DhtErrno {
 	cfg := config.P2pConfig4DhtConManager(conMgr.sdl.SchGetP2pCfgName())
 	conMgr.cfg.local = cfg.Local
+	conMgr.cfg.bootstarpNode = cfg.BootstrapNode
 	conMgr.cfg.maxCon = cfg.MaxCon
 	conMgr.cfg.hsTimeout = cfg.HsTimeout
 	return DhtEnoNone
@@ -975,6 +992,7 @@ func (conMgr *ConMgr)lookupInboundConInst(nid *config.NodeID) *ConInst {
 func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node, msg interface{}) DhtErrno {
 
 	ci.sdl = conMgr.sdl
+	ci.bootstrapNode = conMgr.cfg.bootstarpNode
 	ci.ptnSrcTsk = srcTask
 	if ci.srcTaskName = ci.sdl.SchGetTaskName(srcTask); len(ci.srcTaskName) == 0 {
 		connLog.Debug("setupConInst: source task without name")
