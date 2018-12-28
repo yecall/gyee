@@ -450,6 +450,16 @@ func waitInterrupt() {
 	<-sigc
 }
 
+func waitInterruptWithCallback(cb []func()) {
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt)
+	defer signal.Stop(sigc)
+	<-sigc
+	for idx := 0; idx < len(cb); idx++ {
+		cb[idx]()
+	}
+}
+
 
 
 //
@@ -2193,21 +2203,20 @@ _bhloop:
 		}
 	}
 
-	waitInterrupt()
+	stop := func() {
+		close(subEv.MsgChan)
+		yeShMgr.UnRegister(&subEv)
+		close(subTx.MsgChan)
+		yeShMgr.UnRegister(&subTx)
+		close(subBh.MsgChan)
+		yeShMgr.UnRegister(&subBh)
 
-	if false {
-		time.Sleep(time.Minute + time.Second * 2)
-		yeChainProc()
+		yeShMgr.Stop()
 	}
 
-	waitInterrupt()
+	_ = yeChainProc
+	cbs := []func(){stop}
+	//cbs := []func(){yeChainProc, stop}
 
-	close(subEv.MsgChan)
-	yeShMgr.UnRegister(&subEv)
-	close(subTx.MsgChan)
-	yeShMgr.UnRegister(&subTx)
-	close(subBh.MsgChan)
-	yeShMgr.UnRegister(&subBh)
-
-	yeShMgr.Stop()
+	waitInterruptWithCallback(cbs)
 }
