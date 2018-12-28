@@ -32,7 +32,6 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 
@@ -1218,7 +1217,7 @@ func (conInst *ConInst)txProc() {
 
 	defer func() {
 		if err := recover(); err != nil {
-			log.Debug("txProc: exception raised, wait done...")
+			ciLog.Debug("txProc: exception raised, wait done...")
 			<-conInst.txDone
 			conInst.txDone<-DhtEnoOs.GetEno()
 		}
@@ -1355,7 +1354,7 @@ func (conInst *ConInst)rxProc() {
 
 	defer func() {
 		if err := recover(); err != nil {
-			log.Debug("rxProc: exception raised, wait done...")
+			ciLog.Debug("rxProc: exception raised, wait done...")
 			<-conInst.rxDone
 			conInst.rxDone<-DhtEnoOs.GetEno()
 		}

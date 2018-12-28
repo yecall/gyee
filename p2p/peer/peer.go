@@ -42,7 +42,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -308,9 +308,6 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	case sch.EvPeHandshakeRsp:
 		eno = peMgr.peMgrHandshakeRsp(msg.Body)
-
-	case sch.EvPePingpongRsp:
-		eno = peMgr.peMgrPingpongRsp(msg.Body)
 
 	case sch.EvPeCloseReq:
 		eno = peMgr.peMgrCloseReq(msg)
@@ -899,10 +896,6 @@ func (peMgr *PeerManager)peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 	var rsp = msg.(*msgConnOutRsp)
 	if rsp.result != PeMgrEnoNone {
 
-		// here the outgoing instance might have been killed in function
-		// peMgrHandshakeRsp due to the duplication nodes, so we should
-		// check this to kill it.
-
 		if _, lived := peMgr.peers[rsp.ptn]; lived {
 
 			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, PeInstDirOutbound); eno != PeMgrEnoNone {
@@ -1155,19 +1148,6 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	return peMgr.peMgrIndEnque(&i)
 }
 
-func (peMgr *PeerManager)peMgrPingpongRsp(msg interface{}) PeMgrErrno {
-	var rsp = msg.(*msgPingpongRsp)
-	if rsp.result != PeMgrEnoNone {
-		if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, rsp.dir); eno != PeMgrEnoNone {
-			peerLog.Debug("peMgrPingpongRsp: kill instance failed, inst: %s, node: %s",
-				peMgr.sdl.SchGetTaskName(rsp.ptn),
-				config.P2pNodeId2HexString(rsp.peNode.ID))
-			return eno
-		}
-	}
-	return PeMgrEnoNone
-}
-
 func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	// here it's asked to close a peer instance, this might happen in following cases:
 	// 1) the shell task ask to do this;
@@ -1254,7 +1234,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	// this would never happen since a peer instance would never kill himself in
 	// current implement.
-	panic("peMgrConnCloseInd: should never be called!!!")
+	panic("peMgrConnCloseInd: should never come here!!!")
 
 	schMsg := sch.SchMessage{}
 	ind := msg.(*MsgCloseInd)
@@ -1938,29 +1918,7 @@ func (pi *peerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	peerLog.Debug("piPoweroff: task will be done, name: %s, state: %d",
 		pi.sdl.SchGetTaskName(pi.ptnMe), pi.state)
 
-	if pi.rxtxRuning {
-
-		if pi.txChan != nil {
-			close(pi.txChan)
-		}
-
-		if pi.conn != nil {
-			pi.conn.Close()
-			pi.conn = nil
-		}
-
-		if pi.rxDone != nil {
-			pi.rxDone <- PeMgrEnoNone
-			<-pi.rxDone
-		}
-
-		if pi.rxChan != nil {
-			close(pi.rxChan)
-		}
-	}
-
-	pi.state = peInstStateKilled
-	pi.rxtxRuning = false
+	pi.stopRxTx()
 
 	if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
@@ -2125,24 +2083,7 @@ func (pi *peerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	pi.state = peInstStateKilling
 	node := pi.node
 
-	if pi.rxtxRuning {
-		if pi.txChan != nil {
-			close(pi.txChan)
-		}
-
-		if pi.conn != nil {
-			pi.conn.Close()
-			pi.conn = nil
-		}
-
-		pi.rxDone <- PeMgrEnoNone
-		<-pi.rxDone
-		if pi.rxChan != nil {
-			close(pi.rxChan)
-		}
-
-		pi.rxtxRuning = false
-	}
+	pi.stopRxTx()
 
 	cfm := MsgCloseCfm {
 		result: PeMgrEnoNone,
@@ -2417,6 +2358,19 @@ func piTx(pi *peerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
 	// would then exit for "txChan" closed.
+
+	defer func() {
+		if err := recover(); err != nil {
+			peerLog.Debug("piTx: exception raised, wait done...")
+			for {
+				if _, ok := <-pi.txChan; !ok {
+					peerLog.Debug("piTx: done")
+					return
+				}
+			}
+		}
+	}()
+
 _txLoop:
 	for {
 		// check if done
@@ -2489,6 +2443,15 @@ func piRx(pi *peerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
 	// would then exit.
+
+	defer func() {
+		if err := recover(); err != nil {
+			peerLog.Debug("piRx: exception raised, wait done...")
+			<-pi.rxDone
+			close(pi.rxDone)
+		}
+	}()
+
 	var done PeMgrErrno = PeMgrEnoNone
 	var ok = true
 
@@ -2514,8 +2477,7 @@ _rxLoop:
 
 		// try reading the peer
 		upkg := new(P2pPackage)
-		if eno := upkg.RecvPackage(pi); eno == PeMgrEnoNone {
-		} else {
+		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
 
 			// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
 			// and we will be done then;
@@ -2776,3 +2738,26 @@ func (peMgr *PeerManager)RegisterInstIndCallback(cb interface{}, userData interf
 	return PeMgrEnoNone
 }
 
+func (pi *peerInstance)stopRxTx() {
+	if pi.rxtxRuning {
+		if pi.conn != nil {
+			pi.conn.Close()
+			pi.conn = nil
+		}
+
+		if pi.txChan != nil {
+			close(pi.txChan)
+		}
+
+		if pi.rxDone != nil {
+			pi.rxDone <- PeMgrEnoNone
+			<-pi.rxDone
+		}
+
+		if pi.rxChan != nil {
+			close(pi.rxChan)
+		}
+	}
+	pi.state = peInstStateKilled
+	pi.rxtxRuning = false
+}

@@ -344,7 +344,6 @@ const (
 	EvPeHandshakeReq		= EvPeerEstBase + 3
 	EvPeHandshakeRsp		= EvPeerEstBase + 4
 	EvPePingpongReq			= EvPeerEstBase + 5
-	EvPePingpongRsp			= EvPeerEstBase + 6
 	EvPeCloseReq			= EvPeerEstBase + 7
 	EvPeCloseCfm			= EvPeerEstBase + 8
 	EvPeCloseInd			= EvPeerEstBase + 9
