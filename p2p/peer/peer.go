@@ -42,7 +42,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -256,9 +256,7 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 }
 
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if peMgr.sdl != nil {
-		peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
-	}
+	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
 	if !peMgr.isInited {
 		if msg.Id != sch.EvSchPoweron {
