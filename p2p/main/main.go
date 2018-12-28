@@ -2215,8 +2215,14 @@ _bhloop:
 	}
 
 	_ = yeChainProc
-	cbs := []func(){stop}
-	//cbs := []func(){yeChainProc, stop}
-
+	_ = stop
+	//cbs := []func(){stop}
+	cbs := []func(){yeChainProc, stop}
 	waitInterruptWithCallback(cbs)
+
+	/*
+	time.Sleep(time.Minute + time.Second * 10)
+	yeChainProc()
+	stop()
+	*/
 }

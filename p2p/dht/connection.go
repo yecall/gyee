@@ -41,7 +41,7 @@ type connLogger struct {
 }
 
 var connLog = connLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {
@@ -559,6 +559,8 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		connLog.Debug("connctReq: inbound instance duplicated, id: %x", msg.Peer.ID)
 		return rsp2Sender(DhtErrno(DhtEnoDuplicated))
 	}
+
+	connLog.Debug("connctReq: create connection instance, peer ip: %s", msg.Peer.IP.String())
 
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
 	conMgr.setupConInst(ci, sender, msg.Peer, nil)
