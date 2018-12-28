@@ -124,13 +124,7 @@ func (conMgr *ConMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ptn == nil || msg == nil {
-		connLog.Debug("conMgrProc: " +
-			"invalid parameters, ptn: %p, msg: %p",
-			ptn, msg)
-		return sch.SchEnoParameter
-	}
-
+	connLog.Debug("conMgrProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
