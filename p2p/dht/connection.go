@@ -167,6 +167,8 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = sch.SchEnoParameter
 	}
 
+	connLog.Debug("conMgrProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
+
 	return eno
 }
 
