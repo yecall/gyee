@@ -516,6 +516,7 @@ type MsgDhtConMgrConnectReq struct {
 type MsgDhtConMgrConnectRsp struct {
 	Eno			int						// result code
 	Peer		*config.Node			// peer to be connected
+	Dir			int						// direction
 }
 
 //
@@ -546,8 +547,8 @@ type MsgDhtConMgrSendCfm struct {
 //
 type MsgDhtConMgrCloseReq struct {
 	Task		string				// owner task name
-	Peer		*config.Node			// peer to be connected
-	Dir			int						// instance direction
+	Peer		*config.Node		// peer to be connected
+	Dir			int					// instance direction
 }
 
 //

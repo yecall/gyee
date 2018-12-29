@@ -41,7 +41,7 @@ type connLogger struct {
 }
 
 var connLog = connLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {
@@ -613,6 +613,8 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 //
 func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
+	connLog.Debug("closeReq: peer id: %x, dir: %d", msg.Peer.ID, msg.Dir)
+
 	cid := conInstIdentity {
 		nid:	msg.Peer.ID,
 		dir:	ConInstDir(msg.Dir),
@@ -671,6 +673,8 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 			}
 		}
 	}
+
+	connLog.Debug("closeReq: found: %t, err: %t, dup: %t", found, err, dup)
 
 	if !found {
 		return rsp2Sender(DhtEnoNotFound)

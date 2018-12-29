@@ -2198,7 +2198,7 @@ _bhloop:
 			if cnt & 0xff == 0 {
 				log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
 			}
-			
+
 			time.Sleep(time.Millisecond * 20 /*1000*/)
 		}
 	}
@@ -2217,12 +2217,10 @@ _bhloop:
 	_ = yeChainProc
 	_ = stop
 	//cbs := []func(){stop}
-	cbs := []func(){yeChainProc, stop}
-	waitInterruptWithCallback(cbs)
+	//cbs := []func(){yeChainProc, stop}
+	//waitInterruptWithCallback(cbs)
 
-	/*
 	time.Sleep(time.Minute + time.Second * 10)
 	yeChainProc()
 	stop()
-	*/
 }
