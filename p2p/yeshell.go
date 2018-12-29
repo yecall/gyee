@@ -838,13 +838,20 @@ func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 	for _, bsn := range YeShellCfg.dhtBootstrapNodes {
 		if msg.Eno == dht.DhtEnoNone.GetEno() || msg.Eno == dht.DhtEnoDuplicated.GetEno() {
 			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
+				// done the blind-connect routine
 				yesLog.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
 				yeShMgr.dhtBsChan<-true
-				break
+				// when coming here, we should havd add the connected bootstarp node to our
+				// dht route table, but it's the only node there, we need to start a bootstrap
+				// procedure to fill our route now.
+				schMsg := sch.SchMessage{}
+				yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtRutRefreshReq, nil)
+				yeShMgr.dhtInst.SchSendMessage(&schMsg)
+				return sch.SchEnoNone
 			}
 		}
 	}
-	return sch.SchEnoNone
+	return sch.SchEnoMismatched
 }
 
 func (yeShMgr *yeShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {

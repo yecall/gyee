@@ -96,6 +96,9 @@ func (shMgr *DhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 	case sch.EvDhtShEventInd:
 		eno = shMgr.dhtShEventInd(msg.Body.(*sch.MsgDhtShEventInd))
 
+	case sch.EvDhtRutRefreshReq:
+		eno = shMgr.dhtRutRefreshReq()
+
 	case sch.EvDhtMgrFindPeerReq:
 		eno = shMgr.dhtShFindPeerReq(msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
 
@@ -274,6 +277,12 @@ func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 
 	shMgr.csChan<-msg
 	return sch.SchEnoNone
+}
+
+func (shMgr *DhtShellManager)dhtRutRefreshReq() sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtRutRefreshReq, nil)
+	return shMgr.sdl.SchSendMessage(&msg)
 }
 
 func (shMgr *DhtShellManager)dhtShFindPeerReq(req *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {

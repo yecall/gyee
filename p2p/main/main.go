@@ -2171,34 +2171,34 @@ _bhloop:
 			cnt++
 			now := time.Now().UnixNano()
 
-			log.Debug("testCase8: cnt: %d, ev BroadcastMessageOsn", cnt)
 			data := []byte(fmt.Sprintf("ev: %d", now))
 			key := sha256.Sum256(data)
 			ev.Data = data
 			ev.Key = key[0:]
 			yeShMgr.BroadcastMessageOsn(ev)
 
-			log.Debug("testCase8: cnt: %d, tx BroadcastMessageOsn", cnt)
 			data = []byte(fmt.Sprintf("tx: %d", now))
 			key = sha256.Sum256(data)
 			tx.Data = data
 			tx.Key = key[0:]
 			yeShMgr.BroadcastMessageOsn(tx)
 
-			log.Debug("testCase8: cnt: %d, bh BroadcastMessageOsn", cnt)
 			data = []byte(fmt.Sprintf("bh: %d", now))
 			key = sha256.Sum256(data)
 			bh.Data = data
 			bh.Key = key[0:]
 			yeShMgr.BroadcastMessageOsn(bh)
 
-			log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
 			data = []byte(fmt.Sprintf("bk: %d", now))
 			key = sha256.Sum256(data)
 			bk.Data = data
 			bk.Key = key[0:]
 			yeShMgr.BroadcastMessageOsn(bk)
 
+			if cnt & 0xff == 0 {
+				log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
+			}
+			
 			time.Sleep(time.Millisecond * 20 /*1000*/)
 		}
 	}
