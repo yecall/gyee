@@ -699,28 +699,34 @@ func (yeShMgr *yeShellManager)dhtCsProc() {
 		switch csi.Status {
 
 		case dht.CisNull:
-			yesLog.Debug("dhtCsProc: CisNull, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisNull, peer: %x", *csi.Peer)
 
 		case dht.CisConnecting:
-			yesLog.Debug("dhtCsProc: CisConnecting, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisConnecting, peer: %x", *csi.Peer)
 
 		case dht.CisConnected:
-			yesLog.Debug("dhtCsProc: CisConnected, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisConnected, peer: %x", *csi.Peer)
 
 		case dht.CisAccepted:
-			yesLog.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisAccepted, peer: %x", *csi.Peer)
 
 		case dht.CisInHandshaking:
-			yesLog.Debug("dhtCsProc: CisInHandshaking, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisInHandshaking, peer: %x", *csi.Peer)
 
 		case dht.CisHandshaked:
-			yesLog.Debug("dhtCsProc: CisHandshaked, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisHandshaked, peer: %x", *csi.Peer)
 
 		case dht.CisInService:
-			yesLog.Debug("dhtCsProc: CisInService, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisInService, peer: %x", *csi.Peer)
+
+		case dht.CisInKilling:
+			yesLog.Debug("dhtCsProc: CisInKilling, peer: %x", *csi.Peer)
+
+		case dht.CisOutOfService:
+			yesLog.Debug("dhtCsProc: CisOutOfService, peer: %x", *csi.Peer)
 
 		case dht.CisClosed:
-			yesLog.Debug("dhtCsProc: CisAccepted, dir: %d, peer: %x", *csi.Peer)
+			yesLog.Debug("dhtCsProc: CisClosed, peer: %x", *csi.Peer)
 
 		default:
 			yesLog.Debug("dhtCsProc: invalid connection status: %d", csi.Status)

@@ -258,6 +258,12 @@ func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 	case dht.CisInService:
 		dhtLog.Debug("dhtTestConInstStatusInd: CisInService")
 
+	case dht.CisInKilling:
+		dhtLog.Debug("dhtTestConInstStatusInd: CisInKilling")
+
+	case dht.CisOutOfService:
+		dhtLog.Debug("dhtTestConInstStatusInd: CisOutOfService")
+
 	case dht.CisClosed:
 		dhtLog.Debug("dhtTestConInstStatusInd: CisClosed")
 

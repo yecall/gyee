@@ -647,22 +647,36 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
 	found := false
 	err := false
+	dup := false
 
+	// should get one at most
 	cis := conMgr.lookupConInst(&cid)
 	for _, ci := range cis {
 		if ci != nil {
 			found = true
-			if req2Inst(ci) != sch.SchEnoNone {
+			if ci.status >= CisInKilling {
+				dup = true
+			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
+			} else {
+				ci.status = CisInKilling
+				ind := sch.MsgDhtConInstStatusInd {
+					Peer: &ci.hsInfo.peer.ID,
+					Dir: int(ci.dir),
+					Status: CisInKilling,
+				}
+				schMsg := sch.SchMessage{}
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
+				conMgr.sdl.SchSendMessage(&schMsg)
 			}
 		}
 	}
 
 	if !found {
 		return rsp2Sender(DhtEnoNotFound)
-	}
-
-	if err {
+	} else if dup {
+		return rsp2Sender(DhtEnoDuplicated)
+	} else if err {
 		return rsp2Sender(DhtEnoScheduler)
 	}
 
@@ -772,11 +786,11 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	switch msg.Status {
 
-	case CisClosed:
-		conMgr.instClosedInd(msg)
-
 	case CisOutOfService:
 		conMgr.instOutOfServiceInd(msg)
+
+	case CisClosed:
+		conMgr.instClosedInd(msg)
 
 	case CisNull:
 	case CisConnecting:
@@ -785,6 +799,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	case CisInHandshaking:
 	case CisHandshaked:
 	case CisInService:
+	case CisInKilling:
 	default:
 		connLog.Debug("instStatusInd: invalid status: %d", msg.Status)
 		return sch.SchEnoMismatched
@@ -853,8 +868,6 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 				connLog.Debug("instCloseRsp: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
-
-			delete(conMgr.ciTab, cid)
 		}
 	}
 
@@ -899,19 +912,28 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 
 	found := false
 	err := false
+	dup := false
 
 	cis := conMgr.lookupConInst(&cid)
 	for _, ci := range cis {
 		if ci != nil {
 			found = true
-			if req2Inst(ci) != sch.SchEnoNone {
+			if ci.status >= CisInKilling {
+				dup = true
+			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
+			} else {
+				ci.status = CisInKilling
 			}
 		}
 	}
 
 	if !found {
 		connLog.Debug("rutPeerRemoveInd: not found, id: %x", msg.Peer)
+	}
+
+	if dup {
+		connLog.Debug("rutPeerRemoveInd: kill more than once")
 	}
 
 	if err {
@@ -1145,8 +1167,6 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 			conMgr.sdl.SchSendMessage(&po)
 		}
 	}
-
-	delete(conMgr.ciTab, cid)
 
 	return sch.SchEnoNone
 }
