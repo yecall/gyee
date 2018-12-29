@@ -1162,9 +1162,24 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
 				connLog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
 			}
-			po := sch.SchMessage{}
-			conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
-			conMgr.sdl.SchSendMessage(&po)
+			if ci.status < CisInKilling {
+				ci.status = CisInKilling
+				ind := sch.MsgDhtConInstStatusInd {
+					Peer: msg.Peer,
+					Dir: msg.Dir,
+					Status: CisInKilling,
+				}
+				schMsg := sch.SchMessage{}
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
+				conMgr.sdl.SchSendMessage(&schMsg)
+
+				req := sch.MsgDhtConInstCloseReq{
+					Peer:	msg.Peer,
+					Why:	sch.EvDhtConInstStatusInd,
+				}
+				sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
+				sdl.SchSendMessage(&schMsg)
+			}
 		}
 	}
 

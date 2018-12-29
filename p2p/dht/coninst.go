@@ -43,7 +43,7 @@ type coninstLogger struct {
 }
 
 var ciLog = coninstLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log coninstLogger)Debug(fmt string, args ... interface{}) {
@@ -123,8 +123,8 @@ const (
 	CisInHandshaking				// handshaking
 	CisHandshaked					// handshaked
 	CisInService					// in service
-	CisInKilling					// in killing
 	CisOutOfService					// out of service but is not closed
+	CisInKilling					// in killing
 	CisClosed						// closed
 )
 
@@ -821,16 +821,19 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 	if conInst.txDone != nil {
 
 		close(conInst.txChan)
-		conInst.txChan = nil
 
 		if conInst.con != nil {
 			conInst.con.Close()
 		}
 
+		ciLog.Debug("txTaskStop: try to done tx")
+
 		conInst.txDone<-why
 		done := <-conInst.txDone
+
+		ciLog.Debug("txTaskStop: tx done")
+
 		close(conInst.txDone)
-		conInst.txDone = nil
 
 		return DhtErrno(done)
 	}
@@ -849,10 +852,14 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 			conInst.con.Close()
 		}
 
+		ciLog.Debug("rxTaskStop: try to done rx")
+
 		conInst.rxDone<-why
 		done := <-conInst.rxDone
+
+		ciLog.Debug("rxTaskStop: rx done")
+
 		close(conInst.rxDone)
-		conInst.rxDone = nil
 
 		return DhtErrno(done)
 	}
@@ -1242,6 +1249,8 @@ _txLoop:
 		// fetch pending signal
 		//
 
+		ciLog.Debug("txProc: 0, peer: %x", conInst.hsInfo.peer.ID)
+
 		_, ok = <-conInst.txChan
 		if !ok {
 			goto _checkDone
@@ -1250,6 +1259,8 @@ _txLoop:
 		//
 		// get pending and send it
 		//
+
+		ciLog.Debug("txProc: 1, peer: %x", conInst.hsInfo.peer.ID)
 
 		conInst.txLock.Lock()
 		el = conInst.txPending.Front()
@@ -1273,6 +1284,8 @@ _txLoop:
 			goto _checkDone
 		}
 
+		ciLog.Debug("txProc: 2, peer: %x", conInst.hsInfo.peer.ID)
+
 		pbPkg = new(pb.DhtPackage)
 		dhtPkg.ToPbPackage(pbPkg)
 
@@ -1282,11 +1295,15 @@ _txLoop:
 		// task before we are blocked here.
 		//
 
+		ciLog.Debug("txProc: 3, peer: %x", conInst.hsInfo.peer.ID)
+
 		if txPkg.responsed != nil {
 			if eno, el := conInst.txSetPending(txPkg); eno == DhtEnoNone && el != nil {
 				conInst.txSetTimer(el)
 			}
 		}
+
+		ciLog.Debug("txProc: 4, peer: %x", conInst.hsInfo.peer.ID)
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 			ciLog.Debug("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
@@ -1297,6 +1314,8 @@ _txLoop:
 		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
 			ciLog.Debug("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
 		}
+
+		ciLog.Debug("txProc: 5, peer: %x", conInst.hsInfo.peer.ID)
 
 	_checkDone:
 
@@ -1371,6 +1390,8 @@ _rxLoop:
 
 		var msg *DhtMessage = nil
 
+		ciLog.Debug("rxProc: 0")
+
 		pbPkg := new(pb.DhtPackage)
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
 			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s, hsInfo: %+v, local: %+v",
@@ -1382,6 +1403,8 @@ _rxLoop:
 		if conInst.rxPkgCnt++; conInst.rxPkgCnt % 16 == 0 {
 			ciLog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
 		}
+
+		ciLog.Debug("rxProc: 1")
 
 		pkg := new(DhtPackage)
 		pkg.FromPbPackage(pbPkg)
@@ -1399,15 +1422,21 @@ _rxLoop:
 			goto _checkDone
 		}
 
+		ciLog.Debug("rxProc: 2")
+
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
 			ciLog.Debug("rxProc:GetMessage failed, inst: %s, eno: %d", conInst.name, eno)
 			goto _checkDone
 		}
 
+		ciLog.Debug("rxProc: 3")
+
 		if eno := conInst.dispatch(msg); eno != DhtEnoNone {
 			ciLog.Debug("rxProc: dispatch failed, inst: %s, eno: %d", conInst.name, eno)
 		}
+
+		ciLog.Debug("rxProc: 4")
 
 _checkDone:
 
