@@ -34,7 +34,7 @@ type dhtShellLogger struct {
 }
 
 var dhtLog = dhtShellLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log dhtShellLogger)Debug(fmt string, args ... interface{}) {

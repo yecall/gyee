@@ -36,7 +36,7 @@ type chainShellLogger struct {
 }
 
 var chainLog = chainShellLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log chainShellLogger)Debug(fmt string, args ... interface{}) {

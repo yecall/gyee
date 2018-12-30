@@ -911,7 +911,6 @@ func (yeShMgr *yeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) s
 	// Notice: only when function DhtSetValue called, put value key would be set
 	// and called would be in a blocked mode, we check this case to feed the signal
 	// into the channel which the caller is pending for, else nothing done.
-	yesLog.Debug("dhtMgrPutValueRsp: msg: %+v", *msg)
 	if yeShMgr.putValKey != nil && len(yeShMgr.putValKey) == yesKeyBytes {
 		if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
 			yesLog.Debug("dhtMgrPutValueRsp: key mismatched")

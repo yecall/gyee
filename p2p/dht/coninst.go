@@ -1862,8 +1862,8 @@ func (conInst *ConInst)GetScheduler() *sch.Scheduler {
 // Update instance status
 //
 func (conInst *ConInst)updateStatus(status conInstStatus) {
-	//conInst.cisLock.Lock()
-	//defer conInst.cisLock.Unlock()
+	conInst.cisLock.Lock()
+	defer conInst.cisLock.Unlock()
 	conInst.status = status
 }
 
@@ -1871,7 +1871,7 @@ func (conInst *ConInst)updateStatus(status conInstStatus) {
 // Get instance status
 //
 func (conInst *ConInst)getStatus() conInstStatus {
-	//conInst.cisLock.Lock()
-	//defer conInst.cisLock.Unlock()
+	conInst.cisLock.Lock()
+	defer conInst.cisLock.Unlock()
 	return conInst.status
 }
