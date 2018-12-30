@@ -41,7 +41,7 @@ type connLogger struct {
 }
 
 var connLog = connLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {

@@ -2127,8 +2127,9 @@ _evloop:
 				if !ok {
 					break _evloop
 				}
-				count++
-				log.Debug("count: %d, ev: %x", count, ev.Key)
+				if count++; count & 0x7f == 0 {
+					log.Debug("count: %d, ev: %x", count, ev.Key)
+				}
 			}
 		}
 	}()
@@ -2142,8 +2143,9 @@ _txloop:
 				if !ok {
 					break _txloop
 				}
-				count++
-				log.Debug("count: %d, tx: %x", count, tx.Key)
+				if count++; count & 0x7f == 0 {
+					log.Debug("count: %d, tx: %x", count, tx.Key)
+				}
 			}
 		}
 	}()
@@ -2157,8 +2159,9 @@ _bhloop:
 				if !ok {
 					break _bhloop
 				}
-				count++
-				log.Debug("count: %d, bh: %x", count, bh.Key)
+				if count++; count & 0x7f == 0 {
+					log.Debug("count: %d, bh: %x", count, bh.Key)
+				}
 			}
 		}
 	}()
@@ -2195,7 +2198,7 @@ _bhloop:
 			bk.Key = key[0:]
 			yeShMgr.BroadcastMessageOsn(bk)
 
-			if cnt & 0xff == 0 {
+			if cnt & 0x7f == 0 {
 				log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
 			}
 
