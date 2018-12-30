@@ -2223,7 +2223,7 @@ _bhloop:
 	cbs := []func(){yeChainProc, stop}
 	waitInterruptWithCallback(cbs)
 
-	/*time.Sleep(time.Minute + time.Second * 10)
-	yeChainProc()
-	stop()*/
+	//time.Sleep(time.Second * 10)
+	//yeChainProc()
+	//stop()
 }

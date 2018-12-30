@@ -87,9 +87,7 @@ type ConInst struct {
 	ior				ggio.ReadCloser			// IO reader
 	dir				ConInstDir				// connection instance directory
 	hsInfo			conInstHandshakeInfo	// handshake information
-	txPending		*list.List				// pending packages to be sent
 	txWaitRsp		*list.List				// packages had been sent but waiting for response from peer
-	txLock			sync.Mutex				// tx lock
 	txChan			chan interface{}		// tx pendings signal
 	txDone			chan int				// tx-task done signal
 	rxDone			chan int				// rx-task done signal
@@ -174,7 +172,7 @@ type conInstTxPkg struct {
 // Constants related to performance
 //
 const (
-	ciTxPendingQueueSize = 512				// max tx-pending queue size
+	ciTxPendingQueueSize = 128				// max tx-pending queue size
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
@@ -190,7 +188,6 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		name:				"conInst" + postFixed,
 		status:				CisNull,
 		dir:				ConInstDirUnknown,
-		txPending:			list.New(),
 		txWaitRsp:			list.New(),
 		isBlind:			isBlind,
 		txPkgCnt:			0,
@@ -625,10 +622,7 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 		return DhtEnoParameter
 	}
 
-	conInst.txLock.Lock()
-	defer conInst.txLock.Unlock()
-
-	if conInst.txPending.Len() >= ciTxPendingQueueSize {
+	if len(conInst.txChan) >= cap(conInst.txChan) {
 		ciLog.Debug("txPutPending: pending queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		return DhtEnoResource
@@ -643,7 +637,6 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 	ciLog.Debug("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
 		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
-	conInst.txPending.PushBack(pkg)
 	conInst.txChan<-pkg
 
 	return DhtEnoNone
@@ -708,14 +701,17 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 	ciLog.Debug("txTimerHandler: inst: %s, hsInfo: %+v, local: %+v, txPkg: %+v",
 		conInst.name, conInst.hsInfo, *conInst.local, *txPkg)
 
-	conInst.cleanUp(int(DhtEnoTimeout))
-	conInst.updateStatus(CisClosed)
-	conInst.statusReport()
+	if conInst.getStatus() < CisInKilling {
 
-	if eno := conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask); eno != sch.SchEnoNone {
-		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s, eno: %d, hsInfo: %+v, local: %+v",
-			conInst.name, eno, conInst.hsInfo, *conInst.local)
-		return eno
+		conInst.cleanUp(int(DhtEnoTimeout))
+		conInst.updateStatus(CisClosed)
+		conInst.statusReport()
+
+		if eno := conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask); eno != sch.SchEnoNone {
+			ciLog.Debug("txTimerHandler: invalid parameter, inst: %s, eno: %d, hsInfo: %+v, local: %+v",
+				conInst.name, eno, conInst.hsInfo, *conInst.local)
+			return eno
+		}
 	}
 
 	return sch.SchEnoNone
@@ -761,11 +757,7 @@ func (conInst *ConInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 // Set current Tx pending
 //
 func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Element){
-	conInst.txLock.Lock()
-	defer conInst.txLock.Unlock()
-
 	var el *list.Element = nil
-
 	if txPkg != nil {
 
 		txPkg.taskName = conInst.sdl.SchGetTaskName(txPkg.task)
@@ -776,7 +768,6 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Elemen
 
 		el = conInst.txWaitRsp.PushBack(txPkg)
 	}
-
 	return DhtEnoNone, el
 }
 
@@ -1244,7 +1235,6 @@ _txLoop:
 		var txPkg *conInstTxPkg = nil
 		var dhtPkg *DhtPackage = nil
 		var pbPkg *pb.DhtPackage = nil
-		var ok bool
 		var el *list.Element
 
 		//
@@ -1253,7 +1243,7 @@ _txLoop:
 
 		ciLog.Debug("txProc: 0, peer: %x", conInst.hsInfo.peer.ID)
 
-		_, ok = <-conInst.txChan
+		inf, ok := <-conInst.txChan
 		if !ok {
 			goto _checkDone
 		}
@@ -1264,18 +1254,7 @@ _txLoop:
 
 		ciLog.Debug("txProc: 1, peer: %x", conInst.hsInfo.peer.ID)
 
-		conInst.txLock.Lock()
-		el = conInst.txPending.Front()
-		if el != nil {
-			conInst.txPending.Remove(el)
-		}
-		conInst.txLock.Unlock()
-
-		if el == nil {
-			time.Sleep(time.Microsecond * 10)
-			goto _checkDone
-		}
-
+		txPkg = inf.(*conInstTxPkg)
 		if txPkg, ok = el.Value.(*conInstTxPkg); !ok {
 			ciLog.Debug("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
@@ -1790,9 +1769,6 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 //
 func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
 
-	conInst.txLock.Lock()
-	defer conInst.txLock.Unlock()
-
 	que := conInst.txWaitRsp
 
 	for el := que.Front(); el != nil; el = el.Next() {
@@ -1810,7 +1786,6 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 					//
 
 					txPkg.responsed<-true
-					close(txPkg.responsed)
 				}
 
 				if txPkg.txTid != sch.SchInvalidTid {

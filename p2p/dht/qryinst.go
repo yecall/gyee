@@ -480,7 +480,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	if icb.qryReq.ForWhat == MID_FINDNODE ||
 		icb.qryReq.ForWhat == MID_GETPROVIDER_REQ ||
 		icb.qryReq.ForWhat == MID_GETVALUE_REQ {
-		sendReq.WaitRsp = true
+		sendReq.WaitRsp = false
 		sendReq.WaitMid = waitMid[icb.qryReq.ForWhat]
 		sendReq.WaitSeq = icb.qryReq.Seq
 	} else {
