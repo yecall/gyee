@@ -1292,7 +1292,7 @@ func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
 	}
 
 	if len(inst.txChan) >= cap(inst.txChan) {
-		peerLog.Debug("peMgrDataReq: tx queue full, inst: %s", inst.name)
+		peerLog.Debug("peMgrDataReq: discarded, tx queue full, inst: %s", inst.name)
 		return PeMgrEnoResource
 	}
 
@@ -1743,7 +1743,7 @@ const PeInstDirInbound		= 0					// inbound connection
 const PeInstDirOutbound		= 1					// outbound connection
 
 const PeInstMailboxSize 	= 512				// mailbox size
-const PeInstMaxP2packages	= 128				// max p2p packages pending to be sent
+const PeInstMaxP2packages	= 512				// max p2p packages pending to be sent
 const PeInstMaxPingpongCnt	= 8					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second * 16	// pingpong period
 
@@ -2373,7 +2373,7 @@ func piTx(pi *peerInstance) PeMgrErrno {
 
 _txLoop:
 	for {
-		// check if done
+		// check if any pendings or done
 		upkg, ok := <-pi.txChan
 		if !ok {
 			break _txLoop
@@ -2436,6 +2436,8 @@ _txLoop:
 				pi.txSeq, pi.txOkCnt, pi.txFailedCnt, pi.snid, pi.dir, pi.node.ID)
 		}
 	}
+
+	peerLog.Debug("piTx: exit, snid: %x, dir: %d, peer: %x", pi.snid, pi.dir, pi.node.ID)
 	return PeMgrEnoNone
 }
 
@@ -2556,6 +2558,7 @@ _rxLoop:
 		}
 	}
 
+	peerLog.Debug("piRx: exit, snid: %x, dir: %d, peer: %x", pi.snid, pi.dir, pi.node.ID)
 	return done
 }
 

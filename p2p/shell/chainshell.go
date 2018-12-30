@@ -326,6 +326,12 @@ func (shMgr *ShellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPa
 }
 
 func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	if len(peer.txChan) >= cap(peer.txChan) {
+		chainLog.Debug("send2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
+			peer.snid, peer.dir, peer.nodeId)
+		return sch.SchEnoResource
+	}
+
 	if pkg := shMgr.bcr2Package(req); pkg == nil {
 		chainLog.Debug("send2Peer: bcr2Package failed")
 		return sch.SchEnoUserTask

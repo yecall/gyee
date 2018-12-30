@@ -486,7 +486,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		nearestDist = []int{bn.dist}
 	}
 
-	pcsTab := []int{}
+	pcsTab := make([]int, 0)
 	rsp.Peers = nearest
 	rsp.Dists = nearestDist
 	for _, p := range nearest {

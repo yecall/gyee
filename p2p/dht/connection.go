@@ -656,12 +656,12 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	for _, ci := range cis {
 		if ci != nil {
 			found = true
-			if ci.status >= CisInKilling {
+			if ci.getStatus() >= CisInKilling {
 				dup = true
 			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
 			} else {
-				ci.status = CisInKilling
+				ci.updateStatus(CisInKilling)
 				ind := sch.MsgDhtConInstStatusInd {
 					Peer: &ci.hsInfo.peer.ID,
 					Dir: int(ci.dir),
@@ -922,12 +922,12 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	for _, ci := range cis {
 		if ci != nil {
 			found = true
-			if ci.status >= CisInKilling {
+			if ci.getStatus() >= CisInKilling {
 				dup = true
 			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
 			} else {
-				ci.status = CisInKilling
+				ci.updateStatus(CisInKilling)
 			}
 		}
 	}
@@ -1051,7 +1051,7 @@ func (conMgr *ConMgr)setupConInst(ci *ConInst, srcTask interface{}, peer *config
 
 	} else {
 
-		ci.status = CisAccepted
+		ci.updateStatus(CisAccepted)
 		ci.con = msg.(*sch.MsgDhtLsnMgrAcceptInd).Con
 		ci.dir = ConInstDirInbound
 
@@ -1166,8 +1166,8 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
 				connLog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
 			}
-			if ci.status < CisInKilling {
-				ci.status = CisInKilling
+			if ci.getStatus() < CisInKilling {
+				ci.updateStatus(CisInKilling)
 				ind := sch.MsgDhtConInstStatusInd {
 					Peer: msg.Peer,
 					Dir: msg.Dir,

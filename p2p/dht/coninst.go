@@ -78,6 +78,7 @@ type ConInst struct {
 	srcTaskName		string					// name of the owner source task
 	ptnSrcTsk		interface{}				// for outbound, the source task requests the connection
 
+	cisLock			sync.Mutex				// lock for status updating
 	status			conInstStatus			// instance status
 	hsTimeout		time.Duration			// handshake timeout value
 	cid				conInstIdentity			// connection instance identity
@@ -173,7 +174,7 @@ type conInstTxPkg struct {
 // Constants related to performance
 //
 const (
-	ciTxPendingQueueSize = 64				// max tx-pending queue size
+	ciTxPendingQueueSize = 512				// max tx-pending queue size
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
@@ -277,7 +278,7 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 		if conInst.statusReport() != DhtEnoNone {
 			return sch.SchEnoUserTask
 		}
-		conInst.status = CisConnected
+		conInst.updateStatus(CisConnected)
 		return sch.SchEnoNone
 	}
 
@@ -349,7 +350,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 
 	if conInst.con == nil && conInst.dir == ConInstDirOutbound {
 
-		conInst.status = CisConnecting
+		conInst.updateStatus(CisConnecting)
 		conInst.statusReport()
 
 		if eno := conInst.connect2Peer(); eno != DhtEnoNone {
@@ -366,7 +367,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 		ciLog.Debug("handshakeReq: connect ok, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
-		conInst.status = CisConnected
+		conInst.updateStatus(CisConnected)
 		conInst.statusReport()
 	}
 
@@ -374,7 +375,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	// handshake
 	//
 
-	conInst.status = CisInHandshaking
+	conInst.updateStatus(CisInHandshaking)
 	conInst.hsTimeout = msg.DurHs
 	conInst.statusReport()
 
@@ -408,7 +409,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 		}
 	}
 
-	conInst.status = CisHandshaked
+	conInst.updateStatus(CisHandshaked)
 	conInst.statusReport()
 
 	rsp.Eno = DhtEnoNone.GetEno()
@@ -427,7 +428,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
 
-	conInst.status = CisInService
+	conInst.updateStatus(CisInService)
 	conInst.statusReport()
 
 	return sch.SchEnoNone
@@ -438,13 +439,14 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 
-	if conInst.status != CisHandshaked &&
-		conInst.status != CisInService &&
+	status := conInst.getStatus()
+	if status != CisHandshaked &&
+		status != CisInService &&
 		conInst.dir != ConInstDirOutbound {
 
 		ciLog.Debug("closeReq: " +
 			"status mismatched, dir: %d, status: %d",
-			conInst.dir, conInst.status)
+			conInst.dir, status)
 		return sch.SchEnoMismatched
 	}
 
@@ -458,7 +460,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 		msg.Why, *msg.Peer)
 
 	conInst.cleanUp(DhtEnoNone.GetEno())
-	conInst.status = CisClosed
+	conInst.updateStatus(CisClosed)
 	conInst.statusReport()
 
 	schMsg := sch.SchMessage{}
@@ -707,7 +709,7 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 		conInst.name, conInst.hsInfo, *conInst.local, *txPkg)
 
 	conInst.cleanUp(int(DhtEnoTimeout))
-	conInst.status = CisClosed
+	conInst.updateStatus(CisClosed)
 	conInst.statusReport()
 
 	if eno := conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask); eno != sch.SchEnoNone {
@@ -990,7 +992,7 @@ func (conInst *ConInst)statusReport() DhtErrno {
 	ind := sch.MsgDhtConInstStatusInd {
 		Peer:   &conInst.hsInfo.peer.ID,
 		Dir:    int(conInst.dir),
-		Status: int(conInst.status),
+		Status: int(conInst.getStatus()),
 	}
 
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstStatusInd, &ind)
@@ -1340,8 +1342,10 @@ _txLoop:
 		// the 1) case: report the status and then wait and hen singal done
 		//
 
-		conInst.status = CisOutOfService
-		conInst.statusReport()
+		if conInst.status < CisOutOfService {
+			conInst.updateStatus(CisOutOfService)
+			conInst.statusReport()
+		}
 
 		<-conInst.txDone
 		conInst.txDone<-DhtEnoNone.GetEno()
@@ -1461,8 +1465,10 @@ _checkDone:
 		// the 1) case: report the status and then wait and then signal done
 		//
 
-		conInst.status = CisOutOfService
-		conInst.statusReport()
+		if conInst.status < CisOutOfService {
+			conInst.updateStatus(CisOutOfService)
+			conInst.statusReport()
+		}
 
 		<-conInst.rxDone
 		conInst.rxDone <- DhtEnoNone.GetEno()
@@ -1850,4 +1856,22 @@ func (conInst *ConInst)InstallRxDataCallback(cbf ConInstRxDataCallback) DhtErrno
 //
 func (conInst *ConInst)GetScheduler() *sch.Scheduler {
 	return conInst.sdl
+}
+
+//
+// Update instance status
+//
+func (conInst *ConInst)updateStatus(status conInstStatus) {
+	conInst.cisLock.Lock()
+	defer conInst.cisLock.Unlock()
+	conInst.status = status
+}
+
+//
+// Get instance status
+//
+func (conInst *ConInst)getStatus() conInstStatus {
+	conInst.cisLock.Lock()
+	defer conInst.cisLock.Unlock()
+	return conInst.status
 }
