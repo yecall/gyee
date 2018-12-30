@@ -2199,7 +2199,7 @@ _bhloop:
 			yeShMgr.BroadcastMessageOsn(bk)
 
 			if cnt & 0x7f == 0 {
-				log.Debug("testCase8: cnt: %d, bk BroadcastMessageOsn", cnt)
+				log.Debug("testCase8: cnt: %d, loop BroadcastMessageOsn", cnt)
 			}
 
 			time.Sleep(time.Millisecond * 20 /*1000*/)

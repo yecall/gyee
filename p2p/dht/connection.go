@@ -30,6 +30,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"golang.org/x/text/cmd/gotext/examples/extract_http/pkg"
 )
 
 
@@ -707,7 +708,6 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	}
 
 	ci := conMgr.lookupOutboundConInst(&msg.Peer.ID)
-
 	if ci == nil {
 		ci = conMgr.lookupInboundConInst(&msg.Peer.ID)
 	}
@@ -716,25 +716,35 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 		connLog.Debug("sendReq: connection instance found: %+v", *ci)
 
-		pkg := conInstTxPkg {
-			task:		msg.Task,
-			responsed:	nil,
-			submitTime:	time.Now(),
-			payload:	msg.Data,
-		}
+		curStat := ci.getStatus()
 
-		if msg.WaitRsp == true {
-			pkg.responsed = make(chan bool, 1)
-			pkg.waitMid = msg.WaitMid
-			pkg.waitSeq = msg.WaitSeq
-		}
+		if curStat != CisInService {
 
-		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
-			connLog.Debug("sendReq: txPutPending failed, eno: %d", eno)
+			connLog.Debug("sendReq: can't send, status: %d", curStat)
 			return sch.SchEnoUserTask
-		}
 
-		return sch.SchEnoNone
+		} else {
+
+			pkg := conInstTxPkg{
+				task:       msg.Task,
+				responsed:  nil,
+				submitTime: time.Now(),
+				payload:    msg.Data,
+			}
+
+			if msg.WaitRsp == true {
+				pkg.responsed = make(chan bool, 1)
+				pkg.waitMid = msg.WaitMid
+				pkg.waitSeq = msg.WaitSeq
+			}
+
+			if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
+				connLog.Debug("sendReq: txPutPending failed, eno: %d", eno)
+				return sch.SchEnoUserTask
+			}
+
+			return sch.SchEnoNone
+		}
 	}
 
 	connLog.Debug("sendReq: connection instance not found, tell connection manager to build it ...")
@@ -792,6 +802,9 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	case CisOutOfService:
 		conMgr.instOutOfServiceInd(msg)
+
+	case CisTimeout:
+		conMgr.instTxTimeoutInd(msg)
 
 	case CisClosed:
 		conMgr.instClosedInd(msg)
@@ -1188,4 +1201,12 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 	}
 
 	return sch.SchEnoNone
+}
+
+//
+// instance tx timeout
+//
+func (conMgr *ConMgr)instTxTimeoutInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+	ciLog.Debug("instTxTimeoutInd: peer: %x, dir: %d, status: %d", *msg.Peer, msg.Dir, msg.Status)
+	return conMgr.instOutOfServiceInd(msg)
 }

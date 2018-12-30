@@ -122,6 +122,7 @@ const (
 	CisInHandshaking				// handshaking
 	CisHandshaked					// handshaked
 	CisInService					// in service
+	CisTimeout						// time out
 	CisOutOfService					// out of service but is not closed
 	CisInKilling					// in killing
 	CisClosed						// closed
@@ -704,14 +705,8 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 	if conInst.getStatus() < CisInKilling {
 
 		conInst.cleanUp(int(DhtEnoTimeout))
-		conInst.updateStatus(CisClosed)
+		conInst.updateStatus(CisTimeout)
 		conInst.statusReport()
-
-		if eno := conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask); eno != sch.SchEnoNone {
-			ciLog.Debug("txTimerHandler: invalid parameter, inst: %s, eno: %d, hsInfo: %+v, local: %+v",
-				conInst.name, eno, conInst.hsInfo, *conInst.local)
-			return eno
-		}
 	}
 
 	return sch.SchEnoNone

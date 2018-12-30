@@ -769,7 +769,7 @@ _rxLoop:
 				continue
 			}
 
-			yesLog.Debug("chainRxProc: peer info: %+v, pkg: %+v", *pkg.PeerInfo, *pkg)
+			//yesLog.Debug("chainRxProc: peer info: %+v, pkg: %+v", *pkg.PeerInfo, *pkg)
 
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
