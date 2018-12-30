@@ -41,7 +41,7 @@ type connLogger struct {
 }
 
 var connLog = connLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {
@@ -661,7 +661,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 			} else {
 				ci.updateStatus(CisInKilling)
 				ind := sch.MsgDhtConInstStatusInd {
-					Peer: &ci.hsInfo.peer.ID,
+					Peer: &msg.Peer.ID,
 					Dir: int(ci.dir),
 					Status: CisInKilling,
 				}
@@ -942,7 +942,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 					Status: CisInKilling,
 				}
 				schMsg := sch.SchMessage{}
-				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnMe, sch.EvDhtConInstStatusInd, &ind)
 				conMgr.sdl.SchSendMessage(&schMsg)
 
 				if req2Inst(ci) != sch.SchEnoNone {
@@ -1196,7 +1196,7 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 					Status: CisInKilling,
 				}
 				schMsg := sch.SchMessage{}
-				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnMe, sch.EvDhtConInstStatusInd, &ind)
 				conMgr.sdl.SchSendMessage(&schMsg)
 
 				req := sch.MsgDhtConInstCloseReq{

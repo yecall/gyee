@@ -1314,7 +1314,7 @@ _txLoop:
 		// the 1) case: report the status and then wait and hen singal done
 		//
 
-		if conInst.status < CisOutOfService {
+		if conInst.getStatus() < CisOutOfService {
 			conInst.updateStatus(CisOutOfService)
 			conInst.statusReport()
 		}
@@ -1437,7 +1437,7 @@ _checkDone:
 		// the 1) case: report the status and then wait and then signal done
 		//
 
-		if conInst.status < CisOutOfService {
+		if conInst.getStatus() < CisOutOfService {
 			conInst.updateStatus(CisOutOfService)
 			conInst.statusReport()
 		}
