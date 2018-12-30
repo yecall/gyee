@@ -658,8 +658,6 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 			found = true
 			if ci.getStatus() >= CisInKilling {
 				dup = true
-			} else if req2Inst(ci) != sch.SchEnoNone {
-				err = true
 			} else {
 				ci.updateStatus(CisInKilling)
 				ind := sch.MsgDhtConInstStatusInd {
@@ -670,6 +668,9 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 				schMsg := sch.SchMessage{}
 				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
 				conMgr.sdl.SchSendMessage(&schMsg)
+				if req2Inst(ci) != sch.SchEnoNone {
+					err = true
+				}
 			}
 		}
 	}
@@ -933,20 +934,32 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 			found = true
 			if ci.getStatus() >= CisInKilling {
 				dup = true
-			} else if req2Inst(ci) != sch.SchEnoNone {
-				err = true
 			} else {
 				ci.updateStatus(CisInKilling)
+				ind := sch.MsgDhtConInstStatusInd {
+					Peer: &msg.Peer,
+					Dir: int(ci.dir),
+					Status: CisInKilling,
+				}
+				schMsg := sch.SchMessage{}
+				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
+				conMgr.sdl.SchSendMessage(&schMsg)
+
+				if req2Inst(ci) != sch.SchEnoNone {
+					err = true
+				}
 			}
 		}
 	}
 
 	if !found {
 		connLog.Debug("rutPeerRemoveInd: not found, id: %x", msg.Peer)
+		return sch.SchEnoNotFound
 	}
 
 	if dup {
 		connLog.Debug("rutPeerRemoveInd: kill more than once")
+		return sch.SchEnoDuplicated
 	}
 
 	if err {

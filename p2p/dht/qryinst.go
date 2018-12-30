@@ -333,7 +333,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 
 	//
 	// this timer might for waiting connection establishment response or waiting
-	// response from peer fro a query.
+	// response from peer for a query.
 	//
 
 	if (icb.status != qisWaitConnect && icb.status != qisWaitResponse) || icb.qTid == sch.SchInvalidTid {

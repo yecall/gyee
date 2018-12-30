@@ -702,10 +702,15 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 		conInst.name, conInst.hsInfo, *conInst.local, *txPkg)
 
 	if conInst.getStatus() < CisInKilling {
-
-		conInst.cleanUp(int(DhtEnoTimeout))
 		conInst.updateStatus(CisInKilling)
 		conInst.statusReport()
+		req := sch.MsgDhtConInstCloseReq {
+			Peer: &conInst.cid.nid,
+			Why: sch.EvDhtConInstTxTimer,
+		}
+		schMsg := sch.SchMessage{}
+		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtConInstCloseReq, &req)
+		return conInst.sdl.SchSendMessage(&schMsg)
 	}
 
 	return sch.SchEnoNone
