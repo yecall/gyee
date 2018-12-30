@@ -619,6 +619,9 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		nid:	msg.Peer.ID,
 		dir:	ConInstDir(msg.Dir),
 	}
+	if cid.dir == ConInstDirUnknown {
+		cid.dir = ConInstDirAllbound
+	}
 
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl

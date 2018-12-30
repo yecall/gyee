@@ -139,7 +139,7 @@ const (
 	ConInstDirUnknown	= -1		// not be initialized
 )
 
-type ConInstDir int
+type ConInstDir = int
 
 //
 // Handshake information
