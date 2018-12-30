@@ -1235,7 +1235,6 @@ _txLoop:
 		var txPkg *conInstTxPkg = nil
 		var dhtPkg *DhtPackage = nil
 		var pbPkg *pb.DhtPackage = nil
-		var el *list.Element
 
 		//
 		// fetch pending signal
@@ -1255,11 +1254,6 @@ _txLoop:
 		ciLog.Debug("txProc: 1, peer: %x", conInst.hsInfo.peer.ID)
 
 		txPkg = inf.(*conInstTxPkg)
-		if txPkg, ok = el.Value.(*conInstTxPkg); !ok {
-			ciLog.Debug("txProc: mismatched type, inst: %s", conInst.name)
-			goto _checkDone
-		}
-
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
 			ciLog.Debug("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
