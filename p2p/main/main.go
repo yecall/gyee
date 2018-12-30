@@ -2220,10 +2220,10 @@ _bhloop:
 	_ = yeChainProc
 	_ = stop
 	//cbs := []func(){stop}
-	/*cbs := []func(){yeChainProc, stop}
-	waitInterruptWithCallback(cbs)*/
+	cbs := []func(){yeChainProc, stop}
+	waitInterruptWithCallback(cbs)
 
-	time.Sleep(time.Minute + time.Second * 10)
+	/*time.Sleep(time.Minute + time.Second * 10)
 	yeChainProc()
-	stop()
+	stop()*/
 }
