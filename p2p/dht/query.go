@@ -148,6 +148,7 @@ type qryInstCtrlBlock struct {
 	local		*config.Node					// pointer to local node specification
 	target		config.DsKey					// target is looking up
 	to			config.Node						// to whom the query message sent
+	dir			int								// connection direction
 	qTid		int								// query timer identity
 	begTime		time.Time						// query begin time
 	endTime		time.Time						// query end time
@@ -1302,6 +1303,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			status:		qisNull,
 			target:		qcb.target,
 			to:			pending.node,
+			dir:		ConInstDirUnknown,
 			qTid:		sch.SchInvalidTid,
 			begTime:	time.Time{},
 			endTime:	time.Time{},

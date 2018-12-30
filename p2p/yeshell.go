@@ -844,6 +844,7 @@ func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 				// when coming here, we should havd add the connected bootstarp node to our
 				// dht route table, but it's the only node there, we need to start a bootstrap
 				// procedure to fill our route now.
+				time.Sleep(time.Second)
 				schMsg := sch.SchMessage{}
 				yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtRutRefreshReq, nil)
 				yeShMgr.dhtInst.SchSendMessage(&schMsg)

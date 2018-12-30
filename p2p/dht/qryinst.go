@@ -293,6 +293,7 @@ func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
 		req := sch.MsgDhtConMgrCloseReq {
 			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
 			Peer:	&icb.to,
+			Dir:	icb.dir,
 		}
 
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
@@ -352,6 +353,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 		req := sch.MsgDhtConMgrCloseReq{
 			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
 			Peer:	&icb.to,
+			Dir:	icb.dir,
 		}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
 		sdl.SchSendMessage(&schMsg)
@@ -440,6 +442,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	}
 
 	icb.conEndTime = time.Now()
+	icb.dir = msg.Dir
 
 	//
 	// send query to peer since connection is ok here now

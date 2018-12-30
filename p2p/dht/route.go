@@ -69,6 +69,7 @@ const (
 	rutMgrMaxFails2Del = 3					// max fails to be deleted
 	rutMgrEwmaHisSize = 8					// history sample number
 	rutMgrEwmaMF = 0.1						// memorize factor for EWMA filter
+	rutBootstrap4LBS = true					// if bootstrap for local even it's a bootstrap node
 )
 
 //
@@ -716,8 +717,8 @@ func (rutMgr *RutMgr)rutMgrGetRouteConfig() DhtErrno {
 //
 func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 
-	if rutMgr.bootstrapNode {
-		rutLog.Debug("rutMgrStartBspTimer: no bootstrap timer for a bot")
+	if rutMgr.bootstrapNode && !rutBootstrap4LBS {
+		rutLog.Debug("rutMgrStartBspTimer: no timer, local is bootstrap node")
 		return DhtEnoNone
 	}
 
