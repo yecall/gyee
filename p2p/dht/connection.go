@@ -30,7 +30,6 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"golang.org/x/text/cmd/gotext/examples/extract_http/pkg"
 )
 
 
