@@ -122,7 +122,6 @@ const (
 	CisInHandshaking				// handshaking
 	CisHandshaked					// handshaked
 	CisInService					// in service
-	CisTimeout						// time out
 	CisOutOfService					// out of service but is not closed
 	CisInKilling					// in killing
 	CisClosed						// closed
@@ -705,7 +704,7 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 	if conInst.getStatus() < CisInKilling {
 
 		conInst.cleanUp(int(DhtEnoTimeout))
-		conInst.updateStatus(CisTimeout)
+		conInst.updateStatus(CisInKilling)
 		conInst.statusReport()
 	}
 

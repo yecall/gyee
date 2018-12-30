@@ -41,7 +41,7 @@ type connLogger struct {
 }
 
 var connLog = connLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {
@@ -801,9 +801,6 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	case CisOutOfService:
 		conMgr.instOutOfServiceInd(msg)
-
-	case CisTimeout:
-		conMgr.instTxTimeoutInd(msg)
 
 	case CisClosed:
 		conMgr.instClosedInd(msg)
