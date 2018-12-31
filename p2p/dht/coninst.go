@@ -437,10 +437,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 
 	status := conInst.getStatus()
-	if status != CisHandshaked &&
-		status != CisInService &&
-		conInst.dir != ConInstDirOutbound {
-
+	if status < CisHandshaked || status >= CisClosed {
 		ciLog.Debug("closeReq: " +
 			"status mismatched, dir: %d, status: %d",
 			conInst.dir, status)

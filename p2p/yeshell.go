@@ -457,7 +457,7 @@ func (yeShMgr *yeShellManager)BroadcastMessageOsn(message Message) error {
 	case MessageTypeTx:
 		err = yeShMgr.broadcastTxOsn(&message)
 	case MessageTypeEvent:
-		err = yeShMgr.broadcastEvOsn(&message)
+		err = yeShMgr.broadcastEvOsn(&message, true)
 	case MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBhOsn(&message)
 	case MessageTypeBlock:
@@ -786,7 +786,7 @@ _rxLoop:
 					case MessageTypeTx:
 						err = yeShMgr.broadcastTxOsn(&msg)
 					case MessageTypeEvent:
-						err = yeShMgr.broadcastEvOsn(&msg)
+						err = yeShMgr.broadcastEvOsn(&msg, false)
 					case MessageTypeBlockHeader:
 						err = yeShMgr.broadcastBhOsn(&msg)
 					case MessageTypeBlock:
@@ -992,7 +992,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	return nil
 }
 
-func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
+func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
 	// the local node must be a validator, and the Ev should be broadcast
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
@@ -1022,15 +1022,17 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message) error {
 		return eno
 	}
 
-	req2Dht := sch.MsgDhtMgrPutValueReq {
-		Key: msg.Key,
-		Val: msg.Data,
-		KeepTime: YeShellCfg.EvKeepTime,
-	}
-	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req2Dht)
-	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		yesLog.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
-		return eno
+	if dht {
+		req2Dht := sch.MsgDhtMgrPutValueReq{
+			Key:      msg.Key,
+			Val:      msg.Data,
+			KeepTime: YeShellCfg.EvKeepTime,
+		}
+		yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req2Dht)
+		if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			yesLog.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
+			return eno
+		}
 	}
 
 	return nil
