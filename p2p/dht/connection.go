@@ -239,7 +239,10 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	sdl := conMgr.sdl
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), true)
-	conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil, msg)
+	if dhtEno := conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil, msg); dhtEno != DhtEnoNone {
+		connLog.Debug("acceptInd: setupConInst failed, eno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{
@@ -467,6 +470,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				}
 
 				ci.txPutPending(&pkg)
+				li.Remove(el)
 			}
 
 			delete(conMgr.txQueTab, cid)
@@ -563,7 +567,10 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	connLog.Debug("connctReq: create connection instance, peer ip: %s", msg.Peer.IP.String())
 
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
-	conMgr.setupConInst(ci, sender, msg.Peer, nil)
+	if dhtEno := conMgr.setupConInst(ci, sender, msg.Peer, nil); dhtEno != DhtEnoNone {
+		connLog.Debug("connctReq: setupConInst failed, eno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
 	conMgr.ciSeq++
 
 	td := sch.SchTaskDescription{

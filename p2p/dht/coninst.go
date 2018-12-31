@@ -764,7 +764,8 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Elemen
 		txPkg.taskName = conInst.sdl.SchGetTaskName(txPkg.task)
 		if len(txPkg.taskName) == 0 {
 			ciLog.Debug("txSetPending: task without name")
-			panic("txSetPending: task without name")
+			//panic("txSetPending: task without name")
+			return DhtEnoScheduler, nil
 		}
 
 		el = conInst.txWaitRsp.PushBack(txPkg)
@@ -1274,7 +1275,10 @@ _txLoop:
 		ciLog.Debug("txProc: 3, peer: %x", conInst.hsInfo.peer.ID)
 
 		if txPkg.responsed != nil {
-			if eno, el := conInst.txSetPending(txPkg); eno == DhtEnoNone && el != nil {
+			if eno, el := conInst.txSetPending(txPkg); eno != DhtEnoNone || el == nil {
+				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
+				goto _checkDone
+			} else {
 				conInst.txSetTimer(el)
 			}
 		}
