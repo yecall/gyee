@@ -631,7 +631,14 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErrno {
 	nwt := peMgr.cfg.networkType
 	snid := msg.(*SubNetworkID)
+
 	peerLog.Debug("peMgrDcvFindNodeTimerHandler: nwt: %d, snid: %x", nwt, *snid)
+
+	if _, ok := peMgr.tidFindNode[*snid]; ok {
+		peMgr.tidFindNode[*snid] = sch.SchInvalidTid
+	} else {
+		peerLog.Debug("peMgrDcvFindNodeTimerHandler: no timer for snid: %x", *snid)
+	}
 
 	if nwt == config.P2pNetworkTypeStatic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.staticMaxOutbounds {
@@ -643,12 +650,15 @@ func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErrn
 			peerLog.Debug("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
 			return PeMgrEnoNone
 		}
+	} else {
+		peerLog.Debug("peMgrDcvFindNodeTimerHandler: invalid network type: %d", nwt)
+		return PeMgrEnoParameter
 	}
 
 	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
-	return PeMgrEnoInternal
+	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
@@ -1691,7 +1701,7 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvFindNodeReq, &req)
 		peMgr.sdl.SchSendMessage(&schMsg)
-		timerName = sch.PeerMgrName + "_DcvFindNode"
+		timerName = fmt.Sprintf("%s%x", sch.PeerMgrName + "_DcvFindNodeTimer_", *snid)
 
 		peerLog.Debug("peMgrAsk4More: "+
 			"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
@@ -1707,13 +1717,17 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		timerName = sch.PeerMgrName + "_static"
 	}
 
-	// set a ABS timer
+	// set a ABS timer. notice: we must update tidFindNode for subnet when
+	// find-node timer expired, see function peMgrDcvFindNodeTimerHandler
+	// for more please. also notice that, this function might be called before
+	// the timer is expired, so we need to check to kill it if it's the case.
+	extra := *snid
 	var td = sch.TimerDescription {
 		Name:	timerName,
 		Utid:	sch.PeDcvFindNodeTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	dur,
-		Extra:	snid,
+		Extra:	&extra,
 	}
 
 	if oldTid, ok := peMgr.tidFindNode[*snid]; ok && oldTid != sch.SchInvalidTid {
@@ -1729,7 +1743,8 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	peMgr.tidFindNode[*snid] = tid
 
 	if peerLog.debug__ {
-		dbgStr := fmt.Sprintf("peMgrAsk4More: updated snid_tid: [%x,%d], now: ", *snid, tid)
+		dbgStr := fmt.Sprintf("peMgrAsk4More: ptn: %p, updated snid_tid: [%x,%d], now: ",
+			peMgr.ptnMe, *snid, tid)
 		for k, v := range peMgr.tidFindNode {
 			snid_tid := fmt.Sprintf("[%x,%d],", k, v)
 			dbgStr = dbgStr + snid_tid

@@ -663,7 +663,7 @@ func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 	}
 
 	var td = sch.TimerDescription {
-		Name:	fmt.Sprintf("%s%d", conInst.name, "_txTimer"),
+		Name:	fmt.Sprintf("%s%s", conInst.name, "_txTimer"),
 		Utid:	sch.DhtConInstTxTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	ciTxTimerDuration,

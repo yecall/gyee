@@ -461,7 +461,7 @@ timerLoop:
 		//
 
 		dur := ptm.tmcb.dur
-		if dur <= 0 {
+		if dur <= time.Duration(0) {
 
 			schLog.Debug("schTimerCommonTask: " +
 				"invalid absolute timer duration:%d",
