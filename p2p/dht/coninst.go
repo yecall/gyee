@@ -506,11 +506,16 @@ func (conInst *ConInst)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sch
 	// dispatch for more please.
 	//
 
+	curStat := conInst.getStatus()
+	if curStat != CisInService {
+		ciLog.Debug("rutMgrNearestRsp: not in CisInService, curStat: %d", curStat)
+		return sch.SchEnoMismatched
+	}
+
 	if msg == nil {
 		ciLog.Debug("rutMgrNearestRsp: invalid parameters")
 		return sch.SchEnoParameter
 	}
-
 	ciLog.Debug("rutMgrNearestRsp: msg: %+v", msg)
 
 	var dhtMsg = DhtMessage {

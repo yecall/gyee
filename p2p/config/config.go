@@ -116,7 +116,7 @@ const SubNetIdBytes = 2						// 2 bytes for sub network identity
 type SubNetworkID [SubNetIdBytes]byte		// sbu network identity
 
 var (
-	ZeroSubNet = SubNetworkID{0,0}			// zero sub network
+	ZeroSubNet = SubNetworkID{0x80,0x00}	// zero sub network
 	AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
 	VSubNet = SubNetworkID{0xef, 0xff}		// validators' sub network identity
 )

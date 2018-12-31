@@ -42,7 +42,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -548,7 +548,20 @@ func (peMgr *PeerManager)ocrTimestampCleanup() {
 }
 
 func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
-	var rsp = msg.(*sch.MsgDcvFindNodeRsp)
+	var rsp, _ = msg.(*sch.MsgDcvFindNodeRsp)
+	if rsp == nil {
+		peerLog.Debug("peMgrDcvFindNodeRsp: invalid message")
+		return PeMgrEnoParameter
+	}
+
+	if peerLog.debug__ {
+		dbgStr := fmt.Sprintf("peMgrDcvFindNodeRsp: snid: %x, nodes: ", rsp.Snid)
+		for idx := 0; idx < len(rsp.Nodes); idx++ {
+			dbgStr = dbgStr + rsp.Nodes[idx].IP.String() + ","
+		}
+		peerLog.Debug(dbgStr)
+	}
+
 	if peMgr.dynamicSubNetIdExist(&rsp.Snid) != true {
 		peerLog.Debug("peMgrDcvFindNodeRsp: subnet not exist")
 		return PeMgrEnoNotfound
@@ -559,10 +572,12 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		return PeMgrEnoRecofig
 	}
 
-	var snid = rsp.Snid
-	var appended = make(map[SubNetworkID]int, 0)
-	var dup bool
-	var idEx PeerIdEx
+	var (
+		snid = rsp.Snid
+		appended = make(map[SubNetworkID]int, 0)
+		dup bool
+		idEx PeerIdEx
+	)
 
 	for _, n := range rsp.Nodes {
 		idEx.Id = n.ID
@@ -605,7 +620,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 
 	// drive ourselves to startup outbound for nodes appended
 	for snid := range appended {
-		var schMsg sch.SchMessage
+		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -616,13 +631,16 @@ func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErrno {
 	nwt := peMgr.cfg.networkType
 	snid := msg.(*SubNetworkID)
+	peerLog.Debug("peMgrDcvFindNodeTimerHandler: nwt: %d, snid: %x", nwt, *snid)
 
 	if nwt == config.P2pNetworkTypeStatic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.staticMaxOutbounds {
+			peerLog.Debug("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
 			return PeMgrEnoNone
 		}
 	} else if nwt == config.P2pNetworkTypeDynamic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.subNetMaxOutbounds[*snid] {
+			peerLog.Debug("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
 			return PeMgrEnoNone
 		}
 	}
@@ -1640,7 +1658,7 @@ func (peMgr *PeerManager)peMgrRecfg2DcvMgr() PeMgrErrno {
 func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	var timerName = ""
 	var eno sch.SchErrno
-	var tid int
+	var tid = sch.SchInvalidTid
 
 	if t, ok := peMgr.tmLastFNR[*snid]; ok {
 		if time.Now().Sub(t) <= minDuration4FindNodeReq {
@@ -1698,8 +1716,8 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		Extra:	snid,
 	}
 
-	if tid, ok := peMgr.tidFindNode[*snid]; ok && tid != sch.SchInvalidTid {
-		peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
+	if oldTid, ok := peMgr.tidFindNode[*snid]; ok && oldTid != sch.SchInvalidTid {
+		peMgr.sdl.SchKillTimer(peMgr.ptnMe, oldTid)
 		peMgr.tidFindNode[*snid] = sch.SchInvalidTid
 	}
 
@@ -1709,6 +1727,15 @@ func (peMgr *PeerManager)peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	}
 
 	peMgr.tidFindNode[*snid] = tid
+
+	if peerLog.debug__ {
+		dbgStr := fmt.Sprintf("peMgrAsk4More: updated snid_tid: [%x,%d], now: ", *snid, tid)
+		for k, v := range peMgr.tidFindNode {
+			snid_tid := fmt.Sprintf("[%x,%d],", k, v)
+			dbgStr = dbgStr + snid_tid
+		}
+		peerLog.Debug(dbgStr)
+	}
 
 	return PeMgrEnoNone
 }
@@ -2000,8 +2027,9 @@ func (pi *peerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 		eno = PeMgrEnoInternal
 	}
 
-	peerLog.Debug("piHandshakeReq: handshake result: %d, dir: %d, laddr: %s, raddr: %s, peer: %s",
+	peerLog.Debug("piHandshakeReq: handshake result: %d, snid: %x, dir: %d, laddr: %s, raddr: %s, peer: %s",
 				eno,
+				pi.snid,
 				pi.dir,
 				pi.laddr.String(),
 				pi.raddr.String(),
