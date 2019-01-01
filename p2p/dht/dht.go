@@ -47,11 +47,6 @@ func (log dhtLogger)Debug(fmt string, args ... interface{}) {
 }
 
 //
-// stand alone for TEST when it's true
-//
-const _TEST_ = false
-
-//
 // Dht manager name registered in scheduler
 //
 const DhtMgrName = sch.DhtMgrName
@@ -237,13 +232,11 @@ func (dhtMgr *DhtMgr)poweron(ptn interface{}) sch.SchErrno {
 	_, dhtMgr.ptnPrdMgr = sdl.SchGetUserTaskNode(PrdMgrName)
 	_, dhtMgr.ptnDsMgr = sdl.SchGetUserTaskNode(DsMgrName)
 
-	if _TEST_ == false {
-		var eno sch.SchErrno
-		eno, dhtMgr.ptnShMgr = sdl.SchGetUserTaskNode(sch.DhtShMgrName)
-		if eno != sch.SchEnoNone || dhtMgr.ptnShMgr == nil {
-			dhtLog.Debug("poweron: shell not found")
-			return sch.SchEnoNotFound
-		}
+	var eno sch.SchErrno
+	eno, dhtMgr.ptnShMgr = sdl.SchGetUserTaskNode(sch.DhtShMgrName)
+	if eno != sch.SchEnoNone || dhtMgr.ptnShMgr == nil {
+		dhtLog.Debug("poweron: shell not found")
+		return sch.SchEnoNotFound
 	}
 
 	if dhtMgr.ptnQryMgr == nil ||

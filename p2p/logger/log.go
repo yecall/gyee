@@ -25,8 +25,8 @@ import (
 	"os"
 	"time"
 	"fmt"
-	"log"
 	"runtime"
+	"log"
 	"path/filepath"
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
@@ -36,40 +36,34 @@ import (
 
 type P2pLogger struct {
 	logger				*logrus.Logger	// global or local logger
-	Module				string			// module name
+	Tag					string			// tag string
 	Level				uint32			// logger level
 	Global				bool			// if global logger applied
+	Skip				int				// callers to be skipped
 	LogPosition			bool			// if caller's file and line needed
 }
 
 var (
-	Debug__ = true						// debug stage flag
-	GyeeProject = true					// is playing in github.com/yeeco/gyee project
-	GlobalLogger *logrus.Logger	= nil	// the global logger
+	GyeeProject = false					// is playing in github.com/yeeco/gyee project
+	GlobalLogger *logrus.Logger = nil	// the global logger
 )
 
 func init() {
 	if GyeeProject {
-		// Notice: in the debug stage, the global debug level is forced to be DebugLevel
-		// to output messages as most as possible(the default level is InfoLevel). This
-		// might be conflicted with other module preference.
 		GlobalLogger = gylog.Logger
-		if Debug__ {
-			GlobalLogger.Level = logrus.DebugLevel
-		}
 	} else {
 		// If it's not playing in the gyee project, we create a new global logger than
 		// that created in gyee logger package, see it please.
 		GlobalLogger = logrus.New()
 		GlobalLogger.Out = os.Stdout
 		GlobalLogger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
-		GlobalLogger.Level = logrus.InfoLevel
+		GlobalLogger.Level = logrus.DebugLevel
 	}
 }
 
-func NewP2pLogger(module string, level uint32, isGlobal bool, isPosition bool) *P2pLogger {
+func NewP2pLogger(tag string, level uint32, isGlobal bool, isPosition bool) *P2pLogger {
 	logger := P2pLogger {
-		Module: module,
+		Tag: tag,
 		Level: level,
 		Global:	isGlobal,
 		LogPosition: isPosition,
@@ -86,26 +80,26 @@ func NewP2pLogger(module string, level uint32, isGlobal bool, isPosition bool) *
 }
 
 func (p2pLog *P2pLogger)getCallerFileLine() (string, int) {
-	_, file, line, _ := runtime.Caller(1)
+	_, file, line, _ := runtime.Caller(p2pLog.Skip)
 	return file, line
 }
 
-func Debug(format string, args ... interface{}) {
-	// Notice: only applied in project DEBUG stage to output the caller file and line.
-	// Use the real logger debug interface in normal cases please.
-	if !Debug__ {
+func (p2pLog *P2pLogger)Debug(format string, args ... interface{}) {
+	if !p2pLog.LogPosition {
 		msg := fmt.Sprintf(format, args...)
-		GlobalLogger.Info(msg)
+		p2pLog.logger.Debug(msg)
 	} else {
-		_, file, line, _ := runtime.Caller(2)
+		file, line := p2pLog.getCallerFileLine()
 		text := fmt.Sprintf(format, args...)
-		fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
+		fileLine := fmt.Sprintf("tag: %s, file: %s, line: %d", p2pLog.Tag, file, line)
 		textAndFileLine := fmt.Sprintf("%s\n%s", text, fileLine)
-		// Seems GlobalLogger.Printf does not work with "\n" or "\r\n" to return and
-		// get a new line, but log.Printf does.
-		// GlobalLogger.Printf("%s", textAndFileLine)
-		log.Printf("%s", textAndFileLine)
+		p2pLog.logger.Debug(textAndFileLine)
 	}
+}
+
+func Debug(format string, args ... interface{}) {
+	//GlobalLogger.Debugf(format, args...)
+	log.Printf(format, args...)
 }
 
 func (p2pLog *P2pLogger)SetFileRotationHooker(path string, count uint) {
@@ -123,8 +117,8 @@ func (p2pLog *P2pLogger)newFileRotateHooker(path string, count uint) logrus.Hook
 	if err := os.MkdirAll(path, 0700); err != nil {
 		panic("Failed to create logger folder:" + path + ". err:" + err.Error())
 	}
-	filePath := path + "/yee-%Y%m%d-%H.log"
-	linkPath := path + "/yee.log"
+	filePath := path + "/p2p-%Y%m%d-%H.log"
+	linkPath := path + "/p2p.log"
 	writer, err := rotatelogs.New(
 		filePath,
 		rotatelogs.WithLinkName(linkPath),

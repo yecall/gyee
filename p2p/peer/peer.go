@@ -51,12 +51,6 @@ func (log peerLogger)Debug(fmt string, args ... interface{}) {
 	}
 }
 
-//
-// stand alone for TEST when it's true
-//
-const _TEST_ = false
-
-
 // Peer manager errno
 const (
 	PeMgrEnoNone	= iota
@@ -355,13 +349,11 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		_, peMgr.ptnDcv = peMgr.sdl.SchGetUserTaskNode(sch.DcvMgrName)
 	}
 
-	if _TEST_ == false {
-		var ok sch.SchErrno
-		ok, peMgr.ptnShell = peMgr.sdl.SchGetUserTaskNode(sch.ShMgrName)
-		if ok != sch.SchEnoNone || peMgr.ptnShell == nil {
-			peerLog.Debug("peMgrPoweron: shell not found")
-			return PeMgrEnoScheduler
-		}
+	var ok sch.SchErrno
+	ok, peMgr.ptnShell = peMgr.sdl.SchGetUserTaskNode(sch.ShMgrName)
+	if ok != sch.SchEnoNone || peMgr.ptnShell == nil {
+		peerLog.Debug("peMgrPoweron: shell not found")
+		return PeMgrEnoScheduler
 	}
 
 	peMgr.cfg = peMgrConfig {

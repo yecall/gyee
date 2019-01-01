@@ -129,6 +129,7 @@ type rutMgrNotifee struct {
 //
 type RutMgr struct {
 	sdl				*sch.Scheduler							// pointer to scheduler
+	sdlName			string									// same as the node name
 	name			string									// my name
 	tep				sch.SchUserTaskEp						// task entry
 	ptnMe			interface{}								// pointer to task node of myself
@@ -158,11 +159,12 @@ var defautBspCfg = bootstrapPolicy {
 }
 
 //
-// Reference to external bootstrap nodes
+// Reference to external bootstrap nodes. Notice that "nname" should be the node name
+// of the caller, and must be unique when multiple instances invoked.
 //
-var bootstrapNodes []*config.Node = nil
-func SetBootstrapNodes(bsn []*config.Node) {
-	bootstrapNodes = bsn
+var bootstrapNodes = make(map[string][]*config.Node, 0)
+func SetBootstrapNodes(bsn []*config.Node, nname string) {
+	bootstrapNodes[nname] = bsn
 }
 
 //
@@ -267,6 +269,7 @@ func (rutMgr *RutMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	rutMgr.ptnMe = ptn
 	rutMgr.sdl = sch.SchGetScheduler(ptn)
+	rutMgr.sdlName = rutMgr.sdl.SchGetP2pNodeName()
 
 	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetUserTaskNode(QryMgrName)
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
@@ -466,14 +469,15 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 
 	if dhtEno == DhtEnoNone && len(nearest) <= 0 {
 		rutLog.Debug("nearestReq: empty nearest set from buckets, bootstrap node applied")
-		if bootstrapNodes == nil {
+		bsns, ok := bootstrapNodes[rutMgr.sdlName]
+		if !ok || bsns == nil {
 			rsp.Eno = int(DhtEnoNotFound)
 			rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
 			return rutMgr.sdl.SchSendMessage(&schMsg)
 		}
 
-		idx := mrand.Int31n(int32(len(bootstrapNodes)))
-		node := bootstrapNodes[idx]
+		idx := mrand.Int31n(int32(len(bsns)))
+		node := bsns[idx]
 		hash := rutMgrNodeId2Hash(node.ID)
 		bn := rutMgrBucketNode {
 			node: *node,

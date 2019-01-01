@@ -101,19 +101,19 @@ func (osns *OsnService)Reconfig(reCfg *RecfgCommand) error {
 }
 
 func (osns *OsnService)BroadcastMessage(message Message) error {
-	return osns.BroadcastMessage(message)
+	return osns.yeShMgr.BroadcastMessage(message)
 }
 
 func (osns *OsnService)BroadcastMessageOsn(message Message) error {
-	return osns.BroadcastMessageOsn(message)
+	return osns.yeShMgr.BroadcastMessageOsn(message)
 }
 
 func (osns *OsnService)Register(subscriber *Subscriber) {
-	osns.Register(subscriber)
+	osns.yeShMgr.Register(subscriber)
 }
 
 func (osns *OsnService)UnRegister(subscriber *Subscriber) {
-	osns.UnRegister(subscriber)
+	osns.yeShMgr.UnRegister(subscriber)
 }
 
 func (osns *OsnService)DhtGetValue(key []byte) ([]byte, error) {
@@ -125,5 +125,9 @@ func (osns *OsnService)DhtSetValue(key []byte, value []byte) error {
 }
 
 func (osns *OsnService)GetLocalNode() *config.Node {
-	return osns.yeShMgr.(*yeShellManager).GetLocalNode()
+	return osns.yeShMgr.(*YeShellManager).GetLocalNode()
+}
+
+func (osns *OsnService)GetLocalDhtNode() *config.Node {
+	return osns.yeShMgr.(*YeShellManager).GetLocalDhtNode()
 }

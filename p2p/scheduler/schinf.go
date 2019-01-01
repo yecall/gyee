@@ -337,6 +337,11 @@ func (sdl *Scheduler)SchTaskExist(name string) bool {
 	return eno == SchEnoNone && ptn != nil
 }
 
+// Get p2p network instance node name
+func (sdl *Scheduler)SchGetP2pNodeName() string {
+	return sdl.p2pCfg.Name
+}
+
 // Get p2p network configuration name
 func (sdl *Scheduler)SchGetP2pCfgName() string {
 	return sdl.p2pCfg.CfgName

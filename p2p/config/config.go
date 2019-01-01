@@ -65,7 +65,7 @@ func (log cfgLogger)Debug(fmt string, args ... interface{}) {
 type P2pCfgErrno int
 
 const (
-	PcfgEnoNone			= iota
+	PcfgEnoNone P2pCfgErrno = iota
 	PcfgEnoParameter
 	PcfgEnoPublicKye
 	PcfgEnoPrivateKye
@@ -73,7 +73,23 @@ const (
 	PcfgEnoDatabase
 	PcfgEnoIpAddr
 	PcfgEnoNodeId
+	PcfgEnoUnknown
 )
+
+func (eno P2pCfgErrno)Error() string {
+	errMsg := map[P2pCfgErrno]string {
+		PcfgEnoNone: "none",
+		PcfgEnoParameter: "parameters",
+		PcfgEnoPublicKye: "public key",
+		PcfgEnoPrivateKye: "private key",
+		PcfgEnoDataDir: "data directory",
+		PcfgEnoDatabase: "database",
+		PcfgEnoIpAddr: "ip address",
+		PcfgEnoNodeId: "node identity",
+		PcfgEnoUnknown: "unknown",
+	}
+	return errMsg[eno]
+}
 
 // Some specific paths
 const (
@@ -308,30 +324,35 @@ type Cfg4DhtFileDatastore struct {
 }
 
 // Default version string, formated as "M.m0.m1.m2"
-const dftVersion = "0.1.0.0"
+const DefaultVersion = "0.1.0.0"
 
 // Default p2p instance name
-const dftName = "test"
+const DefaultNodeName = "test"
+
+// Default node database name
+const DefaultNodeDatabase = "nodes"
 
 // Default configuration(notice that it's not a validated configuration and
 // could never be applied), most of those defaults must be overided by higher
 // lever module of system.
 const (
-	dftUdpPort = 30303
-	dftTcpPort = 30303
-	dftDhtPort = 40404
+	DftUdpPort = 30303
+	DftTcpPort = 30303
+	DftDhtPort = 40404
+	DftSnmBits = 0
 )
-var dftLocal = Node {
+var DefaultLocalNode = Node {
 	IP:		P2pGetLocalIpAddr(),
-	UDP:	dftUdpPort,
-	TCP:	dftTcpPort,
+	UDP:	DftUdpPort,
+	TCP:	DftTcpPort,
 	ID:		NodeID{0},
 }
 
-var dhtLocal = Node {
+
+var DefaultDhtLocalNode = Node {
 	IP:		P2pGetLocalIpAddr(),
 	UDP:	0,	// udp not in use for DHT
-	TCP:	dftDhtPort,
+	TCP:	DftDhtPort,
 	ID:		NodeID{0},
 }
 
@@ -339,7 +360,8 @@ var dhtLocal = Node {
 var config = make(map[string] *Config)
 
 // Get default non-bootstrap node config
-var dftDatDir = P2pDefaultDataDir(true)
+var DftDatDir = P2pDefaultDataDir(true)
+
 func P2pDefaultConfig(bsUrls []string) *Config {
 	var defaultConfig = Config {
 		//
@@ -347,8 +369,8 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		//
 
 		NetworkType:			P2pNetworkTypeDynamic,
-		Name:					dftName,
-		Version:				dftVersion,
+		Name:					DefaultNodeName,
+		Version:				DefaultVersion,
 		PrivateKey:				nil,
 		PublicKey:				nil,
 		StaticMaxPeers:			MaxPeers,
@@ -357,12 +379,12 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		BootstrapNodes:			BootstrapNodes,
 		StaticNodes:			nil,
 		StaticNetId:			ZeroSubNet,
-		NodeDataDir:			dftDatDir,
+		NodeDataDir:			DftDatDir,
 		NodeDatabase:			datadirNodeDatabase,
 		NoDial:					false,
 		NoAccept:				false,
 		BootstrapNode:			false,
-		Local:					dftLocal,
+		Local:					DefaultLocalNode,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
 		SubNetMaxPeers:			map[SubNetworkID]int{},
@@ -374,26 +396,26 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		// DHT application part
 		//
 
-		DhtLocal:				dhtLocal,
+		DhtLocal:				DefaultDhtLocalNode,
 		DhtRutCfg: Cfg4DhtRouteManager {
 			NodeId:				NodeID{0},
 			RandomQryNum:		1,
 			Period:				time.Minute * 1,
 		},
 		DhtQryCfg: Cfg4DhtQryManager {
-			Local:				&dhtLocal,
+			Local:				&DefaultDhtLocalNode,
 			MaxPendings:		32,
 			MaxActInsts:		8,
 			QryExpired:			time.Second * 60,
 			QryInstExpired:		time.Second * 16,
 		},
 		DhtConCfg: Cfg4DhtConManager {
-			Local:				&dhtLocal,
+			Local:				&DefaultDhtLocalNode,
 			MaxCon:				512,
 			HsTimeout:			time.Second * 16,
 		},
 		DhtFdsCfg: Cfg4DhtFileDatastore {
-			Path:				dftDatDir,
+			Path:				DftDatDir,
 			ShardFuncName:		sfnNextToLast,
 			PadLength:			2,
 			Sync:				true,
@@ -414,8 +436,8 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		// Chain application part
 		//
 		NetworkType:			P2pNetworkTypeDynamic,
-		Name:					dftName,
-		Version:				dftVersion,
+		Name:					DefaultNodeName,
+		Version:				DefaultVersion,
 		PrivateKey:				nil,
 		PublicKey:				nil,
 		StaticMaxPeers:			0,
@@ -429,7 +451,7 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		NoDial:					true,
 		NoAccept:				true,
 		BootstrapNode:			true,
-		Local:					dftLocal,
+		Local:					DefaultLocalNode,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
 		SubNetMaxPeers:			map[SubNetworkID]int{},
@@ -440,14 +462,14 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		//
 		// DHT application part
 		//
-		DhtLocal:				dhtLocal,
+		DhtLocal:				DefaultDhtLocalNode,
 		DhtRutCfg: Cfg4DhtRouteManager {
 			NodeId:				NodeID{0},
 			RandomQryNum:		1,
 			Period:				time.Minute * 1,
 		},
 		DhtQryCfg: Cfg4DhtQryManager {
-			Local:				&dhtLocal,
+			Local:				&DefaultDhtLocalNode,
 			MaxPendings:		32,
 			MaxActInsts:		8,
 			QryExpired:			time.Second * 60,
@@ -458,7 +480,7 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 			HsTimeout:			time.Second * 16,
 		},
 		DhtFdsCfg: Cfg4DhtFileDatastore {
-			Path:				dftDatDir,
+			Path:				DftDatDir,
 			ShardFuncName:		sfnNextToLast,
 			PadLength:			2,
 			Sync:				true,
@@ -795,6 +817,36 @@ func P2pSign(priKey *ecdsa.PrivateKey, data []byte) (r, s *big.Int, err error) {
 // Verify
 func P2pVerify(pubKey *ecdsa.PublicKey, data [] byte, r, s *big.Int) bool {
 	return ecdsa.Verify(pubKey, data, r, s)
+}
+
+// Set local port
+func P2pSetLocalPort(cfg *Config, udpp uint16, tcpp uint16) P2pCfgErrno {
+	cfg.Local.UDP = udpp
+	cfg.Local.TCP = tcpp
+	return PcfgEnoNone
+}
+
+// Set local ip address and port for chain application
+func P2pSetLocalIpAddr(cfg *Config, ip string, udpp uint16, tcpp uint16) P2pCfgErrno {
+	cfg.Local.IP = net.ParseIP(ip)
+	cfg.Local.UDP = udpp
+	cfg.Local.TCP = tcpp
+	return PcfgEnoNone
+}
+
+// Set local dht port
+func P2pSetLocalDhtPort(cfg *Config, port uint16) P2pCfgErrno {
+	cfg.DhtLocal.UDP = 0
+	cfg.DhtLocal.TCP = port
+	return PcfgEnoNone
+}
+
+// Set local ip address and port for dht application
+func P2pSetLocalDhtIpAddr(cfg *Config, ip string, port uint16) P2pCfgErrno {
+	cfg.DhtLocal.IP = net.ParseIP(ip)
+	cfg.DhtLocal.UDP = 0
+	cfg.DhtLocal.TCP = port
+	return PcfgEnoNone
 }
 
 // Setup local node identity
