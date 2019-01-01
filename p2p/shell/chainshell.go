@@ -283,7 +283,9 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 			if pe.status != pisActive {
 				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
 			} else if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
-				shMgr.send2Peer(pe, req)
+				if req.Exclude == nil || bytes.Compare(pe.nodeId[0:], req.Exclude[0:]) != 0 {
+					shMgr.send2Peer(pe, req)
+				}
 			}
 		}
 
@@ -292,9 +294,13 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 			if pe.status != pisActive {
 				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
 			} else if bytes.Compare(id.snid[0:], config.VSubNet[0:]) == 0 {
-				shMgr.send2Peer(pe, req)
+				if req.Exclude == nil || bytes.Compare(pe.nodeId[0:], req.Exclude[0:]) != 0 {
+					shMgr.send2Peer(pe, req)
+				}
 			} else if bytes.Compare(id.snid[0:], req.LocalSnid) == 0 {
-				 shMgr.send2Peer(pe, req)
+				if req.Exclude == nil || bytes.Compare(pe.nodeId[0:], req.Exclude[0:]) != 0 {
+					shMgr.send2Peer(pe, req)
+				}
 			}
 		}
 
@@ -303,7 +309,9 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 			if pe.status != pisActive {
 				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
 			} else if bytes.Compare(id.snid[0:], config.AnySubNet[0:]) == 0 {
-				shMgr.send2Peer(pe, req)
+				if req.Exclude == nil || bytes.Compare(pe.nodeId[0:], req.Exclude[0:]) != 0 {
+					shMgr.send2Peer(pe, req)
+				}
 			}
 		}
 

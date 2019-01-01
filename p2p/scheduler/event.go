@@ -148,6 +148,7 @@ type MsgShellBroadcastReq struct {
 	Key			[]byte					// key
 	Data    	[]byte					// payload bytes
 	LocalSnid	[]byte					// local sut network identity
+	Exclude		*config.NodeID			// node to be excluded
 }
 
 //

@@ -472,13 +472,13 @@ func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
 	var err error = nil
 	switch message.MsgType {
 	case MessageTypeTx:
-		err = yeShMgr.broadcastTxOsn(&message)
+		err = yeShMgr.broadcastTxOsn(&message, nil)
 	case MessageTypeEvent:
-		err = yeShMgr.broadcastEvOsn(&message, true)
+		err = yeShMgr.broadcastEvOsn(&message, nil,true)
 	case MessageTypeBlockHeader:
-		err = yeShMgr.broadcastBhOsn(&message)
+		err = yeShMgr.broadcastBhOsn(&message, nil)
 	case MessageTypeBlock:
-		err = yeShMgr.broadcastBkOsn(&message)
+		err = yeShMgr.broadcastBkOsn(&message, nil)
 	default:
 		return errors.New(fmt.Sprintf("BroadcastMessageOsn: invalid type: %d", message.MsgType))
 	}
@@ -797,28 +797,26 @@ _rxLoop:
 						Key: pkg.Key,
 						Data: pkg.Payload,
 					}
+					exclude := &pkg.PeerInfo.NodeId
+
+					sub, _ := key.(*Subscriber)
+					sub.MsgChan <- msg
 
 					err := error(nil)
 					switch msg.MsgType {
 					case MessageTypeTx:
-						err = yeShMgr.broadcastTxOsn(&msg)
+						err = yeShMgr.broadcastTxOsn(&msg, exclude)
 					case MessageTypeEvent:
-						err = yeShMgr.broadcastEvOsn(&msg, false)
+						err = yeShMgr.broadcastEvOsn(&msg, exclude, false)
 					case MessageTypeBlockHeader:
-						err = yeShMgr.broadcastBhOsn(&msg)
+						err = yeShMgr.broadcastBhOsn(&msg, exclude)
 					case MessageTypeBlock:
-						err = yeShMgr.broadcastBkOsn(&msg)
+						err = yeShMgr.broadcastBkOsn(&msg, exclude)
 					default:
 						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
 					}
 
-					if err != nil {
-						return false
-					}
-
-					sub, _ := key.(*Subscriber)
-					sub.MsgChan <- msg
-					return true
+					return err == nil
 				})
 			}
 		}
@@ -979,7 +977,7 @@ func (yeShMgr *YeShellManager)broadcastBk(msg *Message) error {
 	return errors.New("broadcastBk: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message) error {
+func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
 	// if local node is a validator, the Tx should be broadcast over the
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
@@ -1004,6 +1002,10 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message) error {
 		Data: msg.Data,
 		LocalSnid: thisCfg.localSnid,
 	}
+	if exclude != nil {
+		ex := *exclude
+		req.Exclude = &ex
+	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 		yesLog.Debug("broadcastTxOsn: SchSendMessage failed, eno: %d", eno)
@@ -1012,7 +1014,7 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message) error {
 	return nil
 }
 
-func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
+func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeID, dht bool) error {
 	// the local node must be a validator, and the Ev should be broadcast
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
@@ -1059,7 +1061,7 @@ func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
 	return nil
 }
 
-func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message) error {
+func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeID) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
@@ -1090,7 +1092,7 @@ func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message) error {
 	return nil
 }
 
-func (yeShMgr *YeShellManager)broadcastBkOsn(msg *Message) error {
+func (yeShMgr *YeShellManager)broadcastBkOsn(msg *Message, exclude *config.NodeID) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
 	k := yesKey{}
