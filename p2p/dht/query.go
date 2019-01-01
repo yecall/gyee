@@ -210,11 +210,7 @@ func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ptn == nil || msg == nil {
-		qryLog.Debug("qryMgrProc: invalid parameters, ptn: %p, msg: %p", ptn, msg)
-		return sch.SchEnoParameter
-	}
-
+	qryLog.Debug("qryMgrProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -256,6 +252,8 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		qryLog.Debug("qryMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
+
+	qryLog.Debug("qryMgrProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
 
 	return eno
 }

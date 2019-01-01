@@ -91,13 +91,7 @@ func (qryInst *QryInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 //
 func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ptn == nil || msg == nil {
-		qiLog.Debug("qryInstProc: " +
-			"invalid parameters, ptn: %p, msg: %p",
-			ptn, msg)
-		return sch.SchEnoParameter
-	}
-
+	qiLog.Debug("qryInstProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	var eno = sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -128,8 +122,10 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 
 	default:
 		qiLog.Debug("qryInstProc: unknown event: %d", msg.Id)
-		return sch.SchEnoParameter
+		eno = sch.SchEnoParameter
 	}
+
+	qiLog.Debug("qryInstProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
 
 	return eno
 }
