@@ -98,12 +98,13 @@ var yesMidItoa = map[int] string {
 type yesKey = config.DsKey										// key type
 
 type yeShellManager struct {
+	name				string									// unique name of the shell manager
 	chainInst			*sch.Scheduler							// chain scheduler pointer
 	ptnChainShell		interface{}								// chain shell manager task node pointer
-	ptChainShMgr		*p2psh.ShellManager							// chain shell manager object
+	ptChainShMgr		*p2psh.ShellManager						// chain shell manager object
 	dhtInst				*sch.Scheduler							// dht scheduler pointer
 	ptnDhtShell			interface{}								// dht shell manager task node pointer
-	ptDhtShMgr			*p2psh.DhtShellManager						// dht shell manager object
+	ptDhtShMgr			*p2psh.DhtShellManager					// dht shell manager object
 	getValKey			yesKey									// key of value to get
 	getValChan			chan []byte								// get value channel
 	putValKey			[]byte									// key of value to put
@@ -130,7 +131,7 @@ type YeShellConfig struct {
 	// Notice: in current stage, a simple configuration for p2p is applied, for total configuration
 	// about p2p, see config.Config please.
 	AppType				config.P2pAppType						// application type
-	Name				string									// node name
+	Name				string									// node name, should be unique
 	Validator			bool									// validator flag
 	BootstrapNode		bool									// bootstrap node flag
 	BootstrapNodes		[]string								// bootstrap nodes
@@ -173,7 +174,7 @@ var DefaultYeShellConfig = YeShellConfig{
 // Global shell configuration: this var is set when function YeShellConfigToP2pCfg called,
 // the p2p user should not change those fields other than "Validator" and "SubNetMaskBits"
 // which can be reconfigurated, since YeShellConfigToP2pCfg should be called once only.
-var YeShellCfg = YeShellConfig{}
+var YeShellCfg = make(map[string]YeShellConfig, 0)
 
 func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	if yesCfg == nil {
@@ -186,7 +187,8 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		return nil
 	}
 
-	YeShellCfg = *yesCfg
+	YeShellCfg[yesCfg.Name] = *yesCfg
+	thisCfg, _ := YeShellCfg[yesCfg.Name]
 
 	cfg := []*config.Config{nil, nil}
 	chainCfg := (*config.Config)(nil)
@@ -227,7 +229,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		byte((snw >> 8) & 0xff),
 		byte(snw & 0xff),
 	}
-	YeShellCfg.localSnid = append(YeShellCfg.localSnid, snid[0:]...)
+	thisCfg.localSnid = append(thisCfg.localSnid, snid[0:]...)
 	chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, snid)
 	chainCfg.SubNetMaxPeers[snid] = config.MaxPeers
 	chainCfg.SubNetMaxOutbounds[snid] = config.MaxOutbounds
@@ -247,8 +249,8 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 
 	dhtCfg = new(config.Config)
 	*dhtCfg = *chainCfg
-	YeShellCfg.dhtBootstrapNodes = config.P2pSetupBootstrapNodes(YeShellCfg.DhtBootstrapNodes)
-	dht.SetBootstrapNodes(YeShellCfg.dhtBootstrapNodes)
+	thisCfg.dhtBootstrapNodes = config.P2pSetupBootstrapNodes(thisCfg.DhtBootstrapNodes)
+	dht.SetBootstrapNodes(thisCfg.dhtBootstrapNodes)
 	dhtCfg.AppType = config.P2P_TYPE_DHT
 	cfg[ChainCfgIdx] = chainCfg
 	cfg[DhtCfgIdx] = dhtCfg
@@ -258,7 +260,9 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 
 func NewYeShellManager(yesCfg *YeShellConfig) *yeShellManager {
 	var eno sch.SchErrno
-	yeShMgr := yeShellManager{}
+	yeShMgr := yeShellManager{
+		name: yesCfg.Name,
+	}
 
 	cfg := YeShellConfigToP2pCfg(yesCfg)
 	if cfg == nil || len(cfg) != 2 {
@@ -343,8 +347,9 @@ func (yeShMgr *yeShellManager)Start() error {
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
 
-	if YeShellCfg.BootstrapNode == false {
-		yeShMgr.bsTicker = time.NewTicker(YeShellCfg.BootstrapTime)
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	if thisCfg.BootstrapNode == false {
+		yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
 		yeShMgr.dhtBsChan = make(chan bool, 1)
 		go yeShMgr.dhtBootstrapProc()
 	}
@@ -356,7 +361,8 @@ func (yeShMgr *yeShellManager)Start() error {
 }
 
 func (yeShMgr *yeShellManager)Stop() {
-	if YeShellCfg.BootstrapNode == false {
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	if thisCfg.BootstrapNode == false {
 		yesLog.Debug("Stop: close dht bootstrap timer")
 		close(yeShMgr.dhtBsChan)
 	}
@@ -388,19 +394,20 @@ func (yeShMgr *yeShellManager)Reconfig(reCfg *RecfgCommand) error {
 		return errors.New(fmt.Sprintf("too much mask bits: %d", reCfg.SubnetMaskBits))
 	}
 
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	VSnidAdd := make([]config.SubNetworkID, 0)
 	VSnidDel := make([]config.SubNetworkID, 0)
 	SnidAdd := make([]config.SubNetworkID, 0)
 	SnidDel := make([]config.SubNetworkID, 0)
 
-	if reCfg.Validator && !YeShellCfg.Validator{
+	if reCfg.Validator && !thisCfg.Validator{
 		VSnidAdd = append(VSnidAdd, config.VSubNet)
-	} else if !reCfg.Validator && YeShellCfg.Validator {
+	} else if !reCfg.Validator && thisCfg.Validator {
 		VSnidDel = append(VSnidDel, config.VSubNet)
 	}
 
-	if reCfg.SubnetMaskBits != YeShellCfg.SubNetMaskBits {
-		oldSnid, err := yeShMgr.getSubnetIdentity(YeShellCfg.SubNetMaskBits)
+	if reCfg.SubnetMaskBits != thisCfg.SubNetMaskBits {
+		oldSnid, err := yeShMgr.getSubnetIdentity(thisCfg.SubNetMaskBits)
 		if err != nil {
 			yesLog.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
 			return err
@@ -811,16 +818,17 @@ _rxLoop:
 
 func (yeShMgr *yeShellManager)dhtBootstrapProc() {
 	defer yeShMgr.bsTicker.Stop()
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
 _bootstarp:
 	for {
 		select {
 		case <-yeShMgr.bsTicker.C:
-			if len(YeShellCfg.dhtBootstrapNodes) <= 0 {
+			if len(thisCfg.dhtBootstrapNodes) <= 0 {
 				yesLog.Debug("dhtBootstrapProc: none of bootstarp nodes")
 			} else {
-				r := rand.Int31n(int32(len(YeShellCfg.dhtBootstrapNodes)))
+				r := rand.Int31n(int32(len(thisCfg.dhtBootstrapNodes)))
 				req := sch.MsgDhtBlindConnectReq{
-					Peer: YeShellCfg.dhtBootstrapNodes[r],
+					Peer: thisCfg.dhtBootstrapNodes[r],
 				}
 				msg := sch.SchMessage{}
 				yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtBlindConnectReq, &req)
@@ -835,7 +843,8 @@ _bootstarp:
 
 func (yeShMgr *yeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
-	for _, bsn := range YeShellCfg.dhtBootstrapNodes {
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	for _, bsn := range thisCfg.dhtBootstrapNodes {
 		if msg.Eno == dht.DhtEnoNone.GetEno() || msg.Eno == dht.DhtEnoDuplicated.GetEno() {
 			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
 				// done the blind-connect routine
@@ -965,6 +974,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	k := yesKey{}
 	copy(k[0:], msg.Key)
 	if yeShMgr.checkDupKey(k) {
@@ -982,7 +992,7 @@ func (yeShMgr *yeShellManager)broadcastTxOsn(msg *Message) error {
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-		LocalSnid: YeShellCfg.localSnid,
+		LocalSnid: thisCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -997,6 +1007,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
 	// to chain shell manager and DHT shell manager.
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	k := yesKey{}
 	copy(k[0:], msg.Key)
 	if yeShMgr.checkDupKey(k) {
@@ -1014,7 +1025,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-		LocalSnid: YeShellCfg.localSnid,
+		LocalSnid: thisCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1026,7 +1037,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
 		req2Dht := sch.MsgDhtMgrPutValueReq{
 			Key:      msg.Key,
 			Val:      msg.Data,
-			KeepTime: YeShellCfg.EvKeepTime,
+			KeepTime: thisCfg.EvKeepTime,
 		}
 		yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req2Dht)
 		if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1041,6 +1052,7 @@ func (yeShMgr *yeShellManager)broadcastEvOsn(msg *Message, dht bool) error {
 func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	k := yesKey{}
 	copy(k[0:], msg.Key)
 	if yeShMgr.checkDupKey(k) {
@@ -1058,7 +1070,7 @@ func (yeShMgr *yeShellManager)broadcastBhOsn(msg *Message) error {
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-		LocalSnid: YeShellCfg.localSnid,
+		LocalSnid: thisCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1128,11 +1140,13 @@ func (yeShMgr *yeShellManager)setDedupTimer(key [yesKeyBytes]byte) error {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
 
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
+
 	if len(key) != yesKeyBytes {
 		return errors.New(fmt.Sprintf("setDedupTimer: invalid key length: %d", len(key)))
 	}
 
-	tm, err := yeShMgr.tmDedup.GetTimer(YeShellCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
+	tm, err := yeShMgr.tmDedup.GetTimer(thisCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
 	if err != dht.TmEnoNone {
 		yesLog.Debug("setDedupTimer: GetTimer failed, error: %s", err.Error())
 		return err

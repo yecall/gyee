@@ -152,7 +152,12 @@ var testCaseTable = []testCase{
 	},
 	{
 		name:			"testCase8",
-		description:	"yee chain test with single shell",
+		description:	"yee chain simple test",
+		entry:			testCase8,
+	},
+	{
+		name:			"testCase9",
+		description:	"yee chain osn service test",
 		entry:			testCase8,
 	},
 }
@@ -160,7 +165,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase8"
+var tgtCase = "testCase9"
 
 //
 // port base
@@ -2215,6 +2220,165 @@ _bhloop:
 		yeShMgr.UnRegister(&subBh)
 
 		yeShMgr.Stop()
+	}
+
+	_ = yeChainProc
+	_ = stop
+	//cbs := []func(){stop}
+	cbs := []func(){yeChainProc, stop}
+	waitInterruptWithCallback(cbs)
+
+	//time.Sleep(time.Second * 10)
+	//yeChainProc()
+	//stop()
+}
+
+func testCase9(tc *testCase) {
+
+	osnCfg := yep2p.DefaultYeShellConfig
+	//osnCfg.BootstrapNode = true
+	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
+	osnSrv.Start()
+
+	localNode := osnSrv.GetLocalNode()
+	localId := fmt.Sprintf("%x", localNode.ID)
+
+	ev := yep2p.Message{
+		MsgType:	yep2p.MessageTypeEvent,
+		From:		localId,
+	}
+
+	tx := yep2p.Message{
+		MsgType:	yep2p.MessageTypeTx,
+		From:		localId,
+	}
+
+	bh := yep2p.Message{
+		MsgType:	yep2p.MessageTypeBlockHeader,
+		From:		localId,
+	}
+
+	bk := yep2p.Message{
+		MsgType:	yep2p.MessageTypeBlock,
+		From:		localId,
+	}
+
+	subEv := yep2p.Subscriber {
+		MsgChan:	make(chan yep2p.Message, 64),
+		MsgType:	yep2p.MessageTypeEvent,
+	}
+
+	subTx := yep2p.Subscriber {
+		MsgChan:	make(chan yep2p.Message, 64),
+		MsgType:	yep2p.MessageTypeTx,
+	}
+
+	subBh := yep2p.Subscriber {
+		MsgChan:	make(chan yep2p.Message, 64),
+		MsgType:	yep2p.MessageTypeBlockHeader,
+	}
+
+	osnSrv.Register(&subEv)
+	osnSrv.Register(&subTx)
+	osnSrv.Register(&subBh)
+
+	go func() {
+		count := 0
+	_evloop:
+		for {
+			select {
+			case ev, ok := <-subEv.MsgChan:
+				if !ok {
+					break _evloop
+				}
+				if count++; count & 0x7f == 0 {
+					log.Debug("count: %d, ev: %x", count, ev.Key)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		count := 0
+	_txloop:
+		for {
+			select {
+			case tx, ok := <-subTx.MsgChan:
+				if !ok {
+					break _txloop
+				}
+				if count++; count & 0x7f == 0 {
+					log.Debug("count: %d, tx: %x", count, tx.Key)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		count := 0
+	_bhloop:
+		for {
+			select {
+			case bh, ok := <-subBh.MsgChan:
+				if !ok {
+					break _bhloop
+				}
+				if count++; count & 0x7f == 0 {
+					log.Debug("count: %d, bh: %x", count, bh.Key)
+				}
+			}
+		}
+	}()
+
+	yeChainProc := func() {
+		cnt := 0
+		cnt_max := 100 * 100 * 100
+
+		for cnt < cnt_max {
+			cnt++
+			now := time.Now().UnixNano()
+
+			data := []byte(fmt.Sprintf("ev: %d", now))
+			key := sha256.Sum256(data)
+			ev.Data = data
+			ev.Key = key[0:]
+			osnSrv.BroadcastMessageOsn(ev)
+
+			data = []byte(fmt.Sprintf("tx: %d", now))
+			key = sha256.Sum256(data)
+			tx.Data = data
+			tx.Key = key[0:]
+			osnSrv.BroadcastMessageOsn(tx)
+
+			data = []byte(fmt.Sprintf("bh: %d", now))
+			key = sha256.Sum256(data)
+			bh.Data = data
+			bh.Key = key[0:]
+			osnSrv.BroadcastMessageOsn(bh)
+
+			data = []byte(fmt.Sprintf("bk: %d", now))
+			key = sha256.Sum256(data)
+			bk.Data = data
+			bk.Key = key[0:]
+			osnSrv.BroadcastMessageOsn(bk)
+
+			if cnt & 0x7f == 0 {
+				log.Debug("testCase9: cnt: %d, loop BroadcastMessageOsn", cnt)
+			}
+
+			time.Sleep(time.Millisecond * 20 /*1000*/)
+		}
+	}
+
+	stop := func() {
+		close(subEv.MsgChan)
+		osnSrv.UnRegister(&subEv)
+		close(subTx.MsgChan)
+		osnSrv.UnRegister(&subTx)
+		close(subBh.MsgChan)
+		osnSrv.UnRegister(&subBh)
+
+		osnSrv.Stop()
 	}
 
 	_ = yeChainProc

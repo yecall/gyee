@@ -26,6 +26,7 @@ package p2p
 
 import (
 	"github.com/pkg/errors"
+	"github.com/yeeco/gyee/p2p/config"
 )
 
 type OsnService struct {
@@ -75,11 +76,12 @@ func OsnServiceConfig(cfg *YeShellConfig) error {
 	return nil
 }
 
-func NewOsnService()(*OsnService, error) {
+var _ = OsnServiceConfig
+
+func NewOsnService(cfg *YeShellConfig)(*OsnService, error) {
 	osns := OsnService{
-		yeShCfg: DefaultYeShellConfig,
+		yeShCfg: *cfg,
 	}
-	OsnServiceConfig(&osns.yeShCfg)
 	if osns.yeShMgr = NewYeShellManager(&osns.yeShCfg); osns.yeShMgr == nil {
 		return nil, errors.New("NewOsnService: NewYeShellManager failed")
 	}
@@ -122,4 +124,6 @@ func (osns *OsnService)DhtSetValue(key []byte, value []byte) error {
 	return osns.yeShMgr.DhtSetValue(key, value)
 }
 
-
+func (osns *OsnService)GetLocalNode() *config.Node {
+	return osns.yeShMgr.(*yeShellManager).GetLocalNode()
+}
