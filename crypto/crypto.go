@@ -21,6 +21,29 @@
 package crypto
 
 
-
 //TODO: config crypto params: hash, keystore.cipher, keystore.kdf, curve,
 //TODO: 支持将来这个模块可以升级配置，算法内容的自描述
+
+type Algorithm uint8
+
+const (
+	ALG_SECP256K1 Algorithm = 1
+	ALG_QTESLA    Algorithm = 128
+)
+
+type Signature struct {
+	Algorithm  Algorithm
+	Signature  []byte
+}
+
+type Signer interface {
+	Algorithm() Algorithm
+
+	InitSigner(privateKey []byte) error
+
+	Sign(data []byte) (signature *Signature, err error)
+
+	RecoverPublicKey(data []byte, signature *Signature) (publicKey []byte, err error)
+
+	Verify(data []byte, signature *Signature) (bool, error)
+}

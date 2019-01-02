@@ -26,18 +26,20 @@ import (
 	"github.com/mr-tron/base58/base58"
 )
 
-type Hash []byte
+const HashLength = 32
+type Hash [HashLength]byte
 
 func (h Hash) Hex() string {
-	return hex.EncodeToString(h)
+	return hex.EncodeToString(h[:])
 }
 
 func (h Hash) Base58() string {
-	return base58.Encode(h)
+	return base58.Encode(h[:])
 }
 
 func (h Hash) Equals(b Hash) bool {
-	return bytes.Compare(h, b) == 0
+	return h==b
+	//return bytes.Compare(h[:], b[:]) == 0
 }
 
 /*

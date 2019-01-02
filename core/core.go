@@ -58,8 +58,7 @@ type Core struct {
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
-
-	subscriber *p2p.Subscriber
+	subscriber     *p2p.Subscriber
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
