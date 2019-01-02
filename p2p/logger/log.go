@@ -46,6 +46,10 @@ type P2pLogger struct {
 var (
 	GyeeProject = false					// is playing in github.com/yeeco/gyee project
 	GlobalLogger *logrus.Logger = nil	// the global logger
+	Level = logrus.DebugLevel
+	Skip = 2
+	Tag = "global"
+	LogPosition = true
 )
 
 func init() {
@@ -98,8 +102,16 @@ func (p2pLog *P2pLogger)Debug(format string, args ... interface{}) {
 }
 
 func Debug(format string, args ... interface{}) {
-	//GlobalLogger.Debugf(format, args...)
-	log.Printf(format, args...)
+	if !LogPosition {
+		//GlobalLogger.Debugf(format, args...)
+		log.Printf(format, args...)
+	} else {
+		_, file, line, _ := runtime.Caller(Skip)
+		text := fmt.Sprintf(format, args...)
+		fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
+		//GlobalLogger.Debugf("%s\n%s", text, fileLine)
+		log.Printf("%s\n%s", text, fileLine)
+	}
 }
 
 func (p2pLog *P2pLogger)SetFileRotationHooker(path string, count uint) {

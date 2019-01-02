@@ -52,7 +52,7 @@ type cfgLogger struct {
 }
 
 var cfgLog = cfgLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log cfgLogger)Debug(fmt string, args ... interface{}) {
@@ -563,6 +563,8 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 			return name, PcfgEnoParameter
 		}
 		name = cfg.CfgName
+	} else {
+		name = name + "_" + fmt.Sprintf("%d", len(config))
 	}
 	cfg.CfgName = name
 
@@ -576,6 +578,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		cfgLog.Debug("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoNodeId
 	}
+	cfgLog.Debug("P2pSetConfig: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
 
 	cfg.DhtLocal.ID = cfg.Local.ID
 	config[name] = cfg
@@ -758,6 +761,9 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 			return PcfgEnoPrivateKye
 		}
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
+	} else {
+		cfgLog.Debug("p2pSetupLocalNodeId: nil private key")
+		return PcfgEnoPrivateKye
 	}
 
 	pnid := p2pPubkey2NodeId(cfg.PublicKey)
@@ -767,8 +773,6 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 	}
 
 	cfg.Local.ID = *pnid
-	cfgLog.Debug("p2pSetupLocalNodeId: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
-
 	return PcfgEnoNone
 }
 

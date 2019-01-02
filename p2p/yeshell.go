@@ -44,7 +44,7 @@ type yesLogger struct {
 }
 
 var yesLog = yesLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log yesLogger)Debug(fmt string, args ... interface{}) {
@@ -197,6 +197,11 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		chainCfg = config.P2pDefaultConfig(yesCfg.BootstrapNodes)
 	}
 
+	chainCfg.AppType = config.P2P_TYPE_CHAIN
+	chainCfg.Name = yesCfg.Name
+	chainCfg.NodeDataDir = yesCfg.NodeDataDir
+	chainCfg.NodeDatabase = yesCfg.NodeDatabase
+
 	if config.P2pSetLocalIpAddr(chainCfg, yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort) != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalIpAddr failed")
 		return nil
@@ -206,11 +211,6 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetupLocalNodeId failed")
 		return nil
 	}
-
-	chainCfg.AppType = config.P2P_TYPE_CHAIN
-	chainCfg.Name = yesCfg.Name
-	chainCfg.NodeDataDir = yesCfg.NodeDataDir
-	chainCfg.NodeDatabase = yesCfg.NodeDatabase
 
 	if yesCfg.Validator {
 		chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, config.VSubNet)
@@ -242,6 +242,11 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	chainCfg.SubNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
 	chainCfg.SubNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
 
+	if config.P2pSetLocalDhtIpAddr(chainCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.PcfgEnoNone {
+		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
+		return nil
+	}
+
 	if chCfgName, eno := config.P2pSetConfig("chain", chainCfg); eno != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetConfig failed")
 		return nil
@@ -251,11 +256,6 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 
 	dhtCfg = new(config.Config)
 	*dhtCfg = *chainCfg
-
-	if config.P2pSetLocalDhtIpAddr(dhtCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.PcfgEnoNone {
-		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
-		return nil
-	}
 
 	bsn := config.P2pSetupBootstrapNodes(thisCfg.DhtBootstrapNodes)
 	thisCfg.dhtBootstrapNodes = append(thisCfg.dhtBootstrapNodes, bsn...)
@@ -786,7 +786,7 @@ _rxLoop:
 				continue
 			}
 
-			yesLog.Debug("chainRxProc: peer info: %+v, pkg: %+v", *pkg.PeerInfo, *pkg)
+			//yesLog.Debug("chainRxProc: peer info: %+v, pkg: %+v", *pkg.PeerInfo, *pkg)
 
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {

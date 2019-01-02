@@ -57,6 +57,24 @@ type AppConfig struct {
 type P2pConfig struct {
 	BootNode []string `toml:"bootnode"`
 	Listen   []string `toml:"listen"`
+
+	AppType				int			`toml:"app_type"`
+	Name				string		`toml:"name"`
+	Validator			bool		`toml:"validator"`
+	BootstrapNode		bool		`toml:"bootstrap_node"`
+	BootstrapNodes		[]string	`toml:"bootstrap_nodes"`
+	DhtBootstrapNodes	[]string	`toml:"dht_bootstrap_nodes"`
+	LocalNodeIp			string		`toml:"local_node_ip"`
+	LocalUdpPort		uint16		`toml:"local_udp_port"`
+	LocalTcpPort		uint16		`toml:"local_tcp_port"`
+	LocalDhtIp			string		`toml:"local_dht_ip"`
+	LocalDhtPort		uint16		`toml:"local_dht_port"`
+	NodeDataDir			string		`toml:"node_data_path"`
+	NodeDatabase		string		`toml:"node_database"`
+	SubNetMaskBits		int			`toml:"subnet_mask_bits"`
+	EvKeepTime			int			`toml:"ev_keep_time"`
+	DedupTime			int			`toml:"dedup_time"`
+	BootstrapTime		int			`toml:"bootstrap_time"`
 }
 
 //Listen addr, modules, access right

@@ -68,7 +68,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase9"
+var tgtCase = "testCase10"
 
 
 //
@@ -363,10 +363,12 @@ func testCase10(tc *testCase) {
 			osnsTab[idx] = osns
 		} else {
 			bsn := bsSrv.GetLocalNode()
-			bsnStr := fmt.Sprintf("%x@%s:%d:%d",bsn.IP.String(), bsn.ID, bsn.UDP, bsn.TCP)
+			bsnStr := fmt.Sprintf("%X@%s:%d:%d", bsn.ID, bsn.IP.String(), bsn.UDP, bsn.TCP)
+			osnCfg.BootstrapNodes = make([]string, 0)
 			osnCfg.BootstrapNodes = append(osnCfg.BootstrapNodes, bsnStr)
 			dhtBsn := bsSrv.GetLocalDhtNode()
-			dhtBsnStr := fmt.Sprintf("%x@%s:%d:%d",dhtBsn.IP.String(), dhtBsn.ID, dhtBsn.UDP, dhtBsn.TCP)
+			dhtBsnStr := fmt.Sprintf("%X@%s:%d:%d", dhtBsn.ID, dhtBsn.IP.String(), dhtBsn.UDP, dhtBsn.TCP)
+			osnCfg.DhtBootstrapNodes = make([]string, 0)
 			osnCfg.DhtBootstrapNodes = append(osnCfg.DhtBootstrapNodes, dhtBsnStr)
 			osns, err := yep2p.NewOsnService(&osnCfg)
 			if err != nil || osns == nil {
@@ -384,10 +386,12 @@ func testCase10(tc *testCase) {
 		appSubs[idx].Register(osnsTab[idx])
 		appSubs[idx].goSubFunc()
 
-		go func() {
-			appMsgs[idx].yeChainProc(osnsTab[idx])
-			appSubs[idx].yeChainStop(osnsTab[idx])
-		}()
+		if false {
+			go func() {
+				appMsgs[idx].yeChainProc(osnsTab[idx])
+				appSubs[idx].yeChainStop(osnsTab[idx])
+			}()
+		}
 	}
 
 	waitInterrupt()
