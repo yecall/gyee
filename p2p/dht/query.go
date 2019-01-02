@@ -359,8 +359,8 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	qcb.ptnOwner = sender
 	qcb.qryReq = msg
 	qcb.seq = qryMgr.qcbSeq
-	qcb.forWhat = forWhat
 	qryMgr.qcbSeq++
+	qcb.forWhat = forWhat
 	qcb.icbSeq = 0
 	qcb.target = msg.Target
 	qcb.status = qsNull

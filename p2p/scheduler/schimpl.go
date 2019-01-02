@@ -331,7 +331,8 @@ taskDone:
 //
 func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
-	var tm *time.Ticker
+	var tk *time.Ticker
+	var tm *time.Timer
 	var killed = false
 	var task = &ptm.tmcb.taskNode.task
 
@@ -377,7 +378,7 @@ func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
 	if ptm.tmcb.tmt == schTmTypePeriod {
 
-		tm = time.NewTicker(ptm.tmcb.dur)
+		tk = time.NewTicker(ptm.tmcb.dur)
 
 		//
 		// go routine to check timer killed
@@ -388,6 +389,7 @@ func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 		go func() {
 			if stop := <-ptm.tmcb.stop; stop {
 				to<-EvSchDone
+				tk.Stop()
 			}
 		}()
 
@@ -397,7 +399,7 @@ func (sdl *scheduler)schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
 		go func() {
 			for {
-				<-tm.C
+				<-tk.C
 				to<-EvTimerBase
 			}
 		}()
@@ -412,7 +414,6 @@ timerLoop:
 
 			event := <-to
 
-
 			//
 			// check if timer killed
 			//
@@ -421,7 +422,7 @@ timerLoop:
 
 				task.lock.Lock()
 
-				tm.Stop()
+				tk.Stop()
 				killed = true
 
 				sdl.lock.Lock()
@@ -476,9 +477,10 @@ timerLoop:
 		//
 
 		var to = make(chan int)
+		tm = time.NewTimer(dur)
 
 		go func() {
-			<-time.After(dur)
+			<-tm.C
 			to<-EvTimerBase
 		}()
 
@@ -489,6 +491,7 @@ timerLoop:
 		go func() {
 			if stop := <-ptm.tmcb.stop; stop {
 				to<-EvSchDone
+				tm.Stop()
 			}
 		}()
 
