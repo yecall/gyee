@@ -363,7 +363,7 @@ func testCase9(tc *testCase) {
 	go subFunc(subTx, "tx")
 	go subFunc(subBh, "bh")
 
-	if false {
+	if true {
 		waitInterruptWithCallback(osnSrv, yeChainProc, yeChainStop)
 	} else {
 		time.Sleep(time.Second * 10)
