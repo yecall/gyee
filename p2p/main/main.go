@@ -28,11 +28,15 @@ import (
 	"time"
 	"fmt"
 	"os"
+	"strconv"
+	"runtime"
 	"os/signal"
 	"crypto/sha256"
+	_ "net/http/pprof"
+	"net/http"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	yep2p	"github.com/yeeco/gyee/p2p"
-	"github.com/yeeco/gyee/p2p/config"
+	config	"github.com/yeeco/gyee/p2p/config"
 )
 
 //
@@ -68,13 +72,25 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase10"
+var tgtCase = "testCase9"
 
+//
+// switch for playing go-monitors, related commands:
+// >> go tool pprof http://localhost:6060/debug/pprof/heap
+// >> curl localhost:6060/goroutines
+//
+const goMonitors = true
 
 //
 // run target case
 //
 func main() {
+
+	if goMonitors {
+		startGoMemoryMonitor()
+		startGoRoutineMonitor()
+	}
+
 	for _, tc := range testCaseTable {
 		if tc.name == tgtCase {
 			tc.entry(&tc)
@@ -84,7 +100,21 @@ func main() {
 	log.Debug("main: target case not found: %s", tgtCase)
 }
 
+func startGoMemoryMonitor() {
+	go func() {
+		http.ListenAndServe("127.0.0.1:6060", nil)
+	}()
+}
 
+func startGoRoutineMonitor() {
+	go func() {
+		http.HandleFunc("/goroutines", func(w http.ResponseWriter, r *http.Request) {
+			num := strconv.FormatInt(int64(runtime.NumGoroutine()), 10)
+			w.Write([]byte(num))
+		});
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+}
 
 func waitInterrupt() {
 	sigc := make(chan os.Signal, 1)
@@ -165,6 +195,7 @@ _loop:
 			}
 		}
 	}
+	log.Debug("subFunc: done, tag: %s", tag)
 }
 
 func (msgs *appMessages)setMessageFrom(n *config.Node) {
@@ -284,6 +315,12 @@ func testCase8(tc *testCase) {
 	//yesCfg.BootstrapNode = true
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
+
+	if true {
+		time.Sleep(time.Second * 10)
+		yeShMgr.Stop()
+		return
+	}
 
 	node := yeShMgr.GetLocalNode()
 	setMessageFrom(node)

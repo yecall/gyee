@@ -44,7 +44,7 @@ type yesLogger struct {
 }
 
 var yesLog = yesLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log yesLogger)Debug(fmt string, args ... interface{}) {

@@ -297,18 +297,6 @@ func (inst *neighborInst)cleanMap(name string) NgbMgrErrno {
 }
 
 func (inst *neighborInst)NgbProtoDieCb(ptn interface{}) sch.SchErrno {
-	if inst.tidPP != sch.SchInvalidTid {
-		inst.sdl.SchKillTimer(inst.ptn, inst.tidPP)
-		inst.tidPP = sch.SchInvalidTid
-	}
-	if inst.tidFN != sch.SchInvalidTid {
-		inst.sdl.SchKillTimer(inst.ptn, inst.tidFN)
-		inst.tidFN = sch.SchInvalidTid
-	}
-	inst.cleanMap(inst.name)
-	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled)
-
-	// any more ...?
 	return sch.SchEnoNone
 }
 
