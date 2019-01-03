@@ -45,5 +45,5 @@ type Signer interface {
 
 	RecoverPublicKey(data []byte, signature *Signature) (publicKey []byte, err error)
 
-	Verify(data []byte, signature *Signature) (bool, error)
+	Verify(publicKey []byte, data []byte, signature *Signature) bool
 }

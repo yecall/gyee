@@ -134,11 +134,13 @@ func (e *Event) AddSelfParent(selfParent *Event) {
 	} else {
 		e.Body.E = append([]common.Hash{selfParent.Hash()}, e.Body.E...)
 	}
+	e.updateKnow(selfParent)
 }
 
 func (e *Event) AddParents(parents []*Event) {
 	for _, parent := range parents {
 		e.Body.E = append(e.Body.E, parent.Hash())
+		e.updateKnow(parent)
 	}
 }
 
@@ -178,21 +180,23 @@ func (e *Event) Unmarshal(data []byte) {
 	e.signature = em.signature
 }
 
-func (e *Event) Sign(signer crypto.Signer) {
+func (e *Event) Sign(signer crypto.Signer) error {
     sig, err := signer.Sign(e.Body.Hash()[:])
     if err != nil {
-
+        return err
 	}
 	e.signature = sig
+	return nil
 }
 
-func (e *Event) SignVerify(signer crypto.Signer) bool {
-    ret, err := signer.Verify(e.Body.Hash()[:], e.signature)
-    if err != nil {
+func (e *Event) RecoverPublicKey(signer crypto.Signer) ([]byte, error){
+	pk, err := signer.RecoverPublicKey(e.Body.Hash()[:], e.signature)
+	return pk, err
+}
 
-	}
+func (e *Event) SignVerify(publicKey []byte, signer crypto.Signer) bool {
+    ret:= signer.Verify(publicKey, e.Body.Hash()[:], e.signature)
 	return ret
-	//TODO: 恢复公钥并转换成地址
 }
 
 func (e *Event) totalTxAndEvent() int {

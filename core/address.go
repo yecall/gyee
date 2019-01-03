@@ -78,7 +78,7 @@ var (
 )
 
 type Address struct {
-	address common.Hash
+	address []byte
 }
 
 func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {
@@ -100,7 +100,7 @@ func (a *Address) Bytes() []byte {
 
 // String returns address string
 func (a *Address) String() string {
-	return a.address.Hex()
+	return hex.EncodeToString(a.address)
 }
 
 // AddressParse parse address string.

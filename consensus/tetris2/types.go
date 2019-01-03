@@ -17,9 +17,15 @@
 
 package tetris2
 
-import "github.com/yeeco/gyee/common"
+import (
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/crypto"
+)
 
 type ICore interface {
+	GetSigner() crypto.Signer
+	GetPrivateKeyOfDefaultAccount() ([]byte, error)
+	AddressFromPublicKey(publicKey []byte) ([]byte, error)
 }
 
 //type ConsensusOutput string

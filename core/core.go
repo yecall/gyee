@@ -48,6 +48,8 @@ import (
 	"github.com/yeeco/gyee/p2p"
 	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/utils/logging"
+	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/crypto/secp256k1"
 )
 
 type Core struct {
@@ -143,3 +145,21 @@ func (c *Core) loop() {
 }
 
 // implements of interface
+
+//ICORE
+func (c *Core) GetSigner() crypto.Signer {
+    return secp256k1.NewSecp256k1Signer()
+}
+
+func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) { //从node的accountManager取
+    return nil, nil
+}
+
+func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {
+    ad, err := NewAddressFromPublicKey(publicKey)
+    if err != nil {
+    	logging.Logger.Warn("New address from public key error", err)
+    	return nil, err
+	}
+	return ad.address, nil
+}

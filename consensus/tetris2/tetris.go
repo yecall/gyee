@@ -34,7 +34,7 @@ import (
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/crypto"
-	"github.com/yeeco/gyee/crypto/secp256k1"
+	"encoding/hex"
 )
 
 var HASH0 = [common.HashLength]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -56,13 +56,13 @@ type Tetris struct {
 	witness    []map[string]*Event          //witness of each round.
 
 	//Input Channel
-	EventCh       chan *Event
-	ParentEventCh chan *Event
+	EventCh       chan []byte
+	ParentEventCh chan []byte
 	TxsCh         chan common.Hash
 
 	//Output Channel
 	OutputCh       chan *ConsensusOutput
-	SendEventCh    chan *Event
+	SendEventCh    chan []byte
 	RequestEventCh chan common.Hash
 
 	eventCache    *utils.LRU //收到过的events，用于去重
@@ -110,12 +110,12 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		n:          blockHeight + 1,
 		validators: make(map[string]map[uint64]*Event, len(validatorList)),
 
-		EventCh:       make(chan *Event, 100),
-		ParentEventCh: make(chan *Event, 100),
+		EventCh:       make(chan []byte, 100),
+		ParentEventCh: make(chan []byte, 100),
 		TxsCh:         make(chan common.Hash, 100000),
 
 		OutputCh:       make(chan *ConsensusOutput, 10),
-		SendEventCh:    make(chan *Event, 100),
+		SendEventCh:    make(chan []byte, 100),
 		RequestEventCh: make(chan common.Hash, 100),
 
 		eventCache:    utils.NewLRU(10000, nil),
@@ -136,8 +136,9 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		lastSendTime: time.Now(),
 	}
 
-	tetris.signer = secp256k1.NewSecp256k1Signer()
-	tetris.signer.InitSigner([]byte{}) //TODO: 初始化要取缺省账户的私钥
+	tetris.signer = core.GetSigner()
+	pk, _ := core.GetPrivateKeyOfDefaultAccount()
+	tetris.signer.InitSigner(pk) //TODO: 初始化要取缺省账户的私钥
 
 	for _, value := range validatorList {
 		tetris.validators[value] = make(map[uint64]*Event)
@@ -215,10 +216,18 @@ func (t *Tetris) loop() {
 		case <-t.quitCh:
 			//logging.Logger.Info("Tetris loop end.")
 			return
-		case event := <-t.EventCh:
-			t.receiveEvent(event)
-		case event := <-t.ParentEventCh:
-			t.receiveParentEvent(event)
+		case eventMsg := <-t.EventCh:
+			var event Event
+			event.Unmarshal(eventMsg)
+			if t.checkEvent(&event) {
+				t.receiveEvent(&event)
+			}
+		case eventMsg := <-t.ParentEventCh:
+			var event Event
+			event.Unmarshal(eventMsg)
+			if t.checkEvent(&event){
+				t.receiveParentEvent(&event)
+			}
 		case tx := <-t.TxsCh:
 			t.receiveTx(tx)
 		case time := <-t.ticker.C:
@@ -238,8 +247,9 @@ func (t *Tetris) sendPlaceholderEvent() {
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.ready = true
+	event.Sign(t.signer)
 
-	t.SendEventCh <- event
+	t.SendEventCh <- event.Marshal()
 	t.validators[t.vid][t.n] = event
 	t.lastSendTime = time.Now()
 	//t.eventCache.Add(event.Hash()) ???
@@ -252,8 +262,9 @@ func (t *Tetris) sendEvent() {
 	event.AddParents(t.eventAccepted)
 	event.AddTransactions(t.txsAccepted)
 	event.ready = true
+	event.Sign(t.signer)
 
-	t.SendEventCh <- event
+	t.SendEventCh <- event.Marshal()
 	t.validators[t.vid][t.n] = event
 	t.lastSendTime = time.Now()
 	t.eventAccepted = make([]*Event, 0)
@@ -313,6 +324,23 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		//	t.sendEvent(t.currentEvent)
 		//}
 	}
+}
+
+func (t *Tetris) checkEvent(event *Event) bool {
+	pk, err := event.RecoverPublicKey(t.signer)
+	if err != nil {
+		logging.Logger.Warn("event check error.", err)
+		return false
+	}
+
+	//TODO：从公钥计算address vid
+	addr, err := t.core.AddressFromPublicKey(pk)
+    event.vid = hex.EncodeToString(addr)
+    //TODO: 检查是否属于当前validators
+
+	ret := event.SignVerify(pk, t.signer)
+
+    return ret
 }
 
 //Receive Event, if the parents not exists, send request
@@ -412,7 +440,6 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	}
 
 	event.know = make(map[string]uint64)
-	//event.parents = make(map[uint]*Event)
 	event.round = ROUND_UNDECIDED
 	event.witness = false
 	event.vote = 0
