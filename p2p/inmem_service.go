@@ -173,7 +173,6 @@ func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
 	ih.lock.RLock()
 	defer ih.lock.RUnlock()
 	for n, _ := range ih.nodes {
-
 		if n != from {
 			if rand.Intn(100) < from.outMiss {
 				//fmt.Println("drop:", message.from, message.msgType)

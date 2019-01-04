@@ -251,8 +251,10 @@ func (t *Tetris) sendPlaceholderEvent() {
 
 	t.SendEventCh <- event.Marshal()
 	t.validators[t.vid][t.n] = event
+	t.eventCache.Add(event.Hash(), event)
+
 	t.lastSendTime = time.Now()
-	//t.eventCache.Add(event.Hash()) ???
+
 	t.n++
 }
 
@@ -266,10 +268,12 @@ func (t *Tetris) sendEvent() {
 
 	t.SendEventCh <- event.Marshal()
 	t.validators[t.vid][t.n] = event
+	t.eventCache.Add(event.Hash(), event)
+
 	t.lastSendTime = time.Now()
 	t.eventAccepted = make([]*Event, 0)
 	t.txsAccepted = make([]common.Hash, 0)
-	//t.eventCache.Add(event.Hash()) ???
+
 	t.n++
 
 	t.update(event)
@@ -366,13 +370,12 @@ func (t *Tetris) receiveEvent(event *Event) {
 	//}
 
 	if t.eventCache.Contains(event.Hash()) {
-		/*
 			logging.Logger.WithFields(logrus.Fields{
-				"event": event.Hex(),
-				"m":     event.Body.M,
+				"event": event.Hash(),
+				"vid":     event.vid,
 				"n":     event.Body.N,
 			}).Debug("Recevie already existed event")
-		*/
+
 		return
 	}
 
@@ -399,13 +402,11 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 	t.parentCountRaw++
 
 	if t.eventCache.Contains(event.Hash()) {
-		/*
 			logging.Logger.WithFields(logrus.Fields{
-				"event": event.Hex(),
-				"m":     event.Body.M,
+				"event": event.Hash(),
+				"vid":     event.vid,
 				"n":     event.Body.N,
-			}).Debug("Recevie already existed event")
-		*/
+			}).Debug("Recevie already existed parent event")
 		return
 	}
 	//logging.Logger.WithFields(logrus.Fields{
@@ -427,9 +428,11 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 }
 
 func (t *Tetris) addReceivedEventToTetris(event *Event) {
-	t.eventCache.Add(event.Hash(), event)
 	me := t.validators[event.vid][event.Body.N]
 	if me != nil {
+		//fmt.Println("*****")
+		//fmt.Println(me.vid, me.Body.N, me.Hash(), t.vid)
+		//fmt.Println(event.vid, event.Body.N, event.Hash())
 		if me.Hash() != event.Hash() {
 			logging.Logger.WithFields(logrus.Fields{
 				"event": event.Hash(),
@@ -444,7 +447,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	event.witness = false
 	event.vote = 0
 	event.committable = COMMITTABLE_UNDECIDED
-
+	t.eventCache.Add(event.Hash(), event)
 	/*
 		新来一个event，可能是request来的，也可能是pending的
 		检查event的parent是否都在，如果有不在的，发request
@@ -632,7 +635,7 @@ func (t *Tetris) update(me *Event) {
 			}
 		}
 		me.round = maxr
-		//fmt.Println(" round:",me.round, " ", n, " ", m, me.Body.E)
+
 		if len(t.witness[me.round]) >= t.params.superMajority {
 			c := 0
 			for _, v := range t.witness[me.round] {

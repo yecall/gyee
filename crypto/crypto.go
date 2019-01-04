@@ -27,6 +27,7 @@ package crypto
 type Algorithm uint8
 
 const (
+	ALG_UNKNOWN   Algorithm = 0
 	ALG_SECP256K1 Algorithm = 1
 	ALG_QTESLA    Algorithm = 128
 )

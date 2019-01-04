@@ -60,7 +60,7 @@ func (s *Signer) Sign(data []byte) (signature *crypto.Signature, err error) {
 		Algorithm: s.Algorithm(),
 		Signature: sig,
 	}
-	return
+	return signature, nil
 }
 
 func (s *Signer) RecoverPublicKey(data []byte, signature *crypto.Signature) (publicKey []byte, err error) {

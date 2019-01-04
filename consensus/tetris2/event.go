@@ -56,7 +56,7 @@ func (ev *EventBody) Marshal() []byte {
 
 type EventMessage struct {
 	Body      *EventBody
-	signature *crypto.Signature
+	Signature *crypto.Signature
 }
 
 func (em *EventMessage) Marshal() []byte {
@@ -83,7 +83,7 @@ type Event struct {
 
 	//fields for consensus computing
 	know        map[string]uint64
-	parents     map[string]*Event
+	//parents     map[string]*Event
 	ready       bool //event is ready if all of it's self-parent events has existed and ready
 	round       int  //event's round number
 	witness     bool
@@ -102,6 +102,7 @@ func NewEvent(vid string, height uint64, sequenceNumber uint64) *Event {
 
 	event := Event{
 		Body: body,
+		vid: vid,
 		know: make(map[string]uint64),
 		//parents:     make(map[string]*Event),
 		ready:       false,
@@ -161,14 +162,13 @@ func (e *Event) Hash() common.Hash {
 		h := sha256.Sum256(e.Marshal())
 		e.hash = h
 	}
-
 	return e.hash
 }
 
 func (e *Event) Marshal() []byte {
 	em := &EventMessage{
 		Body:      e.Body,
-		signature: e.signature,
+		Signature: e.signature,
 	}
 	return em.Marshal()
 }
@@ -177,11 +177,12 @@ func (e *Event) Unmarshal(data []byte) {
 	em := &EventMessage{}
 	em.Unmarshal(data)
 	e.Body = em.Body
-	e.signature = em.signature
+	e.signature = em.Signature
 }
 
 func (e *Event) Sign(signer crypto.Signer) error {
-    sig, err := signer.Sign(e.Body.Hash()[:])
+	h := e.Body.Hash()
+    sig, err := signer.Sign(h[:])
     if err != nil {
         return err
 	}
@@ -190,12 +191,14 @@ func (e *Event) Sign(signer crypto.Signer) error {
 }
 
 func (e *Event) RecoverPublicKey(signer crypto.Signer) ([]byte, error){
-	pk, err := signer.RecoverPublicKey(e.Body.Hash()[:], e.signature)
+	h := e.Body.Hash()
+	pk, err := signer.RecoverPublicKey(h[:], e.signature)
 	return pk, err
 }
 
 func (e *Event) SignVerify(publicKey []byte, signer crypto.Signer) bool {
-    ret:= signer.Verify(publicKey, e.Body.Hash()[:], e.signature)
+	h := e.Body.Hash()
+    ret:= signer.Verify(publicKey, h[:], e.signature)
 	return ret
 }
 
