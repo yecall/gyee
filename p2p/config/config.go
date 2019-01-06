@@ -192,6 +192,8 @@ type Config struct {
 	Local				Node					// local node struct
 	ProtoNum			uint32					// local protocol number
 	Protocols			[]Protocol				// local protocol table
+	SubNetKeyList		map[SubNetworkID]ecdsa.PrivateKey // keys for sub-node
+	SubNetNodeList		map[SubNetworkID]Node	// sub-node identities
 	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be
 	SubNetMaxOutbounds	map[SubNetworkID]int	// max concurrency outbounds
 	SubNetMaxInBounds	map[SubNetworkID]int	// max concurrency inbounds
@@ -749,6 +751,10 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 	}
 	copy(id[:], pbytes[1:])
 	return &id
+}
+
+func P2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
+	return p2pPubkey2NodeId(pub)
 }
 
 // Setup local node identity

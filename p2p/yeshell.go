@@ -130,7 +130,7 @@ type YeShellConfig struct {
 	EvKeepTime			time.Duration							// duration for events kept by dht
 	DedupTime			time.Duration							// duration for deduplication cleanup timer
 	BootstrapTime		time.Duration							// duration for bootstrap blind connection
-	localSnid			[]byte									// local sut network identity
+	localSnid			[]config.SubNetworkID					// local sut network identity
 	dhtBootstrapNodes	[]*config.Node							// dht bootstarp nodes
 }
 
@@ -212,35 +212,12 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		return nil
 	}
 
-	if yesCfg.Validator {
-		chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, config.VSubNet)
-		chainCfg.SubNetMaxPeers[config.VSubNet] = config.MaxPeers
-		chainCfg.SubNetMaxOutbounds[config.VSubNet] = config.MaxOutbounds
-		chainCfg.SubNetMaxInBounds[config.VSubNet] = config.MaxInbounds
-	}
-
-	if yesCfg.SubNetMaskBits > MaxSubNetMaskBits {
-		yesLog.Debug("YeShellConfigToP2pCfg: too big, SubNetMaskBits: %d", yesCfg.SubNetMaskBits)
+	if err := SetupSubNetwork(chainCfg, yesCfg.SubNetMaskBits, yesCfg.Validator); err != nil {
+		yesLog.Debug("YeShellConfigToP2pCfg: SetupSubNetwork failed")
 		return nil
 	}
-	end := len(chainCfg.Local.ID) - 1
-	snw := uint16((chainCfg.Local.ID[end-1] << 8) | chainCfg.Local.ID[end])
-	snw = snw << uint(16 - yesCfg.SubNetMaskBits)
-	snw = snw >> uint(16 - yesCfg.SubNetMaskBits)
-	snid := config.SubNetworkID{
-		byte((snw >> 8) & 0xff),
-		byte(snw & 0xff),
-	}
-	thisCfg.localSnid = append(thisCfg.localSnid, snid[0:]...)
-	chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, snid)
-	chainCfg.SubNetMaxPeers[snid] = config.MaxPeers
-	chainCfg.SubNetMaxOutbounds[snid] = config.MaxOutbounds
-	chainCfg.SubNetMaxInBounds[snid] = config.MaxInbounds
 
-	chainCfg.SubNetIdList = append(chainCfg.SubNetIdList, config.AnySubNet)
-	chainCfg.SubNetMaxPeers[config.AnySubNet] = config.MaxPeers
-	chainCfg.SubNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
-	chainCfg.SubNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
+	thisCfg.localSnid = append(thisCfg.localSnid, chainCfg.SubNetIdList...)
 
 	if config.P2pSetLocalDhtIpAddr(chainCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
@@ -417,14 +394,15 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	}
 
 	if reCfg.SubnetMaskBits != thisCfg.SubNetMaskBits {
-		oldSnid, err := yeShMgr.getSubnetIdentity(thisCfg.SubNetMaskBits)
+		nodeId := yeShMgr.chainInst.SchGetP2pConfig().Local.ID
+		oldSnid, err := GetSubnetIdentity(nodeId, thisCfg.SubNetMaskBits)
 		if err != nil {
-			yesLog.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
+			yesLog.Debug("Reconfig: GetSubnetIdentity failed, error: %s", err.Error())
 			return err
 		}
-		newSnid, err := yeShMgr.getSubnetIdentity(reCfg.SubnetMaskBits)
+		newSnid, err := GetSubnetIdentity(nodeId, reCfg.SubnetMaskBits)
 		if err != nil {
-			yesLog.Debug("Reconfig: getSubnetIdentity failed, error: %s", err.Error())
+			yesLog.Debug("Reconfig: GetSubnetIdentity failed, error: %s", err.Error())
 			return err
 		}
 		SnidAdd = append(SnidAdd, newSnid)
@@ -982,7 +960,6 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeI
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	k := yesKey{}
 	copy(k[0:], msg.Key)
 	if yeShMgr.checkDupKey(k) {
@@ -1000,7 +977,6 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeI
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-		LocalSnid: thisCfg.localSnid,
 	}
 	if exclude != nil {
 		ex := *exclude
@@ -1037,7 +1013,6 @@ func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeI
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-		LocalSnid: thisCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1064,7 +1039,6 @@ func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeI
 func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeID) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	k := yesKey{}
 	copy(k[0:], msg.Key)
 	if yeShMgr.checkDupKey(k) {
@@ -1082,7 +1056,6 @@ func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeI
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-		LocalSnid: thisCfg.localSnid,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1120,13 +1093,12 @@ func (yeShMgr *YeShellManager)broadcastBkOsn(msg *Message, exclude *config.NodeI
 	return nil
 }
 
-func (yeShMgr *YeShellManager)getSubnetIdentity(maskBits int) (config.SubNetworkID, error) {
+func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, error) {
 	if maskBits <= 0 || maskBits > MaxSubNetMaskBits {
 		return config.SubNetworkID{}, errors.New("invalid mask bits")
 	}
-	localId := yeShMgr.chainInst.SchGetP2pConfig().Local.ID
-	end := len(localId) - 1
-	snw := uint16((localId[end-1] << 8) | localId[end])
+	end := len(id) - 1
+	snw := uint16((id[end-1] << 8) | id[end])
 	snw = snw << uint(16 - maskBits)
 	snw = snw >> uint(16 - maskBits)
 	snid := config.SubNetworkID {
@@ -1203,4 +1175,64 @@ func (yeShMgr *YeShellManager)checkDupKey(k yesKey) bool {
 	defer yeShMgr.deDupLock.Unlock()
 	_, dup := yeShMgr.deDupMap[k]
 	return dup
+}
+
+func Snid2Int(snid config.SubNetworkID) int {
+	return (int(snid[0]) << 8) + int(snid[1])
+}
+
+func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
+	// Notice: this function should be called when config.Local is setup
+	if mbs < 0 || mbs > MaxSubNetMaskBits {
+		yesLog.Debug("setupSubNetwork: invalid subnet mask bits: %d", mbs)
+		return errors.New("invalid subnet mask bits")
+	} else if mbs == 0 {
+		cfg.SubNetKeyList[config.ZeroSubNet] = *cfg.PrivateKey
+		cfg.SubNetIdList = append(cfg.SubNetIdList, config.ZeroSubNet)
+		cfg.SubNetNodeList[config.ZeroSubNet] = cfg.Local
+		cfg.SubNetMaxPeers[config.ZeroSubNet] = config.MaxPeers
+		cfg.SubNetMaxOutbounds[config.ZeroSubNet] = config.MaxOutbounds
+		cfg.SubNetMaxInBounds[config.ZeroSubNet] = config.MaxInbounds
+	} else if vdt == false {
+		snid, err := GetSubnetIdentity(cfg.Local.ID, mbs)
+		if err != nil {
+			return errors.New("GetSubnetIdentity failed")
+		}
+		cfg.SubNetKeyList[snid] = *cfg.PrivateKey
+		cfg.SubNetIdList = append(cfg.SubNetIdList, snid)
+		cfg.SubNetNodeList[snid] = cfg.Local
+		cfg.SubNetMaxPeers[snid] = config.MaxPeers
+		cfg.SubNetMaxOutbounds[snid] = config.MaxOutbounds
+		cfg.SubNetMaxInBounds[snid] = config.MaxInbounds
+	} else {
+		count := 1 << uint(mbs)
+		cfg.SubNetIdList = make([]config.SubNetworkID, count)
+		for ; count > 0; {
+			prvKey, err := config.GenerateKey()
+			if err != nil {
+				continue
+			}
+			id := config.P2pPubkey2NodeId(&prvKey.PublicKey)
+			snid, err := GetSubnetIdentity(*id, mbs)
+			if err != nil {
+				return errors.New("GetSubnetIdentity failed")
+			}
+			if _, dup := cfg.SubNetKeyList[snid]; dup {
+				continue
+			}
+			cfg.SubNetKeyList[snid] = *prvKey
+			cfg.SubNetIdList[Snid2Int(snid)] = snid
+			cfg.SubNetNodeList[snid] = config.Node{
+				IP:  cfg.Local.IP,
+				UDP: cfg.Local.UDP,
+				TCP: cfg.Local.TCP,
+				ID:  *id,
+			}
+			cfg.SubNetMaxPeers[snid] = config.MaxPeers
+			cfg.SubNetMaxOutbounds[snid] = config.MaxOutbounds
+			cfg.SubNetMaxInBounds[snid] = config.MaxInbounds
+			count--
+		}
+	}
+	return nil
 }
