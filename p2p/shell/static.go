@@ -256,10 +256,10 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	//
 
 	p2pInstName := sdl.SchGetP2pCfgName()
+	appType := sdl.SchGetAppType()
 	stLog.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
 
 	var staticTasks = make([]string, 0)
-	appType := sdl.SchGetAppType()
 
 	if P2pType(appType) == config.P2P_TYPE_CHAIN {
 
@@ -285,24 +285,22 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	for _, taskName := range staticTasks {
 
 		if sdl.SchTaskExist(taskName) != true {
-			stLog.Debug("P2pStop: inst: %s, task not exist: %s", p2pInstName, taskName)
+			stLog.Debug("P2pStop: inst: %s, type: %d, task not exist: %s", p2pInstName, appType, taskName)
 			continue
 		}
 
-		stLog.Debug("P2pStop: EvSchPoweroff will be sent to inst: %s, task: %s",
-			p2pInstName, taskName)
+		stLog.Debug("P2pStop: EvSchPoweroff will be sent to inst: %s, type: %d, task: %s",
+			p2pInstName, appType, taskName)
 
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
 
-			stLog.Debug("P2pStop: inst: %s, " +
-				"SchSendMessageByName failed, eno: %d, task: %s",
-				p2pInstName, eno, taskName)
+			stLog.Debug("P2pStop: SchSendMessageByName failed, inst: %s, type: %d, eno: %d, task: %s",
+				p2pInstName, appType, eno, taskName)
 
 		} else {
 
-			stLog.Debug("P2pStop: inst: %s, " +
-				"SchSendMessageByName with EvSchPoweroff ok, eno: %d, task: %s",
-				p2pInstName, eno, taskName)
+			stLog.Debug("P2pStop: send EvSchPoweroff ok, inst: %s, type: %d, eno: %d, task: %s",
+				p2pInstName, appType, eno, taskName)
 
 			//
 			// Wait current static task to be done, to ensure the poweroff order specified
@@ -310,15 +308,15 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 			//
 
 			for sdl.SchTaskExist(taskName) {
-				stLog.Debug("P2pStop: waiting inst: %s, task: %s", p2pInstName, taskName)
+				stLog.Debug("P2pStop: waiting inst: %s, type: %d, task: %s", p2pInstName, appType, taskName)
 				time.Sleep(time.Millisecond * 500)
 			}
 
-			stLog.Debug("P2pStop: had done, inst: %s, task: %s", p2pInstName, taskName)
+			stLog.Debug("P2pStop: done, inst: %s, type: %d, task: %s", p2pInstName, appType, taskName)
 		}
 	}
 
-	stLog.Debug("P2pStop: inst: %s total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
+	stLog.Debug("P2pStop: inst: %s, type: %d, total tasks: %d", p2pInstName, appType, sdl.SchGetTaskNumber())
 	stLog.Debug("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
 	//
@@ -338,7 +336,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 		tasks = sdl.SchGetTaskNumber()
 
 		if tasks == 0 {
-			stLog.Debug("P2pStop: inst: %s, all tasks are done", p2pInstName)
+			stLog.Debug("P2pStop: inst: %s, type: %d, all tasks are done", p2pInstName, appType)
 			break
 		}
 
@@ -353,8 +351,8 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 		}
 
 		stLog.Debug("P2pStop: " +
-			"inst: %s, wait seconds: %d, remain tasks: %d, names: %s",
-			p2pInstName, seconds, tasks, strNames)
+			"wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
+			seconds, p2pInstName, appType, tasks, strNames)
 	}
 
 	ch<-true

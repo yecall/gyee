@@ -371,12 +371,6 @@ func (yeShMgr *YeShellManager)Start() error {
 }
 
 func (yeShMgr *YeShellManager)Stop() {
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
-	if thisCfg.BootstrapNode == false {
-		yesLog.Debug("Stop: close dht bootstrap timer")
-		close(yeShMgr.dhtBsChan)
-	}
-
 	yesLog.Debug("Stop: close deduplication ticker")
 	close(yeShMgr.ddtChan)
 
@@ -386,6 +380,12 @@ func (yeShMgr *YeShellManager)Stop() {
 	p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 	<-stopCh
 	yesLog.Debug("Stop: dht stopped")
+
+	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	if thisCfg.BootstrapNode == false {
+		yesLog.Debug("Stop: close dht bootstrap timer")
+		close(yeShMgr.dhtBsChan)
+	}
 
 	yesLog.Debug("Stop: stop chain")
 	p2psh.P2pStop(yeShMgr.chainInst, stopCh)

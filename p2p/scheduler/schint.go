@@ -35,7 +35,7 @@ type schMessage SchMessage
 //
 // User task entry point
 //
-type schUserTaskInf = SchUserTaskInf
+type schUserTaskProc = SchUserTaskInf
 
 //
 // max mail box size
@@ -109,7 +109,7 @@ type schTask struct {
 	lock		sync.Mutex						// lock to protect task control block
 	sdl			*scheduler						// pointer to scheduler
 	name		string							// task name
-	utep		schUserTaskInf					// user task entry point
+	utep		schUserTaskProc					// user task entry point
 	mailbox		schMailBox						// mail box
 	done		chan SchErrno					// done with errno
 	stopped		chan bool						// stopped signal
@@ -158,7 +158,6 @@ type scheduler struct {
 	busySize			int									// number of nodes in busy
 	tmFree				*schTmcbNode						// free timer node queue
 	tmFreeSize			int									// free timer node queue size
-	tmMap				map[*schTmcbNode]*schTaskNode		// map busy timer node pointer to its' owner task node pointer
 	schTaskNodePool		[schTaskNodePoolSize]schTaskNode	// task node pool
 	schTimerNodePool	[schTimerNodePoolSize]schTmcbNode	// timer node pool
 	powerOff			bool								// power off stage flag
