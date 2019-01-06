@@ -32,6 +32,7 @@ import (
 	tab		"github.com/yeeco/gyee/p2p/discover/table"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"crypto/ecdsa"
 )
 
 //
@@ -139,31 +140,32 @@ const (
 
 // peer manager configuration
 type peMgrConfig struct {
-	cfgName				string						// p2p configuration name
-	ip					net.IP						// ip address
-	port				uint16						// tcp port number
-	udp					uint16						// udp port number, used with handshake procedure
-	nodeId				config.NodeID				// the node's public key
-	noDial				bool						// do not dial outbound
-	noAccept			bool						// do not accept inbound
-	bootstrapNode		bool						// local is a bootstrap node
-	defaultCto			time.Duration				// default connect outbound timeout
-	defaultHto			time.Duration				// default handshake timeout
-	defaultAto			time.Duration				// default active read/write timeout
-	maxMsgSize			int							// max tcpmsg package size
-	protoNum			uint32						// local protocol number
-	protocols			[]Protocol					// local protocol table
-	networkType			int							// p2p network type
-	staticMaxPeers		int							// max peers would be
-	staticMaxOutbounds	int							// max concurrency outbounds
-	staticMaxInBounds	int							// max concurrency inbounds
-	staticNodes			[]*config.Node				// static nodes
-	staticSubNetId		SubNetworkID				// static network identity
-	subNetMaxPeers		map[SubNetworkID]int		// max peers would be
-	subNetMaxOutbounds	map[SubNetworkID]int		// max concurrency outbounds
-	subNetMaxInBounds	map[SubNetworkID]int		// max concurrency inbounds
-	subNetIdList		[]SubNetworkID				// sub network identity list. do not put the identity
-	ibpNumTotal			int							// total number of concurrency inbound peers
+	cfgName				string								// p2p configuration name
+	ip					net.IP								// ip address
+	port				uint16								// tcp port number
+	udp					uint16								// udp port number, used with handshake procedure
+	noDial				bool								// do not dial outbound
+	noAccept			bool								// do not accept inbound
+	bootstrapNode		bool								// local is a bootstrap node
+	defaultCto			time.Duration						// default connect outbound timeout
+	defaultHto			time.Duration						// default handshake timeout
+	defaultAto			time.Duration						// default active read/write timeout
+	maxMsgSize			int									// max tcpmsg package size
+	protoNum			uint32								// local protocol number
+	protocols			[]Protocol							// local protocol table
+	networkType			int									// p2p network type
+	staticMaxPeers		int									// max peers would be
+	staticMaxOutbounds	int									// max concurrency outbounds
+	staticMaxInBounds	int									// max concurrency inbounds
+	staticNodes			[]*config.Node						// static nodes
+	staticSubNetId		SubNetworkID						// static network identity
+	subNetMaxPeers		map[SubNetworkID]int				// max peers would be
+	subNetMaxOutbounds	map[SubNetworkID]int				// max concurrency outbounds
+	subNetMaxInBounds	map[SubNetworkID]int				// max concurrency inbounds
+	subNetKeyList		map[SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
+	subNetNodeList		map[SubNetworkID]config.NodeID		// sub-node identities
+	subNetIdList		[]SubNetworkID						// sub network identity list. do not put the identity
+	ibpNumTotal			int									// total number of concurrency inbound peers
 }
 
 // peer manager
@@ -361,7 +363,6 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		ip:					cfg.IP,
 		port:				cfg.Port,
 		udp:				cfg.UDP,
-		nodeId:				cfg.ID,
 		noDial:				cfg.NoDial,
 		noAccept:			cfg.NoAccept,
 		bootstrapNode:		cfg.BootstrapNode,
@@ -381,6 +382,8 @@ func (peMgr *PeerManager)peMgrPoweron(ptn interface{}) PeMgrErrno {
 		subNetMaxPeers:		cfg.SubNetMaxPeers,
 		subNetMaxOutbounds:	cfg.SubNetMaxOutbounds,
 		subNetMaxInBounds:	cfg.SubNetMaxInBounds,
+		subNetKeyList:		cfg.SubNetKeyList,
+		subNetNodeList:		cfg.SubNetNodeList,
 		subNetIdList:		cfg.SubNetIdList,
 		ibpNumTotal:		0,
 	}
@@ -2325,7 +2328,7 @@ func (pi *peerInstance)piHandshakeInbound(inst *peerInstance) PeMgrErrno {
 	// write outbound handshake to remote peer
 	hs2peer := Handshake{}
 	hs2peer.Snid = inst.snid
-	hs2peer.NodeId = pi.peMgr.cfg.nodeId
+	hs2peer.NodeId = pi.peMgr.cfg.subNetNodeList[inst.snid]
 	hs2peer.IP = append(hs2peer.IP, pi.peMgr.cfg.ip ...)
 	hs2peer.UDP = uint32(pi.peMgr.cfg.udp)
 	hs2peer.TCP = uint32(pi.peMgr.cfg.port)
@@ -2348,7 +2351,7 @@ func (pi *peerInstance)piHandshakeOutbound(inst *peerInstance) PeMgrErrno {
 
 	// write outbound handshake to remote peer
 	hs.Snid = pi.snid
-	hs.NodeId = pi.peMgr.cfg.nodeId
+	hs.NodeId = pi.peMgr.cfg.subNetNodeList[pi.snid]
 	hs.IP = append(hs.IP, pi.peMgr.cfg.ip ...)
 	hs.UDP = uint32(pi.peMgr.cfg.udp)
 	hs.TCP = uint32(pi.peMgr.cfg.port)

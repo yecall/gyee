@@ -161,15 +161,16 @@ const (
 )
 
 type tabConfig struct {
-	local			config.Node		// local node identity
-	networkType		int				// p2p network type
-	bootstrapNodes	[]*Node			// bootstrap nodes
-	dataDir			string			// data directory
-	name			string			// node name
-	nodeDb			string			// node database
-	bootstrapNode	bool			// bootstrap flag of local node
-	subNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
-									// of the local node in this list.
+	local			config.Node						// local node identity
+	networkType		int								// p2p network type
+	bootstrapNodes	[]*Node							// bootstrap nodes
+	dataDir			string							// data directory
+	name			string							// node name
+	nodeDb			string							// node database
+	bootstrapNode	bool							// bootstrap flag of local node
+	subNetNodeList	map[SubNetworkID]config.Node	// sub network node identities
+	subNetIdList	[]SubNetworkID					// sub network identity list. do not put the identity
+													// of the local node in this list.
 }
 
 //
@@ -460,12 +461,13 @@ func (tabMgr *TableManager)startSubnetRefresh() TabMgrErrno {
 func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
 	mgr := NewTabMgr()
 	*mgr = *tabMgr
+	mgr.snid			= snid
+	mgr.cfg.local		= tabMgr.cfg.subNetNodeList[snid]
 	mgr.queryIcb		= make([]*instCtrlBlock, 0, TabInstQueringMax)
 	mgr.boundIcb		= make([]*instCtrlBlock, 0, TabInstBondingMax)
 	mgr.queryPending	= make([]*queryPendingEntry, 0, TabInstQPendingMax)
 	mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
 	mgr.dlkTab			= make([]int, 256)
-	mgr.snid			= snid
 	tabMgr.SubNetMgrList[snid] = mgr
 
 	for loop := 0; loop < cap(mgr.buckets); loop++ {
@@ -950,6 +952,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	tabCfg.name				= cfg.Name
 	tabCfg.nodeDb			= cfg.NodeDB
 	tabCfg.bootstrapNode	= cfg.BootstrapNode
+	tabCfg.subNetNodeList	= cfg.SubNetNodeList
 	tabCfg.subNetIdList		= cfg.SubNetIdList
 
 	tabCfg.bootstrapNodes = make([]*Node, len(cfg.BootstrapNodes))

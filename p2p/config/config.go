@@ -238,40 +238,43 @@ type Cfg4PeerListener struct {
 
 // Configuration about peer manager
 type Cfg4PeerManager struct {
-	CfgName				string					// p2p configuration name
-	NetworkType			int						// p2p network type
-	IP					net.IP					// ip address
-	Port				uint16					// tcp port number
-	UDP					uint16					// udp port number, used with handshake procedure
-	ID					NodeID					// the node's public key
-	StaticMaxPeers		int						// max peers would be
-	StaticMaxOutbounds	int						// max concurrency outbounds
-	StaticMaxInBounds	int						// max concurrency inbounds
-	StaticNodes			[]*Node					// static nodes
-	StaticNetId			SubNetworkID			// static network identity
-	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be
-	SubNetMaxOutbounds	map[SubNetworkID]int	// max concurrency outbounds
-	SubNetMaxInBounds	map[SubNetworkID]int	// max concurrency inbounds
-	SubNetIdList		[]SubNetworkID			// sub network identity list. do not put the identity
-												// of the local node in this list.
-	NoDial				bool					// do not dial outbound
-	NoAccept			bool					// do not accept inbound
-	BootstrapNode		bool					// local is a bootstrap node
-	ProtoNum			uint32					// local protocol number
-	Protocols			[]Protocol				// local protocol table
+	CfgName				string								// p2p configuration name
+	NetworkType			int									// p2p network type
+	IP					net.IP								// ip address
+	Port				uint16								// tcp port number
+	UDP					uint16								// udp port number, used with handshake procedure
+	ID					NodeID								// the node's public key
+	StaticMaxPeers		int									// max peers would be
+	StaticMaxOutbounds	int									// max concurrency outbounds
+	StaticMaxInBounds	int									// max concurrency inbounds
+	StaticNodes			[]*Node								// static nodes
+	StaticNetId			SubNetworkID						// static network identity
+	SubNetMaxPeers		map[SubNetworkID]int				// max peers would be
+	SubNetMaxOutbounds	map[SubNetworkID]int				// max concurrency outbounds
+	SubNetMaxInBounds	map[SubNetworkID]int				// max concurrency inbounds
+	SubNetKeyList		map[SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
+	SubNetNodeList		map[SubNetworkID]NodeID				// sub-node identities
+	SubNetIdList		[]SubNetworkID						// sub network identity list. do not put the identity
+															// of the local node in this list.
+	NoDial				bool								// do not dial outbound
+	NoAccept			bool								// do not accept inbound
+	BootstrapNode		bool								// local is a bootstrap node
+	ProtoNum			uint32								// local protocol number
+	Protocols			[]Protocol							// local protocol table
 }
 
 // Configuration about table manager
 type Cfg4TabManager struct {
-	NetworkType		int				// Network type
-	Local			Node			// local node
-	BootstrapNodes	[]*Node			// bootstrap nodes
-	DataDir			string			// data directory
-	Name			string			// node name
-	NodeDB			string			// node database
-	BootstrapNode	bool			// bootstrap node flag
-	SubNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
-									// of the local node in this list.
+	NetworkType		int						// Network type
+	Local			Node					// local node
+	BootstrapNodes	[]*Node					// bootstrap nodes
+	DataDir			string					// data directory
+	Name			string					// node name
+	NodeDB			string					// node database
+	BootstrapNode	bool					// bootstrap node flag
+	SubNetNodeList	map[SubNetworkID]Node	// sub network node identities
+	SubNetIdList	[]SubNetworkID			// sub network identity list. do not put the identity
+											// of the local node in this list.
 }
 
 // Configuration about protocols supported
@@ -981,6 +984,7 @@ func P2pConfig4TabManager(name string) *Cfg4TabManager {
 		NodeDB:			config[name].NodeDatabase,
 		BootstrapNode:	config[name].BootstrapNode,
 		NetworkType:	config[name].NetworkType,
+		SubNetNodeList:	config[name].SubNetNodeList,
 		SubNetIdList:	config[name].SubNetIdList,
 	}
 }
