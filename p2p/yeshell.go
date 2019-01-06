@@ -775,7 +775,6 @@ _rxLoop:
 						Key: pkg.Key,
 						Data: pkg.Payload,
 					}
-					exclude := &pkg.PeerInfo.NodeId
 
 					sub, _ := key.(*Subscriber)
 					sub.MsgChan <- msg
@@ -783,13 +782,13 @@ _rxLoop:
 					err := error(nil)
 					switch msg.MsgType {
 					case MessageTypeTx:
-						err = yeShMgr.broadcastTxOsn(&msg, exclude)
+						err = yeShMgr.broadcastTxOsn(&msg, nil)
 					case MessageTypeEvent:
-						err = yeShMgr.broadcastEvOsn(&msg, exclude, false)
+						err = yeShMgr.broadcastEvOsn(&msg, nil, false)
 					case MessageTypeBlockHeader:
-						err = yeShMgr.broadcastBhOsn(&msg, exclude)
+						err = yeShMgr.broadcastBhOsn(&msg, nil)
 					case MessageTypeBlock:
-						err = yeShMgr.broadcastBkOsn(&msg, exclude)
+						err = yeShMgr.broadcastBkOsn(&msg, nil)
 					default:
 						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
 					}
@@ -955,7 +954,7 @@ func (yeShMgr *YeShellManager)broadcastBk(msg *Message) error {
 	return errors.New("broadcastBk: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
+func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude map[config.NodeID]bool) error {
 	// if local node is a validator, the Tx should be broadcast over the
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
@@ -977,10 +976,7 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeI
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
-	}
-	if exclude != nil {
-		ex := *exclude
-		req.Exclude = &ex
+		Exclude: exclude,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
