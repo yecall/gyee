@@ -610,7 +610,7 @@ func (m *P2PMessage_Pong) GetExtra() []byte {
 type ExtMessage struct {
 	Mid                  *MessageId            `protobuf:"varint,1,req,name=mid,enum=tcpmsg.pb.MessageId" json:"mid,omitempty"`
 	CheckKey             *ExtMessage_CheckKey  `protobuf:"bytes,2,opt,name=checkKey" json:"checkKey,omitempty"`
-	ReportKey            *ExtMessage_ReportKey `protobuf:"bytes,3,opt,name=reportKey" json:"reportKey,omitempty"`
+	ReportKey            *ExtMessage_ReportKey `protobuf:"bytes,3,opt,name=reportKeyFromPeer" json:"reportKeyFromPeer,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
 	XXX_unrecognized     []byte                `json:"-"`
 	XXX_sizecache        int32                 `json:"-"`

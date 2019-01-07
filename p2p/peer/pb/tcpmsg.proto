@@ -147,5 +147,5 @@ message ExtMessage {
 
     required MessageId  mid         = 1;    // message identity
     optional CheckKey   checkKey    = 2;    // check key message
-    optional ReportKey  reportKey   = 3;    // report key message
+    optional ReportKey  reportKeyFromPeer   = 3;    // report key message
 }

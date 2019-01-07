@@ -22,15 +22,15 @@ package shell
 
 import (
 	"time"
+	"fmt"
+	"sync"
+	"container/list"
+	"github.com/pkg/errors"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	peer	"github.com/yeeco/gyee/p2p/peer"
 	dht		"github.com/yeeco/gyee/p2p/dht"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"container/list"
-	"github.com/pkg/errors"
-	"fmt"
-	"sync"
 )
 
 //
@@ -70,6 +70,7 @@ type shellPeerInst struct {
 	txChan		chan *peer.P2pPackage			// tx channel of peer instance
 	rxChan		chan *peer.P2pPackageRx			// rx channel of peer instance
 	hsInfo		*peer.Handshake					// handshake info about peer
+	pi			*peer.PeerInstance				// peer instance pointer
 	status		int								// active peer instance status
 }
 
@@ -193,6 +194,7 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 	txChan, _ := ind.TxChan.(chan *peer.P2pPackage)
 	rxChan, _ := ind.RxChan.(chan *peer.P2pPackageRx)
 	peerInfo, _ := ind.PeerInfo.(*peer.Handshake)
+	pi, _ := ind.PeerInst.(*peer.PeerInstance)
 	peerId := shellPeerID {
 		snid: peerInfo.Snid,
 		nodeId: peerInfo.NodeId,
@@ -203,6 +205,7 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 		txChan: txChan,
 		rxChan: rxChan,
 		hsInfo: peerInfo,
+		pi: pi,
 		status: pisActive,
 	}
 	if _, dup := shMgr.peerActived[peerId]; dup {
@@ -222,10 +225,17 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 					return
 				}
 
-				if rxPkg.MsgId != int(MID_CHKK) && rxPkg.MsgId != int(MID_RPTK) {
-					shMgr.rxChan <- rxPkg
+				if rxPkg.MsgId == int(MID_CHKK) {
+
+					shMgr.checkKeyFromPeer(rxPkg)
+
+				} else if rxPkg.MsgId == int(MID_RPTK) {
+
+					shMgr.reportKeyFromPeer(rxPkg)
+
 				} else {
-					shMgr.reportKey(rxPkg)
+
+					shMgr.rxChan <- rxPkg
 				}
 			}
 		}
@@ -385,6 +395,12 @@ func (shMgr *ShellManager)checkKey(pe *shellPeerInst, pid shellPeerID, req *sch.
 	copy(ddk.key[0:], req.Key)
 	ddk.peer = pid
 
+	pai, ok := shMgr.peerActived[pid]
+	if !ok {
+		chainLog.Debug("checkKey: active peer not found, pid: %+v", pid)
+		return sch.SchEnoNotFound
+	}
+
 	if _, dup := shMgr.deDupMap[ddk]; dup {
 		chainLog.Debug("checkKey: duplicated, ddk: %+v", ddk)
 		return sch.SchEnoDuplicated
@@ -393,6 +409,11 @@ func (shMgr *ShellManager)checkKey(pe *shellPeerInst, pid shellPeerID, req *sch.
 	ddv := deDupVal{
 		bcReq: req,
 		timer: nil,
+	}
+
+	if err := shMgr.checkKey2Peer(pai, &ddk); err != nil {
+		chainLog.Debug("checkKey: checkKey2Peer failed")
+		return sch.SchEnoUserTask
 	}
 
 	tm, err := shMgr.tmDedup.GetTimer(chkkTime, nil, shMgr.deDupTimerCb)
@@ -413,7 +434,36 @@ func (shMgr *ShellManager)checkKey(pe *shellPeerInst, pid shellPeerID, req *sch.
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager)reportKey(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	ddk := deDupKey{}
+	copy(ddk.key[0:], rxPkg.Key)
+	spid := shellPeerID {
+		snid:	rxPkg.PeerInfo.Snid,
+		dir:	rxPkg.PeerInfo.Dir,
+		nodeId:	rxPkg.PeerInfo.NodeId,
+	}
+	ddk.peer = spid
+
+	pai, ok := shMgr.peerActived[spid]
+	if !ok {
+		chainLog.Debug("checkKeyFromPeer: active peer not found, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
+
+	status := int32(peer.KS_NOTEXIST)
+	if _, dup := shMgr.deDupMap[ddk]; dup {
+		status = int32(peer.KS_EXIST)
+	}
+
+	if err := shMgr.reportKey2Peer(pai, &ddk, status); err != nil {
+		chainLog.Debug("checkKeyFromPeer: reportKey2Peer failed, err: %s", err.Error())
+		return sch.SchEnoUserTask
+	}
+
+	return sch.SchEnoNone
+}
+
+func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
 
 	shMgr.deDupLock.Lock()
 	defer shMgr.deDupLock.Unlock()
@@ -430,19 +480,35 @@ func (shMgr *ShellManager)reportKey(rxPkg *peer.P2pPackageRx) sch.SchErrno {
 
 	ddv, ok := shMgr.deDupMap[ddk]
 	if !ok {
-		chainLog.Debug("reportKey: not found, ddk: %+v", ddk)
+		chainLog.Debug("reportKeyFromPeer: not found, ddk: %+v", ddk)
 		return sch.SchEnoNotFound
 	}
 
 	shMgr.tmDedup.KillTimer(ddv.timer)
 	delete(shMgr.deDupMap, ddk)
 
-	if pe, ok := shMgr.peerActived[spid]; ok {
-		return shMgr.send2Peer(pe, ddv.bcReq)
+	upkg := new(peer.P2pPackage)
+	upkg.Pid			= uint32(rxPkg.ProtoId)
+	upkg.Mid			= uint32(rxPkg.MsgId)
+	upkg.Key			= rxPkg.Key
+	upkg.PayloadLength	= uint32(rxPkg.PayloadLength)
+	upkg.Payload		= rxPkg.Payload
+
+	msg := peer.P2pMessage{}
+	if eno := upkg.GetMessage(&msg); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("reportKeyFromPeer: GetMessage failed, eno: %d", eno	)
+		return sch.SchEnoUserTask
 	}
 
-	chainLog.Debug("reportKey: not found, spid: %+v", spid)
-	return sch.SchEnoNotFound
+	if msg.Rptk.Status == int32(peer.KS_NOTEXIST) {
+		if pe, ok := shMgr.peerActived[spid]; ok {
+			return shMgr.send2Peer(pe, ddv.bcReq)
+		}
+		chainLog.Debug("reportKeyFromPeer: not found, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
+
+	return sch.SchEnoNone
 }
 
 func (shMgr *ShellManager)deDupTimerCb(el *list.Element, data interface{}) interface{} {
@@ -462,4 +528,27 @@ func (shMgr *ShellManager)deDupTimerCb(el *list.Element, data interface{}) inter
 	}
 
 	return errors.New(fmt.Sprintf("deDupTimerCb: not found, ddk: %+v", *ddk))
+}
+
+func (shMgr *ShellManager)checkKey2Peer(pai *shellPeerInst, ddk *deDupKey) error {
+	chkk := peer.CheckKey{}
+	chkk.Key = append(chkk.Key, ddk.key[0:]...)
+	upkg := new(peer.P2pPackage)
+	if eno := upkg.CheckKey(pai.pi, &chkk); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("checkKey2Peer: CheckKey failed, eno: %d", eno)
+		return errors.New("checkKey2Peer: ReportKey failed")
+	}
+	return nil
+}
+
+func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, ddk *deDupKey, status int32) error {
+	rptk := peer.ReportKey{}
+	rptk.Key = append(rptk.Key, ddk.key[0:]...)
+	rptk.Status = status
+	upkg := new(peer.P2pPackage)
+	if eno := upkg.ReportKey(pai.pi, &rptk); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("reportKey2Peer: ReportKey failed, eno: %d", eno)
+		return errors.New("reportKey2Peer: ReportKey failed")
+	}
+	return nil
 }

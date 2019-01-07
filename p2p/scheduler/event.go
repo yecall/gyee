@@ -90,6 +90,7 @@ type MsgShellPeerActiveInd struct {
 	TxChan		interface{}			// channel for packages sending
 	RxChan		interface{}			// channel for packages received
 	PeerInfo	interface{}			// handshake info about peer
+	PeerInst	interface{}			// peer instance
 }
 
 //

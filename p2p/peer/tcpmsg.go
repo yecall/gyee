@@ -163,7 +163,7 @@ type P2pMessage struct {
 //
 // Read handshake message from inbound peer
 //
-func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMgrErrno) {
+func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMgrErrno) {
 
 	if inst.hto != 0 {
 		inst.conn.SetReadDeadline(time.Now().Add(inst.hto))
@@ -294,7 +294,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 //
 // Write handshake message to peer
 //
-func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) PeMgrErrno {
+func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) PeMgrErrno {
 
 	pbHandshakeMsg := new(pb.P2PMessage_Handshake)
 	pbHandshakeMsg.SubNetId = append(pbHandshakeMsg.SubNetId, hs.Snid[:]...)
@@ -366,7 +366,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 //
 // Ping
 //
-func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
+func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong) PeMgrErrno {
 
 	pbPing := pb.P2PMessage{
 		Mid: 		new(pb.MessageId),
@@ -419,7 +419,7 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 //
 // Pong
 //
-func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
+func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong) PeMgrErrno {
 
 	pbPong := pb.P2PMessage{
 		Mid: 		new(pb.MessageId),
@@ -472,7 +472,7 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 //
 // Check key
 //
-func (upkg *P2pPackage)CheckKey(inst *peerInstance, chkk CheckKey) PeMgrErrno {
+func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey) PeMgrErrno {
 
 	pbChkk := pb.ExtMessage{
 		Mid: 		new(pb.MessageId),
@@ -526,7 +526,7 @@ func (upkg *P2pPackage)CheckKey(inst *peerInstance, chkk CheckKey) PeMgrErrno {
 //
 // Report key
 //
-func (upkg *P2pPackage)ReportKey(inst *peerInstance, rptk ReportKey) PeMgrErrno {
+func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey) PeMgrErrno {
 	
 	pbRptk := pb.ExtMessage{
 		Mid: 		new(pb.MessageId),
@@ -582,7 +582,7 @@ func (upkg *P2pPackage)ReportKey(inst *peerInstance, rptk ReportKey) PeMgrErrno 
 // Send user packege
 //
 
-func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
+func (upkg *P2pPackage)SendPackage(inst *PeerInstance) PeMgrErrno {
 
 	if inst == nil {
 		tcpmsgLog.Debug("SendPackage: invalid parameter")
@@ -620,7 +620,7 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 //
 // Receive user package
 //
-func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
+func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 
 	if inst == nil {
 		tcpmsgLog.Debug("RecvPackage: invalid parameter")
@@ -723,7 +723,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (upkg *P2pPackage)signOutbound(inst *peerInstance, hs *pb.P2PMessage_Handshake) bool {
+func (upkg *P2pPackage)signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
 	cfg := inst.sdl.SchGetP2pConfig()
 	r, s, err := config.P2pSign(cfg.PrivateKey, hs.NodeId)
 	if err != nil {
@@ -739,7 +739,7 @@ func (upkg *P2pPackage)signOutbound(inst *peerInstance, hs *pb.P2PMessage_Handsh
 	return true
 }
 
-func (upkg *P2pPackage)verifyInbound(inst *peerInstance, hs *pb.P2PMessage_Handshake) bool {
+func (upkg *P2pPackage)verifyInbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
 	pubKey := config.P2pNodeId2Pubkey(hs.NodeId)
 	r := config.P2pBigInt(int(*hs.SignR), hs.R)
 	s := config.P2pBigInt(int(*hs.SignS), hs.S)
