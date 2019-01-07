@@ -25,7 +25,7 @@ const (
 	MessageTypeEvent 		= "ev"
 	MessageTypeBlockHeader	= "blkH"
 	MessageTypeBlock 		= "blk"
-)
+	)
 
 type Message struct {
 	MsgType string

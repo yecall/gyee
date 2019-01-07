@@ -58,7 +58,7 @@ const (
 	xdayCycle		= 1 << xdayBits					// x-day cycle in x-hour
 
 	// min and max duration
-	minDur			= oneTick * xsecondCycle
+	minDur			= oneTick
 	maxDur			= (1 << (xsecondBits + xminuteBits + xhourBits + xdayBits)) * time.Second
 )
 
@@ -175,19 +175,19 @@ func (mgr *TimerManager)StartTimer(ptm interface{}) error {
 		}
 		targetLi = mgr.sTmList[sp]
 	} else if tm.m > 0 {
-		mp := (mgr.mp + tm.s) & (xminuteCycle- 1)
+		mp := (mgr.mp + tm.m) & (xminuteCycle- 1)
 		if mgr.mTmList[mp] == nil {
 			mgr.mTmList[mp] = list.New()
 		}
 		targetLi = mgr.mTmList[mp]
 	} else if tm.h > 0 {
-		hp := (mgr.hp + tm.s) & (xhourCycle - 1)
+		hp := (mgr.hp + tm.h) & (xhourCycle - 1)
 		if mgr.hTmList[hp] == nil {
 			mgr.hTmList[hp] = list.New()
 		}
 		targetLi = mgr.hTmList[hp]
 	} else if tm.d > 0 {
-		dp := (mgr.dp + tm.s) & (xdayCycle - 1)
+		dp := (mgr.dp + tm.d) & (xdayCycle - 1)
 		if mgr.dTmList[dp] == nil {
 			mgr.dTmList[dp] = list.New()
 		}

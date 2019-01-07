@@ -72,10 +72,10 @@ var yesMtAtoi = map[string]int{
 }
 
 var yesMidItoa = map[int] string {
-	int(sch.MSBR_MT_TX):					MessageTypeTx,
-	int(sch.MSBR_MT_EV):					MessageTypeEvent,
-	int(sch.MSBR_MT_BLKH):					MessageTypeBlockHeader,
-	int(sch.MSBR_MT_BLK):					MessageTypeBlock,
+	int(sch.MSBR_MT_TX):			MessageTypeTx,
+	int(sch.MSBR_MT_EV):			MessageTypeEvent,
+	int(sch.MSBR_MT_BLKH):			MessageTypeBlockHeader,
+	int(sch.MSBR_MT_BLK):			MessageTypeBlock,
 }
 
 type yesKey = config.DsKey										// key type
