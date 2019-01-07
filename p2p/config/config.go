@@ -392,6 +392,8 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		Local:					DefaultLocalNode,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
+		SubNetKeyList:			map[SubNetworkID]ecdsa.PrivateKey{},
+		SubNetNodeList:			map[SubNetworkID]Node{},
 		SubNetMaxPeers:			map[SubNetworkID]int{},
 		SubNetMaxOutbounds:		map[SubNetworkID]int{},
 		SubNetMaxInBounds:		map[SubNetworkID]int{},
