@@ -96,6 +96,8 @@ type Tetris struct {
 	parentCount    int
 	eventCount     int
 	txCount        int
+	TrafficIn      int
+	TrafficOut     int
 
 	//request map[string]int
 	level       int
@@ -217,17 +219,20 @@ func (t *Tetris) loop() {
 			return
 		case eventMsg := <-t.EventCh:
 			var event Event
+			t.TrafficIn += len(eventMsg)
 			event.Unmarshal(eventMsg)
 			if t.checkEvent(&event) {
 				t.receiveEvent(&event)
 			}
 		case eventMsg := <-t.ParentEventCh:
 			var event Event
+			t.TrafficIn += len(eventMsg)
 			event.Unmarshal(eventMsg)
 			if t.checkEvent(&event) {
 				t.receiveParentEvent(&event)
 			}
 		case tx := <-t.TxsCh:
+			t.TrafficIn += len(tx)
 			t.receiveTx(tx)
 		case time := <-t.ticker.C:
 			t.receiveTicker(time)
@@ -264,8 +269,9 @@ func (t *Tetris) sendEvent() {
 	event.AddTransactions(t.txsAccepted)
 	event.ready = true
 	event.Sign(t.signer)
-
-	t.SendEventCh <- event.Marshal()
+	eb := event.Marshal()
+	t.TrafficOut += len(eb)
+	t.SendEventCh <- eb
 	t.validators[t.vid][t.n] = event
 	t.eventCache.Add(event.Hash(), event)
 
@@ -468,6 +474,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 									er.count++
 								} else {
 									t.RequestEventCh <- peh
+									t.TrafficOut += 32
 									t.eventRequest.Add(peh, &SyncRequest{count: 1, time: time.Now()})
 								}
 							}
