@@ -19,12 +19,14 @@ package tetris2
 
 import (
 	"crypto/sha256"
-	"encoding/json"
+	//"encoding/json"
 	"time"
 
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto"
-	"github.com/yeeco/gyee/utils/logging"
+	//"github.com/yeeco/gyee/utils/logging"
+	"encoding/binary"
+	"fmt"
 )
 
 const ROUND_UNDECIDED = -1
@@ -46,12 +48,69 @@ func (ev *EventBody) Hash() common.Hash {
 }
 
 func (ev *EventBody) Marshal() []byte {
+	l := 25 + 32 * len(ev.Tx) + 32 * len(ev.E) + 4
+	buf := make([]byte, l)
+	binary.BigEndian.PutUint64(buf[0:8], ev.H)
+	binary.BigEndian.PutUint64(buf[8:16], ev.N)
+	binary.BigEndian.PutUint64(buf[16:24], uint64(ev.T))
+	binary.BigEndian.PutUint16(buf[24:26], uint16(len(ev.Tx)))
+	p := 26
+	for i:=0; i<len(ev.Tx); i++ {
+		copy(buf[p:p+32], ev.Tx[i][:])
+		p += 32
+	}
+	binary.BigEndian.PutUint16(buf[p:p+2], uint16(len(ev.E)))
+	p += 2
+	for i:=0; i<len(ev.E); i++ {
+		copy(buf[p:p+32], ev.E[i][:])
+		p += 32
+	}
+	if ev.P {
+		buf[p] = 1
+	} else {
+		buf[p] = 0
+	}
+
+	p++
+
+	if p != l {
+		fmt.Println("err:", p, l)
+	}
+	return buf
+	/*
 	b, err := json.Marshal(ev)
 	if err != nil {
 		logging.Logger.Error("json encode error")
 		return nil
 	}
 	return b
+	*/
+}
+
+func (ev *EventBody) Unmarshal(data []byte) {
+	ev.H = binary.BigEndian.Uint64(data[0:8])
+	ev.N = binary.BigEndian.Uint64(data[8:16])
+	ev.T = int64(binary.BigEndian.Uint64(data[16:24]))
+	p := 26
+	l := binary.BigEndian.Uint16(data[24:26])
+	ev.Tx = make([]common.Hash, l)
+	for i:=uint16(0); i<l; i++ {
+		copy(ev.Tx[i][:], data[p:p+32])
+		p += 32
+	}
+	l = binary.BigEndian.Uint16(data[p:p+2])
+	p += 2
+	ev.E = make([]common.Hash, l)
+	for i:=uint16(0); i<l; i++ {
+		copy(ev.E[i][:], data[p:p+32])
+		p += 32
+	}
+
+	if data[p] == 1 {
+		ev.P = true
+	} else {
+		ev.P = false
+	}
 }
 
 type EventMessage struct {
@@ -60,16 +119,47 @@ type EventMessage struct {
 }
 
 func (em *EventMessage) Marshal() []byte {
+	b := em.Body.Marshal()
+    s := 1 + len(em.Signature.Signature)
+    l := 8 + len(b) + s
+	buf := make([]byte, l)
+	p := 0
+	binary.BigEndian.PutUint32(buf[p:p+4], uint32(len(b)))
+	p += 4
+	copy(buf[p:p+len(b)], b)
+	p += len(b)
+	binary.BigEndian.PutUint32(buf[p:p+4], uint32(s))
+	p += 4
+	buf[p] = byte(em.Signature.Algorithm)
+	p += 1
+	copy(buf[p:p+len(em.Signature.Signature)], em.Signature.Signature)
+	return buf
+	/*
 	b, err := json.Marshal(em)
 	if err != nil {
 		logging.Logger.Error("json encode error")
 		return nil
 	}
 	return b
+	*/
 }
 
 func (em *EventMessage) Unmarshal(data []byte) {
+	p := 0
+    l := binary.BigEndian.Uint32(data[p:p+4])
+    p += 4
+    em.Body = &EventBody{}
+    em.Body.Unmarshal(data[p:p+int(l)])
+    p += int(l)
+    l = binary.BigEndian.Uint32(data[p:p+4])
+    p += 4
+    em.Signature = &crypto.Signature{}
+    em.Signature.Algorithm = crypto.Algorithm(data[p])
+    p += 1
+    em.Signature.Signature = data[p:p+int(l)-1]
+	/*
 	json.Unmarshal(data, em)
+	*/
 }
 
 type Event struct {
@@ -176,10 +266,12 @@ func (e *Event) Unmarshal(data []byte) {
 	em.Unmarshal(data)
 	e.Body = em.Body
 	e.signature = em.Signature
+	//fmt.Println("len:", len(data))
+	//fmt.Println("raw:", len(e.Body.Tx)*32 + len(e.Body.E)*32 + 100)
 }
 
 func (e *Event) Sign(signer crypto.Signer) error {
-	h := e.Body.Hash()
+	h :=  e.Body.Hash()
 	sig, err := signer.Sign(h[:])
 	if err != nil {
 		return err

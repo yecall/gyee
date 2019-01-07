@@ -803,6 +803,7 @@ func (t *Tetris) consensusComputing() {
 	//c := make([]int, 0)
 	cs := ""
 	txc := make([]common.Hash, 0)
+
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
 			//c = append(c, int(w.Body.M))
