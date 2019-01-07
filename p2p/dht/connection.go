@@ -26,6 +26,7 @@ import (
 	"io"
 	"sync"
 	"container/list"
+	lru		"github.com/hashicorp/golang-lru"
 	ggio	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
@@ -76,6 +77,16 @@ type conMgrCfg struct {
 }
 
 //
+// Connection cache key and value
+//
+type instLruKey struct {
+	peer			config.NodeID					// peer node identity
+	dir				ConInstDir						// direction
+}
+
+type instLruValue *ConInst
+
+//
 // Connection manager
 //
 type ConMgr struct {
@@ -88,7 +99,8 @@ type ConMgr struct {
 	ptnQryMgr		interface{}						// pointer to query manager task node
 	ptnLsnMgr		interface{}						// pointer to the listner manager task node
 	ptnDhtMgr		interface{}						// pointer to dht manager task node
-	lockInstTab		sync.Mutex						// lock for connection instable table
+	instCache		*lru.Cache						// connection instance cache
+	lockInstTab		sync.Mutex						// lock for connection instance table
 	ciTab			map[conInstIdentity]*ConInst	// connection instance table
 	ciSeq			int64							// connection instance sequence number
 	txQueTab		map[conInstIdentity]*list.List	// outbound data pending queue
@@ -196,6 +208,11 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 
 	if dhtEno := conMgr.getConfig(); dhtEno != DhtEnoNone {
 		connLog.Debug("poweron: getConfig failed, dhtEno: %d", dhtEno)
+		return sch.SchEnoUserTask
+	}
+
+	if conMgr.instCache, _ = lru.NewWithEvict(conMgr.cfg.maxCon, conMgr.onInstEvicted); conMgr.instCache == nil {
+		connLog.Debug("poweron: lru.New failed")
 		return sch.SchEnoUserTask
 	}
 
@@ -478,7 +495,17 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	}
 
 	//
-	// we need to update the route manager
+	// update instance cache
+	//
+
+	key := instLruKey{
+		peer: msg.Peer.ID,
+		dir: msg.Dir,
+	}
+	conMgr.instCache.Add(&key, ci)
+
+	//
+	// update the route manager
 	//
 
 	connLog.Debug("handshakeRsp: all ok, try to update route manager, " +
@@ -661,7 +688,6 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	err := false
 	dup := false
 
-	// should get one at most
 	cis := conMgr.lookupConInst(&cid)
 	for _, ci := range cis {
 		if ci != nil {
@@ -734,6 +760,12 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 			return sch.SchEnoUserTask
 
 		} else {
+
+			key := instLruKey {
+				peer: ci.hsInfo.peer.ID,
+				dir: ci.dir,
+			}
+			conMgr.instCache.Add(&key, ci)
 
 			pkg := conInstTxPkg{
 				task:       msg.Task,
@@ -1149,6 +1181,12 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 				err = true
 			}
 			delete(conMgr.ciTab, cid)
+
+			key := instLruKey{
+				peer: ci.hsInfo.peer.ID,
+				dir: ci.dir,
+			}
+			conMgr.instCache.Remove(&key)
 		}
 	}
 
@@ -1226,6 +1264,26 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 // instance tx timeout
 //
 func (conMgr *ConMgr)instTxTimeoutInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
-	ciLog.Debug("instTxTimeoutInd: peer: %x, dir: %d, status: %d", *msg.Peer, msg.Dir, msg.Status)
+	connLog.Debug("instTxTimeoutInd: peer: %x, dir: %d, status: %d", *msg.Peer, msg.Dir, msg.Status)
 	return conMgr.instOutOfServiceInd(msg)
+}
+
+//
+// deal with connection instance evicted
+//
+func (conMgr *ConMgr)onInstEvicted(key interface{}, value interface{}) {
+	k, _ := key.(*instLruKey)
+	ci, _ := value.(instLruValue)
+	if k == nil || ci == nil {
+		connLog.Debug("onInstEvicted: invalid key or value")
+		return
+	}
+	req := sch.MsgDhtConMgrCloseReq {
+		Task: ConMgrName,
+		Peer: &ci.hsInfo.peer,
+		Dir: ci.dir,
+	}
+	msg := sch.SchMessage{}
+	conMgr.sdl.SchMakeMessage(&msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConMgrCloseReq, &req)
+	conMgr.sdl.SchSendMessage(&msg)
 }
