@@ -1132,7 +1132,8 @@ func (yeShMgr *YeShellManager)setDedupTimer(key [yesKeyBytes]byte) error {
 		return err
 	}
 
-	yeShMgr.tmDedup.SetTimerData(tm, &key)
+	key_ := key
+	yeShMgr.tmDedup.SetTimerData(tm, &key_)
 	if err := yeShMgr.tmDedup.StartTimer(tm); err != dht.TmEnoNone {
 		yesLog.Debug("setDedupTimer: StartTimer failed, error: %s", err.Error())
 		return err

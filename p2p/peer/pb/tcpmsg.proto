@@ -137,14 +137,12 @@ message P2PMessage {
 //
 message ExtMessage {
     message CheckKey {
-        required bytes      Key     = 1;    // key to check
-        optional bytes      Extra   = 2;    // extra info, reserved
+        optional bytes      Extra   = 1;    // extra info, reserved
     }
 
     message ReportKey {
-        required bytes      Key     = 1;    // key to report
-        required KeyStatus  Status  = 2;    // key status
-        optional bytes      Extra   = 3;    // extra info, reserved
+        required KeyStatus  Status  = 1;    // key status
+        optional bytes      Extra   = 2;    // extra info, reserved
     }
 
     required MessageId  mid         = 1;    // message identity

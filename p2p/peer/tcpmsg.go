@@ -477,7 +477,7 @@ func (upkg *P2pPackage)CheckKey(inst *peerInstance, chkk CheckKey) PeMgrErrno {
 	pbChkk := pb.ExtMessage{
 		Mid: 		new(pb.MessageId),
 		CheckKey:	&pb.ExtMessage_CheckKey {
-			Key:	make([]byte, 0),
+			Extra:	make([]byte, 0),
 		},
 	}
 
@@ -494,6 +494,7 @@ func (upkg *P2pPackage)CheckKey(inst *peerInstance, chkk CheckKey) PeMgrErrno {
 	pbPkg := pb.P2PPackage {
 		Pid:			new(pb.ProtocolId),
 		ExtMid:			new(pb.MessageId),
+		ExtKey:			make([]byte, 0),
 		PayloadLength:	new(uint32),
 		Payload:		make([]byte, 0),
 	}
@@ -501,6 +502,7 @@ func (upkg *P2pPackage)CheckKey(inst *peerInstance, chkk CheckKey) PeMgrErrno {
 	*pbPkg.PayloadLength = uint32(len(payload))
 	*pbPkg.Pid = PID_EXT
 	*pbPkg.ExtMid = MID_CHKK
+	pbPkg.ExtKey = append(pbPkg.ExtKey, chkk.Key...)
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 
 	if inst.ato != time.Duration(0) {
@@ -529,8 +531,8 @@ func (upkg *P2pPackage)ReportKey(inst *peerInstance, rptk ReportKey) PeMgrErrno 
 	pbRptk := pb.ExtMessage{
 		Mid: 		new(pb.MessageId),
 		ReportKey:	&pb.ExtMessage_ReportKey {
-			Key:	make([]byte, 0),
 			Status:	new(pb.KeyStatus),
+			Extra:	make([]byte, 0),
 		},
 	}
 
@@ -555,6 +557,7 @@ func (upkg *P2pPackage)ReportKey(inst *peerInstance, rptk ReportKey) PeMgrErrno 
 	*pbPkg.PayloadLength = uint32(len(payload))
 	*pbPkg.Pid = PID_EXT
 	*pbPkg.ExtMid = MID_RPTK
+	pbPkg.ExtKey = append(pbPkg.ExtKey, rptk.Key...)
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 
 	if inst.ato != time.Duration(0) {
