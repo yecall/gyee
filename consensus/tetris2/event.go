@@ -26,7 +26,6 @@ import (
 	"github.com/yeeco/gyee/crypto"
 	//"github.com/yeeco/gyee/utils/logging"
 	"encoding/binary"
-	"fmt"
 )
 
 const ROUND_UNDECIDED = -1
@@ -47,9 +46,11 @@ func (ev *EventBody) Hash() common.Hash {
 	return sha256.Sum256(ev.Marshal())
 }
 
-func (ev *EventBody) Marshal() []byte {
-	l := 25 + 32 * len(ev.Tx) + 32 * len(ev.E) + 4
-	buf := make([]byte, l)
+func (ev *EventBody) MarshalLength() int {
+	return 25 + 2 + 32 * len(ev.Tx) + 2 + 32 * len(ev.E) + 1
+}
+
+func (ev *EventBody) MarshalTo(buf []byte) {
 	binary.BigEndian.PutUint64(buf[0:8], ev.H)
 	binary.BigEndian.PutUint64(buf[8:16], ev.N)
 	binary.BigEndian.PutUint64(buf[16:24], uint64(ev.T))
@@ -72,10 +73,13 @@ func (ev *EventBody) Marshal() []byte {
 	}
 
 	p++
+}
 
-	if p != l {
-		fmt.Println("err:", p, l)
-	}
+func (ev *EventBody) Marshal() []byte {
+	l := ev.MarshalLength()
+	buf := make([]byte, l)
+
+	ev.MarshalTo(buf)
 	return buf
 	/*
 	b, err := json.Marshal(ev)
@@ -119,16 +123,17 @@ type EventMessage struct {
 }
 
 func (em *EventMessage) Marshal() []byte {
-	b := em.Body.Marshal()
-    s := 1 + len(em.Signature.Signature)
-    l := 8 + len(b) + s
+	bl := em.Body.MarshalLength()
+
+    sl := 1 + len(em.Signature.Signature)
+    l := 8 + bl + sl
 	buf := make([]byte, l)
 	p := 0
-	binary.BigEndian.PutUint32(buf[p:p+4], uint32(len(b)))
+	binary.BigEndian.PutUint32(buf[p:p+4], uint32(bl))
 	p += 4
-	copy(buf[p:p+len(b)], b)
-	p += len(b)
-	binary.BigEndian.PutUint32(buf[p:p+4], uint32(s))
+	em.Body.MarshalTo(buf[p:p+bl])
+	p += bl
+	binary.BigEndian.PutUint32(buf[p:p+4], uint32(sl))
 	p += 4
 	buf[p] = byte(em.Signature.Algorithm)
 	p += 1
