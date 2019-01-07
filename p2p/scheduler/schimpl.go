@@ -1803,7 +1803,7 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 
 	var tkd  = schTaskDescription {
 		MbSize:	schMaxMbSize,
-		// watch dog is not implemented, configuration about it is ignored.
+		// watch dog is not implemented, ignored.
 		Wd:		&SchWatchDog {HaveDog: false},
 		Flag:	SchCreatedGo,
 	}
