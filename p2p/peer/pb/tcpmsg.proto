@@ -126,26 +126,28 @@ message P2PMessage {
         optional bytes      Extra   = 2;    // extra info, reserved
     }
 
-    message CheckKey {
-        required bytes      Key     = 1;    // key to check
-    }
-
-    message ReportKey {
-        required bytes      Key     = 1;    // key to report
-        required KeyStatus  Status  = 2;    // key status
-    }
-
     required MessageId  mid         = 1;    // message identity
     optional Handshake  handshake   = 2;    // handshake message
     optional Ping       ping        = 3;    // ping message
     optional Pong       pong        = 4;    // pong message
-    optional CheckKey   checkKey    = 5;    // check key message
-    optional ReportKey  reportKey   = 6;    // report key message
 }
 
 //
 // External application message
 //
 message ExtMessage {
+    message CheckKey {
+        required bytes      Key     = 1;    // key to check
+        optional bytes      Extra   = 2;    // extra info, reserved
+    }
 
+    message ReportKey {
+        required bytes      Key     = 1;    // key to report
+        required KeyStatus  Status  = 2;    // key status
+        optional bytes      Extra   = 3;    // extra info, reserved
+    }
+
+    required MessageId  mid         = 1;    // message identity
+    optional CheckKey   checkKey    = 2;    // check key message
+    optional ReportKey  reportKey   = 3;    // report key message
 }

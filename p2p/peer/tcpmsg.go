@@ -69,6 +69,8 @@ const (
 	MID_HANDSHAKE	= pb.MessageId_MID_HANDSHAKE	// handshake
 	MID_PING		= pb.MessageId_MID_PING			// ping
 	MID_PONG		= pb.MessageId_MID_PONG			// pong
+	MID_CHKK		= pb.MessageId_MID_CHKK			// check key
+	MID_RPTK		= pb.MessageId_MID_RPTK			// report key
 
 	// external MID for PID_EXT
 	MID_TX			= pb.MessageId_MID_TX
@@ -78,6 +80,14 @@ const (
 
 	// invalid MID
 	MID_INVALID		= pb.MessageId_MID_INVALID
+)
+
+//
+// Key status
+//
+const (
+	KS_NOTEXIST		= pb.KeyStatus_KS_NOTEXIST
+	KS_EXIST		= pb.KeyStatus_KS_EXIST
 )
 
 //
@@ -111,6 +121,23 @@ type Pingpong struct {
 }
 
 //
+// Check key
+//
+type CheckKey struct {
+	Key			[]byte		// key
+	Extra		[]byte		// extra info
+}
+
+//
+// Check key
+//
+type ReportKey struct {
+	Key			[]byte		// key
+	Status		int32		// key status
+	Extra		[]byte		// extra info
+}
+
+//
 // Package for TCP message
 //
 type P2pPackage struct {
@@ -129,16 +156,14 @@ type P2pMessage struct {
 	Ping			*Pingpong	// ping message
 	Pong			*Pingpong	// pong message
 	Handshake		*Handshake	// handshake message
+	Chkk			*CheckKey	// check key message
+	Rptk			*ReportKey	// report key message
 }
 
 //
 // Read handshake message from inbound peer
 //
 func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMgrErrno) {
-
-	//
-	// read "package" message firstly
-	//
 
 	if inst.hto != 0 {
 		inst.conn.SetReadDeadline(time.Now().Add(inst.hto))
@@ -158,10 +183,6 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 
 		return nil, PeMgrEnoOs
 	}
-
-	//
-	// check the package read
-	//
 
 	if *pkg.Pid != PID_P2P {
 
@@ -190,10 +211,6 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 		return nil, PeMgrEnoMessage
 	}
 
-	//
-	// decode the payload to get "handshake" message
-	//
-
 	pbMsg := new(pb.P2PMessage)
 
 	if err := pbMsg.Unmarshal(pkg.Payload); err != nil {
@@ -205,10 +222,6 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 		return nil, PeMgrEnoMessage
 	}
 
-	//
-	// check the "handshake" message
-	//
-	
 	if *pbMsg.Mid != MID_HANDSHAKE {
 
 		tcpmsgLog.Debug("getHandshakeInbound: " +
@@ -261,10 +274,6 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 		return nil, PeMgrEnoMessage
 	}
 
-	//
-	// get handshake info to return
-	//
-
 	var ptrMsg = new(Handshake)
 	copy(ptrMsg.Snid[:], pbHS.SubNetId)
 	copy(ptrMsg.NodeId[:], pbHS.NodeId)
@@ -287,10 +296,6 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *peerInstance) (*Handshake, PeMg
 //
 func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) PeMgrErrno {
 
-	//
-	// encode "handshake" message as the payload of "package" message
-	//
-
 	pbHandshakeMsg := new(pb.P2PMessage_Handshake)
 	pbHandshakeMsg.SubNetId = append(pbHandshakeMsg.SubNetId, hs.Snid[:]...)
 	pbHandshakeMsg.NodeId = append(pbHandshakeMsg.NodeId, hs.NodeId[:]...)
@@ -304,7 +309,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 		var pbProto = new(pb.P2PMessage_Protocol)
 		pbHandshakeMsg.Protocols[i] = pbProto
 		pbProto.Pid = new(pb.ProtocolId)
-		*pbProto.Pid = pb.ProtocolId_PID_P2P
+		*pbProto.Pid = PID_P2P
 		pbProto.Ver = append(pbProto.Ver, p.Ver[:]...)
 	}
 
@@ -328,23 +333,14 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 		return PeMgrEnoMessage
 	}
 
-	//
-	// setup the "package"
-	//
-
 	pbPkg := new(pb.P2PPackage)
 	pbPkg.Pid = new(pb.ProtocolId)
-	*pbPkg.Pid = pb.ProtocolId_PID_P2P
+	*pbPkg.Pid = PID_P2P
 	pbPkg.ExtMid = new(pb.MessageId)
 	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.PayloadLength = new(uint32)
 	*pbPkg.PayloadLength = uint32(len(payload))
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
-
-	//
-	// send package to peer, notice need to encode here directly, it would be
-	// done in calling of gw.WriteMsg, see bellow.
-	//
 
 	if inst.hto != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.hto))
@@ -372,18 +368,12 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *peerInstance, hs *Handshake) P
 //
 func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 
-	//
-	// encode ping message to payload
-	//
-
 	pbPing := pb.P2PMessage{
 		Mid: 		new(pb.MessageId),
-		Handshake:	nil,
 		Ping:		&pb.P2PMessage_Ping{
 			Seq:	&ping.Seq,
 			Extra:	make([]byte, 0),
 		},
-		Pong:		nil,
 	}
 
 	*pbPing.Mid = MID_PING
@@ -396,10 +386,6 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 		return PeMgrEnoMessage
 	}
 
-	//
-	// setup package for payload
-	//
-
 	pbPkg := pb.P2PPackage {
 		Pid:			new(pb.ProtocolId),
 		ExtMid:			new(pb.MessageId),
@@ -408,23 +394,15 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 	}
 
 	*pbPkg.PayloadLength = uint32(len(payload))
-	*pbPkg.Pid = pb.ProtocolId_PID_P2P
+	*pbPkg.Pid = PID_P2P
 	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
-
-	//
-	// Set deadline
-	//
 
 	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
 	} else {
 		inst.conn.SetWriteDeadline(time.Time{})
 	}
-
-	//
-	// write package to peer
-	//
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
@@ -443,14 +421,8 @@ func (upkg *P2pPackage)ping(inst *peerInstance, ping *Pingpong) PeMgrErrno {
 //
 func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 
-	//
-	// encode pong message to payload.
-	//
-
 	pbPong := pb.P2PMessage{
 		Mid: 		new(pb.MessageId),
-		Handshake:	nil,
-		Ping:		nil,
 		Pong:		&pb.P2PMessage_Pong{
 			Seq:	&pong.Seq,
 			Extra:	make([]byte, 0),
@@ -467,9 +439,57 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 		return PeMgrEnoMessage
 	}
 
-	//
-	// setup package for payload
-	//
+	pbPkg := pb.P2PPackage {
+		Pid:			new(pb.ProtocolId),
+		ExtMid:			new(pb.MessageId),
+		PayloadLength:	new(uint32),
+		Payload:		make([]byte, 0),
+	}
+
+	*pbPkg.PayloadLength = uint32(len(payload))
+	*pbPkg.Pid = PID_P2P
+	*pbPkg.ExtMid = MID_INVALID
+	pbPkg.Payload = append(pbPkg.Payload, payload...)
+
+	if inst.ato != time.Duration(0) {
+		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+	} else {
+		inst.conn.SetWriteDeadline(time.Time{})
+	}
+
+	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+
+		tcpmsgLog.Debug("pong:"+
+			"Write failed, err: %s",
+			err.Error())
+
+		return PeMgrEnoOs
+	}
+
+	return PeMgrEnoNone
+}
+
+//
+// Check key
+//
+func (upkg *P2pPackage)CheckKey(inst *peerInstance, chkk CheckKey) PeMgrErrno {
+
+	pbChkk := pb.ExtMessage{
+		Mid: 		new(pb.MessageId),
+		CheckKey:	&pb.ExtMessage_CheckKey {
+			Key:	make([]byte, 0),
+		},
+	}
+
+	*pbChkk.Mid = MID_CHKK
+	pbChkk.CheckKey.Extra = append(pbChkk.CheckKey.Extra, chkk.Extra...)
+
+	payload, err := pbChkk.Marshal()
+
+	if len(payload) == 0 || err != nil {
+		tcpmsgLog.Debug("chkk: empty payload")
+		return PeMgrEnoMessage
+	}
 
 	pbPkg := pb.P2PPackage {
 		Pid:			new(pb.ProtocolId),
@@ -479,13 +499,9 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 	}
 
 	*pbPkg.PayloadLength = uint32(len(payload))
-	*pbPkg.Pid = pb.ProtocolId_PID_P2P
-	*pbPkg.ExtMid = MID_INVALID
+	*pbPkg.Pid = PID_EXT
+	*pbPkg.ExtMid = MID_CHKK
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
-
-	//
-	// Set deadline
-	//
 
 	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
@@ -493,13 +509,63 @@ func (upkg *P2pPackage)pong(inst *peerInstance, pong *Pingpong) PeMgrErrno {
 		inst.conn.SetWriteDeadline(time.Time{})
 	}
 
-	//
-	// write package to peer
-	//
+	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+
+		tcpmsgLog.Debug("chkk:"+
+			"Write failed, err: %s",
+			err.Error())
+
+		return PeMgrEnoOs
+	}
+
+	return PeMgrEnoNone
+}
+
+//
+// Report key
+//
+func (upkg *P2pPackage)ReportKey(inst *peerInstance, rptk ReportKey) PeMgrErrno {
+	
+	pbRptk := pb.ExtMessage{
+		Mid: 		new(pb.MessageId),
+		ReportKey:	&pb.ExtMessage_ReportKey {
+			Key:	make([]byte, 0),
+			Status:	new(pb.KeyStatus),
+		},
+	}
+
+	*pbRptk.Mid = MID_RPTK
+	*pbRptk.ReportKey.Status = pb.KeyStatus(rptk.Status)
+	pbRptk.ReportKey.Extra = append(pbRptk.ReportKey.Extra, rptk.Extra...)
+
+	payload, err := pbRptk.Marshal()
+
+	if len(payload) == 0 || err != nil {
+		tcpmsgLog.Debug("rptk: empty payload")
+		return PeMgrEnoMessage
+	}
+
+	pbPkg := pb.P2PPackage {
+		Pid:			new(pb.ProtocolId),
+		ExtMid:			new(pb.MessageId),
+		PayloadLength:	new(uint32),
+		Payload:		make([]byte, 0),
+	}
+
+	*pbPkg.PayloadLength = uint32(len(payload))
+	*pbPkg.Pid = PID_EXT
+	*pbPkg.ExtMid = MID_RPTK
+	pbPkg.Payload = append(pbPkg.Payload, payload...)
+
+	if inst.ato != time.Duration(0) {
+		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+	} else {
+		inst.conn.SetWriteDeadline(time.Time{})
+	}
 
 	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		tcpmsgLog.Debug("pong:"+
+		tcpmsgLog.Debug("rptk:"+
 			"Write failed, err: %s",
 			err.Error())
 
@@ -520,10 +586,6 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 		return PeMgrEnoParameter
 	}
 
-	//
-	// Setup the protobuf "package"
-	//
-
 	pbPkg := new(pb.P2PPackage)
 	pbPkg.Pid = new(pb.ProtocolId)
 	*pbPkg.Pid = pb.ProtocolId(upkg.Pid)
@@ -534,22 +596,11 @@ func (upkg *P2pPackage)SendPackage(inst *peerInstance) PeMgrErrno {
 	*pbPkg.PayloadLength = uint32(upkg.PayloadLength)
 	pbPkg.Payload = append(pbPkg.Payload, upkg.Payload...)
 
-	//
-	// Set deadline
-	//
-
 	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
 	} else {
 		inst.conn.SetWriteDeadline(time.Time{})
 	}
-
-	//
-	// Write package to peer. In practice, we find that two routines can not
-	// share a conection to write without sync. But sync is unnecessary here
-	// for this function here had enter the critical section, see how it is
-	// called pls.
-	//
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
 
@@ -573,19 +624,11 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 		return PeMgrEnoParameter
 	}
 
-	//
-	// Setup the reader
-	//
-
 	if inst.ato != time.Duration(0) {
 		inst.conn.SetReadDeadline(time.Now().Add(inst.ato))
 	} else {
 		inst.conn.SetReadDeadline(time.Time{})
 	}
-
-	//
-	// New protobuf "package" and read peer into it
-	//
 
 	pkg := new(pb.P2PPackage)
 
@@ -597,11 +640,6 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 
 		return PeMgrEnoOs
 	}
-
-	//
-	// setup upkg(user package) with type P2pPackage from pb.P2pPackage
-	// object obtained above.
-	//
 
 	upkg.Pid			= uint32(*pkg.Pid)
 	upkg.Mid			= uint32(*pkg.ExtMid)
@@ -616,11 +654,6 @@ func (upkg *P2pPackage)RecvPackage(inst *peerInstance) PeMgrErrno {
 // Decode message from package
 //
 func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
-
-	//
-	// upkg must hold the package extracted from a pb.pb.P2PPackage before
-	// calling into here of this function.
-	//
 
 	if pmsg == nil {
 		tcpmsgLog.Debug("GetMessage: invalid parameter")
@@ -642,6 +675,8 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	pmsg.Handshake = nil
 	pmsg.Ping = nil
 	pmsg.Pong = nil
+	pmsg.Chkk = nil
+	pmsg.Rptk = nil
 
 	if pmsg.Mid == uint32(MID_HANDSHAKE) {
 
