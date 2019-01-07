@@ -33,6 +33,7 @@ import (
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	"crypto/ecdsa"
+	"sync"
 )
 
 //
@@ -163,7 +164,7 @@ type peMgrConfig struct {
 	subNetMaxOutbounds	map[SubNetworkID]int				// max concurrency outbounds
 	subNetMaxInBounds	map[SubNetworkID]int				// max concurrency inbounds
 	subNetKeyList		map[SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
-	subNetNodeList		map[SubNetworkID]config.NodeID		// sub-node identities
+	subNetNodeList		map[SubNetworkID]config.Node		// sub-node identities
 	subNetIdList		[]SubNetworkID						// sub network identity list. do not put the identity
 	ibpNumTotal			int									// total number of concurrency inbound peers
 }
@@ -196,6 +197,7 @@ type PeerManager struct {
 
 	ibInstSeq		int											// inbound instance sequence number
 	obInstSeq		int											// outbound instance sequence number
+	lock			sync.Mutex									// for peer instance to access peer manager
 	peers			map[interface{}]*PeerInstance				// map peer instance's task node pointer to instance pointer
 	nodes			map[SubNetworkID]map[PeerIdEx]*PeerInstance	// map peer node identity to instance pointer
 	workers			map[SubNetworkID]map[PeerIdEx]*PeerInstance	// map peer node identity to pointer of instance in work
@@ -252,8 +254,8 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 }
 
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
+	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
 	if !peMgr.isInited {
 		if msg.Id != sch.EvSchPoweron {
 			peerLog.Debug("peerMgrProc: not be initialized, message discarded, "+
@@ -1157,7 +1159,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.wrkNum[snid]++
 
 	if inst.dir == PeInstDirInbound  &&
-		inst.peMgr.cfg.networkType != config.P2pNetworkTypeStatic {
+		inst.networkType != config.P2pNetworkTypeStatic {
 
 		// Notice: even the network type is not static, the "snid" can be a static subnet
 		// in a configuration where "dynamic" and "static" are exist both. So, calling functions
@@ -1381,28 +1383,34 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	var ptnInst interface{} = nil
 	var peInst = new(PeerInstance)
 
-	*peInst				= peerInstDefault
-	peInst.sdl			= peMgr.sdl
-	peInst.peMgr		= peMgr
-	peInst.tep			= peInst.peerInstProc
-	peInst.ptnMgr		= peMgr.ptnMe
-	peInst.state		= peInstStateConnOut
-	peInst.cto			= peMgr.cfg.defaultCto
-	peInst.hto			= peMgr.cfg.defaultHto
-	peInst.ato			= peMgr.cfg.defaultAto
-	peInst.maxPkgSize	= peMgr.cfg.maxMsgSize
-	peInst.dialer		= &net.Dialer{Timeout: peMgr.cfg.defaultCto}
-	peInst.conn			= nil
-	peInst.laddr		= nil
-	peInst.raddr		= nil
-	peInst.dir			= PeInstDirOutbound
-	peInst.snid			= *snid
-	peInst.node			= *node
+	*peInst					= peerInstDefault
+	peInst.sdl				= peMgr.sdl
+	peInst.peMgr			= peMgr
+	peInst.tep				= peInst.peerInstProc
+	peInst.ptnMgr			= peMgr.ptnMe
+	peInst.state			= peInstStateConnOut
+	peInst.cto				= peMgr.cfg.defaultCto
+	peInst.hto				= peMgr.cfg.defaultHto
+	peInst.ato				= peMgr.cfg.defaultAto
+	peInst.maxPkgSize		= peMgr.cfg.maxMsgSize
+	peInst.dialer			= &net.Dialer{Timeout: peMgr.cfg.defaultCto}
+	peInst.conn				= nil
+	peInst.laddr			= nil
+	peInst.raddr			= nil
+	peInst.dir				= PeInstDirOutbound
+	peInst.networkType		= peMgr.cfg.networkType
+	peInst.snid				= *snid
+	peInst.priKey			= peMgr.cfg.subNetKeyList[*snid]
+	peInst.localNode		= peMgr.cfg.subNetNodeList[*snid]
+	peInst.localProtoNum	= peMgr.cfg.protoNum
+	peInst.localProtocols	= peMgr.cfg.protocols
 
-	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
-	peInst.rxDone		= make(chan PeMgrErrno)
-	peInst.rxtxRuning	= false
+	peInst.node				= *node
+
+	peInst.txChan			= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.rxChan			= make(chan *P2pPackageRx, PeInstMaxP2packages)
+	peInst.rxDone			= make(chan PeMgrErrno)
+	peInst.rxtxRuning		= false
 
 	peMgr.obInstSeq++
 	peInst.name = peInst.name + fmt.Sprintf("_Outbound_%s", fmt.Sprintf("%d", peMgr.obInstSeq))
@@ -1589,70 +1597,51 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 		return PeMgrEnoRecofig
 	}
 
-	delList := make([]config.SubNetworkID, 0)
-	addList := make([]config.SubNetworkID, 0)
-	delList = append(append(delList, msg.VSnidDel...), msg.SnidDel...)
-	addList = append(append(addList, msg.VSnidAdd...), msg.SnidAdd...)
+	peMgr.lock.Lock()
+	defer peMgr.lock.Unlock()
+
+	delList := msg.SnidDel
+	addList := msg.SnidAdd
+	newDelList := make([]config.SubNetworkID, 0)
+	newAddList := make([]sch.SingleSubnetDescriptor, 0)
 
 	// filter out deleting list
-	filterOut := make([]int, 0)
-	for idx, del := range delList {
-		_, inAdding := peMgr.reCfg.addList[del]
-		_, inDeling := peMgr.reCfg.delList[del]
-		if !inAdding || inDeling { continue }
-		filterOut = append(filterOut, idx)
-	}
-	for _, fo := range filterOut {
-		if fo == len(delList) - 1 {
-			delList = delList[0:fo-1]
-		} else {
-			delList = append(delList[fo:], delList[fo])
-		}
-	}
-
 	for _, del := range delList {
-		peMgr.reCfg.delList[del] = nil
+		if _, inAdd := peMgr.reCfg.addList[del]; inAdd {
+			newDelList = append(newDelList, del)
+		}
 	}
 
 	// filter out adding list
-	filterOut = make([]int, 0)
-	for idx, add := range addList {
-		_, inAdding := peMgr.reCfg.addList[add]
-		_, inDeling := peMgr.reCfg.delList[add]
-		if inAdding { continue }
-		filterOut = append(filterOut, idx)
-		if inDeling {
-			delete(peMgr.reCfg.delList, add)
-		}
-	}
-	for _, fo := range filterOut {
-		if fo == len(addList) - 1 {
-			addList = addList[0:fo-1]
-		} else {
-			addList = append(addList[fo:], addList[fo])
-		}
-	}
-
 	for _, add := range addList {
-		peMgr.reCfg.addList[add] = nil
+		if _, inAdd := peMgr.reCfg.addList[add.SubNetId]; !inAdd {
+			newAddList = append(newAddList, add)
+		}
 	}
 
 	// config adding part sub networks
-	for _, add := range addList {
-		peMgr.nodes[add] = make(map[PeerIdEx]*PeerInstance)
-		peMgr.workers[add] = make(map[PeerIdEx]*PeerInstance)
-		peMgr.wrkNum[add] = 0
-		peMgr.ibpNum[add] = 0
-		peMgr.obpNum[add] = 0
-		peMgr.cfg.subNetMaxPeers[add] = config.MaxPeers
-		peMgr.cfg.subNetMaxOutbounds[add] = config.MaxOutbounds
-		peMgr.cfg.subNetMaxInBounds[add] = config.MaxInbounds
+	for _, add := range newAddList {
+		peMgr.nodes[add.SubNetId] = make(map[PeerIdEx]*PeerInstance)
+		peMgr.workers[add.SubNetId] = make(map[PeerIdEx]*PeerInstance)
+		peMgr.wrkNum[add.SubNetId] = 0
+		peMgr.ibpNum[add.SubNetId] = 0
+		peMgr.obpNum[add.SubNetId] = 0
+		peMgr.cfg.subNetKeyList[add.SubNetId] = add.SubNetKey
+		peMgr.cfg.subNetNodeList[add.SubNetId] = add.SubNetNode
+		peMgr.cfg.subNetMaxPeers[add.SubNetId] = add.SubNetMaxPeers
+		peMgr.cfg.subNetMaxOutbounds[add.SubNetId] = add.SubNetMaxOutbounds
+		peMgr.cfg.subNetMaxInBounds[add.SubNetId] = add.SubNetMaxInBounds
+		peMgr.reCfg.addList[add.SubNetId] = nil
 	}
 
 	// kill part of peer instances of each sub network to deleted
-	for _, del := range delList {
+	for _, del := range newDelList {
 		wks, ok := peMgr.workers[del]
-		if !ok { continue }
+		if !ok {
+			continue
+		}
+		peMgr.reCfg.delList[del] = nil
+
 		wkNum := len(wks)
 		count := 0
 		schMsg := sch.SchMessage{}
@@ -1668,7 +1657,11 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 				Why:	msg,
 			}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
-			peMgr.sdl.SchSendMessage(&schMsg)
+			if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+				peerLog.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
+				panic("shellReconfigReq: SchSendMessage failed")
+				return PeMgrEnoScheduler
+			}
 		}
 	}
 
@@ -1682,6 +1675,7 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	}
 	if eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
 		peerLog.Debug("shellReconfigReq: SchSetTimer failed, eno: %d", eno)
+		panic("shellReconfigReq: SchSendMessage failed")
 		return PeMgrEnoScheduler
 	} else {
 		peMgr.reCfgTid = tid
@@ -1695,7 +1689,11 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	}
 
 	// tell discover manager that sub networks changed
-	peMgr.peMgrRecfg2DcvMgr()
+	if eno := peMgr.peMgrRecfg2DcvMgr(); eno != PeMgrEnoNone {
+		peerLog.Debug("shellReconfigReq: peMgrRecfg2DcvMgr failed, eno: %d", eno)
+		panic("shellReconfigReq: SchSendMessage failed")
+		return eno
+	}
 
 	return PeMgrEnoNone
 }
@@ -1848,42 +1846,49 @@ type PeerInstance struct {
 	// We backup the pointer to peer manager here to access it while an instance
 	// is running, this might bring us those problems in "SYNC" between instances
 	// and the peer manager.
-	peMgr		*PeerManager				// pointer to peer manager
+	peMgr			*PeerManager				// pointer to peer manager
 
-	name		string						// name
-	tep			sch.SchUserTaskEp			// entry
-	ptnMe		interface{}					// the instance task node pointer
-	ptnMgr		interface{}					// the peer manager task node pointer
-	state		peerInstState				// state
-	cto			time.Duration				// connect timeout value
-	hto			time.Duration				// handshake timeout value
-	ato			time.Duration				// active peer connection read/write timeout value
-	dialer		*net.Dialer					// dialer to make outbound connection
-	conn		net.Conn					// connection
-	iow			ggio.WriteCloser			// IO writer
-	ior			ggio.ReadCloser				// IO reader
-	laddr		*net.TCPAddr				// local ip address
-	raddr		*net.TCPAddr				// remote ip address
-	dir			int							// direction: outbound(+1) or inbound(-1)
-	snid		config.SubNetworkID			// sub network identity
-	node		config.Node					// peer "node" information
-	protoNum	uint32						// peer protocol number
-	protocols	[]Protocol					// peer protocol table
-	maxPkgSize	int							// max size of tcpmsg package
-	ppTid		int							// pingpong timer identity
-	rxChan		chan *P2pPackageRx			// rx pending channel
-	txChan		chan *P2pPackage			// tx pending channel
-	txPendNum	int							// tx pending number
-	txSeq		int64						// statistics sequence number
-	txOkCnt		int64						// tx ok counter
-	txFailedCnt	int64						// tx failed counter
-	rxDone		chan PeMgrErrno				// RX chan
-	rxtxRuning	bool						// indicating that rx and tx routines are running
-	ppSeq		uint64						// pingpong sequence no.
-	ppCnt		int							// pingpong counter
-	rxEno		PeMgrErrno					// rx errno
-	txEno		PeMgrErrno					// tx errno
-	ppEno		PeMgrErrno					// pingpong errno
+	name			string						// name
+	tep				sch.SchUserTaskEp			// entry
+	ptnMe			interface{}					// the instance task node pointer
+	ptnMgr			interface{}					// the peer manager task node pointer
+	state			peerInstState				// state
+	cto				time.Duration				// connect timeout value
+	hto				time.Duration				// handshake timeout value
+	ato				time.Duration				// active peer connection read/write timeout value
+	dialer			*net.Dialer					// dialer to make outbound connection
+	conn			net.Conn					// connection
+	iow				ggio.WriteCloser			// IO writer
+	ior				ggio.ReadCloser				// IO reader
+	laddr			*net.TCPAddr				// local ip address
+	raddr			*net.TCPAddr				// remote ip address
+	dir				int							// direction: outbound(+1) or inbound(-1)
+	snid			config.SubNetworkID			// sub network identity
+
+	networkType		int							// network type
+	priKey			ecdsa.PrivateKey			// local node private key
+	localNode		config.Node					// local "node" information
+	localProtoNum	uint32						// local protocol number
+	localProtocols	[]Protocol					// local protocol table
+
+	node			config.Node					// peer "node" information
+	protoNum		uint32						// peer protocol number
+	protocols		[]Protocol					// peer protocol table
+	maxPkgSize		int							// max size of tcpmsg package
+	ppTid			int							// pingpong timer identity
+	rxChan			chan *P2pPackageRx			// rx pending channel
+	txChan			chan *P2pPackage			// tx pending channel
+	txPendNum		int							// tx pending number
+	txSeq			int64						// statistics sequence number
+	txOkCnt			int64						// tx ok counter
+	txFailedCnt		int64						// tx failed counter
+	rxDone			chan PeMgrErrno				// RX chan
+	rxtxRuning		bool						// indicating that rx and tx routines are running
+	ppSeq			uint64						// pingpong sequence no.
+	ppCnt			int							// pingpong counter
+	rxEno			PeMgrErrno					// rx errno
+	txEno			PeMgrErrno					// tx errno
+	ppEno			PeMgrErrno					// pingpong errno
 }
 
 var peerInstDefault = PeerInstance {
@@ -2029,17 +2034,18 @@ func (pi *PeerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 		return PeMgrEnoInternal
 	}
 
-	var addr = &net.TCPAddr{IP: pi.node.IP, Port: int(pi.node.TCP)}
-	var conn net.Conn = nil
-	var err error
-	var eno PeMgrErrno = PeMgrEnoNone
+	var (
+		addr = &net.TCPAddr{IP: pi.node.IP, Port: int(pi.node.TCP)}
+		conn net.Conn = nil
+		err error
+		eno PeMgrErrno = PeMgrEnoNone
+	)
 
 	pi.dialer.Timeout = pi.cto
 
 	if conn, err = pi.dialer.Dial("tcp", addr.String()); err != nil {
-		// Notice "local" not the address used to connect to peer but the address listened in local
 		peerLog.Debug("piConnOutReq: dial failed, local: %s, to: %s, err: %s",
-			fmt.Sprintf("%s:%d", pi.peMgr.cfg.ip.String(), pi.peMgr.cfg.port),
+			fmt.Sprintf("%s:%d", pi.node.IP.String(), pi.node.TCP),
 			addr.String(), err.Error())
 		eno = PeMgrEnoOs
 	} else {
@@ -2053,8 +2059,8 @@ func (pi *PeerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 			pi.raddr.String())
 	}
 
-	var schMsg = sch.SchMessage{}
-	var rsp = msgConnOutRsp {
+	schMsg := sch.SchMessage{}
+	rsp := msgConnOutRsp {
 		result:	eno,
 		snid:	pi.snid,
 		peNode:	&pi.node,
@@ -2083,8 +2089,8 @@ func (pi *PeerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 		return PeMgrEnoInternal
 	}
 
-	// Carry out action according to the direction of current peer instance connection.
 	var eno PeMgrErrno
+
 	if pi.dir == PeInstDirInbound {
 		eno = pi.piHandshakeInbound(pi)
 	} else if pi.dir == PeInstDirOutbound {
@@ -2102,15 +2108,14 @@ func (pi *PeerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 				pi.raddr.String(),
 				fmt.Sprintf("%+v", pi.node))
 
-	var rsp = msgHandshakeRsp {
+	rsp := msgHandshakeRsp {
 		result:	eno,
 		dir:	pi.dir,
 		snid:	pi.snid,
 		peNode:	&pi.node,
 		ptn:	pi.ptnMe,
 	}
-
-	var schMsg = sch.SchMessage{}
+	schMsg := sch.SchMessage{}
 	pi.sdl.SchMakeMessage(&schMsg, pi.ptnMe, pi.ptnMgr, sch.EvPeHandshakeRsp, &rsp)
 	pi.sdl.SchSendMessage(&schMsg)
 
@@ -2188,10 +2193,9 @@ func (pi *PeerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 		ptn:	pi.ptnMe,
 	}
 
-	peMgr := pi.peMgr
 	schMsg := sch.SchMessage{}
-	peMgr.sdl.SchMakeMessage(&schMsg, pi.ptnMe, peMgr.ptnMe, sch.EvPeCloseCfm, &cfm)
-	peMgr.sdl.SchSendMessage(&schMsg)
+	pi.sdl.SchMakeMessage(&schMsg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseCfm, &cfm)
+	pi.sdl.SchSendMessage(&schMsg)
 
 	return PeMgrEnoNone
 }
@@ -2318,28 +2322,30 @@ func (pi *PeerInstance)piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 	// backup info about protocols supported by peer. notice that here we can
 	// check against the ip and tcp port from handshake with that obtained from
 	// underlying network, but we not now.
-	inst.protoNum = hs.ProtoNum
-	inst.protocols = hs.Protocols
 	inst.snid = hs.Snid
+	pi.peMgr.setHandshakeParameters(inst, hs.Snid)
+
 	inst.node.ID = hs.NodeId
 	inst.node.IP = append(inst.node.IP, hs.IP...)
 	inst.node.TCP = uint16(hs.TCP)
 	inst.node.UDP = uint16(hs.UDP)
+	inst.protoNum = hs.ProtoNum
+	inst.protocols = hs.Protocols
 
 	// write outbound handshake to remote peer
 	hs2peer := Handshake{}
 	hs2peer.Snid = inst.snid
-	hs2peer.NodeId = pi.peMgr.cfg.subNetNodeList[inst.snid]
-	hs2peer.IP = append(hs2peer.IP, pi.peMgr.cfg.ip ...)
-	hs2peer.UDP = uint32(pi.peMgr.cfg.udp)
-	hs2peer.TCP = uint32(pi.peMgr.cfg.port)
-	hs2peer.ProtoNum = pi.peMgr.cfg.protoNum
-	hs2peer.Protocols = pi.peMgr.cfg.protocols
+	hs2peer.NodeId = inst.localNode.ID
+	hs2peer.IP = append(hs2peer.IP, inst.localNode.IP ...)
+	hs2peer.UDP = uint32(inst.localNode.UDP)
+	hs2peer.TCP = uint32(inst.localNode.TCP)
+	hs2peer.ProtoNum = inst.localProtoNum
+	hs2peer.Protocols = inst.localProtocols
+
 	if eno = pkg.putHandshakeOutbound(inst, &hs2peer); eno != PeMgrEnoNone {
 		peerLog.Debug("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
-
 	inst.state = peInstStateHandshook
 
 	return PeMgrEnoNone
@@ -2352,12 +2358,12 @@ func (pi *PeerInstance)piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 
 	// write outbound handshake to remote peer
 	hs.Snid = pi.snid
-	hs.NodeId = pi.peMgr.cfg.subNetNodeList[pi.snid]
-	hs.IP = append(hs.IP, pi.peMgr.cfg.ip ...)
-	hs.UDP = uint32(pi.peMgr.cfg.udp)
-	hs.TCP = uint32(pi.peMgr.cfg.port)
-	hs.ProtoNum = pi.peMgr.cfg.protoNum
-	hs.Protocols = append(hs.Protocols, pi.peMgr.cfg.protocols ...)
+	hs.NodeId = pi.localNode.ID
+	hs.IP = append(hs.IP, pi.localNode.IP...)
+	hs.UDP = uint32(pi.localNode.UDP)
+	hs.TCP = uint32(pi.localNode.TCP)
+	hs.ProtoNum = pi.protoNum
+	hs.Protocols = append(hs.Protocols, pi.protocols ...)
 
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
 		peerLog.Debug("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
@@ -2754,6 +2760,8 @@ func (peMgr *PeerManager)updateStaticStatus(snid SubNetworkID, idEx PeerIdEx, st
 	}
 }
 func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
+	peMgr.lock.Lock()
+	defer peMgr.lock.Unlock()
 	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		for _, id := range peMgr.cfg.subNetIdList {
 			if id == *snid {
@@ -2765,12 +2773,24 @@ func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
 }
 
 func (peMgr *PeerManager)staticSubNetIdExist(snid *SubNetworkID) bool {
+	peMgr.lock.Lock()
+	defer peMgr.lock.Unlock()
 	if peMgr.cfg.networkType == config.P2pNetworkTypeStatic {
 		return peMgr.cfg.staticSubNetId == *snid
 	} else if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
 		return len(peMgr.cfg.staticNodes) > 0 && peMgr.cfg.staticSubNetId == *snid
 	}
 	return false
+}
+
+func (peMgr *PeerManager)setHandshakeParameters(inst *PeerInstance, snid config.SubNetworkID) {
+	peMgr.lock.Lock()
+	defer peMgr.lock.Unlock()
+	inst.networkType = peMgr.cfg.networkType
+	inst.priKey = peMgr.cfg.subNetKeyList[snid]
+	inst.localNode = peMgr.cfg.subNetNodeList[snid]
+	inst.localProtoNum = peMgr.cfg.protoNum
+	inst.localProtocols = peMgr.cfg.protocols
 }
 
 func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {

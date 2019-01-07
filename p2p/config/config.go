@@ -197,8 +197,8 @@ type Config struct {
 	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be
 	SubNetMaxOutbounds	map[SubNetworkID]int	// max concurrency outbounds
 	SubNetMaxInBounds	map[SubNetworkID]int	// max concurrency inbounds
-	SubNetIdList		[]SubNetworkID			// sub network identity list. do not put the identity
-												// of the local node in this list.
+	SubNetIdList		[]SubNetworkID			// sub network identity list
+
 	//
 	// DHT application part
 	//
@@ -253,7 +253,7 @@ type Cfg4PeerManager struct {
 	SubNetMaxOutbounds	map[SubNetworkID]int				// max concurrency outbounds
 	SubNetMaxInBounds	map[SubNetworkID]int				// max concurrency inbounds
 	SubNetKeyList		map[SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
-	SubNetNodeList		map[SubNetworkID]NodeID				// sub-node identities
+	SubNetNodeList		map[SubNetworkID]Node				// sub-node
 	SubNetIdList		[]SubNetworkID						// sub network identity list. do not put the identity
 															// of the local node in this list.
 	NoDial				bool								// do not dial outbound
@@ -967,6 +967,8 @@ func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 		NoAccept:			config[name].NoAccept,
 		ProtoNum:			config[name].ProtoNum,
 		Protocols:			config[name].Protocols,
+		SubNetKeyList:		config[name].SubNetKeyList,
+		SubNetNodeList:		config[name].SubNetNodeList,
 		SubNetMaxPeers:		config[name].SubNetMaxPeers,
 		SubNetMaxOutbounds:	config[name].SubNetMaxOutbounds,
 		SubNetMaxInBounds:	config[name].SubNetMaxInBounds,

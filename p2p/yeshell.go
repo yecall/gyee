@@ -25,8 +25,9 @@ import (
 	"errors"
 	"fmt"
 	"bytes"
-	"container/list"
 	"math/rand"
+	"crypto/ecdsa"
+	"container/list"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	dht		"github.com/yeeco/gyee/p2p/dht"
@@ -77,6 +78,17 @@ var yesMidItoa = map[int] string {
 	int(sch.MSBR_MT_BLKH):			MessageTypeBlockHeader,
 	int(sch.MSBR_MT_BLK):			MessageTypeBlock,
 }
+
+type SubnetDescriptor struct {
+	SubNetKeyList		map[config.SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
+	SubNetNodeList		map[config.SubNetworkID]config.Node			// sub-node identities
+	SubNetMaxPeers		map[config.SubNetworkID]int					// max peers would be
+	SubNetMaxOutbounds	map[config.SubNetworkID]int					// max concurrency outbounds
+	SubNetMaxInBounds	map[config.SubNetworkID]int					// max concurrency inbounds
+	SubNetIdList		[]config.SubNetworkID						// sub network identity list
+}
+
+type SingleSubnetDescriptor = sch.SingleSubnetDescriptor			// single subnet descriptor
 
 type yesKey = config.DsKey										// key type
 
@@ -377,41 +389,30 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	}
 
 	if reCfg.SubnetMaskBits <= 0 || reCfg.SubnetMaskBits > MaxSubNetMaskBits {
-		yesLog.Debug("")
-		return errors.New(fmt.Sprintf("too much mask bits: %d", reCfg.SubnetMaskBits))
+		yesLog.Debug("Reconfig: invalid mask bits: %d", reCfg.SubnetMaskBits)
+		return errors.New(fmt.Sprintf("invalid mask bits: %d", reCfg.SubnetMaskBits))
 	}
 
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
-	VSnidAdd := make([]config.SubNetworkID, 0)
-	VSnidDel := make([]config.SubNetworkID, 0)
-	SnidAdd := make([]config.SubNetworkID, 0)
+	if reCfg.SubnetMaskBits == thisCfg.SubNetMaskBits &&
+		reCfg.Validator == thisCfg.Validator {
+		yesLog.Debug("Reconfig: no reconfiguration needed")
+		return errors.New("no reconfiguration needed")
+	}
+
+	SnidAdd := make([]SingleSubnetDescriptor, 0)
 	SnidDel := make([]config.SubNetworkID, 0)
+	SnidDel = append(SnidDel, thisCfg.localSnid...)
 
-	if reCfg.Validator && !thisCfg.Validator{
-		VSnidAdd = append(VSnidAdd, config.VSubNet)
-	} else if !reCfg.Validator && thisCfg.Validator {
-		VSnidDel = append(VSnidDel, config.VSubNet)
-	}
+	sd := new(SubnetDescriptor)
+	local := yeShMgr.GetLocalNode()
+	priKey := yeShMgr.GetLocalPrivateKey()
 
-	if reCfg.SubnetMaskBits != thisCfg.SubNetMaskBits {
-		nodeId := yeShMgr.chainInst.SchGetP2pConfig().Local.ID
-		oldSnid, err := GetSubnetIdentity(nodeId, thisCfg.SubNetMaskBits)
-		if err != nil {
-			yesLog.Debug("Reconfig: GetSubnetIdentity failed, error: %s", err.Error())
-			return err
-		}
-		newSnid, err := GetSubnetIdentity(nodeId, reCfg.SubnetMaskBits)
-		if err != nil {
-			yesLog.Debug("Reconfig: GetSubnetIdentity failed, error: %s", err.Error())
-			return err
-		}
-		SnidAdd = append(SnidAdd, newSnid)
-		SnidDel = append(SnidDel, oldSnid)
-	}
+	sd.Setup(local, priKey, reCfg.SubnetMaskBits, reCfg.Validator)
+	ssdl := sd.GetSutnetDescriptorList()
+	SnidAdd = append(SnidAdd, *ssdl...)
 
 	req := sch.MsgShellReconfigReq {
-		VSnidAdd: VSnidAdd,
-		VSnidDel: VSnidDel,
 		SnidAdd: SnidAdd,
 		SnidDel: SnidDel,
 	}
@@ -1162,6 +1163,11 @@ func (yeShMgr *YeShellManager)GetLocalNode() *config.Node {
 	return &cfg.Local
 }
 
+func (yeShMgr *YeShellManager)GetLocalPrivateKey() *ecdsa.PrivateKey {
+	cfg := yeShMgr.chainInst.SchGetP2pConfig()
+	return cfg.PrivateKey
+}
+
 func (yeShMgr *YeShellManager)GetLocalDhtNode() *config.Node {
 	cfg := yeShMgr.chainInst.SchGetP2pConfig()
 	return &cfg.DhtLocal
@@ -1233,3 +1239,78 @@ func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
 	}
 	return nil
 }
+
+func (snd *SubnetDescriptor)Setup(node *config.Node, priKey *ecdsa.PrivateKey, mbs int, vdt bool) error {
+	if mbs < 0 || mbs > MaxSubNetMaskBits {
+		yesLog.Debug("Setup: invalid subnet mask bits: %d", mbs)
+		return errors.New("invalid subnet mask bits")
+	} else if mbs == 0 {
+		snd.SubNetKeyList[config.ZeroSubNet] = *priKey
+		snd.SubNetIdList = append(snd.SubNetIdList, config.ZeroSubNet)
+		snd.SubNetNodeList[config.ZeroSubNet] = *node
+		snd.SubNetMaxPeers[config.ZeroSubNet] = config.MaxPeers
+		snd.SubNetMaxOutbounds[config.ZeroSubNet] = config.MaxOutbounds
+		snd.SubNetMaxInBounds[config.ZeroSubNet] = config.MaxInbounds
+	} else if vdt == false {
+		snid, err := GetSubnetIdentity(node.ID, mbs)
+		if err != nil {
+			yesLog.Debug("Setup: GetSubnetIdentity failed")
+			return errors.New("GetSubnetIdentity failed")
+		}
+		snd.SubNetKeyList[snid] = *priKey
+		snd.SubNetIdList = append(snd.SubNetIdList, snid)
+		snd.SubNetNodeList[snid] = *node
+		snd.SubNetMaxPeers[snid] = config.MaxPeers
+		snd.SubNetMaxOutbounds[snid] = config.MaxOutbounds
+		snd.SubNetMaxInBounds[snid] = config.MaxInbounds
+	} else {
+		count := 1 << uint(mbs)
+		snd.SubNetIdList = make([]config.SubNetworkID, count)
+		for ; count > 0; {
+			prvKey, err := config.GenerateKey()
+			if err != nil {
+				continue
+			}
+			id := config.P2pPubkey2NodeId(&prvKey.PublicKey)
+			snid, err := GetSubnetIdentity(*id, mbs)
+			if err != nil {
+				yesLog.Debug("Setup: GetSubnetIdentity failed")
+				return errors.New("GetSubnetIdentity failed")
+			}
+			if _, dup := snd.SubNetKeyList[snid]; dup {
+				continue
+			}
+			snd.SubNetKeyList[snid] = *prvKey
+			snd.SubNetIdList[Snid2Int(snid)] = snid
+			snd.SubNetNodeList[snid] = config.Node{
+				IP:  node.IP,
+				UDP: node.UDP,
+				TCP: node.TCP,
+				ID:  *id,
+			}
+			snd.SubNetMaxPeers[snid] = config.MaxPeers
+			snd.SubNetMaxOutbounds[snid] = config.MaxOutbounds
+			snd.SubNetMaxInBounds[snid] = config.MaxInbounds
+			count--
+		}
+	}
+	return nil
+}
+
+func (snd *SubnetDescriptor)GetSutnetDescriptorList() *[]SingleSubnetDescriptor {
+	ssdl := make([]SingleSubnetDescriptor, 0)
+	for idx := 0; idx < len(snd.SubNetIdList); idx++ {
+		snid := snd.SubNetIdList[idx]
+		ssd := SingleSubnetDescriptor {
+			SubNetKey: snd.SubNetKeyList[snid],
+			SubNetNode: snd.SubNetNodeList[snid],
+			SubNetMaxPeers: snd.SubNetMaxPeers[snid],
+			SubNetMaxOutbounds: snd.SubNetMaxOutbounds[snid],
+			SubNetMaxInBounds: snd.SubNetMaxInBounds[snid],
+			SubNetId: snid,
+		}
+		ssdl = append(ssdl, ssd)
+	}
+	return &ssdl
+}
+

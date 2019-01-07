@@ -435,8 +435,10 @@ func (shMgr *ShellManager)checkKey(pe *shellPeerInst, pid shellPeerID, req *sch.
 }
 
 func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+
 	ddk := deDupKey{}
 	copy(ddk.key[0:], rxPkg.Key)
+
 	spid := shellPeerID {
 		snid:	rxPkg.PeerInfo.Snid,
 		dir:	rxPkg.PeerInfo.Dir,
@@ -531,24 +533,30 @@ func (shMgr *ShellManager)deDupTimerCb(el *list.Element, data interface{}) inter
 }
 
 func (shMgr *ShellManager)checkKey2Peer(pai *shellPeerInst, ddk *deDupKey) error {
+
 	chkk := peer.CheckKey{}
 	chkk.Key = append(chkk.Key, ddk.key[0:]...)
 	upkg := new(peer.P2pPackage)
+
 	if eno := upkg.CheckKey(pai.pi, &chkk); eno != peer.PeMgrEnoNone {
 		chainLog.Debug("checkKey2Peer: CheckKey failed, eno: %d", eno)
 		return errors.New("checkKey2Peer: ReportKey failed")
 	}
+
 	return nil
 }
 
 func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, ddk *deDupKey, status int32) error {
+
 	rptk := peer.ReportKey{}
 	rptk.Key = append(rptk.Key, ddk.key[0:]...)
 	rptk.Status = status
 	upkg := new(peer.P2pPackage)
+
 	if eno := upkg.ReportKey(pai.pi, &rptk); eno != peer.PeMgrEnoNone {
 		chainLog.Debug("reportKey2Peer: ReportKey failed, eno: %d", eno)
 		return errors.New("reportKey2Peer: ReportKey failed")
 	}
+
 	return nil
 }

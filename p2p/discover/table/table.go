@@ -468,6 +468,7 @@ func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
 	mgr.queryPending	= make([]*queryPendingEntry, 0, TabInstQPendingMax)
 	mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
 	mgr.dlkTab			= make([]int, 256)
+	mgr.tabSetupLocalHashId()
 	tabMgr.SubNetMgrList[snid] = mgr
 
 	for loop := 0; loop < cap(mgr.buckets); loop++ {
@@ -503,25 +504,35 @@ func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 }
 
 func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgrErrno {
-	delList := make([]config.SubNetworkID, 0)
-	addList := make([]config.SubNetworkID, 0)
-	delList = append(append(delList, msg.VSnidDel...), msg.SnidDel...)
-	addList = append(append(addList, msg.VSnidAdd...), msg.SnidAdd...)
+	delList := msg.SnidDel
+	addList := msg.SnidAdd
 
 	for _, del := range delList {
-		if _, ok := tabMgr.SubNetMgrList[del]; ok {
+		if mgr, ok := tabMgr.SubNetMgrList[del]; ok {
+			if mgr.arfTid != sch.SchInvalidTid {
+				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, mgr.arfTid)
+				mgr.arfTid = sch.SchInvalidTid
+			}
+			delete(tabMgr.cfg.subNetNodeList, del)
 			delete(tabMgr.SubNetMgrList, del)
 		}
 	}
 
 	for _, add := range addList {
-		if _, ok := tabMgr.SubNetMgrList[add]; ok {
+		if _, ok := tabMgr.SubNetMgrList[add.SubNetId]; ok {
 			tabLog.Debug("shellReconfigReq: duplicated for adding")
 			continue
 		}
+		tabMgr.cfg.subNetNodeList[add.SubNetId] = add.SubNetNode
+	}
 
-		mgr := tabMgr.mgr4Subnet(add)
-		tabMgr.SubNetMgrList[add] = mgr
+	for _, add := range addList {
+		if _, ok := tabMgr.SubNetMgrList[add.SubNetId]; ok {
+			tabLog.Debug("shellReconfigReq: duplicated for adding")
+			continue
+		}
+		mgr := tabMgr.mgr4Subnet(add.SubNetId)
+		tabMgr.SubNetMgrList[add.SubNetId] = mgr
 
 		if eno := mgr.startSubnetRefresh(); eno != TabMgrEnoNone {
 			tabLog.Debug("shellReconfigReq: failed, eno: %d, snid: %x", eno, mgr.snid)

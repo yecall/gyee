@@ -724,8 +724,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 }
 
 func (upkg *P2pPackage)signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
-	cfg := inst.sdl.SchGetP2pConfig()
-	r, s, err := config.P2pSign(cfg.PrivateKey, hs.NodeId)
+	r, s, err := config.P2pSign(&inst.priKey, hs.NodeId)
 	if err != nil {
 		tcpmsgLog.Debug("signOutbound: P2pSign failed, error: %s", err.Error())
 		return false

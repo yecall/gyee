@@ -33,6 +33,7 @@ import (
 	"time"
 	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
+	"crypto/ecdsa"
 )
 
 //
@@ -126,10 +127,17 @@ type MsgShellPeerAskToCloseInd struct {
 //
 // EvShellReconfigReq
 //
+type SingleSubnetDescriptor struct {
+	SubNetKey			ecdsa.PrivateKey							// key for sub-node
+	SubNetNode			config.Node									// sub-node identity
+	SubNetMaxPeers		int											// max peers would be
+	SubNetMaxOutbounds	int											// max concurrency outbounds
+	SubNetMaxInBounds	int											// max concurrency inbounds
+	SubNetId			config.SubNetworkID							// sub network identity
+}
+
 type MsgShellReconfigReq struct {
-	VSnidAdd	[]config.SubNetworkID	// validator sub network identities to be added
-	VSnidDel	[]config.SubNetworkID	// validator sub network identities to be deleted
-	SnidAdd		[]config.SubNetworkID	// common sub network identities to be added
+	SnidAdd		[]SingleSubnetDescriptor	// common sub network identities to be added
 	SnidDel		[]config.SubNetworkID	// common sub network identities to be deleted
 }
 
