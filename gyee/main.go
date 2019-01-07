@@ -95,6 +95,7 @@ func gyee(ctx *cli.Context) error {
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}
+
 	node.Start()
 	node.WaitForShutdown()
 	return nil

@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/yeeco/gyee/common"
-	"github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 const ROUND_UNDECIDED = -1
@@ -83,7 +83,6 @@ type Event struct {
 
 	//fields for consensus computing
 	know        map[string]uint64
-	//parents     map[string]*Event
 	ready       bool //event is ready if all of it's self-parent events has existed and ready
 	round       int  //event's round number
 	witness     bool
@@ -101,10 +100,9 @@ func NewEvent(vid string, height uint64, sequenceNumber uint64) *Event {
 	}
 
 	event := Event{
-		Body: body,
-		vid: vid,
-		know: make(map[string]uint64),
-		//parents:     make(map[string]*Event),
+		Body:        body,
+		vid:         vid,
+		know:        make(map[string]uint64),
 		ready:       false,
 		round:       ROUND_UNDECIDED,
 		witness:     false,
@@ -182,15 +180,15 @@ func (e *Event) Unmarshal(data []byte) {
 
 func (e *Event) Sign(signer crypto.Signer) error {
 	h := e.Body.Hash()
-    sig, err := signer.Sign(h[:])
-    if err != nil {
-        return err
+	sig, err := signer.Sign(h[:])
+	if err != nil {
+		return err
 	}
 	e.signature = sig
 	return nil
 }
 
-func (e *Event) RecoverPublicKey(signer crypto.Signer) ([]byte, error){
+func (e *Event) RecoverPublicKey(signer crypto.Signer) ([]byte, error) {
 	h := e.Body.Hash()
 	pk, err := signer.RecoverPublicKey(h[:], e.signature)
 	return pk, err
@@ -198,7 +196,7 @@ func (e *Event) RecoverPublicKey(signer crypto.Signer) ([]byte, error){
 
 func (e *Event) SignVerify(publicKey []byte, signer crypto.Signer) bool {
 	h := e.Body.Hash()
-    ret:= signer.Verify(publicKey, h[:], e.signature)
+	ret := signer.Verify(publicKey, h[:], e.signature)
 	return ret
 }
 

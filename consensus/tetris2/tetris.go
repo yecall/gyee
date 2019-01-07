@@ -29,12 +29,12 @@ import (
 	"sync"
 	"time"
 
+	"encoding/hex"
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
-	"github.com/yeeco/gyee/crypto"
-	"encoding/hex"
 )
 
 var HASH0 = [common.HashLength]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -45,8 +45,8 @@ type SyncRequest struct {
 }
 
 type Tetris struct {
-	core ICore
-    signer  crypto.Signer
+	core   ICore
+	signer crypto.Signer
 
 	vid string //My vid，using the validator address string
 	h   uint64 //Current Block Height
@@ -156,7 +156,6 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		maxSunk:           0,
 	}
 
-	//tetris.currentEvent = NewEvent(tetris.h, tetris.address, tetris.n)
 	tetris.prepare()
 
 	return &tetris, nil
@@ -225,7 +224,7 @@ func (t *Tetris) loop() {
 		case eventMsg := <-t.ParentEventCh:
 			var event Event
 			event.Unmarshal(eventMsg)
-			if t.checkEvent(&event){
+			if t.checkEvent(&event) {
 				t.receiveParentEvent(&event)
 			}
 		case tx := <-t.TxsCh:
@@ -277,25 +276,6 @@ func (t *Tetris) sendEvent() {
 	t.n++
 
 	t.update(event)
-
-	/*
-		event.setAppendE()
-		if event.totalEvent() == 1 {
-			t.noRecvCount++
-		} else {
-			t.noRecvCount = 0
-		}
-		t.SendEventCh <- event
-		t.lastSendTime = time.Now()
-		event.ready = true
-		t.validators[t.address][t.n] = &event
-		//t.memberHeight[t.m] = t.n
-		t.eventCache.Add(event.Hex(), &event)
-		t.n += 1
-		t.currentEvent = NewEvent(t.h, t.address, t.n)
-		t.currentEvent.appendEvent(&event)
-		t.update(&event)
-	*/
 }
 
 func (t *Tetris) receiveTicker(time time.Time) {
@@ -319,14 +299,6 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		if len(t.txsAccepted) > t.params.maxTxPerEvent {
 			t.sendEvent()
 		}
-
-		//t.currentEvent.appendTx(tx)
-		////if t.noRecvCount > 5 {
-		////	return
-		////}
-		//if t.currentEvent.totalTx() > t.params.maxTxPerEvent {
-		//	t.sendEvent(t.currentEvent)
-		//}
 	}
 }
 
@@ -339,12 +311,12 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 	//TODO：从公钥计算address vid
 	addr, err := t.core.AddressFromPublicKey(pk)
-    event.vid = hex.EncodeToString(addr)
-    //TODO: 检查是否属于当前validators
+	event.vid = hex.EncodeToString(addr)
+	//TODO: 检查是否属于当前validators
 
 	ret := event.SignVerify(pk, t.signer)
 
-    return ret
+	return ret
 }
 
 //Receive Event, if the parents not exists, send request
@@ -370,11 +342,11 @@ func (t *Tetris) receiveEvent(event *Event) {
 	//}
 
 	if t.eventCache.Contains(event.Hash()) {
-			logging.Logger.WithFields(logrus.Fields{
-				"event": event.Hash(),
-				"vid":     event.vid,
-				"n":     event.Body.N,
-			}).Debug("Recevie already existed event")
+		logging.Logger.WithFields(logrus.Fields{
+			"event": event.Hash(),
+			"vid":   event.vid,
+			"n":     event.Body.N,
+		}).Debug("Recevie already existed event")
 
 		return
 	}
@@ -402,11 +374,11 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 	t.parentCountRaw++
 
 	if t.eventCache.Contains(event.Hash()) {
-			logging.Logger.WithFields(logrus.Fields{
-				"event": event.Hash(),
-				"vid":     event.vid,
-				"n":     event.Body.N,
-			}).Debug("Recevie already existed parent event")
+		logging.Logger.WithFields(logrus.Fields{
+			"event": event.Hash(),
+			"vid":   event.vid,
+			"n":     event.Body.N,
+		}).Debug("Recevie already existed parent event")
 		return
 	}
 	//logging.Logger.WithFields(logrus.Fields{
@@ -810,9 +782,9 @@ func (t *Tetris) consensusComputing() {
 
 				if vt >= t.params.superMajority {
 					me.committable = vv
-					//if i > 3 {
-					//	fmt.Println("committable at", i)
-					//}
+					if i > 3 {
+						fmt.Println("committable at", i)
+					}
 					break loop
 				} else {
 					w.vote = vv
@@ -894,7 +866,7 @@ func (t *Tetris) consensusComputing() {
 
 func (t *Tetris) know(x, y *Event) bool {
 	//if x.Body.N > y.Body.N+30 {
-	//	fmt.Println(">>>>>>>", x.Body.N-y.Body.N, x.Body.M, y.Body.M, x.Body.N, y.Body.N, ">>>", t.m)
+	//	fmt.Println(">>>>>>>", x.Body.N-y.Body.N, x.vid, y.vid, x.Body.N, y.Body.N, ">>>", t.vid)
 	//}
 
 	if x.know[y.vid] >= y.Body.N {
