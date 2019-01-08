@@ -44,7 +44,7 @@ type tabLogger struct {
 }
 
 var tabLog = tabLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log tabLogger)Debug(fmt string, args ... interface{}) {
@@ -1315,6 +1315,9 @@ func (tabMgr *TableManager)tabQuery(target *NodeID, nodes []*Node) TabMgrErrno {
 			msg.Id				= uint64(time.Now().UnixNano())
 			msg.Expiration		= 0
 			msg.Extra			= nil
+
+			tabLog.Debug("tabQuery: EvNblFindNodeReq will be sent, ip: %s, udp: %d",
+				msg.To.IP.String(), msg.To.UDP)
 
 			tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblFindNodeReq, msg)
 			tabMgr.sdl.SchSendMessage(&schMsg)

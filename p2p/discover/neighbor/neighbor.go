@@ -41,7 +41,7 @@ type ngbLogger struct {
 }
 
 var ngbLog = ngbLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log ngbLogger)Debug(fmt string, args ... interface{}) {
@@ -167,9 +167,12 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 	dst.IP = append(dst.IP, fn.To.IP...)
 	dst.Port = int(fn.To.UDP)
 
+	ngbLog.Debug("NgbProtoFindNodeReq: sending to ip: %s, udp: %d", dst.IP.String(), dst.Port)
+
 	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
-		var rsp = sch.NblFindNodeRsp{}
-		var schMsg  = sch.SchMessage{}
+		ngbLog.Debug("NgbProtoFindNodeReq: failed to send, ip: %s, udp: %d", dst.IP.String(), dst.Port)
+		rsp := sch.NblFindNodeRsp{}
+		schMsg := sch.SchMessage{}
 		rsp.Result = (NgbProtoEnoUdp << 16) + tab.TabMgrEnoUdp
 		rsp.FindNode = inst.msgBody.(*um.FindNode)
 		inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
@@ -347,7 +350,7 @@ func (ngbMgr *NeighborManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 
 func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if ngbLog.debug__ && ngbMgr.sdl != nil{
-		ngbLog.Debug("ngbProtoProc: ngbMgr.name: %s, msg.Id: %d", ngbMgr.name, msg.Id)
+		ngbLog.Debug("ngbMgrProc: ngbMgr.name: %s, msg.Id: %d", ngbMgr.name, msg.Id)
 	}
 
 	var eno NgbMgrErrno
