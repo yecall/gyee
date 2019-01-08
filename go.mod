@@ -2,6 +2,7 @@ module github.com/yeeco/gyee
 
 require (
 	github.com/BurntSushi/toml v0.3.1
+	github.com/allegro/bigcache v1.1.0
 	github.com/ethereum/go-ethereum v1.8.20
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
