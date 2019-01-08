@@ -19,7 +19,6 @@ package tetris2
 
 import (
 	"crypto/sha256"
-	//"encoding/json"
 	"time"
 
 	"github.com/yeeco/gyee/common"
@@ -30,8 +29,6 @@ import (
 
 const ROUND_UNDECIDED = -1
 const COMMITTABLE_UNDECIDED = -1
-
-//TODO:这里用json做的序列化，以后要改成pb
 
 type EventBody struct {
 	H  uint64        //Block Height
@@ -308,39 +305,6 @@ func (e *Event) totalTx() int {
 func (e *Event) totalEvent() int {
 	return len(e.Body.E)
 }
-
-//func (e *Event) appendTx(tx []byte) {
-//	e.Body.Tx = append(e.Body.Tx, tx)
-//}
-//
-//func (e *Event) appendEvent(event *Event) {
-//	p := e.parents[event.address]
-//	if p != nil {
-//		if event.Body.N > p.Body.N {
-//			e.parents[event.address] = event
-//			e.updateKnow(event)
-//		}
-//	} else {
-//		e.parents[event.address] = event
-//		e.updateKnow(event)
-//	}
-//}
-//
-//func (e *Event) setAppendE() {
-//	p := e.parents[e.address]
-//	if p == nil {
-//		e.Body.E = append(e.Body.E, "")
-//	} else {
-//		e.Body.E = append(e.Body.E, p.Hex())
-//	}
-//
-//	for key, p := range e.parents {
-//		if key != e.Body.M {
-//			e.Body.E = append(e.Body.E, p.Hex())
-//		}
-//	}
-//
-//}
 
 func (e *Event) updateKnow(event *Event) {
 	e.know[e.vid] = e.Body.N

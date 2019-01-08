@@ -20,7 +20,7 @@ package tetris2
 /*
 9. 需解决的工程问题：1）点火问题。2）区块同步效率问题。3）成员替换时的know清单问题。4）内存释放问题。5）fork检测后操作问题。6)调速问题。
    7）metrics。8）块确认时中断问题。9）crash-recovery处理。10）上层协议member rotation。11）更换m的设计，直接用地址，hash用[]byte
-
+   12) H变化时中断开始新一轮共识
 */
 
 import (
@@ -130,7 +130,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		txsPending:   make(map[common.Hash]map[string]uint64),
 		txsCommitted: utils.NewLRU(100000, nil),
 
-		ticker:    time.NewTicker(time.Second),
+		ticker:    time.NewTicker(2 * time.Second),
 		heartBeat: make(map[string]time.Time),
 
 		quitCh: make(chan struct{}),
@@ -163,13 +163,13 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 	return &tetris, nil
 }
 
-func (c *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
-	if len(c.heartBeat) < c.params.superMajority {
+func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
+	if len(t.heartBeat) < t.params.superMajority {
 		return false, 0
 	}
 
 	var times []time.Time
-	for _, time := range c.heartBeat {
+	for _, time := range t.heartBeat {
 		times = append(times, time)
 	}
 
@@ -178,12 +178,13 @@ func (c *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
 	})
 
 	now := time.Now()
-	return true, now.Sub(times[c.params.superMajority-1])
+	return true, now.Sub(times[t.params.superMajority-1])
 }
 
 func (t *Tetris) MemberRotate(joins []string, quits []string) {
 	for _, vid := range quits {
 		delete(t.validators, vid)
+		delete(t.heartBeat, vid)
 	}
 
 	for _, vid := range joins {
@@ -222,7 +223,12 @@ func (t *Tetris) loop() {
 			t.TrafficIn += len(eventMsg)
 			event.Unmarshal(eventMsg)
 			if t.checkEvent(&event) {
-				t.receiveEvent(&event)
+				t.heartBeat[event.vid] = time.Now()
+				if event.Body.P { //如果是心跳，更新心跳时间表
+					//logging.Logger.Info("receive heartbeat:", event.vid)
+				} else {
+					t.receiveEvent(&event)
+				}
 			}
 		case eventMsg := <-t.ParentEventCh:
 			var event Event
@@ -260,9 +266,12 @@ func (t *Tetris) sendPlaceholderEvent() {
 	t.lastSendTime = time.Now()
 
 	t.n++
+
+	t.update(event)
 }
 
 func (t *Tetris) sendEvent() {
+	//logging.Logger.Info("sendEvent:", t.vid, "txs:",len(t.txsAccepted))
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.AddParents(t.eventAccepted)
@@ -284,26 +293,40 @@ func (t *Tetris) sendEvent() {
 	t.update(event)
 }
 
-func (t *Tetris) receiveTicker(time time.Time) {
+func (t *Tetris) sendHeartbeat() {
+	pulse := NewPulse()
+	pulse.Sign(t.signer)
+	pb := pulse.Marshal()
+	t.TrafficOut += len(pb)
+	t.SendEventCh <- pb
+}
 
+func (t *Tetris) receiveTicker(ttime time.Time) {
+	if ttime.Sub(t.lastSendTime) > 1*time.Second {
+		t.sendHeartbeat()
+	}
 }
 
 func (t *Tetris) receiveTx(tx common.Hash) {
 	if !t.txsCache.Contains(tx) {
 		t.txCount++
-		//if t.txCount % 30000 == 0 {
-		//	logging.Logger.WithFields(logrus.Fields{
-		//		"tm":     t.m,
-		//		"tn":     t.n,
-		//		"c":      t.txCount,
-		//		"pending": t.eventPending.Len(),
-		//	}).Info("Tx count")
-		//}
+		if t.txCount%30000 == 0 {
+			logging.Logger.WithFields(logrus.Fields{
+				"vid":     t.vid[0:4],
+				"c":       t.txCount,
+				"pending": t.eventPending.Len(),
+			}).Info("Tx count")
+		}
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
 
 		if len(t.txsAccepted) > t.params.maxTxPerEvent {
-			t.sendEvent()
+			ok, _ := t.MajorityBeatTime()
+			if ok {
+				t.sendEvent()
+			} else {
+				t.txsAccepted = t.txsAccepted[10:]
+			}
 		}
 	}
 }
@@ -538,8 +561,6 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 								}
 
 								t.eventAccepted = append(t.eventAccepted, e)
-								//t.currentEvent.appendEvent(e)
-								//}
 								t.eventPending.Remove(e.Hash())
 								//unpending = true
 							}
@@ -606,16 +627,25 @@ func (t *Tetris) update(me *Event) {
 			pe, ok := t.eventCache.Get(e)
 			if ok {
 				pme := t.validators[pe.(*Event).vid][pe.(*Event).Body.N]
-				if pme != nil && pme.round > maxr {
-					maxr = pme.round
+				if pme != nil {
+					if pme.round > maxr {
+						maxr = pme.round
+					}
+				} else {
+					fmt.Println("pme==nil")
 				}
 			} else {
+				fmt.Println("eventCache no:", e)
 				return
 			}
 		}
 		me.round = maxr
-
-		if len(t.witness[me.round]) >= t.params.superMajority {
+		if me.round == ROUND_UNDECIDED {
+			fmt.Println(me.Body)
+			fmt.Println(me.Body.E)
+			fmt.Println(t.eventCache.Len())
+		}
+		if len(t.witness[me.round]) >= t.params.superMajority { //todo:这个地方有过一次panic，out of range
 			c := 0
 			for _, v := range t.witness[me.round] {
 				if t.knowWell(me, v) {
@@ -626,7 +656,7 @@ func (t *Tetris) update(me *Event) {
 				me.round++
 			}
 		}
-		pme := t.validators[me.vid][me.Body.N-1]
+		pme := t.validators[me.vid][n-1]
 		if pme != nil {
 			if me.round > pme.round {
 				me.witness = true
@@ -637,6 +667,9 @@ func (t *Tetris) update(me *Event) {
 					t.witness = append(t.witness, make(map[string]*Event))
 				}
 				t.witness[me.round][me.vid] = me
+				if me.round == 0 {
+					fmt.Println("*************", me.round, pme.round, pme.Body.N)
+				}
 				newWitness = true
 			}
 		} else {
@@ -789,9 +822,9 @@ func (t *Tetris) consensusComputing() {
 
 				if vt >= t.params.superMajority {
 					me.committable = vv
-					if i > 3 {
-						fmt.Println("committable at", i)
-					}
+					//if i > 3 {
+					//	fmt.Println("committable at", i)
+					//}
 					break loop
 				} else {
 					w.vote = vv
@@ -807,13 +840,13 @@ func (t *Tetris) consensusComputing() {
 	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！已确认交易只有一个cache来去重。
 	//todo:fair排序问题？
 
-	//c := make([]int, 0)
+	c := make([]string, 0)
 	cs := ""
 	txc := make([]common.Hash, 0)
 
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
-			//c = append(c, int(w.Body.M))
+			c = append(c, w.vid[0:4])
 			for _, tx := range w.Body.Tx {
 				if t.txsCommitted.Contains(tx) {
 					continue
@@ -835,13 +868,23 @@ func (t *Tetris) consensusComputing() {
 
 	//fmt.Println("pending tx:", len(t.PendingTxs))
 
-	if len(txc) == 0 {
-		for _, w := range t.witness[0] {
-			if w.committable == 1 {
-				fmt.Println(w.vid, ":", len(w.Body.Tx))
-			}
-		}
-	}
+	//if len(txc) == 0 {
+	//	for _, w := range t.witness[0] {
+	//		if w.committable == 1 {
+	//			fmt.Println(w.vid, ":", len(w.Body.Tx))
+	//		}
+	//	}
+	//}
+	//fmt.Println()
+	//fmt.Println("*****node:", t.vid[2:4])
+	//for _, w := range t.witness[0] {
+	//	fmt.Print(w.vid[2:4], "(", w.Body.N, ")", ", ")
+	//}
+	//fmt.Println()
+	//for _, w := range t.witness[1] {
+	//	fmt.Print(w.vid[2:4], "(", w.Body.N, ")", ",")
+	//}
+	//fmt.Println()
 
 	//sort.Strings(txc)
 	sort.Slice(txc, func(i, j int) bool {
@@ -856,11 +899,14 @@ func (t *Tetris) consensusComputing() {
 		}
 		return false
 	})
-	//sort.Ints(c)
-	//for i := 0; i < len(c); i++ {
-	//	cs = cs + strconv.Itoa(c[i])
-	//}
+	sort.Strings(c)
+	for i := 0; i < len(c); i++ {
+		cs = cs + c[i]
+	}
 
+	//if t.h < 10 {
+	//	fmt.Println(t.vid[0:4], "'s consensus events:", cs)
+	//}
 	//fmt.Print("******************* consensus reached ******************* ")
 	//fmt.Println("m=", t.m, " n=", t.h+1, ":", cs)
 

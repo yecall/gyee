@@ -42,7 +42,6 @@ import (
 	"encoding/hex"
 
 	"github.com/pkg/errors"
-	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 )
