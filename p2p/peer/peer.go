@@ -256,6 +256,7 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
+
 	if !peMgr.isInited {
 		if msg.Id != sch.EvSchPoweron {
 			peerLog.Debug("peerMgrProc: not be initialized, message discarded, "+
@@ -324,9 +325,7 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = PeMgrEnoParameter
 	}
 
-	if peMgr.sdl != nil {
-		peerLog.Debug("peerMgrProc: get out, name: %s, msg.Id: %d", peMgr.name, msg.Id)
-	}
+	peerLog.Debug("peerMgrProc: get out, name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
 	if eno != PeMgrEnoNone {
 		schEno = sch.SchEnoUserTask
@@ -1957,6 +1956,7 @@ func (pi *PeerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 }
 
 func (pi *PeerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
 	peerLog.Debug("peerInstProc: name: %s, msg.Id: %d", pi.name, msg.Id)
 
 	var eno PeMgrErrno

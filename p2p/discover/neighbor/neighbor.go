@@ -121,11 +121,10 @@ func (inst *neighborInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 
 func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ngbLog.debug__ && inst.sdl != nil {
-		ngbLog.Debug("ngbProtoProc: inst.name: %s, msg.Id: %d", inst.name, msg.Id)
-	}
+	ngbLog.Debug("ngbProtoProc: inst.name: %s, msg.Id: %d", inst.name, msg.Id)
 
 	var protoEno NgbProtoErrno
+
 	switch msg.Id {
 	case sch.EvSchPoweroff:
 		protoEno = inst.NgbProtoPoweroff(ptn)
@@ -145,6 +144,8 @@ func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.
 		ngbLog.Debug("NgbProtoProc: invalid message, msg.Id: %d", msg.Id)
 		protoEno = NgbProtoEnoParameter
 	}
+
+	ngbLog.Debug("ngbProtoProc: get out, inst.name: %s, msg.Id: %d", inst.name, msg.Id)
 
 	if protoEno != NgbProtoEnoNone {
 		return sch.SchEnoUserTask
@@ -349,11 +350,11 @@ func (ngbMgr *NeighborManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 }
 
 func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if ngbLog.debug__ && ngbMgr.sdl != nil{
-		ngbLog.Debug("ngbMgrProc: ngbMgr.name: %s, msg.Id: %d", ngbMgr.name, msg.Id)
-	}
+
+	ngbLog.Debug("ngbMgrProc: ngbMgr.name: %s, msg.Id: %d", ngbMgr.name, msg.Id)
 
 	var eno NgbMgrErrno
+
 	switch msg.Id {
 	case sch.EvSchPoweron:
 		return ngbMgr.PoweronHandler(ptn)
@@ -371,6 +372,8 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		ngbLog.Debug("NgbMgrProc:  invalid message id: %d", msg.Id)
 		eno = NgbMgrEnoParameter
 	}
+
+	ngbLog.Debug("ngbMgrProc: get out, ngbMgr.name: %s, msg.Id: %d", ngbMgr.name, msg.Id)
 
 	if eno != NgbMgrEnoNone {
 		return sch.SchEnoUserTask

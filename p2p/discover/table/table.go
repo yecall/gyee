@@ -291,6 +291,9 @@ func (tabMgr *TableManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessa
 }
 
 func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+
+	tabLog.Debug("tabMgrProc: name: %s, msg.Id: %d", tabMgr.name, msg.Id)
+
 	var eno TabMgrErrno = TabMgrEnoNone
 
 	switch msg.Id {
@@ -333,8 +336,10 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 
 	default:
 		tabLog.Debug("TabMgrProc: invalid message: %d", msg.Id)
-		return sch.SchEnoUserTask
+		eno = TabMgrEnoParameter
 	}
+
+	tabLog.Debug("TabMgrProc: get out, name: %s, msg.Id: %d", tabMgr.name, msg.Id)
 
 	if eno != TabMgrEnoNone {
 		return sch.SchEnoUserTask
