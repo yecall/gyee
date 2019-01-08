@@ -92,7 +92,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase7"
+var tgtCase = "testCase6"
 
 //
 // switch for playing go-monitors, related commands:
@@ -330,28 +330,30 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 // testCase5
 //
 func testCase5(tc *testCase) {
-
-	yesCfg := yep2p.DefaultYeShellConfig
-	//yesCfg.BootstrapNode = true
-	yesCfg.SubNetMaskBits = 0
-	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
-	yeShMgr.Start()
-	time.Sleep(time.Second * 10)
-	yeShMgr.Stop()
+	for loop := 0; loop < 100; loop++ {
+		yesCfg := yep2p.DefaultYeShellConfig
+		//yesCfg.BootstrapNode = true
+		yesCfg.SubNetMaskBits = 0
+		yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+		yeShMgr.Start()
+		time.Sleep(time.Second * 60)
+		yeShMgr.Stop()
+	}
 }
 
 //
 // testCase6
 //
 func testCase6(tc *testCase) {
-
-	yesCfg := yep2p.DefaultYeShellConfig
-	//yesCfg.BootstrapNode = true
-	yesCfg.SubNetMaskBits = 4
-	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
-	yeShMgr.Start()
-	time.Sleep(time.Second * 10)
-	yeShMgr.Stop()
+	for loop := 0; loop < 100; loop++ {
+		yesCfg := yep2p.DefaultYeShellConfig
+		//yesCfg.BootstrapNode = true
+		yesCfg.SubNetMaskBits = 4
+		yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+		yeShMgr.Start()
+		time.Sleep(time.Second * 120)
+		yeShMgr.Stop()
+	}
 }
 
 //
