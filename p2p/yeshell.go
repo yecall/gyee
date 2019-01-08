@@ -1190,12 +1190,12 @@ func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
 		yesLog.Debug("setupSubNetwork: invalid subnet mask bits: %d", mbs)
 		return errors.New("invalid subnet mask bits")
 	} else if mbs == 0 {
-		cfg.SubNetKeyList[config.ZeroSubNet] = *cfg.PrivateKey
-		cfg.SubNetIdList = append(cfg.SubNetIdList, config.ZeroSubNet)
-		cfg.SubNetNodeList[config.ZeroSubNet] = cfg.Local
-		cfg.SubNetMaxPeers[config.ZeroSubNet] = config.MaxPeers
-		cfg.SubNetMaxOutbounds[config.ZeroSubNet] = config.MaxOutbounds
-		cfg.SubNetMaxInBounds[config.ZeroSubNet] = config.MaxInbounds
+		cfg.SubNetKeyList[config.AnySubNet] = *cfg.PrivateKey
+		cfg.SubNetIdList = append(cfg.SubNetIdList, config.AnySubNet)
+		cfg.SubNetNodeList[config.AnySubNet] = cfg.Local
+		cfg.SubNetMaxPeers[config.AnySubNet] = config.MaxPeers
+		cfg.SubNetMaxOutbounds[config.AnySubNet] = config.MaxOutbounds
+		cfg.SubNetMaxInBounds[config.AnySubNet] = config.MaxInbounds
 	} else if vdt == false {
 		snid, err := GetSubnetIdentity(cfg.Local.ID, mbs)
 		if err != nil {
