@@ -1511,9 +1511,9 @@ func (tabMgr *TableManager)tabUpdateBucket(inst *instCtrlBlock, result int) TabM
 func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 	// Update node database while local node is a bootstrap node for an unexcepeted
 	// bounding procedure: this procedure is inited by neighbor manager task when a
-	// Ping or Pong message recived without a responding neighbor instance can be mapped
-	// to it. In this case, the neighbor manager then carry the pingpong procedure (if Ping
-	// received, a Pong sent firstly), and when Pong recvied, it is sent to here the
+	// Ping or Pong message received without a responding neighbor instance can be mapped
+	// to it. In this case, the neighbor manager would play the pingpong procedure (if Ping
+	// received, a Pong sent firstly), and when Pong received, it is sent to here the
 	// table manager task, see Ping, Pong handler in file neighbor.go for details pls.
 	id := n.NodeId
 	snid := tabMgr.snid

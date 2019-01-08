@@ -40,7 +40,7 @@ type schLogger struct {
 }
 
 var schLog = schLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log schLogger)Debug(fmt string, args ... interface{}) {
@@ -1816,7 +1816,7 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	}
 
 	//
-	// loop the static table table
+	// loop the static table
 	//
 
 	for loop, desc := range tsd {

@@ -53,26 +53,46 @@ type testCase struct {
 //
 var testCaseTable = []testCase{
 	{
+		name:			"testCase5",
+		description:	"yee chain start/stop test, SubNetMaskBits == 0",
+		entry:			testCase5,
+	},
+	{
+		name:			"testCase6",
+		description:	"yee chain start/stop test, SubNetMaskBits != 0",
+		entry:			testCase6,
+	},
+	{
+		name:			"testCase7",
+		description:	"yee chain test, SubNetMaskBits == 0",
+		entry:			testCase7,
+	},
+	{
 		name:			"testCase8",
-		description:	"yee chain simple test",
+		description:	"yee chain OSN test, SubNetMaskBits != 0",
 		entry:			testCase8,
 	},
 	{
 		name:			"testCase9",
-		description:	"yee chain osn service test",
+		description:	"yee chain OSN test, SubNetMaskBits == 0",
 		entry:			testCase9,
 	},
 	{
 		name:			"testCase10",
-		description:	"multiple yee chain osn services test on one host",
+		description:	"yee chain OSN test, SubNetMaskBits != 0",
 		entry:			testCase10,
+	},
+	{
+		name:			"testCase11",
+		description:	"multiple yee chain OSN test on one host",
+		entry:			testCase11,
 	},
 }
 
 //
 // target case
 //
-var tgtCase = "testCase8"
+var tgtCase = "testCase6"
 
 //
 // switch for playing go-monitors, related commands:
@@ -307,20 +327,74 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 }
 
 //
+// testCase5
+//
+func testCase5(tc *testCase) {
+
+	yesCfg := yep2p.DefaultYeShellConfig
+	//yesCfg.BootstrapNode = true
+	yesCfg.SubNetMaskBits = 0
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+	time.Sleep(time.Second * 10)
+	yeShMgr.Stop()
+}
+
+//
+// testCase6
+//
+func testCase6(tc *testCase) {
+
+	yesCfg := yep2p.DefaultYeShellConfig
+	//yesCfg.BootstrapNode = true
+	yesCfg.SubNetMaskBits = 4
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+	time.Sleep(time.Second * 10)
+	yeShMgr.Stop()
+}
+
+//
+// testCase7
+//
+func testCase7(tc *testCase) {
+
+	yesCfg := yep2p.DefaultYeShellConfig
+	//yesCfg.BootstrapNode = true
+	yesCfg.SubNetMaskBits = 0
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+
+	node := yeShMgr.GetLocalNode()
+	setMessageFrom(node)
+
+	yeShMgr.Register(&subEv)
+	yeShMgr.Register(&subTx)
+	yeShMgr.Register(&subBh)
+
+	go subFunc(subEv, "ev")
+	go subFunc(subTx, "tx")
+	go subFunc(subBh, "bh")
+
+	if true {
+		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
+	} else {
+		time.Sleep(time.Second * 10)
+		yeChainProc(yeShMgr, ev, tx, bh, bk)
+		yeChainStop(yeShMgr, subEv, subTx, subBh)
+	}
+}
+
+//
 // testCase8
 //
 func testCase8(tc *testCase) {
 
 	yesCfg := yep2p.DefaultYeShellConfig
 	//yesCfg.BootstrapNode = true
+	yesCfg.SubNetMaskBits = 4
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
-
-	if true {
-		time.Sleep(time.Second * 10)
-		yeShMgr.Stop()
-		return
-	}
 
 	node := yeShMgr.GetLocalNode()
 	setMessageFrom(node)
@@ -349,6 +423,7 @@ func testCase9(tc *testCase) {
 
 	osnCfg := yep2p.DefaultYeShellConfig
 	//osnCfg.BootstrapNode = true
+	osnCfg.SubNetMaskBits = 0
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
@@ -376,6 +451,37 @@ func testCase9(tc *testCase) {
 // testCase10
 //
 func testCase10(tc *testCase) {
+
+	osnCfg := yep2p.DefaultYeShellConfig
+	//osnCfg.BootstrapNode = true
+	osnCfg.SubNetMaskBits = 4
+	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
+	osnSrv.Start()
+
+	node := osnSrv.GetLocalNode()
+	setMessageFrom(node)
+
+	osnSrv.Register(&subEv)
+	osnSrv.Register(&subTx)
+	osnSrv.Register(&subBh)
+
+	go subFunc(subEv, "ev")
+	go subFunc(subTx, "tx")
+	go subFunc(subBh, "bh")
+
+	if true {
+		waitInterruptWithCallback(osnSrv, yeChainProc, yeChainStop)
+	} else {
+		time.Sleep(time.Second * 10)
+		yeChainProc(osnSrv, ev, tx, bh, bk)
+		yeChainStop(osnSrv, subEv, subTx, subBh)
+	}
+}
+
+//
+// testCase11
+//
+func testCase11(tc *testCase) {
 	appInstNum := 8
 	appMsgs := make([]*appMessages, appInstNum)
 	appSubs := make([]*appSubcribers, appInstNum)
