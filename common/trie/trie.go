@@ -21,10 +21,8 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/log"
 )
 
 var (
@@ -32,27 +30,27 @@ var (
 	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 	// emptyState is the known hash of an empty state trie entry.
-	emptyState = crypto.Keccak256Hash(nil)
+	emptyState = common.Hash{} //crypto.Keccak256Hash(nil)
 )
 
-var (
-	cacheMissCounter   = metrics.NewRegisteredCounter("trie/cachemiss", nil)
-	cacheUnloadCounter = metrics.NewRegisteredCounter("trie/cacheunload", nil)
-)
+//var (
+//	cacheMissCounter   = metrics.NewRegisteredCounter("trie/cachemiss", nil)
+//	cacheUnloadCounter = metrics.NewRegisteredCounter("trie/cacheunload", nil)
+//)
 
 // CacheMisses retrieves a global counter measuring the number of cache misses
 // the trie had since process startup. This isn't useful for anything apart from
 // trie debugging purposes.
-func CacheMisses() int64 {
-	return cacheMissCounter.Count()
-}
+//func CacheMisses() int64 {
+//	return cacheMissCounter.Count()
+//}
 
 // CacheUnloads retrieves a global counter measuring the number of cache unloads
 // the trie did since process startup. This isn't useful for anything apart from
 // trie debugging purposes.
-func CacheUnloads() int64 {
-	return cacheUnloadCounter.Count()
-}
+//func CacheUnloads() int64 {
+//	return cacheUnloadCounter.Count()
+//}
 
 // LeafCallback is a callback type invoked when a trie operation reaches a leaf
 // node. It's used by state sync and commit to allow handling external references
@@ -428,7 +426,7 @@ func (t *Trie) resolve(n node, prefix []byte) (node, error) {
 }
 
 func (t *Trie) resolveHash(n hashNode, prefix []byte) (node, error) {
-	cacheMissCounter.Inc(1)
+	//cacheMissCounter.Inc(1)
 
 	hash := common.BytesToHash(n)
 	if node := t.db.node(hash, t.cachegen); node != nil {

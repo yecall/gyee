@@ -23,31 +23,30 @@ import (
 	"time"
 
 	"github.com/allegro/bigcache"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/log"
 )
 
-var (
-	memcacheCleanHitMeter   = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
-	memcacheCleanMissMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/miss", nil)
-	memcacheCleanReadMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
-	memcacheCleanWriteMeter = metrics.NewRegisteredMeter("trie/memcache/clean/write", nil)
-
-	memcacheFlushTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/flush/time", nil)
-	memcacheFlushNodesMeter = metrics.NewRegisteredMeter("trie/memcache/flush/nodes", nil)
-	memcacheFlushSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/flush/size", nil)
-
-	memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/gc/time", nil)
-	memcacheGCNodesMeter = metrics.NewRegisteredMeter("trie/memcache/gc/nodes", nil)
-	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/gc/size", nil)
-
-	memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/commit/time", nil)
-	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
-	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
-)
+//var (
+//	memcacheCleanHitMeter   = metrics.NewRegisteredMeter("trie/memcache/clean/hit", nil)
+//	memcacheCleanMissMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/miss", nil)
+//	memcacheCleanReadMeter  = metrics.NewRegisteredMeter("trie/memcache/clean/read", nil)
+//	memcacheCleanWriteMeter = metrics.NewRegisteredMeter("trie/memcache/clean/write", nil)
+//
+//	memcacheFlushTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/flush/time", nil)
+//	memcacheFlushNodesMeter = metrics.NewRegisteredMeter("trie/memcache/flush/nodes", nil)
+//	memcacheFlushSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/flush/size", nil)
+//
+//	memcacheGCTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/gc/time", nil)
+//	memcacheGCNodesMeter = metrics.NewRegisteredMeter("trie/memcache/gc/nodes", nil)
+//	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/gc/size", nil)
+//
+//	memcacheCommitTimeTimer  = metrics.NewRegisteredResettingTimer("trie/memcache/commit/time", nil)
+//	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
+//	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
+//)
 
 // secureKeyPrefix is the database key prefix used to store trie node preimages.
 var secureKeyPrefix = []byte("secure-key-")
@@ -362,8 +361,8 @@ func (db *Database) node(hash common.Hash, cachegen uint16) node {
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
 		if enc, err := db.cleans.Get(string(hash[:])); err == nil && enc != nil {
-			memcacheCleanHitMeter.Mark(1)
-			memcacheCleanReadMeter.Mark(int64(len(enc)))
+			//memcacheCleanHitMeter.Mark(1)
+			//memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return mustDecodeNode(hash[:], enc, cachegen)
 		}
 	}
@@ -382,8 +381,8 @@ func (db *Database) node(hash common.Hash, cachegen uint16) node {
 	}
 	if db.cleans != nil {
 		db.cleans.Set(string(hash[:]), enc)
-		memcacheCleanMissMeter.Mark(1)
-		memcacheCleanWriteMeter.Mark(int64(len(enc)))
+		//memcacheCleanMissMeter.Mark(1)
+		//memcacheCleanWriteMeter.Mark(int64(len(enc)))
 	}
 	return mustDecodeNode(hash[:], enc, cachegen)
 }
@@ -394,8 +393,8 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
 		if enc, err := db.cleans.Get(string(hash[:])); err == nil && enc != nil {
-			memcacheCleanHitMeter.Mark(1)
-			memcacheCleanReadMeter.Mark(int64(len(enc)))
+			//memcacheCleanHitMeter.Mark(1)
+			//memcacheCleanReadMeter.Mark(int64(len(enc)))
 			return enc, nil
 		}
 	}
@@ -412,8 +411,8 @@ func (db *Database) Node(hash common.Hash) ([]byte, error) {
 	if err == nil && enc != nil {
 		if db.cleans != nil {
 			db.cleans.Set(string(hash[:]), enc)
-			memcacheCleanMissMeter.Mark(1)
-			memcacheCleanWriteMeter.Mark(int64(len(enc)))
+			//memcacheCleanMissMeter.Mark(1)
+			//memcacheCleanWriteMeter.Mark(int64(len(enc)))
 		}
 	}
 	return enc, err
@@ -501,9 +500,9 @@ func (db *Database) Dereference(root common.Hash) {
 	db.gcsize += storage - db.dirtiesSize
 	db.gctime += time.Since(start)
 
-	memcacheGCTimeTimer.Update(time.Since(start))
-	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
+	//memcacheGCTimeTimer.Update(time.Since(start))
+	//memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	//memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
 	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
 		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
@@ -646,9 +645,9 @@ func (db *Database) Cap(limit common.StorageSize) error {
 	db.flushsize += storage - db.dirtiesSize
 	db.flushtime += time.Since(start)
 
-	memcacheFlushTimeTimer.Update(time.Since(start))
-	memcacheFlushSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheFlushNodesMeter.Mark(int64(nodes - len(db.dirties)))
+	//memcacheFlushTimeTimer.Update(time.Since(start))
+	//memcacheFlushSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	//memcacheFlushNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
 	log.Debug("Persisted nodes from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
 		"flushnodes", db.flushnodes, "flushsize", db.flushsize, "flushtime", db.flushtime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
@@ -708,9 +707,9 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 
 	db.uncache(node)
 
-	memcacheCommitTimeTimer.Update(time.Since(start))
-	memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
-	memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
+	//memcacheCommitTimeTimer.Update(time.Since(start))
+	//memcacheCommitSizeMeter.Mark(int64(storage - db.dirtiesSize))
+	//memcacheCommitNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
 	logger := log.Info
 	if !report {
