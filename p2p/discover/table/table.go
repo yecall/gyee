@@ -1099,7 +1099,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 
 		tabLog.Debug("tabRefresh: snid: %x, seems all buckets are empty, " +
 			"set local as target and try seeds from database and bootstrap nodes ...",
-			snid)
+			*snid)
 
 		target = NodeID(mgr.cfg.local.ID)
 		seeds := mgr.tabSeedsFromDb(TabInstQPendingMax, seedMaxAge)

@@ -931,6 +931,7 @@ func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 		TCP:			config[name].Local.TCP,
 		ID:				config[name].Local.ID,
 		NetworkType:	config[name].NetworkType,
+		SubNetNodeList: config[name].SubNetNodeList,
 		SubNetIdList:	config[name].SubNetIdList,
 	}
 }
