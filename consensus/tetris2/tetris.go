@@ -130,7 +130,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		txsPending:   make(map[common.Hash]map[string]uint64),
 		txsCommitted: utils.NewLRU(100000, nil),
 
-		ticker:    time.NewTicker(2 * time.Second),
+		ticker:    time.NewTicker(1 * time.Second),
 		heartBeat: make(map[string]time.Time),
 
 		quitCh: make(chan struct{}),
@@ -641,9 +641,24 @@ func (t *Tetris) update(me *Event) {
 		}
 		me.round = maxr
 		if me.round == ROUND_UNDECIDED {
+			fmt.Println("t.vid:", t.vid[2:4], "me.vid", me.vid[2:4])
 			fmt.Println(me.Body)
-			fmt.Println(me.Body.E)
 			fmt.Println(t.eventCache.Len())
+			pe, _ := t.eventCache.Get(me.Body.E[0])
+			pme := pe.(*Event)
+			fmt.Println(pme.round)
+			pme = t.validators[pme.vid][pme.Body.N]
+			fmt.Println(pme.round)
+			for k,v := range t.validators {
+				fmt.Print(k[2:4],": ")
+				for nn := uint64(t.h); nn<t.n+10; nn++ { //怀疑可能是updateall时的高度不够，就是自身n不是最大的时候，会有event没update
+					ee := v[nn]
+					if ee != nil {
+						fmt.Print(ee.round, " ")
+					}
+				}
+				fmt.Println()
+			}
 		}
 		if len(t.witness[me.round]) >= t.params.superMajority { //todo:这个地方有过一次panic，out of range
 			c := 0
@@ -687,7 +702,7 @@ func (t *Tetris) update(me *Event) {
 func (t *Tetris) updateAll() {
 	//计算round， witness，
 	newWitness := false
-	for n := t.h + 1; n < t.n; n++ {
+	for n := t.h + 1; n < t.n; n++ { //TODO:这个地方n可能不够高
 		for m, _ := range t.validators {
 			me := t.validators[m][n]
 
