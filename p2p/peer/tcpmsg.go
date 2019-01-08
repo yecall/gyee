@@ -306,7 +306,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) P
 	pbHandshakeMsg.Protocols = make([]*pb.P2PMessage_Protocol, *pbHandshakeMsg.ProtoNum)
 
 	for i, p := range hs.Protocols {
-		var pbProto = new(pb.P2PMessage_Protocol)
+		pbProto := new(pb.P2PMessage_Protocol)
 		pbHandshakeMsg.Protocols[i] = pbProto
 		pbProto.Pid = new(pb.ProtocolId)
 		*pbProto.Pid = PID_P2P

@@ -44,7 +44,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -2362,8 +2362,8 @@ func (pi *PeerInstance)piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 	hs.IP = append(hs.IP, pi.localNode.IP...)
 	hs.UDP = uint32(pi.localNode.UDP)
 	hs.TCP = uint32(pi.localNode.TCP)
-	hs.ProtoNum = pi.protoNum
-	hs.Protocols = append(hs.Protocols, pi.protocols ...)
+	hs.ProtoNum = pi.localProtoNum
+	hs.Protocols = append(hs.Protocols, pi.localProtocols...)
 
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
 		peerLog.Debug("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
