@@ -95,7 +95,7 @@ type Scheduler = scheduler
 type SchUserTaskEp = func(ptn interface{}, msg *SchMessage) SchErrno
 
 // User task inteface for scheduler
-type SchUserTaskInf interface {
+type SchUserTaskInterface interface {
 	TaskProc4Scheduler(ptn interface{}, msg *SchMessage) SchErrno
 }
 
@@ -135,7 +135,7 @@ const SchMaxMbSize = 1024 * (1)
 type SchTaskDescription struct {
 	Name	string						// user task name
 	MbSize	int							// mailbox size
-	Ep		SchUserTaskInf				// user task entry point
+	Ep		SchUserTaskInterface		// user task entry point
 	Wd		*SchWatchDog				// watchdog
 	Flag	int							// flag: start at once or to be suspended
 	DieCb	func(interface{}) SchErrno	// callbacked when going to die
@@ -163,7 +163,7 @@ type TimerDescription struct {
 // Static user task description
 type TaskStaticDescription struct {
 	Name	string								// task name
-	Tep		SchUserTaskInf						// task inteface, it's the user control block which
+	Tep		SchUserTaskInterface				// task inteface, it's the user control block which
 												// exports its' entry point
 	MbSize	int									// mailbox size, if less than zero, default value applied
 	Wd		SchWatchDog							// watchdog

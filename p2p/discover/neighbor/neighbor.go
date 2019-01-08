@@ -360,6 +360,8 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		return ngbMgr.PoweronHandler(ptn)
 	case sch.EvSchPoweroff:
 		return ngbMgr.PoweroffHandler(ptn)
+	case sch.EvShellReconfigReq:
+		eno = ngbMgr.shellReconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
 	case sch.EvNblMsgInd:
 		eno = ngbMgr.UdpMsgInd(msg.Body.(*UdpMsgInd))
 	case sch.EvNblFindNodeReq:
@@ -427,6 +429,27 @@ func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
 	return ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
+func (ngbMgr *NeighborManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) NgbMgrErrno {
+	add := msg.SnidAdd
+	del := msg.SnidDel
+
+	for _, d := range del {
+		for idx, id := range ngbMgr.cfg.SubNetIdList {
+			if id == d {
+				ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList[0:idx], ngbMgr.cfg.SubNetIdList[idx+1:]...)
+				break;
+			}
+		}
+		delete(ngbMgr.cfg.SubNetNodeList, d)
+	}
+
+	for _, a := range add {
+		ngbMgr.cfg.SubNetNodeList[a.SubNetId] = a.SubNetNode
+	}
+
+	return NgbMgrEnoNone
+}
+
 func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 	var eno NgbMgrErrno
 	switch msg.msgType {
@@ -446,10 +469,12 @@ func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 }
 
 func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
-	if ping.To.NodeId != ngbMgr.cfg.ID {
+	if ngbMgr.checkDestNode(&ping.To, ping.SubNetId) == false {
+		ngbLog.Debug("PingHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
 	if expired(ping.Expiration) {
+		ngbLog.Debug("PingHandler: message expired")
 		return NgbMgrEnoTimeout
 	}
 
@@ -483,13 +508,16 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 
 	pum := new(um.UdpMsg)
 	if eno := pum.Encode(um.UdpMsgTypePong, &pong); eno != um.UdpMsgEnoNone {
+		ngbLog.Debug("PingHandler: Encode failed")
 		return NgbMgrEnoEncode
 	}
 	buf, bytes := pum.GetRawMessage()
 	if buf == nil || bytes <= 0 {
+		ngbLog.Debug("PingHandler: GetRawMessage failed")
 		return NgbMgrEnoEncode
 	}
 	if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
+		ngbLog.Debug("PingHandler: sendUdpMsg failed")
 		return NgbMgrEnoUdp
 	}
 
@@ -497,6 +525,7 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	strSubNetId := config.P2pSubNetId2HexString(ping.SubNetId)
 	strPeerNodeId = strSubNetId + strPeerNodeId
 	if ngbMgr.checkMap(strPeerNodeId, um.UdpMsgTypeAny) == true {
+		ngbLog.Debug("PingHandler: checkMap failed")
 		return NgbMgrEnoNone
 	}
 
@@ -507,10 +536,12 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 }
 
 func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
-	if pong.To.NodeId != ngbMgr.cfg.ID {
+	if ngbMgr.checkDestNode(&pong.To, pong.SubNetId) == false {
+		ngbLog.Debug("PongHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
 	if expired(pong.Expiration) {
+		ngbLog.Debug("PongHandler: message expired")
 		return NgbMgrEnoTimeout
 	}
 
@@ -536,10 +567,12 @@ func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
 }
 
 func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno {
-	if findNode.To.NodeId != ngbMgr.cfg.ID {
+	if ngbMgr.checkDestNode(&findNode.To, findNode.SubNetId) == false {
+		ngbLog.Debug("FindNodeHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
 	if expired(findNode.Expiration) {
+		ngbLog.Debug("FindNodeHandler: message expired")
 		return NgbMgrEnoTimeout
 	}
 
@@ -548,15 +581,21 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	if findNode.SubNetId != config.AnySubNet {
 		mgr := ngbMgr.tabMgr.TabGetInstBySubNetId(&findNode.SubNetId)
 		if mgr == nil {
-			return NgbMgrEnoMismatched
+			ngbLog.Debug("FindNodeHandler: no manager for subnet: %x", findNode.SubNetId)
+			return NgbMgrEnoNotFound
 		}
 		nodes = append(nodes,
 			mgr.TabClosest(tab.Closest4Queried,
 							tab.NodeID(findNode.Target),
 							tab.TabInstQPendingMax)...)
 	} else {
-		mgr := (*tab.TableManager)(nil)
-		for _, mgr = range ngbMgr.tabMgr.SubNetMgrList {
+
+		mgrs := ngbMgr.tabMgr.TabGetInstAll()
+		if mgrs == nil {
+			ngbLog.Debug("FindNodeHandler: none of table managers found")
+			return NgbMgrEnoNotFound
+		}
+		for _, mgr := range *mgrs {
 			if mgr == nil {
 				continue
 			}
@@ -602,9 +641,8 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		umNodes = append(umNodes, &umn)
 	}
 
-	local := ngbMgr.localNode()
 	neighbors := um.Neighbors{
-		From: 			*local,
+		From: 			findNode.To,
 		To:				findNode.From,
 		FromSubNetId:	ngbMgr.cfg.SubNetIdList,
 		SubNetId:		findNode.SubNetId,
@@ -614,15 +652,29 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		Extra:			nil,
 
 	}
+
 	toAddr := net.UDPAddr {
 		IP: 	findNode.From.IP,
 		Port:	int(findNode.From.UDP),
 		Zone:	"",
 	}
+
 	pum := new(um.UdpMsg)
-	pum.Encode(um.UdpMsgTypeNeighbors, &neighbors)
-	buf, _ := pum.GetRawMessage()
-	sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr)
+	if eno := pum.Encode(um.UdpMsgTypeNeighbors, &neighbors); eno != um.UdpMsgEnoNone {
+		ngbLog.Debug("FindNodeHandler: Encode failed")
+		return NgbMgrEnoEncode
+	}
+
+	buf, bytes := pum.GetRawMessage()
+	if buf == nil || bytes <= 0 {
+		ngbLog.Debug("FindNodeHandler: GetRawMessage failed")
+		return NgbMgrEnoEncode
+	}
+
+	if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
+		ngbLog.Debug("FindNodeHandler: sendUdpMsg failed")
+		return NgbMgrEnoUdp
+	}
 
 	strPeerNodeId := config.P2pNodeId2HexString(findNode.From.NodeId)
 	strSubNetId := config.P2pSubNetId2HexString(findNode.SubNetId)
@@ -637,10 +689,12 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 }
 
 func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
-	if nbs.To.NodeId != ngbMgr.cfg.ID {
+	if ngbMgr.checkDestNode(&nbs.To, nbs.SubNetId) == false {
+		ngbLog.Debug("NeighborsHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
 	if expired(nbs.Expiration) {
+		ngbLog.Debug("NeighborsHandler: message expired")
 		return NgbMgrEnoTimeout
 	}
 
@@ -857,6 +911,19 @@ func (ngbMgr *NeighborManager) localNode() *um.Node {
 	}
 }
 
+func (ngbMgr *NeighborManager) localSubNode(snid config.SubNetworkID) *um.Node {
+	id := ngbMgr.getSubNodeId(snid)
+	if id == nil {
+		return nil
+	}
+	return &um.Node {
+		IP:		ngbMgr.cfg.IP,
+		UDP:	ngbMgr.cfg.UDP,
+		TCP:	ngbMgr.cfg.TCP,
+		NodeId:	*id,
+	}
+}
+
 func expired(ts uint64) bool {
 	if ts == 0 { return false }
 	return time.Unix(int64(ts), 0).Before(time.Now())
@@ -868,16 +935,38 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 		ngbLog.Debug("setupConfig: P2pConfig4UdpNgbManager failed")
 		return sch.SchEnoConfig
 	}
-	ngbMgr.cfg.IP			= ptCfg.IP
-	ngbMgr.cfg.UDP			= ptCfg.UDP
-	ngbMgr.cfg.TCP			= ptCfg.TCP
-	ngbMgr.cfg.ID			= ptCfg.ID
-	ngbMgr.cfg.NetworkType	= ptCfg.NetworkType
-	ngbMgr.cfg.SubNetIdList	= ptCfg.SubNetIdList
+	ngbMgr.cfg.IP				= ptCfg.IP
+	ngbMgr.cfg.UDP				= ptCfg.UDP
+	ngbMgr.cfg.TCP				= ptCfg.TCP
+	ngbMgr.cfg.ID				= ptCfg.ID
+	ngbMgr.cfg.NetworkType		= ptCfg.NetworkType
+	ngbMgr.cfg.SubNetNodeList	= ptCfg.SubNetNodeList
+	ngbMgr.cfg.SubNetIdList		= ptCfg.SubNetIdList
 	if len(ngbMgr.cfg.SubNetIdList) == 0 &&
 		ngbMgr.cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList, config.AnySubNet)
 	}
 	return sch.SchEnoNone
+}
+
+func (ngbMgr *NeighborManager)checkDestNode(dst *um.Node, snid config.SubNetworkID) bool {
+	if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
+		return me.ID == dst.NodeId
+	}
+	return false
+}
+
+func (ngbMgr *NeighborManager)getSubNode(snid config.SubNetworkID) *config.Node {
+	if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
+		return &me
+	}
+	return nil
+}
+
+func (ngbMgr *NeighborManager)getSubNodeId(snid config.SubNetworkID) *config.NodeID {
+	if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
+		return &me.ID
+	}
+	return nil
 }
 

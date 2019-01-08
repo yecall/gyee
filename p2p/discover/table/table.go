@@ -399,7 +399,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// set, the network type must be P2pNetworkTypeDynamic, and none of sub
 	// network identities are specified, see function tabGetConfig called
 	// aboved for details. if it's not a AnySubNet, then some sub network
-	// identities must be provided, and it must be a ZeroSubNet.
+	// identities must be provided.
 
 	if tabMgr.snid == config.AnySubNet {
 
@@ -509,6 +509,9 @@ func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 }
 
 func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgrErrno {
+	tabMgr.lock.Lock()
+	defer tabMgr.lock.Unlock()
+
 	delList := msg.SnidDel
 	addList := msg.SnidAdd
 
@@ -1085,6 +1088,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 
 	var nodes []*Node
 	var target NodeID
+
 	if tid == nil {
 		rand.Read(target[:])
 	} else {
@@ -1099,7 +1103,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 
 		target = NodeID(mgr.cfg.local.ID)
 		seeds := mgr.tabSeedsFromDb(TabInstQPendingMax, seedMaxAge)
-		var seedsBackup = make([]*Node, 0)
+		seedsBackup := make([]*Node, 0)
 
 		if len(seeds) == 0 {
 			tabLog.Debug("tabRefresh: empty seeds set from nodes database")
@@ -1109,7 +1113,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 			// we report them to discover task to speed up our p2p network.
 			for _, dbn := range seeds {
 				if mgr.tabShouldBoundDbNode(NodeID(dbn.ID)) == false {
-					var umNode = um.Node {
+					umNode := um.Node {
 						IP:		dbn.IP,
 						UDP:	dbn.UDP,
 						TCP:	dbn.TCP,
@@ -2115,10 +2119,18 @@ func (tabMgr *TableManager)TabGetSubNetId() *SubNetworkID {
 }
 
 func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManager {
+	// should be called with the "root" manager
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	if tabMgr.snid != AnySubNet {
 		return tabMgr.SubNetMgrList[*snid]
 	}
 	return tabMgr.SubNetMgrList[AnySubNet]
+}
+
+func (tabMgr *TableManager)TabGetInstAll() *map[SubNetworkID]*TableManager {
+	// should be called with the "root" manager
+	tabMgr.lock.Lock()
+	defer tabMgr.lock.Unlock()
+	return &tabMgr.SubNetMgrList
 }

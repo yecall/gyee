@@ -409,7 +409,7 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	priKey := yeShMgr.GetLocalPrivateKey()
 
 	sd.Setup(local, priKey, reCfg.SubnetMaskBits, reCfg.Validator)
-	ssdl := sd.GetSutnetDescriptorList()
+	ssdl := sd.GetSubnetDescriptorList()
 	SnidAdd = append(SnidAdd, *ssdl...)
 
 	req := sch.MsgShellReconfigReq {
@@ -1297,7 +1297,7 @@ func (snd *SubnetDescriptor)Setup(node *config.Node, priKey *ecdsa.PrivateKey, m
 	return nil
 }
 
-func (snd *SubnetDescriptor)GetSutnetDescriptorList() *[]SingleSubnetDescriptor {
+func (snd *SubnetDescriptor)GetSubnetDescriptorList() *[]SingleSubnetDescriptor {
 	ssdl := make([]SingleSubnetDescriptor, 0)
 	for idx := 0; idx < len(snd.SubNetIdList); idx++ {
 		snid := snd.SubNetIdList[idx]

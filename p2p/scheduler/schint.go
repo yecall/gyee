@@ -35,7 +35,7 @@ type schMessage SchMessage
 //
 // User task entry point
 //
-type schUserTaskProc = SchUserTaskInf
+type schUserTaskProc = SchUserTaskInterface
 
 //
 // max mail box size

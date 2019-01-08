@@ -1311,10 +1311,12 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 
 		qryLog.Debug("qryMgrQcbPutActived: icb: %+v", icb)
 
+		qryInst := NewQryInst()
+		qryInst.icb = &icb
 		td := sch.SchTaskDescription{
 			Name:		icb.name,
 			MbSize:		sch.SchMaxMbSize,
-			Ep:			NewQryInst(),
+			Ep:			qryInst,
 			Wd:			&sch.SchWatchDog{HaveDog:false,},
 			Flag:		sch.SchCreatedGo,
 			DieCb:		nil,
@@ -1338,11 +1340,11 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qcb.icbSeq++
 
 		po := sch.SchMessage{}
-		qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweron, nil)
+		qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, ptn, sch.EvSchPoweron, nil)
 		qryMgr.sdl.SchSendMessage(&po)
 
 		start := sch.SchMessage{}
-		qryMgr.sdl.SchMakeMessage(&start, qryMgr.ptnMe, icb.ptnInst, sch.EvDhtQryInstStartReq, nil)
+		qryMgr.sdl.SchMakeMessage(&start, qryMgr.ptnMe, ptn, sch.EvDhtQryInstStartReq, nil)
 		qryMgr.sdl.SchSendMessage(&start)
 	}
 

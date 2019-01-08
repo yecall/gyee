@@ -212,12 +212,13 @@ type Config struct {
 
 // Configuration about neighbor manager on UDP
 type Cfg4UdpNgbManager struct {
-	IP				net.IP			// ip address
-	UDP				uint16			// udp port numbers
-	TCP				uint16			// tcp port numbers
-	ID				NodeID			// the node's public key
-	NetworkType		int				// network type
-	SubNetIdList	[]SubNetworkID	// sub network identity list. do not put the identity
+	IP				net.IP						// ip address
+	UDP				uint16						// udp port numbers
+	TCP				uint16						// tcp port numbers
+	ID				NodeID						// the node's public key
+	NetworkType		int							// network type
+	SubNetNodeList	map[SubNetworkID]Node		// sub-node identities
+	SubNetIdList	[]SubNetworkID				// sub network identity list
 }
 
 // Configuration about neighbor listener on UDP

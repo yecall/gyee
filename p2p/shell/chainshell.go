@@ -102,6 +102,7 @@ type ShellManager struct {
 	ptnMe			interface{}						// pointer to task node of myself
 	ptnPeMgr		interface{}						// pointer to task node of peer manager
 	ptnTabMgr		interface{}						// pointer to task node of table manager
+	ptnNgbMgr		interface{}						// pointer to task node of neighbor manager
 	peerActived		map[shellPeerID]*shellPeerInst	// active peers
 	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all instances
 	deDup			bool							// deduplication flag
@@ -175,6 +176,7 @@ func (shMgr *ShellManager)powerOn(ptn interface{}) sch.SchErrno {
 	shMgr.sdl = sch.SchGetScheduler(ptn)
 	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	_, shMgr.ptnTabMgr = shMgr.sdl.SchGetUserTaskNode(sch.TabMgrName)
+	_, shMgr.ptnNgbMgr = shMgr.sdl.SchGetUserTaskNode(sch.NgbLsnName)
 	if shMgr.deDup {
 		if eno := shMgr.startDedup(); eno != sch.SchEnoNone {
 			chainLog.Debug("powerOn: startDedup failed, eno: %d", eno)
@@ -308,6 +310,10 @@ func (shMgr *ShellManager)GetRxChan() chan *peer.P2pPackageRx {
 func (shMgr *ShellManager)reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnPeMgr, sch.EvShellReconfigReq, req)
+	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		return eno
+	}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnNgbMgr, sch.EvShellReconfigReq, req); eno
 	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		return eno
 	}
