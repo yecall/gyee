@@ -20,7 +20,7 @@ import (
 	"hash"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	sha3 "github.com/yeeco/gyee/crypto/hash"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
 )
@@ -57,7 +57,7 @@ var hasherPool = sync.Pool{
 	New: func() interface{} {
 		return &hasher{
 			tmp: make(sliceBuffer, 0, 550), // cap is as large as a full fullNode.
-			sha: sha3.NewKeccak256().(keccakState),
+			sha: sha3.NewHash256().(keccakState),
 		}
 	},
 }
