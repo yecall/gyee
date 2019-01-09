@@ -118,7 +118,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		ParentEventCh: make(chan []byte, 100),
 		TxsCh:         make(chan common.Hash, 100000),
 
-		OutputCh:       make(chan *ConsensusOutput, 10),
+		OutputCh:       make(chan *ConsensusOutput, 10), //TODO：这种指针可能有问题吧？
 		SendEventCh:    make(chan []byte, 100),
 		RequestEventCh: make(chan common.Hash, 100),
 
@@ -310,17 +310,23 @@ func (t *Tetris) receiveTicker(ttime time.Time) {
 	if ttime.Sub(t.lastSendTime) > 1*time.Second {
 		t.sendHeartbeat()
 	}
+	//if strings.Contains(t.vid, "3038") || strings.Contains(t.vid, "3039") {
+	//	fmt.Println()
+	//	fmt.Println(t.vid[2:4], "------>")
+	//	fmt.Println("sendEventCh:",len(t.SendEventCh), "requestEventCh:", len(t.RequestEventCh), "outputCh:", len(t.OutputCh))
+	//	fmt.Println("EventCh:", len(t.EventCh), "TxsCh:", len(t.TxsCh), "ParentCh:",len(t.ParentEventCh))
+	//}
 }
 
 func (t *Tetris) receiveTx(tx common.Hash) {
 	if !t.txsCache.Contains(tx) {
 		t.txCount++
 		if t.txCount%30000 == 0 {
-			logging.Logger.WithFields(logrus.Fields{
-				"vid":     t.vid[0:4],
-				"c":       t.txCount,
-				"pending": t.eventPending.Len(),
-			}).Info("Tx count")
+			//logging.Logger.WithFields(logrus.Fields{
+			//	"vid":     t.vid[0:4],
+			//	"c":       t.txCount,
+			//	"pending": t.eventPending.Len(),
+			//}).Info("Tx count")
 		}
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
@@ -900,6 +906,7 @@ func (t *Tetris) consensusComputing() {
 
 	o := &ConsensusOutput{h: t.h + 1, output: cs, Tx: txc}
 	t.OutputCh <- o
+	//deadlock的问题在这儿，当一个event触发大量的共识时，由于这儿是递归，一直没有返回，但在发output，导致外部程序的loop处理不了output而死锁！
 
 	t.h++
 	t.prepare() //开始下一轮
