@@ -52,8 +52,9 @@ type Tetris struct {
 	h   uint64 //Current Block Height
 	n   uint64 //Current Sequence Number for processing
 
-	validators map[string]map[uint64]*Event //key: validator address, value map of event of n
-	witness    []map[string]*Event          //witness of each round.
+	validators       map[string]map[uint64]*Event //key: validator address, value map of event of n
+	validatorsHeight map[string]uint64            //validator's current height
+	witness          []map[string]*Event          //witness of each round.
 
 	//Input Channel
 	EventCh       chan []byte
@@ -111,6 +112,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		h:          blockHeight,
 		n:          blockHeight + 1,
 		validators: make(map[string]map[uint64]*Event, len(validatorList)),
+		validatorsHeight: make(map[string]uint64, len(validatorList)),
 
 		EventCh:       make(chan []byte, 100),
 		ParentEventCh: make(chan []byte, 100),
@@ -184,6 +186,7 @@ func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
 func (t *Tetris) MemberRotate(joins []string, quits []string) {
 	for _, vid := range quits {
 		delete(t.validators, vid)
+		delete(t.validatorsHeight, vid)
 		delete(t.heartBeat, vid)
 	}
 
@@ -261,13 +264,14 @@ func (t *Tetris) sendPlaceholderEvent() {
 
 	t.SendEventCh <- event.Marshal()
 	t.validators[t.vid][t.n] = event
+	t.validatorsHeight[t.vid] = t.n
 	t.eventCache.Add(event.Hash(), event)
 
 	t.lastSendTime = time.Now()
 
 	t.n++
 
-	t.update(event)
+	t.update(event, false)
 }
 
 func (t *Tetris) sendEvent() {
@@ -282,6 +286,7 @@ func (t *Tetris) sendEvent() {
 	t.TrafficOut += len(eb)
 	t.SendEventCh <- eb
 	t.validators[t.vid][t.n] = event
+	t.validatorsHeight[t.vid] = t.n
 	t.eventCache.Add(event.Hash(), event)
 
 	t.lastSendTime = time.Now()
@@ -290,7 +295,7 @@ func (t *Tetris) sendEvent() {
 
 	t.n++
 
-	t.update(event)
+	t.update(event, false)
 }
 
 func (t *Tetris) sendHeartbeat() {
@@ -325,7 +330,7 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 			if ok {
 				t.sendEvent()
 			} else {
-				t.txsAccepted = t.txsAccepted[10:]
+				//t.txsAccepted = t.txsAccepted[10:]
 			}
 		}
 	}
@@ -542,6 +547,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 						if pAllReady {
 							e.ready = true
 							t.validators[e.vid][e.Body.N] = e
+							t.validatorsHeight[e.vid] = e.Body.N
 							//t.memberHeight[e.Body.M] = e.Body.N
 							if t.eventPending.Contains(e.Hash()) {
 								//if t.currentEvent.Body.N-e.Body.N < 20 { //试验
@@ -578,9 +584,16 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 			return unpending[i].Body.N < unpending[j].Body.N
 		})
 
+		newWitness := false
 		for _, event := range unpending {
 			//fmt.Print("    t:", t.m, " n:", event.Body.N, " m:", event.Body.M)
-			t.update(event)
+			if t.update(event, true) {
+				newWitness = true
+			}
+		}
+
+		if newWitness {
+			t.consensusComputing()
 		}
 		//fmt.Println()
 	}
@@ -610,7 +623,7 @@ func (t *Tetris) prepare() {
 
 //有新event加入tetris的时候，
 
-func (t *Tetris) update(me *Event) {
+func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 	newWitness := false
 	n := me.Body.N
 	if n == t.h+1 {
@@ -632,11 +645,15 @@ func (t *Tetris) update(me *Event) {
 						maxr = pme.round
 					}
 				} else {
-					fmt.Println("pme==nil")
+					//这儿是me的parent pme的n已经在base之下，在t.validators中已经delete。
+					//因为me的self parent应该必然存在，所以round肯定可以得到
+					//fmt.Println("t.vid=", t.vid[2:4], "me.vid=", me.vid[2:4], "pme==nil", "pe=", pe)
+					//fmt.Println("n=", n, "pe.n=", pe.(*Event).Body.N, "h=", t.h)
 				}
 			} else {
+				//缓存中已经没有这个event，
 				fmt.Println("eventCache no:", e)
-				return
+				continue
 			}
 		}
 		me.round = maxr
@@ -649,9 +666,9 @@ func (t *Tetris) update(me *Event) {
 			fmt.Println(pme.round)
 			pme = t.validators[pme.vid][pme.Body.N]
 			fmt.Println(pme.round)
-			for k,v := range t.validators {
-				fmt.Print(k[2:4],": ")
-				for nn := uint64(t.h); nn<t.n+10; nn++ { //怀疑可能是updateall时的高度不够，就是自身n不是最大的时候，会有event没update
+			for k, v := range t.validators {
+				fmt.Print(k[2:4], ": ")
+				for nn := uint64(t.h); nn < t.n+10; nn++ { //怀疑可能是updateall时的高度不够，就是自身n不是最大的时候，会有event没update
 					ee := v[nn]
 					if ee != nil {
 						fmt.Print(ee.round, " ")
@@ -660,7 +677,7 @@ func (t *Tetris) update(me *Event) {
 				fmt.Println()
 			}
 		}
-		if len(t.witness[me.round]) >= t.params.superMajority { //todo:这个地方有过一次panic，out of range
+		if len(t.witness[me.round]) >= t.params.superMajority { //todo:这个地方有过一次panic，out of range, 原因是placeholder miss了update
 			c := 0
 			for _, v := range t.witness[me.round] {
 				if t.knowWell(me, v) {
@@ -682,85 +699,41 @@ func (t *Tetris) update(me *Event) {
 					t.witness = append(t.witness, make(map[string]*Event))
 				}
 				t.witness[me.round][me.vid] = me
-				if me.round == 0 {
-					fmt.Println("*************", me.round, pme.round, pme.Body.N)
-				}
+				//if me.round == 0 {
+				//	fmt.Println("*************", me.round, pme.round, pme.Body.N)
+				//}
 				newWitness = true
 			}
 		} else {
 			fmt.Println("这儿应该不会跑到的。。。")
-			return
+			fmt.Println("t.vid=", t.vid[2:4], "me.vid=", me.vid[2:4], n)
+			//return
 		}
 	}
 
 	//如果发现新的witness，就计算一次共识
-	if newWitness {
+	if newWitness && !fromAll {
 		t.consensusComputing()
 	}
+
+	return newWitness
 }
 
 func (t *Tetris) updateAll() {
 	//计算round， witness，
 	newWitness := false
-	for n := t.h + 1; n < t.n; n++ { //TODO:这个地方n可能不够高
+	maxh := uint64(0)
+	for _, vh := range t.validatorsHeight {
+		if maxh < vh {
+			maxh = vh
+		}
+	}
+	for n := t.h + 1; n <= maxh; n++ {
 		for m, _ := range t.validators {
 			me := t.validators[m][n]
-
 			if me != nil {
-				if me.round != ROUND_UNDECIDED {
-					continue
-				}
-				if n == t.h+1 {
-					me.round = 0
-					me.witness = true
-
-					if t.witness[0] == nil {
-						t.witness[0] = make(map[string]*Event)
-					}
-					t.witness[0][m] = me
-				} else {
-					maxr := me.round
-					for _, e := range me.Body.E {
-						pe, ok := t.eventCache.Get(e)
-						if ok {
-							pme := t.validators[pe.(*Event).vid][pe.(*Event).Body.N]
-							if pme != nil && pme.round > maxr {
-								maxr = pme.round
-							}
-						} else {
-							return
-						}
-					}
-					me.round = maxr
-
-					if len(t.witness[me.round]) >= t.params.superMajority {
-						c := 0
-						for _, v := range t.witness[me.round] {
-							if t.knowWell(me, v) {
-								c++
-							}
-						}
-						if c >= t.params.superMajority {
-							me.round++
-						}
-					}
-					pme := t.validators[me.vid][me.Body.N-1]
-					if pme != nil {
-						if me.round > pme.round {
-							me.witness = true
-							//if t.witness[me.round] == nil {
-							//	t.witness[me.round] = make(map[uint]*Event)
-							//}
-							if len(t.witness) <= me.round {
-								t.witness = append(t.witness, make(map[string]*Event))
-							}
-							t.witness[me.round][m] = me
-							newWitness = true
-						}
-					} else {
-						fmt.Println("这儿应该不会跑到的。。。")
-						return
-					}
+				if t.update(me, true) {
+					newWitness = true
 				}
 			}
 		}
