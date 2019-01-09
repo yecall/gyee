@@ -166,7 +166,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 }
 
 func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
-	if len(t.heartBeat) < t.params.superMajority {
+	if len(t.heartBeat) < t.params.superMajority - 1 {
 		return false, 0
 	}
 
@@ -180,7 +180,7 @@ func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
 	})
 
 	now := time.Now()
-	return true, now.Sub(times[t.params.superMajority-1])
+	return true, now.Sub(times[t.params.superMajority-2])
 }
 
 func (t *Tetris) MemberRotate(joins []string, quits []string) {
@@ -203,7 +203,7 @@ func (t *Tetris) Start() error {
 	return nil
 }
 
-func (t *Tetris) Stop() error {
+func (t *Tetris) Stop() error { //TODO: stop是channel中还有消息怎么处理？需要关闭么？
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	//logging.Logger.Info("Tetris Stop...")
@@ -336,7 +336,7 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 			if ok {
 				t.sendEvent()
 			} else {
-				//t.txsAccepted = t.txsAccepted[10:]
+				t.txsAccepted = t.txsAccepted[10:]
 			}
 		}
 	}
