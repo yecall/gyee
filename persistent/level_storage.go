@@ -21,25 +21,13 @@
 package persistent
 
 import (
-	"encoding/hex"
-	"sync"
-
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 type LevelStorage struct {
-	db          *leveldb.DB
-	enableBatch bool
-	mutex       sync.Mutex
-	batchOps    map[string]*batchOp
-}
-
-type batchOp struct {
-	key   []byte
-	value []byte
-	del   bool
+	db *leveldb.DB
 }
 
 func NewLevelStorage(path string) (*LevelStorage, error) {
@@ -55,51 +43,23 @@ func NewLevelStorage(path string) (*LevelStorage, error) {
 	}
 
 	return &LevelStorage{
-		db:          db,
-		enableBatch: false,
-		batchOps:    make(map[string]*batchOp),
+		db: db,
 	}, nil
 }
 
-func (storage *LevelStorage) Get(key []byte) ([]byte, error) {
-	value, err := storage.db.Get(key, nil)
-	if err != nil && err == leveldb.ErrNotFound {
-		return nil, ErrKeyNotFound
-	}
+func (storage *LevelStorage) Has(key []byte) (bool, error) {
+	return storage.db.Has(key, nil)
+}
 
-	return value, err
+func (storage *LevelStorage) Get(key []byte) ([]byte, error) {
+	return storage.db.Get(key, nil)
 }
 
 func (storage *LevelStorage) Put(key []byte, value []byte) error {
-	if storage.enableBatch {
-		storage.mutex.Lock()
-		defer storage.mutex.Unlock()
-
-		storage.batchOps[hex.EncodeToString(key)] = &batchOp{
-			key:   key,
-			value: value,
-			del:   false,
-		}
-
-		return nil
-	}
-
 	return storage.db.Put(key, value, nil)
 }
 
 func (storage *LevelStorage) Del(key []byte) error {
-	if storage.enableBatch {
-		storage.mutex.Lock()
-		defer storage.mutex.Unlock()
-
-		storage.batchOps[hex.EncodeToString(key)] = &batchOp{
-			key: key,
-			del: true,
-		}
-
-		return nil
-	}
-
 	return storage.db.Delete(key, nil)
 }
 
@@ -107,39 +67,41 @@ func (storage *LevelStorage) Close() error {
 	return storage.db.Close()
 }
 
-func (storage *LevelStorage) EnableBatch() {
-	storage.enableBatch = true
-}
-
-func (storage *LevelStorage) DisableBatch() {
-	storage.mutex.Lock()
-	defer storage.mutex.Unlock()
-
-	storage.batchOps = make(map[string]*batchOp)
-	storage.enableBatch = false
-}
-
-func (storage *LevelStorage) Flush() error {
-	storage.mutex.Lock()
-	defer storage.mutex.Unlock()
-
-	if !storage.enableBatch {
-		return nil
-	}
-
-	batch := new(leveldb.Batch)
-	for _, op := range storage.batchOps {
-		if op.del {
-			batch.Delete(op.key)
-		} else {
-			batch.Put(op.key, op.value)
-		}
-	}
-	storage.batchOps = make(map[string]*batchOp)
-
-	return storage.db.Write(batch, nil)
-}
-
-func (storage *LevelStorage)GetLevelDB() *leveldb.DB {
+func (storage *LevelStorage) GetLevelDB() *leveldb.DB {
 	return storage.db
+}
+
+func (storage *LevelStorage) NewBatch() Batch {
+	return &ldbBatch{db: storage.db, b: new(leveldb.Batch)}
+}
+
+type ldbBatch struct {
+	db   *leveldb.DB
+	b    *leveldb.Batch
+	size int
+}
+
+func (b *ldbBatch) Put(key, value []byte) error {
+	b.b.Put(key, value)
+	b.size += len(value)
+	return nil
+}
+
+func (b *ldbBatch) Del(key []byte) error {
+	b.b.Delete(key)
+	b.size += 1
+	return nil
+}
+
+func (b *ldbBatch) ValueSize() int {
+	return b.size
+}
+
+func (b *ldbBatch) Write() error {
+	return b.db.Write(b.b, nil)
+}
+
+func (b *ldbBatch) Reset() {
+	b.b.Reset()
+	b.size = 0
 }

@@ -22,16 +22,42 @@ package persistent
 
 import "errors"
 
+// Code using batches should try to add this much data to the batch.
+// The value was determined empirically.
+const IdealBatchSize = 100 * 1024
+
 var (
 	ErrKeyNotFound = errors.New("not found")
 )
 
-type Storage interface {
+type Getter interface {
 	Get(key []byte) ([]byte, error)
+	Has(key []byte) (bool, error)
+}
+
+type Putter interface {
 	Put(key []byte, value []byte) error
+}
+
+type Deleter interface {
 	Del(key []byte) error
-	EnableBatch()
-	DisableBatch()
-	Flush() error
+}
+
+type Storage interface {
+	Getter
+	Putter
+	Deleter
+
 	Close() error
+
+	NewBatch() Batch
+}
+
+type Batch interface {
+	Putter
+	Deleter
+
+	ValueSize() int
+	Write() error
+	Reset()
 }

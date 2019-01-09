@@ -22,6 +22,7 @@ package persistent
 
 import (
 	"encoding/hex"
+	"github.com/yeeco/gyee/common"
 	"sync"
 )
 
@@ -29,17 +30,26 @@ type MemoryStorage struct {
 	data *sync.Map
 }
 
-type kv struct{ k, v []byte }
+type kv struct {
+	k, v []byte
+	del  bool
+}
 
-type MemoryBatch struct {
+type memoryBatch struct {
 	db      *MemoryStorage
 	entries []*kv
+	size    int
 }
 
 func NewMemoryStorage() (*MemoryStorage, error) {
 	return &MemoryStorage{
 		data: new(sync.Map),
 	}, nil
+}
+
+func (db *MemoryStorage) Has(key []byte) (bool, error) {
+	_, ok := db.data.Load(key)
+	return ok, nil
 }
 
 func (db *MemoryStorage) Get(key []byte) ([]byte, error) {
@@ -50,7 +60,7 @@ func (db *MemoryStorage) Get(key []byte) ([]byte, error) {
 }
 
 func (db *MemoryStorage) Put(key []byte, value []byte) error {
-	db.data.Store(hex.EncodeToString(key), value)
+	db.data.Store(hex.EncodeToString(key), common.CopyBytes(value))
 	return nil
 }
 
@@ -59,16 +69,46 @@ func (db *MemoryStorage) Del(key []byte) error {
 	return nil
 }
 
-func (db *MemoryStorage) EnableBatch() {
-}
-
-func (db *MemoryStorage) Flush() error {
-	return nil
-}
-
-func (db *MemoryStorage) DisableBatch() {
-}
-
 func (db *MemoryStorage) Close() error {
 	return nil
+}
+
+func (db *MemoryStorage) NewBatch() Batch {
+	return &memoryBatch{db: db}
+}
+
+func (b *memoryBatch) Put(key, value []byte) error {
+	b.entries = append(b.entries, &kv{
+		common.CopyBytes(key), common.CopyBytes(value),
+		false})
+	b.size += len(value)
+	return nil
+}
+
+func (b *memoryBatch) Del(key []byte) error {
+	b.entries = append(b.entries, &kv{
+		common.CopyBytes(key), nil,
+		true})
+	b.size += 1
+	return nil
+}
+
+func (b *memoryBatch) ValueSize() int {
+	return b.size
+}
+
+func (b *memoryBatch) Write() error {
+	for _, kv := range b.entries {
+		if kv.del {
+			b.db.Del(kv.k)
+		} else {
+			b.db.Put(kv.k, kv.v)
+		}
+	}
+	return nil
+}
+
+func (b *memoryBatch) Reset() {
+	b.entries = b.entries[:0]
+	b.size = 0
 }
