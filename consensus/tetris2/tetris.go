@@ -24,12 +24,12 @@ package tetris2
 */
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"sync"
 	"time"
 
-	"encoding/hex"
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto"
@@ -107,11 +107,11 @@ type Tetris struct {
 
 func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint64) (*Tetris, error) {
 	tetris := Tetris{
-		core:       core,
-		vid:        vid,
-		h:          blockHeight,
-		n:          blockHeight + 1,
-		validators: make(map[string]map[uint64]*Event, len(validatorList)),
+		core:             core,
+		vid:              vid,
+		h:                blockHeight,
+		n:                blockHeight + 1,
+		validators:       make(map[string]map[uint64]*Event, len(validatorList)),
 		validatorsHeight: make(map[string]uint64, len(validatorList)),
 
 		EventCh:       make(chan []byte, 100),
@@ -166,7 +166,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 }
 
 func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
-	if len(t.heartBeat) < t.params.superMajority - 1 {
+	if len(t.heartBeat) < t.params.superMajority-1 {
 		return false, 0
 	}
 
@@ -322,11 +322,12 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 	if !t.txsCache.Contains(tx) {
 		t.txCount++
 		if t.txCount%30000 == 0 {
-			//logging.Logger.WithFields(logrus.Fields{
-			//	"vid":     t.vid[0:4],
-			//	"c":       t.txCount,
-			//	"pending": t.eventPending.Len(),
-			//}).Info("Tx count")
+			logging.Logger.WithFields(logrus.Fields{
+				"vid":     t.vid[0:4],
+				"n":       t.n,
+				"c":       t.txCount,
+				"pending": t.eventPending.Len(),
+			}).Info("Tx count")
 		}
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
@@ -475,6 +476,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		ei, ok := t.eventPending.Get(key)
 		if ok {
 			ev := ei.(*Event)
+
 			bsl := make(map[common.Hash]*Event)
 			bsl[ev.Hash()] = ev
 			bs := append([]map[common.Hash]*Event{}, bsl)
@@ -658,7 +660,7 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 				}
 			} else {
 				//缓存中已经没有这个event，
-				fmt.Println("eventCache no:", e)
+				fmt.Println("eventCache no existed:", e)
 				continue
 			}
 		}
@@ -939,4 +941,62 @@ func (t *Tetris) knowWell(x, y *Event) bool {
 		return true
 	}
 	return false
+}
+
+func (t Tetris) DebugPrint() {
+	fmt.Println()
+	fmt.Println("t.vid:", t.vid[2:4], "t.h:", t.h, "t.n", t.n, "pendings:", t.eventPending.Len())
+	//for _, key := range t.eventPending.Keys() {
+	//	ei, ok := t.eventPending.Get(key)
+	//	if ok {
+	//		ev := ei.(*Event)
+	//        fmt.Println(ev.vid[2:4], ev.Body.N, len(ev.Body.E), len(ev.Body.Tx))
+	//	}
+	//}
+	allt := make(map[string]map[uint64]*Event)
+	height := make(map[string]uint64)
+
+	keys := []string{}
+	for k := range t.validators {
+		keys = append(keys, k)
+		allt[k] = make(map[uint64]*Event)
+	}
+	sort.Strings(keys)
+
+
+	for _, key := range t.eventPending.Keys() {
+		ei, ok := t.eventPending.Get(key)
+		if ok {
+			ev := ei.(*Event)
+			allt[ev.vid][ev.Body.N] = ev
+			if ev.Body.N > height[ev.vid] {
+				height[ev.vid] = ev.Body.N
+			}
+		}
+	}
+
+	for _, key := range keys {
+		fmt.Print(key[2:4], ":")
+		for h := t.h + 1; h <= t.validatorsHeight[key]; h++ {
+			if t.validators[key][h] != nil {
+                 fmt.Print("E")
+			} else {
+				fmt.Print("-")
+			}
+		}
+		pstart := t.validatorsHeight[key] + 1
+		if pstart < t.h + 1 {
+			pstart = t.h+1
+		}
+		for p := pstart; p <= height[key]; p++ {
+			if allt[key][p] != nil {
+				fmt.Print("*")
+			} else {
+				fmt.Print(".")
+			}
+		}
+		fmt.Print("(",height[key], t.validatorsHeight[key],")")
+		fmt.Println()
+	}
+	fmt.Println()
 }
