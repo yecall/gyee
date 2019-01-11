@@ -82,6 +82,7 @@ const (
 	EvShellPeerAskToCloseInd	= EvShellBase + 4
 	EvShellReconfigReq			= EvShellBase + 5
 	EvShellBroadcastReq			= EvShellBase + 6
+	EvShellSubnetUpdateReq		= EvShellBase + 7
 )
 
 //

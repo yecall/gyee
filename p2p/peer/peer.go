@@ -1694,6 +1694,14 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 		return eno
 	}
 
+	// tell shell manager to update subnet info
+	schMsg := sch.SchMessage{}
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellSubnetUpdateReq, nil)
+	if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		peerLog.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
+		return PeMgrEnoScheduler
+	}
+
 	return PeMgrEnoNone
 }
 
@@ -2793,6 +2801,15 @@ func (peMgr *PeerManager)setHandshakeParameters(inst *PeerInstance, snid config.
 	inst.localNode = peMgr.cfg.subNetNodeList[snid]
 	inst.localProtoNum = peMgr.cfg.protoNum
 	inst.localProtocols = peMgr.cfg.protocols
+}
+
+func (peMgr *PeerManager)GetLocalSubnetInfo()([]config.SubNetworkID, map[config.SubNetworkID]config.Node) {
+	peMgr.lock.Lock()
+	defer peMgr.lock.Unlock()
+	if !peMgr.isInited {
+		return nil, nil
+	}
+	return peMgr.cfg.subNetIdList, peMgr.cfg.subNetNodeList
 }
 
 func (peMgr *PeerManager)isStaticSubNetId(snid SubNetworkID) bool {

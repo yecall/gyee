@@ -96,21 +96,24 @@ const (
 )
 
 type ShellManager struct {
-	sdl				*sch.Scheduler					// pointer to scheduler
-	name			string							// my name
-	tep				sch.SchUserTaskEp				// task entry
-	ptnMe			interface{}						// pointer to task node of myself
-	ptnPeMgr		interface{}						// pointer to task node of peer manager
-	ptnTabMgr		interface{}						// pointer to task node of table manager
-	ptnNgbMgr		interface{}						// pointer to task node of neighbor manager
-	peerActived		map[shellPeerID]*shellPeerInst	// active peers
-	rxChan			chan *peer.P2pPackageRx			// total rx channel, for rx packages from all instances
-	deDup			bool							// deduplication flag
-	tmDedup			*dht.TimerManager				// deduplication timer manager
-	deDupMap		map[deDupKey]*deDupVal			// map for keys of messages had been sent
-	deDupTiker		*time.Ticker					// deduplication ticker
-	deDupDone		chan bool						// deduplication routine done channel
-	deDupLock		sync.Mutex						// deduplication lock
+	sdl				*sch.Scheduler							// pointer to scheduler
+	name			string									// my name
+	tep				sch.SchUserTaskEp						// task entry
+	ptnMe			interface{}								// pointer to task node of myself
+	ptnPeMgr		interface{}								// pointer to task node of peer manager
+	ptnTabMgr		interface{}								// pointer to task node of table manager
+	ptnNgbMgr		interface{}								// pointer to task node of neighbor manager
+	ptrPeMgr		*peer.PeerManager						// pointer to peer manager
+	localSnid		[]config.SubNetworkID					// local sub network identities
+	localNode		map[config.SubNetworkID]config.Node		// local sub nodes
+	peerActived		map[shellPeerID]*shellPeerInst			// active peers
+	rxChan			chan *peer.P2pPackageRx					// total rx channel, for rx packages from all instances
+	deDup			bool									// deduplication flag
+	tmDedup			*dht.TimerManager						// deduplication timer manager
+	deDupMap		map[deDupKey]*deDupVal					// map for keys of messages had been sent
+	deDupTiker		*time.Ticker							// deduplication ticker
+	deDupDone		chan bool								// deduplication routine done channel
+	deDupLock		sync.Mutex								// deduplication lock
 }
 
 //
@@ -119,6 +122,8 @@ type ShellManager struct {
 func NewShellMgr() *ShellManager  {
 	shMgr := ShellManager {
 		name: ShMgrName,
+		localSnid: make([]config.SubNetworkID, 0),
+		localNode: make(map[config.SubNetworkID]config.Node, 0),
 		peerActived: make(map[shellPeerID]*shellPeerInst, 0),
 		rxChan: make(chan *peer.P2pPackageRx, rxChanSize),
 		deDup: true,
@@ -164,6 +169,8 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = shMgr.reconfigReq(msg.Body.(*sch.MsgShellReconfigReq))
 	case sch.EvShellBroadcastReq:
 		eno = shMgr.broadcastReq(msg.Body.(*sch.MsgShellBroadcastReq))
+	case sch.EvShellSubnetUpdateReq:
+		eno = shMgr.updateLocalSubnetInfo()
 	default:
 		chainLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -177,6 +184,10 @@ func (shMgr *ShellManager)powerOn(ptn interface{}) sch.SchErrno {
 	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	_, shMgr.ptnTabMgr = shMgr.sdl.SchGetUserTaskNode(sch.TabMgrName)
 	_, shMgr.ptnNgbMgr = shMgr.sdl.SchGetUserTaskNode(sch.NgbLsnName)
+
+	shMgr.ptrPeMgr = shMgr.sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
+	shMgr.updateLocalSubnetInfo()
+
 	if shMgr.deDup {
 		if eno := shMgr.startDedup(); eno != sch.SchEnoNone {
 			chainLog.Debug("powerOn: startDedup failed, eno: %d", eno)
@@ -590,4 +601,17 @@ func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, ddk *deDupKey, stat
 	}
 
 	return nil
+}
+
+func (shMgr *ShellManager)updateLocalSubnetInfo() sch.SchErrno {
+_update_again:
+	snids, nodes:= shMgr.ptrPeMgr.GetLocalSubnetInfo()
+	if snids == nil || nodes == nil {
+		chainLog.Debug("updateLocalSubnetInfo: peer manager had not be inited yet...")
+		time.Sleep(time.Second)
+		goto _update_again
+	}
+	shMgr.localSnid = snids
+	shMgr.localNode = nodes
+	return sch.SchEnoNone
 }

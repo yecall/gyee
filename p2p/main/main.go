@@ -269,6 +269,9 @@ func (subs *appSubcribers)goSubFunc() {
 }
 
 func setMessageFrom(n *config.Node) {
+	// "From" set here might be overlapped later, for a sub node identity
+	// is more suitable for this this field. see EvShellBroadcastReq event
+	// handler in file chainshell.go please.
 	from := fmt.Sprintf("%x", n.ID)
 	ev.From = from
 	tx.From = from
