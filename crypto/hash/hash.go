@@ -21,9 +21,10 @@
 package hash
 
 import (
+	"hash"
+
 	"golang.org/x/crypto/ripemd160"
 	"golang.org/x/crypto/sha3"
-	"hash"
 )
 
 func NewHash256() hash.Hash { return sha3.New256() }

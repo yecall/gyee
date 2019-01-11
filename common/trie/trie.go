@@ -22,15 +22,17 @@ import (
 	"fmt"
 
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/log"
 )
 
 var (
 	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	// value generated with sha3([]byte{0x80}), while 0x80 is rlp encoded byte for empty string
+	emptyRoot = common.HexToHash("bc2071a4de846f285702447f2589dd163678e0972a8a1b0d28b04ed5c094547f")
 
 	// emptyState is the known hash of an empty state trie entry.
-	emptyState = common.Hash{} //crypto.Keccak256Hash(nil)
+	emptyState = common.BytesToHash(hash.Sha3256(nil))
 )
 
 //var (

@@ -20,9 +20,9 @@ import (
 	"hash"
 	"sync"
 
-	sha3 "github.com/yeeco/gyee/crypto/hash"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
+	sha3 "github.com/yeeco/gyee/crypto/hash"
 )
 
 type hasher struct {
