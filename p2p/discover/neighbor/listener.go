@@ -392,8 +392,10 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 		msgBody:udpReader.udpMsg.GetDecodedMsg(),
 	}
 	if udpReader.udpMsg.CheckUdpMsgFromPeer(from) != true {
+		lsnLog.Debug("msgHandler: CheckUdpMsgFromPeer failed")
 		return sch.SchEnoUserTask
 	}
+	udpReader.udpMsg.DebugPeerMessage()
 	udpReader.sdl.SchMakeMessage(&msg, udpReader.ptnMe, udpReader.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
 	udpReader.sdl.SchSendMessage(&msg)
 	return sch.SchEnoNone

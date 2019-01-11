@@ -189,7 +189,7 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 		 Dur:	NgbProtoFindNodeResponseTimeout,
 		 Extra:	nil,
 	 }
-	_, inst.tidFN = inst.sdl.SchSetTimer(ptn, &tmd)
+	 _, inst.tidFN = inst.sdl.SchSetTimer(ptn, &tmd)
 
 	 return NgbProtoEnoNone
 }

@@ -441,6 +441,25 @@ func (shMgr *ShellManager)checkKey(pe *shellPeerInst, pid shellPeerID, req *sch.
 }
 
 func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	upkg := new(peer.P2pPackage)
+	upkg.Pid			= uint32(rxPkg.ProtoId)
+	upkg.Mid			= uint32(rxPkg.MsgId)
+	upkg.Key			= rxPkg.Key
+	upkg.PayloadLength	= uint32(rxPkg.PayloadLength)
+	upkg.Payload		= rxPkg.Payload
+
+	msg := peer.ExtMessage{}
+	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("checkKeyFromPeer: GetExtMessage failed, eno: %d", eno	)
+		return sch.SchEnoUserTask
+	}
+
+	if msg.Mid != uint32(MID_RPTK) {
+		chainLog.Debug("checkKeyFromPeer: message type mismatched, mid: %d", msg.Mid)
+		return sch.SchEnoUserTask
+	}
+
+	chainLog.Debug("checkKeyFromPeer: %s", msg.Chkk.String())
 
 	ddk := deDupKey{}
 	copy(ddk.key[0:], rxPkg.Key)
@@ -472,6 +491,25 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 }
 
 func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	upkg := new(peer.P2pPackage)
+	upkg.Pid			= uint32(rxPkg.ProtoId)
+	upkg.Mid			= uint32(rxPkg.MsgId)
+	upkg.Key			= rxPkg.Key
+	upkg.PayloadLength	= uint32(rxPkg.PayloadLength)
+	upkg.Payload		= rxPkg.Payload
+
+	msg := peer.ExtMessage{}
+	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("reportKeyFromPeer: GetExtMessage failed, eno: %d", eno	)
+		return sch.SchEnoUserTask
+	}
+
+	if msg.Mid != uint32(MID_RPTK) {
+		chainLog.Debug("reportKeyFromPeer: message type mismatched, mid: %d", msg.Mid)
+		return sch.SchEnoUserTask
+	}
+
+	chainLog.Debug("reportKeyFromPeer: %s", msg.Rptk.String())
 
 	shMgr.deDupLock.Lock()
 	defer shMgr.deDupLock.Unlock()
@@ -494,19 +532,6 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 
 	shMgr.tmDedup.KillTimer(ddv.timer)
 	delete(shMgr.deDupMap, ddk)
-
-	upkg := new(peer.P2pPackage)
-	upkg.Pid			= uint32(rxPkg.ProtoId)
-	upkg.Mid			= uint32(rxPkg.MsgId)
-	upkg.Key			= rxPkg.Key
-	upkg.PayloadLength	= uint32(rxPkg.PayloadLength)
-	upkg.Payload		= rxPkg.Payload
-
-	msg := peer.P2pMessage{}
-	if eno := upkg.GetMessage(&msg); eno != peer.PeMgrEnoNone {
-		chainLog.Debug("reportKeyFromPeer: GetMessage failed, eno: %d", eno	)
-		return sch.SchEnoUserTask
-	}
 
 	if msg.Rptk.Status == int32(peer.KS_NOTEXIST) {
 		if pe, ok := shMgr.peerActived[spid]; ok {

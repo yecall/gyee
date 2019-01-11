@@ -142,7 +142,8 @@ type YeShellConfig struct {
 	EvKeepTime			time.Duration							// duration for events kept by dht
 	DedupTime			time.Duration							// duration for deduplication cleanup timer
 	BootstrapTime		time.Duration							// duration for bootstrap blind connection
-	localSnid			[]config.SubNetworkID					// local sut network identity
+	localSnid			[]config.SubNetworkID					// local sub network identities
+	localNode			map[config.SubNetworkID]config.Node		// local sub nodes
 	dhtBootstrapNodes	[]*config.Node							// dht bootstarp nodes
 }
 
@@ -177,6 +178,9 @@ var DefaultYeShellConfig = YeShellConfig{
 	EvKeepTime:			DftEvKeepTime,
 	DedupTime:			DftDedupTime,
 	BootstrapTime:		DftBootstrapTime,
+	localSnid:			make([]config.SubNetworkID, 0),
+	localNode:			make(map[config.SubNetworkID]config.Node, 0),
+	dhtBootstrapNodes:	make([]*config.Node, 0),
 }
 
 // Global shell configuration: this var is set when function YeShellConfigToP2pCfg called,
@@ -230,6 +234,9 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	}
 
 	thisCfg.localSnid = append(thisCfg.localSnid, chainCfg.SubNetIdList...)
+	for _, snid := range thisCfg.localSnid {
+		thisCfg.localNode[snid] = chainCfg.SubNetNodeList[snid]
+	}
 
 	if config.P2pSetLocalDhtIpAddr(chainCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
@@ -423,6 +430,24 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.Debug("Reconfig: SchSendMessage failed, eno: %d", eno)
 		return eno
+	}
+
+	for _, snid := range SnidDel {
+		for idx := 0; idx < len(thisCfg.localSnid); idx++ {
+			if thisCfg.localSnid[idx] == snid {
+				if idx != len(thisCfg.localSnid) {
+					thisCfg.localSnid = append(thisCfg.localSnid[0:idx], thisCfg.localSnid[idx+1:]...)
+				} else {
+					thisCfg.localSnid = thisCfg.localSnid[0:idx]
+				}
+			}
+		}
+		delete(thisCfg.localNode, snid)
+	}
+
+	for _, ssd := range SnidAdd {
+		thisCfg.localSnid = append(thisCfg.localSnid, ssd.SubNetId)
+		thisCfg.localNode[ssd.SubNetId] = ssd.SubNetNode
 	}
 
 	return nil
@@ -1313,4 +1338,6 @@ func (snd *SubnetDescriptor)GetSubnetDescriptorList() *[]SingleSubnetDescriptor 
 	}
 	return &ssdl
 }
+
+
 

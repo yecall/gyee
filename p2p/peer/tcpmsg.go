@@ -24,6 +24,7 @@ import (
 	"io"
 	"time"
 	"net"
+	"fmt"
 	ggio "github.com/gogo/protobuf/io"
 	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/peer/pb"
@@ -129,7 +130,7 @@ type CheckKey struct {
 }
 
 //
-// Check key
+// Report key
 //
 type ReportKey struct {
 	Key			[]byte		// key
@@ -149,13 +150,22 @@ type P2pPackage struct {
 }
 
 //
-// Message for TCP message
+// Message for internal TCP message
 //
 type P2pMessage struct {
 	Mid				uint32		// message identity
 	Ping			*Pingpong	// ping message
 	Pong			*Pingpong	// pong message
 	Handshake		*Handshake	// handshake message
+	Chkk			*CheckKey	// check key message
+	Rptk			*ReportKey	// report key message
+}
+
+//
+// Message for external TCP message
+//
+type ExtMessage struct {
+	Mid				uint32		// message identity
 	Chkk			*CheckKey	// check key message
 	Rptk			*ReportKey	// report key message
 }
@@ -678,8 +688,6 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	pmsg.Handshake = nil
 	pmsg.Ping = nil
 	pmsg.Pong = nil
-	pmsg.Chkk = nil
-	pmsg.Rptk = nil
 
 	if pmsg.Mid == uint32(MID_HANDSHAKE) {
 
@@ -723,6 +731,55 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
+func (upkg *P2pPackage)GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
+	// Notice: the underlying p2p would not try really to decode the application user's
+	// message, except those "CheckKey" and "ReportKey" messages, which are applied for
+	// the deduplication function implemented currently in p2p.
+	if extMsg == nil {
+		tcpmsgLog.Debug("GetExtMessage: invalid parameter")
+		return PeMgrEnoParameter
+	}
+
+	pbMsg := new(pb.ExtMessage)
+
+	if err := pbMsg.Unmarshal(upkg.Payload); err != nil {
+
+		tcpmsgLog.Debug("GetExtMessage:" +
+			"Unmarshal failed, err: %s",
+			err.Error())
+
+		return PeMgrEnoMessage
+	}
+
+	extMsg.Mid = uint32(*pbMsg.Mid)
+	extMsg.Chkk = nil
+	extMsg.Rptk = nil
+
+	if extMsg.Mid == uint32(MID_CHKK) {
+
+		chkk := new(CheckKey)
+		chkk.Key = append(chkk.Key, upkg.Key...)
+		extMsg.Chkk = chkk
+
+	} else if extMsg.Mid == uint32(MID_RPTK) {
+
+		rptk := new(ReportKey)
+		rptk.Key = append(rptk.Key, upkg.Key...)
+		rptk.Status = int32(*pbMsg.ReportKey.Status)
+		extMsg.Rptk = rptk
+
+	} else {
+
+		tcpmsgLog.Debug("GetExtMessage: " +
+			"unknown message identity: %d",
+			extMsg.Mid)
+
+		return PeMgrEnoMessage
+	}
+
+	return PeMgrEnoNone
+}
+
 func (upkg *P2pPackage)signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
 	r, s, err := config.P2pSign(&inst.priKey, hs.NodeId)
 	if err != nil {
@@ -743,4 +800,29 @@ func (upkg *P2pPackage)verifyInbound(inst *PeerInstance, hs *pb.P2PMessage_Hands
 	r := config.P2pBigInt(int(*hs.SignR), hs.R)
 	s := config.P2pBigInt(int(*hs.SignS), hs.S)
 	return config.P2pVerify(pubKey, hs.NodeId, r, s)
+}
+
+func (upkg *P2pPackage)String() string {
+	if !tcpmsgLog.debug__ {
+		return ""
+	} else {
+		strPkg := fmt.Sprintf("P2pPackage: Key: %x\n", upkg.Key)
+		strPkg += fmt.Sprintf("\tPid: %d, Mid: %d, PayloadLength: %d",
+			upkg.Pid, upkg.Mid, upkg.PayloadLength)
+		return strPkg
+	}
+}
+
+func (ck *CheckKey)String() string {
+	return fmt.Sprintf("CheckKey: key: %x", ck.Key)
+}
+
+func (rk *ReportKey)String() string {
+	return fmt.Sprintf("ReportKey: status: %d, key: %x", rk.Status, rk.Key)
+}
+
+func (upkg *P2pPackage)DebugPeerPackage() {
+	if tcpmsgLog.debug__ {
+		tcpmsgLog.Debug("DebugPeerPackage: %s", upkg.String())
+	}
 }

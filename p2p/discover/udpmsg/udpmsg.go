@@ -22,6 +22,7 @@ package udpmsg
 
 import (
 	"net"
+	"fmt"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	config	"github.com/yeeco/gyee/p2p/config"
 	pb		"github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
@@ -136,6 +137,8 @@ type UdpMsg struct {
 	From	*net.UDPAddr	// source address from underlying network library
 	Msg		*pb.UdpMessage	// protobuf message
 	Eno		UdpMsgErrno		// current errno
+	typ		UdpMsgType		// message type
+	pum		interface{}		// pointer to Ping, Pong...
 }
 
 //
@@ -162,6 +165,8 @@ func NewUdpMsg() *UdpMsg {
 		From:	nil,
 		Msg:	nil,
 		Eno:	UdpMsgEnoUnknown,
+		typ:	UdpMsgTypeUnknown,
+		pum:	nil,
 	}
 }
 
@@ -253,7 +258,10 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 		return nil
 	}
 
-	return f.(func()interface{})()
+	pum.typ = mt
+	pum.pum = f.(func()interface{})()
+
+	return pum.pum
 }
 
 //
@@ -852,24 +860,139 @@ const (
 	CmpNodeNotEquTcpPort
 )
 
-func (n1 *Node) CompareWith(n2 *Node) int {
+func (n *Node) CompareWith(n2 *Node) int {
 
-	if n1.UDP != n2.UDP {
+	if n.UDP != n2.UDP {
 
 		return CmpNodeNotEquUdpPort
 
-	} else if n1.TCP != n2.TCP {
+	} else if n.TCP != n2.TCP {
 
 		return CmpNodeNotEquTcpPort
 
-	} else if n1.IP.Equal(n2.IP) != true {
+	} else if n.IP.Equal(n2.IP) != true {
 
 		return CmpNodeNotEquIp
 
-	}	else	if n1.NodeId != n2.NodeId {
+	}	else	if n.NodeId != n2.NodeId {
 
 		return CmpNodeNotEquId
 	}
 
 	return CmpNodeEqu
+}
+
+//
+// String udp messages
+//
+
+func (n *Node)Srting() string {
+	NodeId := "\t" + "NodeId: " + fmt.Sprintf("%x", n.NodeId) + "\n"
+	IP := "\t" + "IP: " + n.IP.String() + "\n"
+	UDP := "\t" + "UDP: " + fmt.Sprintf("%d", n.UDP) + "\n"
+	TCP := "\t" + "TCP: " + fmt.Sprintf("%d", n.TCP) + "\n"
+	strNode := "\n" + NodeId + IP + UDP + TCP
+	return strNode
+}
+
+func (snid SubNetworkID)String() string {
+	return fmt.Sprintf("%x", snid)
+}
+
+func (ping *Ping)String() string {
+	if !udpmsgLog.debug__ {
+		return ""
+	} else {
+		strPing := "Ping: "
+		From := "From: " + ping.From.Srting() + "\n"
+		To := "To: " + ping.To.Srting() + "\n"
+		FromSubNetId := "FromSubNetId: "
+		for idx := 0; idx < len(ping.FromSubNetId); idx++ {
+			FromSubNetId += ping.FromSubNetId[idx].String() + ","
+		}
+		SubNetId := "SubNetId: " + ping.SubNetId.String() + "\n"
+		Id := "Id: " + fmt.Sprintf("%d", ping.Id)
+		Expiration := "Expiration: " + fmt.Sprintf("%d", ping.Expiration) + "\n"
+		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
+		return strPing
+	}
+}
+
+func (pong *Pong)String() string {
+	if !udpmsgLog.debug__ {
+		return ""
+	} else {
+		strPing := "Pong: "
+		From := "From: " + pong.From.Srting() + "\n"
+		To := "To: " + pong.To.Srting() + "\n"
+		FromSubNetId := "FromSubNetId: "
+		for idx := 0; idx < len(pong.FromSubNetId); idx++ {
+			FromSubNetId += pong.FromSubNetId[idx].String() + ","
+		}
+		SubNetId := "SubNetId: " + pong.SubNetId.String() + "\n"
+		Id := "Id: " + fmt.Sprintf("%d", pong.Id)
+		Expiration := "Expiration: " + fmt.Sprintf("%d", pong.Expiration) + "\n"
+		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
+		return strPing
+	}
+}
+
+func (findnode *FindNode)String() string {
+	if !udpmsgLog.debug__ {
+		return ""
+	} else {
+		strPing := "FindNode: "
+		From := "From: " + findnode.From.Srting() + "\n"
+		To := "To: " + findnode.To.Srting() + "\n"
+		FromSubNetId := "FromSubNetId: "
+		for idx := 0; idx < len(findnode.FromSubNetId); idx++ {
+			FromSubNetId += findnode.FromSubNetId[idx].String() + ","
+		}
+		SubNetId := "SubNetId: " + findnode.SubNetId.String() + "\n"
+		Target := "Target: " + fmt.Sprintf("%x", findnode.Target) + "\n"
+		Id := "Id: " + fmt.Sprintf("%d", findnode.Id)
+		Expiration := "Expiration: " + fmt.Sprintf("%d", findnode.Expiration) + "\n"
+		strPing += From + To + FromSubNetId + SubNetId + Target + Id + Expiration
+		return strPing
+	}
+}
+
+func (neighbors *Neighbors)String() string {
+	if !udpmsgLog.debug__ {
+		return ""
+	} else {
+		strPing := "Neighbors: "
+		From := "From: " + neighbors.From.Srting() + "\n"
+		To := "To: " + neighbors.To.Srting() + "\n"
+		FromSubNetId := "FromSubNetId: "
+		for idx := 0; idx < len(neighbors.FromSubNetId); idx++ {
+			FromSubNetId += neighbors.FromSubNetId[idx].String() + ","
+		}
+		SubNetId := "SubNetId: " + neighbors.SubNetId.String() + "\n"
+		Nodes := "Nodes:"
+		for idx := 0; idx < len(neighbors.Nodes); idx++ {
+			Nodes += neighbors.Nodes[idx].Srting() + "\n"
+		}
+		Id := "Id: " + fmt.Sprintf("%d", neighbors.Id)
+		Expiration := "Expiration: " + fmt.Sprintf("%d", neighbors.Expiration) + "\n"
+		strPing += From + To + FromSubNetId + SubNetId + Nodes + Id + Expiration
+		return strPing
+	}
+}
+
+func (pum *UdpMsg)DebugPeerMessage() {
+	if udpmsgLog.debug__ {
+		switch pum.typ {
+		case UdpMsgTypePing:
+			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*Ping).String())
+		case UdpMsgTypePong:
+			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*Pong).String())
+		case UdpMsgTypeFindNode:
+			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*FindNode).String())
+		case UdpMsgTypeNeighbors:
+			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*Neighbors).String())
+		default:
+			udpmsgLog.Debug("DebugPeerMessage: invalid message type: %d", pum.typ)
+		}
+	}
 }

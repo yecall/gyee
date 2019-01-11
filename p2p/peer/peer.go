@@ -2632,6 +2632,8 @@ _rxLoop:
 			continue
 		}
 
+		upkg.DebugPeerPackage()
+
 		if upkg.Pid == uint32(PID_P2P) {
 			msg := sch.SchMessage{}
 			pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPeRxDataInd, upkg)

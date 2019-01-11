@@ -126,10 +126,10 @@ message P2PMessage {
         optional bytes      Extra   = 2;    // extra info, reserved
     }
 
-    required MessageId  mid         = 1;    // message identity
-    optional Handshake  handshake   = 2;    // handshake message
-    optional Ping       ping        = 3;    // ping message
-    optional Pong       pong        = 4;    // pong message
+    required MessageId      mid         = 1;    // message identity
+    optional Handshake      handshake   = 2;    // handshake message
+    optional Ping           ping        = 3;    // ping message
+    optional Pong           pong        = 4;    // pong message
 }
 
 //
@@ -145,7 +145,7 @@ message ExtMessage {
         optional bytes      Extra   = 2;    // extra info, reserved
     }
 
-    required MessageId  mid         = 1;    // message identity
-    optional CheckKey   checkKey    = 2;    // check key message
-    optional ReportKey  reportKeyFromPeer   = 3;    // report key message
+    required MessageId      mid                 = 1;    // message identity
+    optional CheckKey       checkKey            = 2;    // check key message
+    optional ReportKey      reportKeyFromPeer   = 3;    // report key message
 }
