@@ -619,16 +619,21 @@ absTimerLoop:
 
 	//
 	// exit, notice that here task is still locked, and only when killed we
-	// need more cleaning job.
+	// need to feed the "stopped"
 	//
 
 	if killed {
 
 		ptm.tmcb.stopped<-true
-
-		close(ptm.tmcb.stop)
-		close(ptm.tmcb.stopped)
 	}
+
+	// notice: here the timer owner task might be blocked in function schKillTimer
+	// (if it's called), for waiting "stopped": the action "kill" and the event
+	// "expirted" happened at the "same" time, but "expired" is selected, so "close"
+	// for "stopped" is needed.
+
+	close(ptm.tmcb.stop)
+	close(ptm.tmcb.stopped)
 
 	ptm.tmcb.taskNode = nil
 	task.lock.Unlock()
@@ -1589,7 +1594,7 @@ func (sdl *scheduler)schKillTimer(ptn *schTaskNode, tid int) SchErrno {
 	// emit stop signal and wait stopped signal
 	//
 
-	var tcb = &ptn.task.tmTab[tid].tmcb
+	tcb := &ptn.task.tmTab[tid].tmcb
 	tcb.stop<-true
 
 	ptn.task.lock.Unlock()

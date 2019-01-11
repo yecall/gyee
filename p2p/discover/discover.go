@@ -189,8 +189,8 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 		return DcvMgrEnoNone
 	}
 
-	var schMsg = sch.SchMessage{}
-	var r = sch.MsgDcvFindNodeRsp{
+	schMsg := sch.SchMessage{}
+	r := sch.MsgDcvFindNodeRsp{
 		Snid:	rsp.Snid,
 		Nodes:	rsp.Nodes,
 	}
