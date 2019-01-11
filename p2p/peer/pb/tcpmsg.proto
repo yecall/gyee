@@ -83,11 +83,11 @@ enum KeyStatus {
 //
 
 message P2PPackage {
-    required ProtocolId Pid         = 1;    // protocol identity
-    optional MessageId ExtMid       = 2;    // required for "Pid" whch is not PID_P2P
-    optional bytes ExtKey           = 3;    // key of message packaged
-    required uint32 PayloadLength   = 4;    // payload length
-    optional bytes Payload          = 5;    // payload
+    required ProtocolId Pid             = 1;    // protocol identity
+    optional MessageId ExtMid           = 2;    // required for "Pid" whch is not PID_P2P
+    optional bytes ExtKey               = 3;    // key of message packaged
+    required uint32 PayloadLength       = 4;    // payload length
+    optional bytes Payload              = 5;    // payload
 }
 
 //
@@ -117,13 +117,13 @@ message P2PMessage {
     }
 
     message Ping {
-        required uint64     seq     = 1;    // sequence number
-        optional bytes      Extra   = 2;    // extra info, reserved
+        required uint64     seq         = 1;    // sequence number
+        optional bytes      Extra       = 2;    // extra info, reserved
     }
 
     message Pong {
-        required uint64     seq     = 1;    // sequence number
-        optional bytes      Extra   = 2;    // extra info, reserved
+        required uint64     seq         = 1;    // sequence number
+        optional bytes      Extra       = 2;    // extra info, reserved
     }
 
     required MessageId      mid         = 1;    // message identity
@@ -137,15 +137,15 @@ message P2PMessage {
 //
 message ExtMessage {
     message CheckKey {
-        optional bytes      Extra   = 1;    // extra info, reserved
+        optional bytes      Extra       = 1;    // extra info, reserved
     }
 
     message ReportKey {
-        required KeyStatus  Status  = 1;    // key status
-        optional bytes      Extra   = 2;    // extra info, reserved
+        required KeyStatus  Status      = 1;    // key status
+        optional bytes      Extra       = 2;    // extra info, reserved
     }
 
-    required MessageId      mid                 = 1;    // message identity
-    optional CheckKey       checkKey            = 2;    // check key message
-    optional ReportKey      reportKeyFromPeer   = 3;    // report key message
+    required MessageId      mid         = 1;    // message identity
+    optional CheckKey       checkKey    = 2;    // check key message
+    optional ReportKey      reportKey   = 3;    // report key message
 }
