@@ -1106,3 +1106,4 @@ func FromECDSA(priK *ecdsa.PrivateKey) []byte {
 	return priK.D.Bytes()
 }
 
+

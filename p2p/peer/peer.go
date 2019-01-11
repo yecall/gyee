@@ -44,7 +44,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {

@@ -895,10 +895,6 @@ func (n *Node)Srting() string {
 	return strNode
 }
 
-func (snid SubNetworkID)String() string {
-	return fmt.Sprintf("%x", snid)
-}
-
 func (ping *Ping)String() string {
 	if !udpmsgLog.debug__ {
 		return ""
@@ -908,9 +904,10 @@ func (ping *Ping)String() string {
 		To := "To: " + ping.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
 		for idx := 0; idx < len(ping.FromSubNetId); idx++ {
-			FromSubNetId += ping.FromSubNetId[idx].String() + ","
+			FromSubNetId += fmt.Sprintf("%x", ping.FromSubNetId[idx]) + ","
 		}
-		SubNetId := "SubNetId: " + ping.SubNetId.String() + "\n"
+		FromSubNetId += "\n"
+		SubNetId := "SubNetId: " + fmt.Sprintf("%x", ping.SubNetId) + "\n"
 		Id := "Id: " + fmt.Sprintf("%d", ping.Id)
 		Expiration := "Expiration: " + fmt.Sprintf("%d", ping.Expiration) + "\n"
 		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
@@ -927,9 +924,10 @@ func (pong *Pong)String() string {
 		To := "To: " + pong.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
 		for idx := 0; idx < len(pong.FromSubNetId); idx++ {
-			FromSubNetId += pong.FromSubNetId[idx].String() + ","
+			FromSubNetId += fmt.Sprintf("%x", pong.FromSubNetId[idx]) + ","
 		}
-		SubNetId := "SubNetId: " + pong.SubNetId.String() + "\n"
+		FromSubNetId += "\n"
+		SubNetId := "SubNetId: " + fmt.Sprintf("%x", pong.SubNetId) + "\n"
 		Id := "Id: " + fmt.Sprintf("%d", pong.Id)
 		Expiration := "Expiration: " + fmt.Sprintf("%d", pong.Expiration) + "\n"
 		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
@@ -946,9 +944,10 @@ func (findnode *FindNode)String() string {
 		To := "To: " + findnode.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
 		for idx := 0; idx < len(findnode.FromSubNetId); idx++ {
-			FromSubNetId += findnode.FromSubNetId[idx].String() + ","
+			FromSubNetId += fmt.Sprintf("%x", findnode.FromSubNetId[idx]) + ","
 		}
-		SubNetId := "SubNetId: " + findnode.SubNetId.String() + "\n"
+		FromSubNetId += "\n"
+		SubNetId := "SubNetId: " + fmt.Sprintf("%x", findnode.SubNetId) + "\n"
 		Target := "Target: " + fmt.Sprintf("%x", findnode.Target) + "\n"
 		Id := "Id: " + fmt.Sprintf("%d", findnode.Id)
 		Expiration := "Expiration: " + fmt.Sprintf("%d", findnode.Expiration) + "\n"
@@ -966,9 +965,10 @@ func (neighbors *Neighbors)String() string {
 		To := "To: " + neighbors.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
 		for idx := 0; idx < len(neighbors.FromSubNetId); idx++ {
-			FromSubNetId += neighbors.FromSubNetId[idx].String() + ","
+			FromSubNetId += fmt.Sprintf("%x", neighbors.FromSubNetId[idx]) + ","
 		}
-		SubNetId := "SubNetId: " + neighbors.SubNetId.String() + "\n"
+		FromSubNetId += "\n"
+		SubNetId := "SubNetId: " + fmt.Sprintf("%x", neighbors.SubNetId) + "\n"
 		Nodes := "Nodes:"
 		for idx := 0; idx < len(neighbors.Nodes); idx++ {
 			Nodes += neighbors.Nodes[idx].Srting() + "\n"
