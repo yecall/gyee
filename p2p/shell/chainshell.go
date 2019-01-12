@@ -434,8 +434,13 @@ func (shMgr *ShellManager)startDedup() sch.SchErrno {
 		for {
 			select {
 			case <-shMgr.deDupTiker.C:
+
+				shMgr.deDupLock.Lock()
 				shMgr.tmDedup.TickProc()
+				shMgr.deDupLock.Unlock()
+
 			case <-shMgr.deDupDone:
+
 				shMgr.deDupTiker.Stop()
 				break _dedupLoop
 			}
@@ -611,10 +616,9 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 }
 
 func (shMgr *ShellManager)deDupTimerCb(el *list.Element, data interface{}) interface{} {
-
-	shMgr.deDupLock.Lock()
-	defer shMgr.deDupLock.Unlock()
-
+	// Notice: do not invoke Lock ... Unlock ... on shMgr.deDupLock here
+	// please, since this function is called back within TickProc of timer
+	// manager when any timer get expired. See function startDedup.
 	ddk, ok := data.(*deDupKey)
 	if !ok {
 		chainLog.Debug("deDupTimerCb: invalid timer data")
@@ -684,7 +688,9 @@ const (
 
 func (shMgr *ShellManager)setKeyMap(k *config.DsKey) int {
 	shMgr.deDupKeyLock.Lock()
+	shMgr.deDupLock.Lock()
 	defer shMgr.deDupKeyLock.Unlock()
+	defer shMgr.deDupLock.Unlock()
 
 	if _, ok := shMgr.deDupKeyMap[*k]; ok {
 		return SKM_DUPLICATED

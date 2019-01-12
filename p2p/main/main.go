@@ -37,6 +37,7 @@ import (
 	log		"github.com/yeeco/gyee/p2p/logger"
 	yep2p	"github.com/yeeco/gyee/p2p"
 	config	"github.com/yeeco/gyee/p2p/config"
+	"bytes"
 )
 
 //
@@ -69,23 +70,28 @@ var testCaseTable = []testCase{
 	},
 	{
 		name:			"testCase8",
-		description:	"yee chain OSN test, SubNetMaskBits != 0",
+		description:	"yee chain test, SubNetMaskBits != 0",
 		entry:			testCase8,
 	},
 	{
 		name:			"testCase9",
-		description:	"yee chain OSN test, SubNetMaskBits == 0",
+		description:	"yee dht test",
 		entry:			testCase9,
 	},
 	{
 		name:			"testCase10",
-		description:	"yee chain OSN test, SubNetMaskBits != 0",
+		description:	"yee chain OSN test, SubNetMaskBits == 0",
 		entry:			testCase10,
 	},
 	{
 		name:			"testCase11",
-		description:	"multiple yee chain OSN test on one host",
+		description:	"yee chain OSN test, SubNetMaskBits != 0",
 		entry:			testCase11,
+	},
+	{
+		name:			"testCase12",
+		description:	"multiple yee chain OSN test on one host",
+		entry:			testCase12,
 	},
 }
 
@@ -319,6 +325,40 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 	}
 }
 
+func yeDhtProc(yeShMgr yep2p.Service) {
+	cnt := 0
+	cnt_max := 100 * 100 * 100
+
+	for cnt < cnt_max {
+		cnt++
+
+		now := time.Now().UnixNano()
+		data := []byte(fmt.Sprintf("bk: %d", now))
+		bk.Data = append(bk.Data[0:0], data...)
+		key := sha256.Sum256(data)
+		bk.Key = append(bk.Key[0:0], key[0:]...)
+
+		if err := yeShMgr.BroadcastMessageOsn(bk); err != nil {
+			log.Debug("yeDhtProc: BroadcastMessageOsn failed, err: %s", err.Error())
+		} else {
+			log.Debug("yeDhtProc: value put\nkey: %x\nvalue: %x\n", bk.Key, bk.Data)
+			time.Sleep(time.Millisecond * 1000)
+			if val, err := yeShMgr.DhtGetValue(bk.Key); err != nil {
+				log.Debug("yeDhtProc: DhtGetValue failed, err: %s", err.Error())
+			} else {
+				log.Debug("yeDhtProc: value got\nkey: %x\nvalue: %x\n", bk.Key, val)
+				if bytes.Compare(bk.Data, val) != 0 {
+					log.Debug("yeDhtProc: value mismatched")
+				}
+			}
+		}
+
+		if cnt & 0x7f == 0 {
+			log.Debug("yeDhtProc: cnt: %d, loop BroadcastMessageOsn", cnt)
+		}
+	}
+}
+
 func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subscriber, subBh yep2p.Subscriber) {
 	close(subEv.MsgChan)
 	yeShMgr.UnRegister(&subEv)
@@ -426,6 +466,37 @@ func testCase8(tc *testCase) {
 //
 func testCase9(tc *testCase) {
 
+	yesCfg := yep2p.DefaultYeShellConfig
+	//yesCfg.BootstrapNode = true
+	yesCfg.SubNetMaskBits = 4
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+
+	node := yeShMgr.GetLocalNode()
+	setMessageFrom(node)
+
+	yeShMgr.Register(&subEv)
+	yeShMgr.Register(&subTx)
+	yeShMgr.Register(&subBh)
+
+	go subFunc(subEv, "ev")
+	go subFunc(subTx, "tx")
+	go subFunc(subBh, "bh")
+
+	if true {
+		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
+	} else {
+		time.Sleep(time.Second * 10)
+		yeDhtProc(yeShMgr)
+		yeChainStop(yeShMgr, subEv, subTx, subBh)
+	}
+}
+
+//
+// testCase10
+//
+func testCase10(tc *testCase) {
+
 	osnCfg := yep2p.DefaultYeShellConfig
 	//osnCfg.BootstrapNode = true
 	osnCfg.SubNetMaskBits = 0
@@ -453,9 +524,9 @@ func testCase9(tc *testCase) {
 }
 
 //
-// testCase10
+// testCase11
 //
-func testCase10(tc *testCase) {
+func testCase11(tc *testCase) {
 
 	osnCfg := yep2p.DefaultYeShellConfig
 	//osnCfg.BootstrapNode = true
@@ -484,9 +555,9 @@ func testCase10(tc *testCase) {
 }
 
 //
-// testCase11
+// testCase12
 //
-func testCase11(tc *testCase) {
+func testCase12(tc *testCase) {
 	appInstNum := 8
 	appMsgs := make([]*appMessages, appInstNum)
 	appSubs := make([]*appSubcribers, appInstNum)

@@ -1144,9 +1144,9 @@ func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, err
 }
 
 func (yeShMgr *YeShellManager)deDupTimerCb(el *list.Element, data interface{}) interface{} {
-	yeShMgr.deDupLock.Lock()
-	defer yeShMgr.deDupLock.Unlock()
-
+	// Notice: do not invoke Lock ... Unlock ... on yeShMgr.deDupLock here
+	// please, since this function is called back within TickProc of timer
+	// manager when any timer get expired. See function deDupTickerProc.
 	if key, ok := data.(*[yesKeyBytes]byte); !ok {
 		return errors.New("deDupTimerCb: invalid key")
 	} else {
@@ -1188,7 +1188,11 @@ _dedup:
 	for {
 		select {
 		case <-yeShMgr.deDupTiker.C:
+
+			yeShMgr.deDupLock.Lock()
 			yeShMgr.tmDedup.TickProc()
+			yeShMgr.deDupLock.Unlock()
+
 		case <-yeShMgr.ddtChan:
 			break _dedup
 		}
