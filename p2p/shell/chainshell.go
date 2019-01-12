@@ -487,6 +487,11 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		return sch.SchEnoNotFound
 	}
 
+	if pai.status != pisActive {
+		chainLog.Debug("checkKeyFromPeer: peer not active, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
+
 	status := int32(peer.KS_NOTEXIST)
 	if _, dup := shMgr.deDupMap[ddk]; dup {
 		status = int32(peer.KS_EXIST)
@@ -521,15 +526,27 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 
 	chainLog.Debug("reportKeyFromPeer: %s", msg.Rptk.String())
 
-	shMgr.deDupLock.Lock()
-	defer shMgr.deDupLock.Unlock()
-
-	ddk := deDupKey{}
 	spid := shellPeerID{
 		snid:   rxPkg.PeerInfo.Snid,
 		dir:    rxPkg.PeerInfo.Dir,
 		nodeId: rxPkg.PeerInfo.NodeId,
 	}
+
+	pai, ok := shMgr.peerActived[spid]
+	if !ok {
+		chainLog.Debug("reportKeyFromPeer: active peer not found, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
+
+	if pai.status != pisActive {
+		chainLog.Debug("reportKeyFromPeer: peer not active, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
+
+	shMgr.deDupLock.Lock()
+	defer shMgr.deDupLock.Unlock()
+
+	ddk := deDupKey{}
 
 	copy(ddk.key[0:], rxPkg.Key)
 	ddk.peer = spid
@@ -544,11 +561,7 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 	delete(shMgr.deDupMap, ddk)
 
 	if msg.Rptk.Status == int32(peer.KS_NOTEXIST) {
-		if pe, ok := shMgr.peerActived[spid]; ok {
-			return shMgr.send2Peer(pe, ddv.bcReq)
-		}
-		chainLog.Debug("reportKeyFromPeer: not found, spid: %+v", spid)
-		return sch.SchEnoNotFound
+		return shMgr.send2Peer(pai, ddv.bcReq)
 	}
 
 	return sch.SchEnoNone
