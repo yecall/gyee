@@ -307,6 +307,7 @@ func (e *Event) totalEvent() int {
 }
 
 func (e *Event) updateKnow(event *Event) {
+	//TODO:updateKnow(nil)可以改在new里头
 	e.know[e.vid] = e.Body.N
 	if event != nil {
 		for key, value := range event.know {

@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"fmt"
 )
 
 type InmemService struct {
@@ -196,7 +197,8 @@ func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
 	if ok {
 		return v, nil
 	}
-	return nil, errors.New("key not existed")
+	l := fmt.Sprintf("%d", len(ih.dht))
+	return nil, errors.New("key not existed:" + l)
 }
 
 func (ih *InmemHub) SetValue(key []byte, value []byte) error {
