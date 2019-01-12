@@ -25,7 +25,15 @@ import (
 	"github.com/mr-tron/base58/base58"
 )
 
-const HashLength = 32
+const (
+	// length of Hash in bytes
+	HashLength = 32
+
+	// length of Address in bytes
+	AddressLength = 20
+)
+
+// Storage for SHA3 256 hash
 type Hash [HashLength]byte
 
 // BytesToHash sets b to hash.
@@ -52,7 +60,7 @@ func (h Hash) Base58() string {
 }
 
 func (h Hash) Equals(b Hash) bool {
-	return h==b
+	return h == b
 	//return bytes.Compare(h[:], b[:]) == 0
 }
 
@@ -64,6 +72,27 @@ func (h *Hash) SetBytes(b []byte) {
 	}
 
 	copy(h[HashLength-len(b):], b)
+}
+
+type Address [AddressLength]byte
+
+// BytesToAddress returns Address with value b.
+// If b is larger than len(h), b will be cropped from the left.
+func BytesToAddress(b []byte) Address {
+	var a Address
+	a.SetBytes(b)
+	return a
+}
+
+// HexToAddress returns Address with byte values of s.
+// If s is larger than len(h), s will be cropped from the left.
+func HexToAddress(s string) Address { return BytesToAddress(FromHex(s)) }
+
+func (a *Address) SetBytes(b []byte) {
+	if len(b) > len(a) {
+		b = b[len(b)-AddressLength:]
+	}
+	copy(a[AddressLength-len(b):], b)
 }
 
 /*
