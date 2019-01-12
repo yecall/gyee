@@ -680,6 +680,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.dir			= PeInstDirInbound
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.pingChan		= make(chan *Pingpong, PeInstMaxPings)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
@@ -1407,6 +1408,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.node				= *node
 
 	peInst.txChan			= make(chan *P2pPackage, PeInstMaxP2packages)
+	peInst.pingChan			= make(chan *Pingpong, PeInstMaxPings)
 	peInst.rxChan			= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone			= make(chan PeMgrErrno)
 	peInst.rxtxRuning		= false
@@ -1843,6 +1845,7 @@ const PeInstDirOutbound		= 1					// outbound connection
 
 const PeInstMailboxSize 	= 512				// mailbox size
 const PeInstMaxP2packages	= 512				// max p2p packages pending to be sent
+const PeInstMaxPings		= 8					// max pings pending to be sent
 const PeInstMaxPingpongCnt	= 8					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second * 16	// pingpong period
 
@@ -1885,6 +1888,7 @@ type PeerInstance struct {
 	ppTid			int							// pingpong timer identity
 	rxChan			chan *P2pPackageRx			// rx pending channel
 	txChan			chan *P2pPackage			// tx pending channel
+	pingChan		chan *Pingpong				// ping channel
 	txPendNum		int							// tx pending number
 	txSeq			int64						// statistics sequence number
 	txOkCnt			int64						// tx ok counter
@@ -2146,38 +2150,7 @@ func (pi *PeerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 		Seq:	pi.ppSeq,
 		Extra:	nil,
 	}
-	pi.ppSeq++
-
-	upkg := new(P2pPackage)
-	if eno := upkg.ping(pi, &ping); eno != PeMgrEnoNone {
-		pi.ppEno = eno
-		i := P2pIndConnStatusPara {
-			Ptn:		pi.ptnMe,
-			PeerInfo:	&Handshake{
-				Snid:      pi.snid,
-				NodeId:    pi.node.ID,
-				ProtoNum:  pi.protoNum,
-				Protocols: pi.protocols,
-			},
-			Status		:	int(eno),
-			Flag		:	false,
-			Description	:	"piPingpongReq: failed",
-		}
-
-		req := sch.MsgPeCloseReq {
-			Ptn: pi.ptnMe,
-			Snid: pi.snid,
-			Node: pi.node,
-			Dir: pi.dir,
-			Why: &i,
-		}
-
-		msg := sch.SchMessage{}
-		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
-		pi.sdl.SchSendMessage(&msg)
-
-		return eno
-	}
+	pi.pingChan<-&ping
 
 	return PeMgrEnoNone
 }
@@ -2482,64 +2455,127 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		}
 	}()
 
+	ask4Close := func(eno PeMgrErrno) {
+
+		// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning of
+		// this instance, BUT at this moment, the message queue of peer manager might
+		// be FULL, so the instance would be blocked while sending; AND the peer manager
+		// might had fired pi.txDone and been blocked by pi.txExit. panic is called
+		// for such a overload system, see scheduler please.
+
+		pi.txFailedCnt += 1
+		pi.txEno = eno
+
+		hs := Handshake{
+			Snid:      pi.snid,
+			NodeId:    pi.node.ID,
+			ProtoNum:  pi.protoNum,
+			Protocols: pi.protocols,
+		}
+
+		i := P2pIndConnStatusPara{
+			Ptn:         pi.ptnMe,
+			PeerInfo:    &hs,
+			Status:      int(eno),
+			Flag:        false,
+			Description: "piTx: SendPackage failed",
+		}
+
+		req := sch.MsgPeCloseReq{
+			Ptn:  pi.ptnMe,
+			Snid: pi.snid,
+			Node: pi.node,
+			Dir:  pi.dir,
+			Why:  &i,
+		}
+
+		msg := sch.SchMessage{}
+		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
+		pi.sdl.SchSendMessage(&msg)
+
+		peerLog.Debug("piTx: failed, EvPeCloseReq sent. snid: %x, dir: %d, peer-ip: %s",
+			pi.snid, pi.dir, pi.node.IP.String())
+	}
+
+	var (
+		isPing	bool
+		isData	bool
+		okPing	bool
+		okData	bool
+		ping	*Pingpong
+		upkg	*P2pPackage
+	)
+
 _txLoop:
+
 	for {
+
+		isPing = false
+		isData = false
+		okPing = false
+		okData = false
+		ping = (*Pingpong)(nil)
+		upkg = (*P2pPackage)(nil)
+
+		select {
+		case ping, okPing = <-pi.pingChan:
+			isPing = true
+			isData = false
+		case upkg, okData = <-pi.txChan:
+			isPing = false
+			isData = true
+		}
+
 		// check if any pendings or done
-		upkg, ok := <-pi.txChan
-		if !ok {
-			break _txLoop
-		}
+		if isPing {
 
-		// if in errors, sleep then check done
-		if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
-			time.Sleep(time.Millisecond * 10)
-			continue
-		}
+			if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
+				time.Sleep(time.Millisecond * 10)
+				continue
+			}
 
-		// carry out Tx
-		pi.txPendNum -= 1
-		pi.txSeq += 1
-		if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
-			pi.txOkCnt += 1
-		} else {
-			// 1) if failed, callback to the user, so he can close this peer seems in troubles,
-			// we will be done then.
-			// 2) it is possible that, while we are blocked here in writing and the connection
-			// is closed for some reasons(for example the user close the peer), in this case,
-			// we would get an error.
-			pi.txFailedCnt += 1
-			pi.txEno = eno
-			hs := Handshake {
-				Snid:		pi.snid,
-				NodeId:		pi.node.ID,
-				ProtoNum:	pi.protoNum,
-				Protocols:	pi.protocols,
-			}
-			i := P2pIndConnStatusPara{
-				Ptn:		pi.ptnMe,
-				PeerInfo:	&hs,
-				Status:		int(eno),
-				Flag:		false,
-				Description:"piTx: SendPackage failed",
-			}
-			req := sch.MsgPeCloseReq {
-				Ptn: pi.ptnMe,
-				Snid: pi.snid,
-				Node: pi.node,
-				Dir: pi.dir,
-				Why: &i,
-			}
-			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning of
-			// this instance, BUT at this moment, the message queue of peer manager might
-			// be FULL, so the instance would be blocked while sending; AND the peer manager
-			// might had fired pi.txDone and been blocked by pi.txExit. panic is called
-			// for such a overload system, see scheduler please.
-			msg := sch.SchMessage{}
-			pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
-			pi.sdl.SchSendMessage(&msg)
+			if okPing && ping != nil {
 
-			peerLog.Debug("piTx: failed, EvPeCloseReq sent. snid: %x, dir: %d, peer-ip: %s",
-				pi.snid, pi.dir, pi.node.IP.String())
+				pi.txSeq += 1
+
+				upkg := new(P2pPackage)
+				if eno := upkg.ping(pi, ping); eno == PeMgrEnoNone {
+
+					pi.txOkCnt += 1
+
+				} else {
+
+					ask4Close(eno)
+				}
+			}
+
+		} else if isData {
+
+			if !okData {
+				break _txLoop
+			}
+
+			if upkg == nil {
+				peerLog.Debug("piTx: nil package")
+				continue
+			}
+
+			if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
+				time.Sleep(time.Millisecond * 10)
+				continue
+			}
+
+			pi.txPendNum -= 1
+			pi.txSeq += 1
+
+			if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
+
+				pi.txOkCnt += 1
+
+			} else {
+
+				ask4Close(eno)
+			}
 		}
 
 		if pi.txSeq & 0x0f == 0 {
@@ -2553,6 +2589,7 @@ _txLoop:
 }
 
 func piRx(pi *PeerInstance) PeMgrErrno {
+
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
 	// would then exit.
@@ -2569,8 +2606,9 @@ func piRx(pi *PeerInstance) PeMgrErrno {
 	var ok = true
 
 _rxLoop:
+
 	for {
-		// check if we are done
+
 		select {
 		case done, ok = <-pi.rxDone:
 			peerLog.Debug("piRx: pi: %s, done with: %d", pi.name, done)
@@ -2643,14 +2681,20 @@ _rxLoop:
 		upkg.DebugPeerPackage()
 
 		if upkg.Pid == uint32(PID_P2P) {
+
 			msg := sch.SchMessage{}
 			pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPeRxDataInd, upkg)
 			pi.sdl.SchSendMessage(&msg)
+
 		} else if upkg.Pid == uint32(PID_EXT) {
+
 			if len(pi.rxChan) >= cap(pi.rxChan) {
+
 				peerLog.Debug("piRx: rx queue full, snid: %x, dir: %d, pi: %s, peer: %x",
 					pi.snid, pi.dir, pi.name, pi.node.ID)
+
 			} else {
+
 				peerInfo := PeerInfo{}
 				pkgCb := P2pPackageRx{}
 				peerInfo.Protocols = nil
@@ -2670,9 +2714,12 @@ _rxLoop:
 				pkgCb.Key = upkg.Key
 				pkgCb.PayloadLength = int(upkg.PayloadLength)
 				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
+
 				pi.rxChan <- &pkgCb
 			}
+
 		} else {
+
 			peerLog.Debug("piRx: package discarded for unknown pid: pi: %s, %d", pi.name, upkg.Pid)
 		}
 	}

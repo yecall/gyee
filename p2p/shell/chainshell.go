@@ -126,7 +126,7 @@ func NewShellMgr() *ShellManager  {
 		localNode: make(map[config.SubNetworkID]config.Node, 0),
 		peerActived: make(map[shellPeerID]*shellPeerInst, 0),
 		rxChan: make(chan *peer.P2pPackageRx, rxChanSize),
-		deDup: false,
+		deDup: true,
 	}
 
 	if shMgr.deDup {
