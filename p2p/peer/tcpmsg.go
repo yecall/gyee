@@ -59,6 +59,7 @@ const MaxProtocols = config.MaxProtocols
 const (
 	PID_P2P			= pb.ProtocolId_PID_P2P		// p2p internal
 	PID_EXT			= pb.ProtocolId_PID_EXT		// external protocol
+	PID_UNKNOWN		= -1
 )
 
 //
@@ -509,11 +510,11 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey) PeMgrErrno {
 		Payload:		make([]byte, 0),
 	}
 
-	*pbPkg.PayloadLength = uint32(len(payload))
 	*pbPkg.Pid = PID_EXT
 	*pbPkg.ExtMid = MID_CHKK
 	pbPkg.ExtKey = append(pbPkg.ExtKey, chkk.Key...)
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
+	*pbPkg.PayloadLength = uint32(len(payload))
 
 	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
@@ -564,11 +565,11 @@ func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey) PeMgrErrno
 		Payload:		make([]byte, 0),
 	}
 
-	*pbPkg.PayloadLength = uint32(len(payload))
 	*pbPkg.Pid = PID_EXT
 	*pbPkg.ExtMid = MID_RPTK
 	pbPkg.ExtKey = append(pbPkg.ExtKey, rptk.Key...)
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
+	*pbPkg.PayloadLength = uint32(len(payload))
 
 	if inst.ato != time.Duration(0) {
 		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
@@ -654,11 +655,28 @@ func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 		return PeMgrEnoOs
 	}
 
-	upkg.Pid			= uint32(*pkg.Pid)
-	upkg.Mid			= uint32(*pkg.ExtMid)
-	upkg.Key			= append(upkg.Key[0:], pkg.ExtKey...)
-	upkg.PayloadLength	= *pkg.PayloadLength
-	upkg.Payload		= append(upkg.Payload, pkg.Payload ...)
+	pid := uint32(*pkg.Pid)
+
+	if pid != uint32(PID_P2P) && pid != uint32(PID_EXT) {
+
+		tcpmsgLog.Debug("RecvPackage: " +
+			"Invalid protocol identity: %d",
+			pid	)
+
+		return PeMgrEnoMessage
+	}
+
+	upkg.Pid = pid
+	upkg.PayloadLength = *pkg.PayloadLength
+
+	if upkg.Pid == uint32(PID_EXT) {
+		upkg.Mid = uint32(*pkg.ExtMid)
+		upkg.Key = append(upkg.Key[0:], pkg.ExtKey...)
+	}
+
+	if upkg.PayloadLength > 0 {
+		upkg.Payload = append(upkg.Payload, pkg.Payload ...)
+	}
 
 	return PeMgrEnoNone
 }
