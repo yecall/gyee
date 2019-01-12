@@ -22,6 +22,7 @@
 package table
 
 import (
+	"os"
 	"time"
 	"path"
 	"math/rand"
@@ -167,6 +168,7 @@ type tabConfig struct {
 	dataDir			string							// data directory
 	name			string							// node name
 	nodeDb			string							// node database
+	noHistory		bool							// no history node database
 	bootstrapNode	bool							// bootstrap flag of local node
 	subNetNodeList	map[SubNetworkID]config.Node	// sub network node identities
 	subNetIdList	[]SubNetworkID					// sub network identity list. do not put the identity
@@ -970,6 +972,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	tabCfg.dataDir			= cfg.DataDir
 	tabCfg.name				= cfg.Name
 	tabCfg.nodeDb			= cfg.NodeDB
+	tabCfg.noHistory		= cfg.NoHistory
 	tabCfg.bootstrapNode	= cfg.BootstrapNode
 	tabCfg.subNetNodeList	= cfg.SubNetNodeList
 	tabCfg.subNetIdList		= cfg.SubNetIdList
@@ -984,16 +987,26 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	// for static network type, table manager is not applied; a table manager with sub
 	// network identity as config.ZeroSubNet means that this manager is not applied to
 	// any real service activities.
+
 	tabMgr.networkType = cfg.NetworkType
+
 	if tabMgr.networkType == config.P2pNetworkTypeStatic {
+
 		tabMgr.snid = config.ZeroSubNet
+
 	} else if tabMgr.networkType == config.P2pNetworkTypeDynamic {
+
 		if len(tabCfg.subNetIdList) == 0 {
+
 			tabMgr.snid = AnySubNet
+
 		} else {
+
 			tabMgr.snid = config.ZeroSubNet
 		}
+
 	} else {
+
 		tabLog.Debug("tabGetConfig: invalid network type: %d", tabMgr.networkType)
 		return TabMgrEnoConfig
 	}
@@ -1008,8 +1021,13 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 	}
 
 	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.name, tabMgr.cfg.nodeDb)
-	db, err := newNodeDB(dbPath, ndbVersion, NodeID(tabMgr.cfg.local.ID))
+	if tabMgr.cfg.noHistory {
+		if _, err := os.Stat(dbPath); err == nil {
+			os.RemoveAll(dbPath)
+		}
+	}
 
+	db, err := newNodeDB(dbPath, ndbVersion, NodeID(tabMgr.cfg.local.ID))
 	if err != nil {
 		tabLog.Debug("tabNodeDbPrepare: newNodeDB failed, err: %s", err.Error())
 		return TabMgrEnoDatabase

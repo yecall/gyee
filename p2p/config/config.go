@@ -186,6 +186,7 @@ type Config struct {
 	StaticNodes			[]*Node					// static nodes
 	NodeDataDir			string					// node data directory
 	NodeDatabase		string					// node database
+	NoNdbHistory		bool					// do not use history of nodes
 	NoDial				bool					// do not dial out flag
 	NoAccept			bool					// do not accept incoming dial flag
 	BootstrapNode		bool					// bootstrap node flag
@@ -272,6 +273,7 @@ type Cfg4TabManager struct {
 	DataDir			string					// data directory
 	Name			string					// node name
 	NodeDB			string					// node database
+	NoHistory		bool					// do not use history of nodes
 	BootstrapNode	bool					// bootstrap node flag
 	SubNetNodeList	map[SubNetworkID]Node	// sub network node identities
 	SubNetIdList	[]SubNetworkID			// sub network identity list. do not put the identity
@@ -387,6 +389,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		StaticNetId:			ZeroSubNet,
 		NodeDataDir:			DftDatDir,
 		NodeDatabase:			datadirNodeDatabase,
+		NoNdbHistory:			true,
 		NoDial:					false,
 		NoAccept:				false,
 		BootstrapNode:			false,
@@ -456,6 +459,7 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		StaticNetId:			ZeroSubNet,
 		NodeDataDir:			P2pDefaultDataDir(true),
 		NodeDatabase:			datadirNodeDatabase,
+		NoNdbHistory:			true,
 		NoDial:					true,
 		NoAccept:				true,
 		BootstrapNode:			true,
@@ -990,6 +994,7 @@ func P2pConfig4TabManager(name string) *Cfg4TabManager {
 		DataDir:		config[name].NodeDataDir,
 		Name:			config[name].Name,
 		NodeDB:			config[name].NodeDatabase,
+		NoHistory:		config[name].NoNdbHistory,
 		BootstrapNode:	config[name].BootstrapNode,
 		NetworkType:	config[name].NetworkType,
 		SubNetNodeList:	config[name].SubNetNodeList,
