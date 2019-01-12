@@ -781,7 +781,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 	snid := ping.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
-	if !ok {
+	if !tabMgr.cfg.bootstrapNode && !ok {
 		return TabMgrEnoNotFound
 	}
 
@@ -802,7 +802,7 @@ func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 	snid := pong.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
-	if !ok {
+	if !tabMgr.cfg.bootstrapNode && !ok {
 		return TabMgrEnoNotFound
 	}
 
@@ -823,7 +823,7 @@ func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 	snid := findNode.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
-	if !ok {
+	if !tabMgr.cfg.bootstrapNode && !ok {
 		return TabMgrEnoNotFound
 	}
 
@@ -1223,7 +1223,7 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*N
 
 	// the most closest bank: one should sort nodes in this bank if accurate
 	// order by log2 distance against the target node is expected, but we not.
-	if bk := tabMgr.buckets[dt]; bk != nil {
+	if bk := tabMgr.buckets[dt]; bk != nil && len(bk.nodes) > 0 {
 		if addClosest(bk) >= size {
 			return closest
 		}
@@ -1231,7 +1231,7 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*N
 
 	// the second closest bank
 	for loop := dt + 1; loop < cap(tabMgr.buckets); loop++ {
-		if bk := tabMgr.buckets[loop]; bk != nil {
+		if bk := tabMgr.buckets[loop]; bk != nil && len(bk.nodes) > 0 {
 			if addClosest(bk) >= size {
 				return closest
 			}
@@ -1242,7 +1242,7 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*N
 
 	// the last bank
 	for loop := dt - 1; loop >= 0; loop-- {
-		if bk := tabMgr.buckets[loop]; bk != nil {
+		if bk := tabMgr.buckets[loop]; bk != nil && len(bk.nodes) > 0 {
 			if addClosest(bk) >= size {
 				return closest
 			}
@@ -1422,16 +1422,6 @@ func (tabMgr *TableManager)tabFindInst(node *um.Node, state int) *instCtrlBlock 
 }
 
 func (tabMgr *TableManager)tabUpdateNodeDb4Query(inst *instCtrlBlock, result int) TabMgrErrno {
-	// 1) Update sending ping request time;
-	// 2) Update receiving pong response time if we receive it indeed;
-	// 3) Update find node failed counter;
-	// 4) When pingpong ok, init the peer node record totally;
-	// 5) When pingpong failed, if the node had been recorded in database, clear
-	// the find node failed counter to be zero;
-	//
-	// Notice: in current implement, peer node records would be removed from node
-	// database just by cleaner task, which checks if conditions are fullfilled to
-	// do that, see it pls.
 	snid := tabMgr.snid
 	var fnFailUpdate = func() TabMgrErrno {
 		id := NodeID(inst.req.(*um.FindNode).To.NodeId)
@@ -1737,7 +1727,7 @@ func (b *bucket) eldestPong(src []*bucketEntry) ([]*bucketEntry) {
 
 func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 	// node must be pinged can it be added into a bucket, if pong does not received
-	// while adding, we set a very old one.
+	// while adding, we set it a very old one.
 	if n == nil || lastQuery == nil || lastPing == nil {
 		tabLog.Debug("tabBucketAddNode: invalid parameters")
 		return TabMgrEnoParameter

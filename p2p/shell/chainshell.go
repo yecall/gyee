@@ -399,7 +399,6 @@ func (shMgr *ShellManager)startDedup() sch.SchErrno {
 			}
 		}
 	}()
-	chainLog.Debug("startDedup: exit")
 	return sch.SchEnoNone
 }
 
