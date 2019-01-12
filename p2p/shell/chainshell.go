@@ -31,6 +31,7 @@ import (
 	peer	"github.com/yeeco/gyee/p2p/peer"
 	dht		"github.com/yeeco/gyee/p2p/dht"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"bytes"
 )
 
 //
@@ -91,6 +92,7 @@ type deDupVal struct {
 
 const (
 	chkkTime		= time.Second * 8
+	keyTime			= time.Second * 8
 	MID_CHKK		= peer.MID_CHKK
 	MID_RPTK		= peer.MID_RPTK
 )
@@ -110,10 +112,12 @@ type ShellManager struct {
 	rxChan			chan *peer.P2pPackageRx					// total rx channel, for rx packages from all instances
 	deDup			bool									// deduplication flag
 	tmDedup			*dht.TimerManager						// deduplication timer manager
+	deDupKeyMap		map[config.DsKey]interface{}			// keys known in local node
 	deDupMap		map[deDupKey]*deDupVal					// map for keys of messages had been sent
 	deDupTiker		*time.Ticker							// deduplication ticker
 	deDupDone		chan bool								// deduplication routine done channel
 	deDupLock		sync.Mutex								// deduplication lock
+	deDupKeyLock	sync.Mutex								// deduplication key lock
 }
 
 //
@@ -131,6 +135,7 @@ func NewShellMgr() *ShellManager  {
 
 	if shMgr.deDup {
 		shMgr.tmDedup = dht.NewTimerManager()
+		shMgr.deDupKeyMap = make(map[config.DsKey]interface{}, 0)
 		shMgr.deDupMap = make(map[deDupKey]*deDupVal, 0)
 		shMgr.deDupTiker = time.NewTicker(dht.OneTick)
 		shMgr.deDupDone = make(chan bool)
@@ -229,13 +234,18 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 
 	chainLog.Debug("peerActiveInd: peer info: %+v", *peerInfo)
 
-	go func() {
+	approc := func() {
 		for {
 			select {
 			case rxPkg, ok := <-peerInst.rxChan:
 				if !ok {
-					chainLog.Debug("peerActiveInd: exit for rxChan closed, peer info: %+v", *peerInfo)
+					chainLog.Debug("approc: exit for rxChan closed, peer info: %+v", *peerInfo)
 					return
+				}
+
+				if shMgr.deDup == false {
+					shMgr.rxChan <- rxPkg
+					continue
 				}
 
 				if rxPkg.MsgId == int(MID_CHKK) {
@@ -248,11 +258,28 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 
 				} else {
 
-					shMgr.rxChan <- rxPkg
+					k := config.DsKey{}
+					copy(k[0:], rxPkg.Key)
+					skm := shMgr.setKeyMap(&k)
+
+					if skm == SKM_OK {
+
+						shMgr.rxChan <- rxPkg
+
+					} else if skm == SKM_DUPLICATED {
+
+						chainLog.Debug("approc: duplicated, key: %x", k)
+
+					} else if skm == SKM_FAILED {
+
+						chainLog.Debug("approc: setKeyMap failed")
+					}
 				}
 			}
 		}
-	}()
+	}
+
+	go approc()
 
 	return sch.SchEnoNone
 }
@@ -340,18 +367,33 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	}
 
 	switch req.MsgType {
+
 	case sch.MSBR_MT_EV, sch.MSBR_MT_TX, sch.MSBR_MT_BLKH:
+
+		if shMgr.deDup {
+			key := config.DsKey{}
+			copy(key[0:], req.Key)
+			skm := shMgr.setKeyMap(&key)
+			if skm == SKM_DUPLICATED || skm == SKM_FAILED {
+				chainLog.Debug("broadcastReq: setKeyMap duplicated or failed, skm: %d", skm)
+				break
+			}
+		}
+
 		for id, pe := range shMgr.peerActived {
 			if pe.status != pisActive {
 				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
 			} else {
-				if shMgr.deDup == false {
-					shMgr.send2Peer(pe, req)
-				} else {
-					shMgr.checkKey(pe, id, req)
+				if req.Exclude == nil || (req.Exclude != nil && bytes.Compare(id.nodeId[0:], req.Exclude[0:]) != 0) {
+					if shMgr.deDup == false {
+						shMgr.send2Peer(pe, req)
+					} else {
+						shMgr.checkKey(pe, id, req)
+					}
 				}
 			}
 		}
+
 	default:
 		chainLog.Debug("broadcastReq: invalid message type: %d", req.MsgType)
 		return sch.SchEnoParameter
@@ -471,15 +513,14 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 
 	chainLog.Debug("checkKeyFromPeer: %s", msg.Chkk.String())
 
-	ddk := deDupKey{}
-	copy(ddk.key[0:], rxPkg.Key)
+	key := config.DsKey{}
+	copy(key[0:], rxPkg.Key)
 
 	spid := shellPeerID {
 		snid:	rxPkg.PeerInfo.Snid,
 		dir:	rxPkg.PeerInfo.Dir,
 		nodeId:	rxPkg.PeerInfo.NodeId,
 	}
-	ddk.peer = spid
 
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
@@ -492,15 +533,14 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		return sch.SchEnoNotFound
 	}
 
-	shMgr.deDupLock.Lock()
-	defer shMgr.deDupLock.Unlock()
-
+	shMgr.deDupKeyLock.Lock()
 	status := int32(peer.KS_NOTEXIST)
-	if _, dup := shMgr.deDupMap[ddk]; dup {
+	if _, dup := shMgr.deDupKeyMap[key]; dup {
 		status = int32(peer.KS_EXIST)
 	}
+	shMgr.deDupKeyLock.Unlock()
 
-	if err := shMgr.reportKey2Peer(pai, &ddk, status); err != nil {
+	if err := shMgr.reportKey2Peer(pai, &key, status); err != nil {
 		chainLog.Debug("checkKeyFromPeer: reportKey2Peer failed, err: %s", err.Error())
 		return sch.SchEnoUserTask
 	}
@@ -577,6 +617,7 @@ func (shMgr *ShellManager)deDupTimerCb(el *list.Element, data interface{}) inter
 
 	ddk, ok := data.(*deDupKey)
 	if !ok {
+		chainLog.Debug("deDupTimerCb: invalid timer data")
 		panic("deDupTimerCb: invalid data")
 	}
 
@@ -605,10 +646,10 @@ func (shMgr *ShellManager)checkKey2Peer(pai *shellPeerInst, ddk *deDupKey) error
 	return nil
 }
 
-func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, ddk *deDupKey, status int32) error {
+func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, key *config.DsKey, status int32) error {
 
 	rptk := peer.ReportKey{}
-	rptk.Key = append(rptk.Key, ddk.key[0:]...)
+	rptk.Key = append(rptk.Key, key[0:]...)
 	rptk.Status = status
 	upkg := new(peer.P2pPackage)
 
@@ -633,4 +674,48 @@ _update_again:
 	shMgr.localSnid = snids
 	shMgr.localNode = nodes
 	return sch.SchEnoNone
+}
+
+const (
+	SKM_OK = iota
+	SKM_DUPLICATED
+	SKM_FAILED
+)
+
+func (shMgr *ShellManager)setKeyMap(k *config.DsKey) int {
+	shMgr.deDupKeyLock.Lock()
+	defer shMgr.deDupKeyLock.Unlock()
+
+	if _, ok := shMgr.deDupKeyMap[*k]; ok {
+		return SKM_DUPLICATED
+	}
+
+	tm, err := shMgr.tmDedup.GetTimer(keyTime, nil, shMgr.deDupKeyCb)
+	if err != dht.TmEnoNone {
+		chainLog.Debug("setKeyMap: GetTimer failed, error: %s", err.Error())
+		return SKM_FAILED
+	}
+
+	shMgr.tmDedup.SetTimerData(tm, k)
+	shMgr.deDupKeyMap[*k] = tm
+
+	if shMgr.tmDedup.StartTimer(tm); err != dht.TmEnoNone {
+		chainLog.Debug("setKeyMap: StartTimer failed, error: %s", err.Error())
+		return SKM_FAILED
+	}
+
+	return SKM_OK
+}
+
+func (shMgr *ShellManager)deDupKeyCb(el *list.Element, data interface{})interface{} {
+	shMgr.deDupKeyLock.Lock()
+	defer shMgr.deDupKeyLock.Unlock()
+
+	k, ok := data.(*config.DsKey)
+	if !ok {
+		chainLog.Debug("deDupKeyCb: invalid timer data")
+		panic("deDupKeyCb: invalid timer data")
+	}
+	delete(shMgr.deDupKeyMap, *k)
+	return nil
 }

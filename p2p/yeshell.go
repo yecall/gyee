@@ -770,15 +770,16 @@ _csLoop:
 }
 
 func (yeShMgr *YeShellManager)chainRxProc() {
-
 _rxLoop:
 	for {
 		select {
 		case pkg, ok := <-yeShMgr.chainRxChan:
+
 			if !ok {
 				yesLog.Debug("chainRxProc: channel closed")
 				break _rxLoop
 			}
+
 			if pkg.ProtoId != int(peer.PID_EXT) {
 				yesLog.Debug("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
 				continue
@@ -795,6 +796,7 @@ _rxLoop:
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 				subList.(*sync.Map).Range(func(key, value interface{}) bool {
+
 					msg := Message {
 						MsgType: msgType,
 						From: fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
@@ -804,17 +806,16 @@ _rxLoop:
 
 					sub, _ := key.(*Subscriber)
 					sub.MsgChan <- msg
+					exclude := pkg.PeerInfo.NodeId
 
 					err := error(nil)
 					switch msg.MsgType {
 					case MessageTypeTx:
-						err = yeShMgr.broadcastTxOsn(&msg, nil)
+						err = yeShMgr.broadcastTxOsn(&msg, &exclude)
 					case MessageTypeEvent:
-						err = yeShMgr.broadcastEvOsn(&msg, nil, false)
+						err = yeShMgr.broadcastEvOsn(&msg, &exclude, false)
 					case MessageTypeBlockHeader:
-						err = yeShMgr.broadcastBhOsn(&msg, nil)
-					case MessageTypeBlock:
-						err = yeShMgr.broadcastBkOsn(&msg, nil)
+						err = yeShMgr.broadcastBhOsn(&msg, &exclude)
 					default:
 						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
 					}
@@ -824,16 +825,19 @@ _rxLoop:
 			}
 		}
 	}
+
 	yesLog.Debug("chainRxProc: exit")
 }
 
 func (yeShMgr *YeShellManager)dhtBootstrapProc() {
 	defer yeShMgr.bsTicker.Stop()
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
+
 _bootstarp:
 	for {
 		select {
 		case <-yeShMgr.bsTicker.C:
+
 			if len(thisCfg.dhtBootstrapNodes) <= 0 {
 				yesLog.Debug("dhtBootstrapProc: none of bootstarp nodes")
 			} else {
@@ -845,22 +849,27 @@ _bootstarp:
 				yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtBlindConnectReq, &req)
 				yeShMgr.dhtInst.SchSendMessage(&msg)
 			}
+
 		case <-yeShMgr.dhtBsChan:
 			break _bootstarp
 		}
 	}
+
 	yesLog.Debug("dhtBootstrapProc: exit")
 }
 
 func (yeShMgr *YeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
+
 	for _, bsn := range thisCfg.dhtBootstrapNodes {
 		if msg.Eno == dht.DhtEnoNone.GetEno() || msg.Eno == dht.DhtEnoDuplicated.GetEno() {
 			if bytes.Compare(msg.Peer.ID[0:], bsn.ID[0:]) == 0 {
+
 				// done the blind-connect routine
 				yesLog.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
 				yeShMgr.dhtBsChan<-true
+
 				// when coming here, we should havd add the connected bootstarp node to our
 				// dht route table, but it's the only node there, we need to start a bootstrap
 				// procedure to fill our route now.
@@ -868,10 +877,12 @@ func (yeShMgr *YeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 				schMsg := sch.SchMessage{}
 				yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtRutRefreshReq, nil)
 				yeShMgr.dhtInst.SchSendMessage(&schMsg)
+
 				return sch.SchEnoNone
 			}
 		}
 	}
+
 	return sch.SchEnoMismatched
 }
 
@@ -980,7 +991,7 @@ func (yeShMgr *YeShellManager)broadcastBk(msg *Message) error {
 	return errors.New("broadcastBk: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude map[config.NodeID]bool) error {
+func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
 	// if local node is a validator, the Tx should be broadcast over the
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
@@ -1035,6 +1046,7 @@ func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeI
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
+		Exclude: exclude,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1078,6 +1090,7 @@ func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeI
 		From: msg.From,
 		Key: msg.Key,
 		Data: msg.Data,
+		Exclude: exclude,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {

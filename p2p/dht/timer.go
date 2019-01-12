@@ -119,7 +119,7 @@ func (mgr *TimerManager)GetTimer(dur time.Duration, dat interface{}, tcb TimerCa
 		return nil, TmEnoPara
 	}
 
-	ss := int64(dur.Seconds())
+	ss := int64(dur.Seconds() / oneTick.Seconds()) + int64(mgr.sp)
 	xs := ss & (xsecondCycle - 1)
 	ss = ss >> xsecondBits
 	xm := ss & (xminuteCycle - 1)
@@ -137,6 +137,7 @@ func (mgr *TimerManager)GetTimer(dur time.Duration, dat interface{}, tcb TimerCa
 		tcb:	tcb,
 		li:		nil,
 		el:		nil,
+		k:		nil,
 	}
 
 	return &tm, TmEnoNone
@@ -156,13 +157,13 @@ func (mgr *TimerManager)SetTimerData(ptm interface{}, data interface{}) error {
 
 func (mgr *TimerManager)SetTimerKey(ptm interface{}, key []byte) error {
 	tm := ptm.(*timer)
-	tm.k = key
+	tm.k = append(tm.k, key...)
 	return TmEnoNone
 }
 
 func (mgr *TimerManager)StartTimer(ptm interface{}) error {
-	tm := ptm.(*timer)
-	if tm == nil {
+	tm, ok := ptm.(*timer)
+	if tm == nil || !ok {
 		return TmEnoPara
 	}
 
