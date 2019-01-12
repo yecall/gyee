@@ -24,7 +24,7 @@ import (
 	"time"
 	"fmt"
 	"container/list"
-	p2plog	"github.com/ethereum/go-ethereum/log"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 

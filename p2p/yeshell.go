@@ -928,9 +928,9 @@ func (yeShMgr *YeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvider
 }
 
 func (yeShMgr *YeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
-	// Notice: only when function DhtSetValue called, put value key would be set
-	// and called would be in a blocked mode, we check this case to feed the signal
-	// into the channel which the caller is pending for, else nothing done.
+	// Notice: only when function DhtSetValue called, yeShMgr.putValKey would be set
+	// and would play in a blocked mode, we check this case to feed the signal into
+	// the channel which the caller is pending for, else nothing done.
 	if yeShMgr.putValKey != nil && len(yeShMgr.putValKey) == yesKeyBytes {
 		if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
 			yesLog.Debug("dhtMgrPutValueRsp: key mismatched")
@@ -1210,7 +1210,7 @@ func Snid2Int(snid config.SubNetworkID) int {
 }
 
 func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
-	// Notice: this function should be called when config.Local is setup
+	// Notice: this function should be called after config.Local is setup
 	if mbs < 0 || mbs > MaxSubNetMaskBits {
 		yesLog.Debug("setupSubNetwork: invalid subnet mask bits: %d", mbs)
 		return errors.New("invalid subnet mask bits")
