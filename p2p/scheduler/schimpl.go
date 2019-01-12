@@ -1613,7 +1613,7 @@ func (sdl *scheduler)schKillTaskTimers(task *schTask) SchErrno {
 
 	task.lock.Lock()
 	stopped := make([]chan bool, 0)
-	for tm, _ := range task.tmIdxTab {
+	for tm := range task.tmIdxTab {
 		tm.tmcb.stop<-true
 		stopped = append(stopped, tm.tmcb.stopped)
 	}

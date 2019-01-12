@@ -437,7 +437,7 @@ func (ngbMgr *NeighborManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) Ngb
 		for idx, id := range ngbMgr.cfg.SubNetIdList {
 			if id == d {
 				ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList[0:idx], ngbMgr.cfg.SubNetIdList[idx+1:]...)
-				break;
+				break
 			}
 		}
 		delete(ngbMgr.cfg.SubNetNodeList, d)

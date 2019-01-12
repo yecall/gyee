@@ -131,7 +131,7 @@ func startGoRoutineMonitor() {
 		http.HandleFunc("/goroutines", func(w http.ResponseWriter, r *http.Request) {
 			num := strconv.FormatInt(int64(runtime.NumGoroutine()), 10)
 			w.Write([]byte(num))
-		});
+		})
 		http.ListenAndServe("localhost:6060", nil)
 	}()
 }

@@ -395,7 +395,7 @@ func (shMgr *ShellManager)startDedup() sch.SchErrno {
 				shMgr.tmDedup.TickProc()
 			case <-shMgr.deDupDone:
 				shMgr.deDupTiker.Stop()
-				break _dedupLoop;
+				break _dedupLoop
 			}
 		}
 	}()
@@ -595,10 +595,12 @@ func (shMgr *ShellManager)checkKey2Peer(pai *shellPeerInst, ddk *deDupKey) error
 	chkk.Key = append(chkk.Key, ddk.key[0:]...)
 	upkg := new(peer.P2pPackage)
 
-	if eno := upkg.CheckKey(pai.pi, &chkk); eno != peer.PeMgrEnoNone {
+	if eno := upkg.CheckKey(pai.pi, &chkk, false); eno != peer.PeMgrEnoNone {
 		chainLog.Debug("checkKey2Peer: CheckKey failed, eno: %d", eno)
 		return errors.New("checkKey2Peer: ReportKey failed")
 	}
+
+	pai.txChan<-upkg
 
 	return nil
 }
@@ -610,10 +612,12 @@ func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, ddk *deDupKey, stat
 	rptk.Status = status
 	upkg := new(peer.P2pPackage)
 
-	if eno := upkg.ReportKey(pai.pi, &rptk); eno != peer.PeMgrEnoNone {
+	if eno := upkg.ReportKey(pai.pi, &rptk, false); eno != peer.PeMgrEnoNone {
 		chainLog.Debug("reportKey2Peer: ReportKey failed, eno: %d", eno)
 		return errors.New("reportKey2Peer: ReportKey failed")
 	}
+
+	pai.txChan<-upkg
 
 	return nil
 }

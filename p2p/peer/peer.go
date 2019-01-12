@@ -680,7 +680,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.dir			= PeInstDirInbound
 
 	peInst.txChan		= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.pingChan		= make(chan *Pingpong, PeInstMaxPings)
+	peInst.ppChan		= make(chan *P2pPackage, PeInstMaxPings)
 	peInst.rxChan		= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
@@ -1408,7 +1408,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	peInst.node				= *node
 
 	peInst.txChan			= make(chan *P2pPackage, PeInstMaxP2packages)
-	peInst.pingChan			= make(chan *Pingpong, PeInstMaxPings)
+	peInst.ppChan			= make(chan *P2pPackage, PeInstMaxPings)
 	peInst.rxChan			= make(chan *P2pPackageRx, PeInstMaxP2packages)
 	peInst.rxDone			= make(chan PeMgrErrno)
 	peInst.rxtxRuning		= false
@@ -1888,7 +1888,7 @@ type PeerInstance struct {
 	ppTid			int							// pingpong timer identity
 	rxChan			chan *P2pPackageRx			// rx pending channel
 	txChan			chan *P2pPackage			// tx pending channel
-	pingChan		chan *Pingpong				// ping channel
+	ppChan			chan *P2pPackage			// ping channel
 	txPendNum		int							// tx pending number
 	txSeq			int64						// statistics sequence number
 	txOkCnt			int64						// tx ok counter
@@ -2150,7 +2150,14 @@ func (pi *PeerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 		Seq:	pi.ppSeq,
 		Extra:	nil,
 	}
-	pi.pingChan<-&ping
+
+	upkg := new(P2pPackage)
+	if eno := upkg.ping(pi, &ping, false); eno != PeMgrEnoNone {
+		peerLog.Debug("piPingpongReq: ping failed, eno: %d", eno)
+		return eno
+	}
+
+	pi.ppChan<-upkg
 
 	return PeMgrEnoNone
 }
@@ -2498,11 +2505,11 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 	}
 
 	var (
-		isPing	bool
+		isPP	bool
 		isData	bool
-		okPing	bool
+		okPP	bool
 		okData	bool
-		ping	*Pingpong
+		ppkg	*P2pPackage
 		upkg	*P2pPackage
 	)
 
@@ -2510,36 +2517,35 @@ _txLoop:
 
 	for {
 
-		isPing = false
-		isData = false
-		okPing = false
-		okData = false
-		ping = (*Pingpong)(nil)
-		upkg = (*P2pPackage)(nil)
+		isPP	= false
+		isData	= false
+		okPP	= false
+		okData	= false
+		ppkg	= (*P2pPackage)(nil)
+		upkg	= (*P2pPackage)(nil)
 
 		select {
-		case ping, okPing = <-pi.pingChan:
-			isPing = true
-			isData = false
+		case ppkg, okPP = <-pi.ppChan:
+			isPP	= true
+			isData	= false
 		case upkg, okData = <-pi.txChan:
-			isPing = false
-			isData = true
+			isPP	= false
+			isData	= true
 		}
 
 		// check if any pendings or done
-		if isPing {
+		if isPP {
 
 			if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
 				time.Sleep(time.Millisecond * 10)
 				continue
 			}
 
-			if okPing && ping != nil {
+			if okPP && ppkg != nil {
 
 				pi.txSeq += 1
 
-				upkg := new(P2pPackage)
-				if eno := upkg.ping(pi, ping); eno == PeMgrEnoNone {
+				if eno := ppkg.SendPackage(pi); eno == PeMgrEnoNone {
 
 					pi.txOkCnt += 1
 
@@ -2776,17 +2782,22 @@ func (pi *PeerInstance)piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 }
 
 func (pi *PeerInstance)piP2pPingProc(ping *Pingpong) PeMgrErrno {
-	upkg := new(P2pPackage)
 	pong := Pingpong {
 		Seq:	ping.Seq,
 		Extra:	nil,
 	}
+
 	pi.ppCnt = 0
-	if eno := upkg.pong(pi, &pong); eno != PeMgrEnoNone {
+	upkg := new(P2pPackage)
+
+	if eno := upkg.pong(pi, &pong, false); eno != PeMgrEnoNone {
 		peerLog.Debug("piP2pPingProc: pong failed, eno: %d, pi: %s",
 			eno, fmt.Sprintf("%+v", *pi))
 		return eno
 	}
+
+	pi.ppChan<-upkg
+
 	return PeMgrEnoNone
 }
 

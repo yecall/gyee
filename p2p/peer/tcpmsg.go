@@ -377,7 +377,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) P
 //
 // Ping
 //
-func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong) PeMgrErrno {
+func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMgrErrno {
 
 	pbPing := pb.P2PMessage{
 		Mid: 		new(pb.MessageId),
@@ -409,19 +409,22 @@ func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong) PeMgrErrno {
 	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 
-	if inst.ato != time.Duration(0) {
-		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
-	} else {
-		inst.conn.SetWriteDeadline(time.Time{})
-	}
+	if write {
 
-	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+		if inst.ato != time.Duration(0) {
+			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		} else {
+			inst.conn.SetWriteDeadline(time.Time{})
+		}
 
-		tcpmsgLog.Debug("ping:"+
-			"Write failed, err: %s",
-			err.Error())
+		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		return PeMgrEnoOs
+			tcpmsgLog.Debug("ping:"+
+				"Write failed, err: %s",
+				err.Error())
+
+			return PeMgrEnoOs
+		}
 	}
 
 	return PeMgrEnoNone
@@ -430,7 +433,7 @@ func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong) PeMgrErrno {
 //
 // Pong
 //
-func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong) PeMgrErrno {
+func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong, write bool) PeMgrErrno {
 
 	pbPong := pb.P2PMessage{
 		Mid: 		new(pb.MessageId),
@@ -462,19 +465,22 @@ func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong) PeMgrErrno {
 	*pbPkg.ExtMid = MID_INVALID
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 
-	if inst.ato != time.Duration(0) {
-		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
-	} else {
-		inst.conn.SetWriteDeadline(time.Time{})
-	}
+	if write {
 
-	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+		if inst.ato != time.Duration(0) {
+			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		} else {
+			inst.conn.SetWriteDeadline(time.Time{})
+		}
 
-		tcpmsgLog.Debug("pong:"+
-			"Write failed, err: %s",
-			err.Error())
+		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		return PeMgrEnoOs
+			tcpmsgLog.Debug("pong:"+
+				"Write failed, err: %s",
+				err.Error())
+
+			return PeMgrEnoOs
+		}
 	}
 
 	return PeMgrEnoNone
@@ -483,7 +489,7 @@ func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong) PeMgrErrno {
 //
 // Check key
 //
-func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey) PeMgrErrno {
+func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) PeMgrErrno {
 
 	pbChkk := pb.ExtMessage{
 		Mid: 		new(pb.MessageId),
@@ -516,19 +522,22 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey) PeMgrErrno {
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 	*pbPkg.PayloadLength = uint32(len(payload))
 
-	if inst.ato != time.Duration(0) {
-		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
-	} else {
-		inst.conn.SetWriteDeadline(time.Time{})
-	}
+	if write {
 
-	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+		if inst.ato != time.Duration(0) {
+			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		} else {
+			inst.conn.SetWriteDeadline(time.Time{})
+		}
 
-		tcpmsgLog.Debug("chkk:"+
-			"Write failed, err: %s",
-			err.Error())
+		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		return PeMgrEnoOs
+			tcpmsgLog.Debug("chkk:"+
+				"Write failed, err: %s",
+				err.Error())
+
+			return PeMgrEnoOs
+		}
 	}
 
 	return PeMgrEnoNone
@@ -537,7 +546,7 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey) PeMgrErrno {
 //
 // Report key
 //
-func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey) PeMgrErrno {
+func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey, write bool) PeMgrErrno {
 	
 	pbRptk := pb.ExtMessage{
 		Mid: 		new(pb.MessageId),
@@ -571,19 +580,22 @@ func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey) PeMgrErrno
 	pbPkg.Payload = append(pbPkg.Payload, payload...)
 	*pbPkg.PayloadLength = uint32(len(payload))
 
-	if inst.ato != time.Duration(0) {
-		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
-	} else {
-		inst.conn.SetWriteDeadline(time.Time{})
-	}
+	if write {
 
-	if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+		if inst.ato != time.Duration(0) {
+			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		} else {
+			inst.conn.SetWriteDeadline(time.Time{})
+		}
 
-		tcpmsgLog.Debug("rptk:"+
-			"Write failed, err: %s",
-			err.Error())
+		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
 
-		return PeMgrEnoOs
+			tcpmsgLog.Debug("rptk:"+
+				"Write failed, err: %s",
+				err.Error())
+
+			return PeMgrEnoOs
+		}
 	}
 
 	return PeMgrEnoNone
