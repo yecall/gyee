@@ -397,19 +397,26 @@ func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMg
 		return PeMgrEnoMessage
 	}
 
-	pbPkg := pb.P2PPackage {
-		Pid:			new(pb.ProtocolId),
-		ExtMid:			new(pb.MessageId),
-		PayloadLength:	new(uint32),
-		Payload:		make([]byte, 0),
-	}
+	if !write {
 
-	*pbPkg.PayloadLength = uint32(len(payload))
-	*pbPkg.Pid = PID_P2P
-	*pbPkg.ExtMid = MID_INVALID
-	pbPkg.Payload = append(pbPkg.Payload, payload...)
+		upkg.Pid = uint32(PID_P2P)
+		upkg.Mid = uint32(*pbPing.Mid)
+		upkg.PayloadLength = uint32(len(payload))
+		upkg.Payload = append(upkg.Payload, payload...)
 
-	if write {
+	} else {
+
+		pbPkg := pb.P2PPackage {
+			Pid:			new(pb.ProtocolId),
+			ExtMid:			new(pb.MessageId),
+			PayloadLength:	new(uint32),
+			Payload:		make([]byte, 0),
+		}
+
+		*pbPkg.PayloadLength = uint32(len(payload))
+		*pbPkg.Pid = PID_P2P
+		*pbPkg.ExtMid = *pbPing.Mid
+		pbPkg.Payload = append(pbPkg.Payload, payload...)
 
 		if inst.ato != time.Duration(0) {
 			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
@@ -453,19 +460,27 @@ func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong, write bool) PeMg
 		return PeMgrEnoMessage
 	}
 
-	pbPkg := pb.P2PPackage {
-		Pid:			new(pb.ProtocolId),
-		ExtMid:			new(pb.MessageId),
-		PayloadLength:	new(uint32),
-		Payload:		make([]byte, 0),
-	}
+	if !write {
 
-	*pbPkg.PayloadLength = uint32(len(payload))
-	*pbPkg.Pid = PID_P2P
-	*pbPkg.ExtMid = MID_INVALID
-	pbPkg.Payload = append(pbPkg.Payload, payload...)
+		upkg.Pid = uint32(PID_P2P)
+		upkg.Mid = uint32(*pbPong.Mid)
+		upkg.PayloadLength = uint32(len(payload))
+		upkg.Payload = append(upkg.Payload, payload...)
 
-	if write {
+	} else {
+
+		pbPkg := pb.P2PPackage {
+			Pid:			new(pb.ProtocolId),
+			ExtMid:			new(pb.MessageId),
+			PayloadLength:	new(uint32),
+			Payload:		make([]byte, 0),
+		}
+
+		*pbPkg.PayloadLength = uint32(len(payload))
+		*pbPkg.Pid = PID_P2P
+		*pbPkg.ExtMid = *pbPong.Mid
+		pbPkg.Payload = append(pbPkg.Payload, payload...)
+
 
 		if inst.ato != time.Duration(0) {
 			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
@@ -508,21 +523,29 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) 
 		return PeMgrEnoMessage
 	}
 
-	pbPkg := pb.P2PPackage {
-		Pid:			new(pb.ProtocolId),
-		ExtMid:			new(pb.MessageId),
-		ExtKey:			make([]byte, 0),
-		PayloadLength:	new(uint32),
-		Payload:		make([]byte, 0),
-	}
+	if !write {
 
-	*pbPkg.Pid = PID_EXT
-	*pbPkg.ExtMid = MID_CHKK
-	pbPkg.ExtKey = append(pbPkg.ExtKey, chkk.Key...)
-	pbPkg.Payload = append(pbPkg.Payload, payload...)
-	*pbPkg.PayloadLength = uint32(len(payload))
+		upkg.Pid = uint32(PID_EXT)
+		upkg.Mid = uint32(*pbChkk.Mid)
+		upkg.Key = append(upkg.Key, chkk.Key...)
+		upkg.PayloadLength = uint32(len(payload))
+		upkg.Payload = append(upkg.Payload, payload...)
 
-	if write {
+	} else {
+
+		pbPkg := pb.P2PPackage {
+			Pid:			new(pb.ProtocolId),
+			ExtMid:			new(pb.MessageId),
+			ExtKey:			make([]byte, 0),
+			PayloadLength:	new(uint32),
+			Payload:		make([]byte, 0),
+		}
+
+		*pbPkg.Pid = PID_EXT
+		*pbPkg.ExtMid = *pbChkk.Mid
+		pbPkg.ExtKey = append(pbPkg.ExtKey, chkk.Key...)
+		pbPkg.Payload = append(pbPkg.Payload, payload...)
+		*pbPkg.PayloadLength = uint32(len(payload))
 
 		if inst.ato != time.Duration(0) {
 			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
@@ -567,20 +590,28 @@ func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey, write bool
 		return PeMgrEnoMessage
 	}
 
-	pbPkg := pb.P2PPackage {
-		Pid:			new(pb.ProtocolId),
-		ExtMid:			new(pb.MessageId),
-		PayloadLength:	new(uint32),
-		Payload:		make([]byte, 0),
-	}
+	if !write {
 
-	*pbPkg.Pid = PID_EXT
-	*pbPkg.ExtMid = MID_RPTK
-	pbPkg.ExtKey = append(pbPkg.ExtKey, rptk.Key...)
-	pbPkg.Payload = append(pbPkg.Payload, payload...)
-	*pbPkg.PayloadLength = uint32(len(payload))
+		upkg.Pid = uint32(PID_EXT)
+		upkg.Mid = uint32(*pbRptk.Mid)
+		upkg.Key = append(upkg.Key, rptk.Key...)
+		upkg.PayloadLength = uint32(len(payload))
+		upkg.Payload = append(upkg.Payload, payload...)
 
-	if write {
+	} else {
+
+		pbPkg := pb.P2PPackage {
+			Pid:			new(pb.ProtocolId),
+			ExtMid:			new(pb.MessageId),
+			PayloadLength:	new(uint32),
+			Payload:		make([]byte, 0),
+		}
+
+		*pbPkg.Pid = PID_EXT
+		*pbPkg.ExtMid = *pbRptk.Mid
+		pbPkg.ExtKey = append(pbPkg.ExtKey, rptk.Key...)
+		pbPkg.Payload = append(pbPkg.Payload, payload...)
+		*pbPkg.PayloadLength = uint32(len(payload))
 
 		if inst.ato != time.Duration(0) {
 			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
