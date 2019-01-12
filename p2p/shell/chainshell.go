@@ -492,6 +492,9 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		return sch.SchEnoNotFound
 	}
 
+	shMgr.deDupLock.Lock()
+	defer shMgr.deDupLock.Unlock()
+
 	status := int32(peer.KS_NOTEXIST)
 	if _, dup := shMgr.deDupMap[ddk]; dup {
 		status = int32(peer.KS_EXIST)
