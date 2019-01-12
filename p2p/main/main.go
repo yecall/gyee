@@ -288,27 +288,27 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 		now := time.Now().UnixNano()
 
 		data := []byte(fmt.Sprintf("ev: %d", now))
+		ev.Data = append(ev.Data[0:0], data...)
 		key := sha256.Sum256(data)
-		ev.Data = data
-		ev.Key = key[0:]
+		ev.Key = append(ev.Key[0:0], key[0:]...)
 		yeShMgr.BroadcastMessageOsn(ev)
 
 		data = []byte(fmt.Sprintf("tx: %d", now))
+		tx.Data = append(tx.Data[0:0], data...)
 		key = sha256.Sum256(data)
-		tx.Data = data
-		tx.Key = key[0:]
+		tx.Key = append(tx.Key[0:0], key[0:]...)
 		yeShMgr.BroadcastMessageOsn(tx)
 
 		data = []byte(fmt.Sprintf("bh: %d", now))
+		bh.Data = append(bh.Data[0:0], data...)
 		key = sha256.Sum256(data)
-		bh.Data = data
-		bh.Key = key[0:]
+		bh.Key = append(bh.Key[0:0], key[0:]...)
 		yeShMgr.BroadcastMessageOsn(bh)
 
 		data = []byte(fmt.Sprintf("bk: %d", now))
+		bk.Data = append(bk.Data[0:0], data...)
 		key = sha256.Sum256(data)
-		bk.Data = data
-		bk.Key = key[0:]
+		bk.Key = append(bk.Key[0:0], key[0:]...)
 		yeShMgr.BroadcastMessageOsn(bk)
 
 		if cnt & 0x7f == 0 {

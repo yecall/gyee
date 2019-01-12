@@ -340,10 +340,7 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	}
 
 	switch req.MsgType {
-	case sch.MSBR_MT_EV:
-	case sch.MSBR_MT_TX:
-	case sch.MSBR_MT_BLKH:
-	default:
+	case sch.MSBR_MT_EV, sch.MSBR_MT_TX, sch.MSBR_MT_BLKH:
 		for id, pe := range shMgr.peerActived {
 			if pe.status != pisActive {
 				chainLog.Debug("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
@@ -355,6 +352,9 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 				}
 			}
 		}
+	default:
+		chainLog.Debug("broadcastReq: invalid message type: %d", req.MsgType)
+		return sch.SchEnoParameter
 	}
 
 	return sch.SchEnoNone
@@ -418,7 +418,7 @@ func (shMgr *ShellManager)checkKey(pe *shellPeerInst, pid shellPeerID, req *sch.
 	}
 
 	if _, dup := shMgr.deDupMap[ddk]; dup {
-		chainLog.Debug("checkKey: duplicated, ddk: %+v", ddk)
+		chainLog.Debug("checkKey: duplicated, type: %d, ddk: %+v", req.MsgType, ddk)
 		return sch.SchEnoDuplicated
 	}
 
@@ -464,7 +464,7 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		return sch.SchEnoUserTask
 	}
 
-	if msg.Mid != uint32(MID_RPTK) {
+	if msg.Mid != uint32(MID_CHKK) {
 		chainLog.Debug("checkKeyFromPeer: message type mismatched, mid: %d", msg.Mid)
 		return sch.SchEnoUserTask
 	}
