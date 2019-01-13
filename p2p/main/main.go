@@ -36,7 +36,7 @@ import (
 	"net/http"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	yep2p	"github.com/yeeco/gyee/p2p"
-	config	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/config"
 	"bytes"
 )
 
@@ -123,7 +123,7 @@ func main() {
 			return
 		}
 	}
-	log.Debug("main: target case not found: %s", tgtCase)
+	log.Debug("main: target case not found: %s", "testCase9")
 }
 
 func startGoMemoryMonitor() {

@@ -140,6 +140,7 @@ type Handshake struct {
 	TCP				uint32					// tcp port number
 	ProtoNum		uint32					// number of protocols supported
 	Protocols		[]DhtProtocol			// version of protocol
+	Extra			[]byte					// extra info
 }
 
 type FindNode struct {
@@ -859,7 +860,7 @@ func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbHs.Id = new(uint64)
 	*pbHs.Id = uint64(time.Now().UnixNano())
-	pbHs.Extra = nil
+	pbHs.Extra = hs.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
@@ -1024,7 +1025,7 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbGvr.Id = new(uint64)
 	*pbGvr.Id = uint64(gvr.Id)
-	pbGvr.Extra = dhtMsg.GetProviderReq.Extra
+	pbGvr.Extra = gvr.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
@@ -1230,12 +1231,14 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 		Ping:		pbPing,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PING
+	ping := dhtMsg.Ping
 
-	pbPing.From = dhtMsg.setNode(&dhtMsg.Ping.From, pb.DhtMessage_CONT_YES)
-	pbPing.To = dhtMsg.setNode(&dhtMsg.Ping.To, pb.DhtMessage_CONT_YES)
+
+	pbPing.From = dhtMsg.setNode(&ping.From, pb.DhtMessage_CONT_YES)
+	pbPing.To = dhtMsg.setNode(&ping.To, pb.DhtMessage_CONT_YES)
 	pbPing.Seq = new(uint64)
-	*pbPing.Seq = uint64(dhtMsg.Ping.Seq)
-	pbPing.Extra = dhtMsg.Ping.Extra
+	*pbPing.Seq = uint64(ping.Seq)
+	pbPing.Extra = ping.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
@@ -1266,12 +1269,13 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 		Pong:		pbPong,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PONG
+	pong := dhtMsg.Pong
 
-	pbPong.From = dhtMsg.setNode(&dhtMsg.Pong.From, pb.DhtMessage_CONT_YES)
-	pbPong.To = dhtMsg.setNode(&dhtMsg.Pong.To, pb.DhtMessage_CONT_YES)
+	pbPong.From = dhtMsg.setNode(&pong.From, pb.DhtMessage_CONT_YES)
+	pbPong.To = dhtMsg.setNode(&pong.To, pb.DhtMessage_CONT_YES)
 	pbPong.Seq = new(uint64)
-	*pbPong.Seq = uint64(dhtMsg.Pong.Seq)
-	pbPong.Extra = dhtMsg.Pong.Extra
+	*pbPong.Seq = uint64(pong.Seq)
+	pbPong.Extra = pong.Extra
 
 	pl, err := pbMsg.Marshal()
 	if err != nil {
