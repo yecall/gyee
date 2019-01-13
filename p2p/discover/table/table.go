@@ -795,8 +795,8 @@ func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 		return TabMgrEnoNotFound
 	}
 
-	if mgr == nil && tabMgr.cfg.bootstrapNode && tabMgr.snid == config.AnySubNet {
-		if mgr = tabMgr.SubNetMgrList[config.AnySubNet]; mgr == nil {
+	if mgr == nil {
+		if mgr = tabMgr.switch2RootInst(); mgr == nil {
 			tabLog.Debug("tabMgrPingedInd: invalid snid: %x", snid)
 			return TabMgrEnoNotFound
 		}
@@ -824,8 +824,8 @@ func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 		return TabMgrEnoNotFound
 	}
 
-	if mgr == nil && tabMgr.cfg.bootstrapNode && tabMgr.snid == config.AnySubNet {
-		if mgr = tabMgr.SubNetMgrList[config.AnySubNet]; mgr == nil {
+	if mgr == nil {
+		if mgr = tabMgr.switch2RootInst(); mgr == nil {
 			tabLog.Debug("tabMgrPongedInd: invalid snid: %x", snid)
 			return TabMgrEnoNotFound
 		}
@@ -853,8 +853,8 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 		return TabMgrEnoNotFound
 	}
 
-	if mgr == nil && tabMgr.cfg.bootstrapNode && tabMgr.snid == config.AnySubNet {
-		if mgr = tabMgr.SubNetMgrList[config.AnySubNet]; mgr == nil {
+	if mgr == nil {
+		if mgr = tabMgr.switch2RootInst(); mgr == nil {
 			tabLog.Debug("tabMgrQueriedInd: invalid snid: %x", snid)
 			return TabMgrEnoNotFound
 		}
@@ -2240,4 +2240,18 @@ func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, err
 		byte(snw & 0xff),
 	}
 	return snid, nil
+}
+
+func (tabMgr *TableManager)switch2RootInst() *TableManager {
+	// notice: "tabMgr" must be the root instance to call this function. this is for
+	// bootstrap node configed as "AnySubNet".
+	mgr := (*TableManager)(nil)
+	if tabMgr.cfg.bootstrapNode {
+		if tabMgr.snid == config.AnySubNet {
+			mgr = tabMgr
+		} else if tabMgr.snid == config.ZeroSubNet && len(tabMgr.SubNetMgrList) == 1 {
+			mgr = tabMgr.SubNetMgrList[config.AnySubNet]
+		}
+	}
+	return mgr
 }
