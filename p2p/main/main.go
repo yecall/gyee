@@ -338,8 +338,8 @@ func yeDhtProc(yeShMgr yep2p.Service) {
 		key := sha256.Sum256(data)
 		bk.Key = append(bk.Key[0:0], key[0:]...)
 
-		if err := yeShMgr.BroadcastMessageOsn(bk); err != nil {
-			log.Debug("yeDhtProc: BroadcastMessageOsn failed, err: %s", err.Error())
+		if err := yeShMgr.DhtSetValue(bk.Key, bk.Data); err != nil {
+			log.Debug("yeDhtProc: DhtSetValue failed, err: %s", err.Error())
 		} else {
 			log.Debug("yeDhtProc: value put\nkey: %x\nvalue: %x\n", bk.Key, bk.Data)
 			time.Sleep(time.Millisecond * 1000)

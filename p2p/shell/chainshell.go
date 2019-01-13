@@ -376,8 +376,8 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 			key := config.DsKey{}
 			copy(key[0:], req.Key)
 			skm := shMgr.setKeyMap(&key)
+			chainLog.Debug("broadcastReq: setKeyMap result skm: %d", skm)
 			if skm == SKM_DUPLICATED || skm == SKM_FAILED {
-				chainLog.Debug("broadcastReq: setKeyMap duplicated or failed, skm: %d", skm)
 				break
 			}
 		}
@@ -388,9 +388,11 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 			} else {
 				if req.Exclude == nil || (req.Exclude != nil && bytes.Compare(id.nodeId[0:], req.Exclude[0:]) != 0) {
 					if shMgr.deDup == false {
-						shMgr.send2Peer(pe, req)
+						eno := shMgr.send2Peer(pe, req)
+						chainLog.Debug("broadcastReq: send2Peer result eno: %d", eno)
 					} else {
-						shMgr.checkKey(pe, id, req)
+						eno := shMgr.checkKey(pe, id, req)
+						chainLog.Debug("broadcastReq: checkKey result eno: %d", eno)
 					}
 				}
 			}
