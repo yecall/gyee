@@ -831,12 +831,11 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	}
 
 	//
-	// check if target found: if true, query should be ended, report the result
+	// check if target found: if true, query should be stopped, result should be reported
 	//
 
 	if msg.ForWhat == sch.EvDhtConInstNeighbors ||
-		msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
-		msg.ForWhat == sch.EvDhtConInstGetValRsp {
+		msg.ForWhat == sch.EvDhtConInstGetProviderRsp {
 
 		for _, peer := range msg.Peers {
 
@@ -853,6 +852,20 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 				return sch.SchEnoNone
 			}
+		}
+
+	} else if msg.ForWhat == sch.EvDhtConInstGetValRsp {
+
+		if msg.Value != nil && len(msg.Value) > 0 {
+
+			qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), peer, msg.Value, msg.Provider)
+
+			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
+				qryLog.Debug("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
+				return sch.SchEnoUserTask
+			}
+
+			return sch.SchEnoNone
 		}
 	}
 
