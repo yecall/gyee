@@ -253,14 +253,17 @@ type DhtProviderStoreRecord struct {
 func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 
 	if dhtMsg == nil {
+		protoLog.Debug("GetMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
 	if dhtPkg.Pid != uint32(PID_DHT) {
+		protoLog.Debug("GetMessage: invalid pid: %d", dhtPkg.Pid)
 		return DhtEnoMismatched
 	}
 
 	if dhtPkg.PayloadLength == 0 || int(dhtPkg.PayloadLength) != len(dhtPkg.Payload) {
+		protoLog.Debug("GetMessage: invalid payload")
 		return DhtEnoSerialization
 	}
 
@@ -276,36 +279,47 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 	switch mid {
 
 	case pb.DhtMessage_MID_HANDSHAKE:
+		protoLog.Debug("GetMessage: DhtMessage_MID_HANDSHAKE")
 		eno = dhtMsg.GetHandshakeMessage(pbMsg.Handshake)
 
 	case pb.DhtMessage_MID_FINDNODE:
+		protoLog.Debug("GetMessage: DhtMessage_MID_FINDNODE")
 		eno = dhtMsg.GetFindNodeMessage(pbMsg.FindNode)
 
 	case pb.DhtMessage_MID_NEIGHBORS:
+		protoLog.Debug("GetMessage: DhtMessage_MID_NEIGHBORS")
 		eno = dhtMsg.GetNeighborsMessage(pbMsg.Neighbors)
 
 	case pb.DhtMessage_MID_PUTVALUE:
+		protoLog.Debug("GetMessage: DhtMessage_MID_PUTVALUE")
 		eno = dhtMsg.GetPutValueMessage(pbMsg.PutValue)
 
 	case pb.DhtMessage_MID_GETVALUE_REQ:
+		protoLog.Debug("GetMessage: DhtMessage_MID_GETVALUE_REQ")
 		eno = dhtMsg.GetGetValueReqMessage(pbMsg.GetValueReq)
 
 	case pb.DhtMessage_MID_GETVALUE_RSP:
+		protoLog.Debug("GetMessage: DhtMessage_MID_GETVALUE_RSP")
 		eno = dhtMsg.GetGetValueRspMessage(pbMsg.GetValueRsp)
 
 	case pb.DhtMessage_MID_PUTPROVIDER:
+		protoLog.Debug("GetMessage: DhtMessage_MID_PUTPROVIDER")
 		eno = dhtMsg.GetPutProviderMessage(pbMsg.PutProvider)
 
 	case pb.DhtMessage_MID_GETPROVIDER_REQ:
+		protoLog.Debug("GetMessage: DhtMessage_MID_GETPROVIDER_REQ")
 		eno = dhtMsg.GetGetProviderReqMessage(pbMsg.GetProviderReq)
 
 	case pb.DhtMessage_MID_GETPROVIDER_RSP:
+		protoLog.Debug("GetMessage: DhtMessage_MID_GETPROVIDER_RSP")
 		eno = dhtMsg.GetGetProviderRspMessage(pbMsg.GetProviderRsp)
 
 	case pb.DhtMessage_MID_PING:
+		protoLog.Debug("GetMessage: DhtMessage_MID_PING")
 		eno = dhtMsg.GetPingMessage(pbMsg.Ping)
 
 	case pb.DhtMessage_MID_PONG:
+		protoLog.Debug("GetMessage: DhtMessage_MID_PONG")
 		eno = dhtMsg.GetPongMessage(pbMsg.Pong)
 
 	default:
@@ -1276,6 +1290,11 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 // Encode data store (key, value) record
 //
 func (dhtDsRec *DhtDatastoreRecord)EncDsRecord(dsr *DsRecord) DhtErrno {
+
+	// Notice: the [key, value] pair stored can not be a simple pair of [key, value]
+	// from the datastore user, depended on the application, more complexity might be
+	// needed. Aimed at this, encoding/decoding are introduced, but currently, not so
+	// much are took into account. See DecDsRecord also please.
 
 	if dsr == nil {
 		protoLog.Debug("EncDsRecord: invalid parameters")

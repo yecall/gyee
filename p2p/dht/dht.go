@@ -131,10 +131,7 @@ func (dhtMgr *DhtMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 //
 func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ptn == nil || msg == nil {
-		dhtLog.Debug("dhtMgrProc: invalid parameters")
-		return sch.SchEnoParameter
-	}
+	dhtLog.Debug("dhtMgrProc: name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
 
 	var eno = sch.SchEnoUnknown
 
@@ -213,6 +210,8 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = sch.SchEnoParameter
 		dhtLog.Debug("dhtMgrProc: invalid event, id: %d", msg.Id)
 	}
+
+	dhtLog.Debug("dhtMgrProc: get out, name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
 
 	return eno
 }

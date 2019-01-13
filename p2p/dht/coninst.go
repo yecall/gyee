@@ -1253,15 +1253,11 @@ _txLoop:
 		// get pending and send it
 		//
 
-		ciLog.Debug("txProc: 1, peer: %x", conInst.hsInfo.peer.ID)
-
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
 			ciLog.Debug("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
 		}
-
-		ciLog.Debug("txProc: 2, peer: %x", conInst.hsInfo.peer.ID)
 
 		pbPkg = new(pb.DhtPackage)
 		dhtPkg.ToPbPackage(pbPkg)
@@ -1272,8 +1268,6 @@ _txLoop:
 		// task before we are blocked here.
 		//
 
-		ciLog.Debug("txProc: 3, peer: %x", conInst.hsInfo.peer.ID)
-
 		if txPkg.responsed != nil {
 			if eno, el := conInst.txSetPending(txPkg); eno != DhtEnoNone || el == nil {
 				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
@@ -1282,8 +1276,6 @@ _txLoop:
 				conInst.txSetTimer(el)
 			}
 		}
-
-		ciLog.Debug("txProc: 4, peer: %x", conInst.hsInfo.peer.ID)
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 			ciLog.Debug("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
@@ -1294,8 +1286,6 @@ _txLoop:
 		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
 			ciLog.Debug("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
 		}
-
-		ciLog.Debug("txProc: 5, peer: %x", conInst.hsInfo.peer.ID)
 
 	_checkDone:
 
@@ -1372,8 +1362,6 @@ _rxLoop:
 
 		var msg *DhtMessage = nil
 
-		ciLog.Debug("rxProc: 0")
-
 		pbPkg := new(pb.DhtPackage)
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
 			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s, hsInfo: %+v, local: %+v",
@@ -1385,8 +1373,6 @@ _rxLoop:
 		if conInst.rxPkgCnt++; conInst.rxPkgCnt % 16 == 0 {
 			ciLog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
 		}
-
-		ciLog.Debug("rxProc: 1")
 
 		pkg := new(DhtPackage)
 		pkg.FromPbPackage(pbPkg)
@@ -1404,21 +1390,15 @@ _rxLoop:
 			goto _checkDone
 		}
 
-		ciLog.Debug("rxProc: 2")
-
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
 			ciLog.Debug("rxProc:GetMessage failed, inst: %s, eno: %d", conInst.name, eno)
 			goto _checkDone
 		}
 
-		ciLog.Debug("rxProc: 3")
-
 		if eno := conInst.dispatch(msg); eno != DhtEnoNone {
 			ciLog.Debug("rxProc: dispatch failed, inst: %s, eno: %d", conInst.name, eno)
 		}
-
-		ciLog.Debug("rxProc: 4")
 
 _checkDone:
 

@@ -345,7 +345,7 @@ func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep
 
 		} else {
 
-			log.Debug("yeDhtProc: value put\nkey: %x\nvalue: %x\n", bk.Key, bk.Data)
+			log.Debug("yeDhtProc: value put:\n\tkey: %x\n\tvalue: %x", bk.Key, bk.Data)
 			time.Sleep(time.Millisecond * 1000)
 
 			if val, err := yeShMgr.DhtGetValue(bk.Key); err != nil {
@@ -354,7 +354,7 @@ func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep
 
 			} else {
 
-				log.Debug("yeDhtProc: value got\nkey: %x\nvalue: %x\n", bk.Key, val)
+				log.Debug("yeDhtProc: good got:\n\tkey: %x\n\tvalue: %x", bk.Key, val)
 
 				if bytes.Compare(bk.Data, val) != 0 {
 					log.Debug("yeDhtProc: value mismatched")
@@ -492,7 +492,7 @@ func testCase9(tc *testCase) {
 	go subFunc(subTx, "tx")
 	go subFunc(subBh, "bh")
 
-	if true {
+	if false {
 		waitInterruptWithCallback(yeShMgr, yeDhtProc, yeChainStop)
 	} else {
 		time.Sleep(time.Second * 10)

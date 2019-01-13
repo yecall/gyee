@@ -183,10 +183,7 @@ func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.
 //
 func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ptn == nil || msg == nil {
-		dsLog.Debug("dsMgrProc: invalid parameters")
-		return sch.SchEnoParameter
-	}
+	dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	eno := sch.SchEnoUnknown
 
@@ -226,6 +223,8 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 		eno = sch.SchEnoParameter
 		dsLog.Debug("dsMgrProc: unknown message: %d", msg.Id)
 	}
+
+	dsLog.Debug("dsMgrProc: get out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	return eno
 }
@@ -705,7 +704,7 @@ func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 		return nil
 	}
 
-	return  dsr.Value.([]byte)
+	return  ddsr.Value
 }
 
 //

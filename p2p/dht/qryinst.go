@@ -212,8 +212,8 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 		IsBlind:	false,
 	}
 
-	qiLog.Debug("startReq: ask connection manager for peer, " +
-		"inst: %s, to: %+v", qryInst.icb.name, *req.Peer)
+	qiLog.Debug("startReq: ask connection manager for peer, inst: %s, ForWhat: %d, to: %+v",
+		icb.name, icb.qryReq.ForWhat, *req.Peer)
 
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
 	icb.sdl.SchSendMessage(&msg)
@@ -397,7 +397,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		return sch.SchEnoParameter
 	}
 
-	qiLog.Debug("connectRsp: eno: %d, peer: %+v", msg.Eno, *msg.Peer)
+	qiLog.Debug("connectRsp: ForWhat: %d, eno: %d, peer: %+v",
+		qryInst.icb.qryReq.ForWhat, msg.Eno, *msg.Peer)
 
 	icb := qryInst.icb
 	sdl := icb.sdl
@@ -424,8 +425,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	if msg.Eno != DhtEnoNone.GetEno() && msg.Eno != DhtEnoDuplicated.GetEno() {
 
 		qiLog.Debug("connectRsp:" +
-			"connect failed, eno: %d, peer: %+V",
-			msg.Eno, *msg.Peer)
+			"connect failed, ForWhat: %d, eno: %d, peer: %+V",
+			icb.qryReq.ForWhat, msg.Eno, *msg.Peer)
 
 		ind.Status = qisDone
 		icb.status = qisDone
@@ -448,7 +449,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	if eno != DhtEnoNone {
 
-		qiLog.Debug("connectRsp: setupQryPkg failed, eno: %d", eno)
+		qiLog.Debug("connectRsp: setupQryPkg failed, ForWhat: %d, eno: %d",
+			icb.qryReq.ForWhat, eno)
 
 		ind.Status = qisDone
 		icb.status = qisDone
@@ -461,7 +463,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	}
 
 	qiLog.Debug("connectRsp: setupQryPkg ok, " +
-		"inst: %s, icb.qryReq: %+v", icb.name, *icb.qryReq)
+		"inst: %s, ForWhat: %d, icb.qryReq: %+v",
+		icb.name, icb.qryReq.ForWhat, *icb.qryReq)
 
 	sendReq.Task = icb.ptnInst
 	sendReq.Peer = &icb.to

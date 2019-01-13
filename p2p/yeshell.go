@@ -45,7 +45,7 @@ type yesLogger struct {
 }
 
 var yesLog = yesLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log yesLogger)Debug(fmt string, args ... interface{}) {
@@ -268,6 +268,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	var eno sch.SchErrno
 	yeShMgr := YeShellManager{
 		name: yesCfg.Name,
+		putValKey: make([]byte, 0),
 	}
 
 	cfg := YeShellConfigToP2pCfg(yesCfg)
@@ -521,11 +522,21 @@ func (yeShMgr *YeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 		return nil, eno
 	}
 
+	yesLog.Debug("DhtGetValue: to pend on getValChan")
+
 	copy(yeShMgr.getValKey[0:], key)
-	if val, ok := <-yeShMgr.getValChan; ok {
-		return val, nil
+	val, ok := <-yeShMgr.getValChan
+	yeShMgr.getValKey = yesKey{0x00, 0x00}
+
+	yesLog.Debug("DhtGetValue: get out from getValChan, ok: %t, val: %x", ok, val)
+
+	if !ok {
+		return nil, errors.New("DhtGetValue: failed, channel closed")
+	} else if len(val) <= 0 {
+		return nil, errors.New("DhtGetValue: empty value")
 	}
-	return nil, errors.New("DhtGetValue: failed, channel closed")
+
+	return val, nil
 }
 
 func (yeShMgr *YeShellManager)DhtSetValue(key []byte, value []byte) error {
@@ -546,9 +557,14 @@ func (yeShMgr *YeShellManager)DhtSetValue(key []byte, value []byte) error {
 		return eno
 	}
 
-	copy(yeShMgr.putValKey, key)
+	yesLog.Debug("DhtSetValue: to pend on putValChan")
+
+	yeShMgr.putValKey = append(yeShMgr.putValKey, key...)
 	result, ok := <-yeShMgr.putValChan
-	yeShMgr.putValKey = nil
+	yeShMgr.putValKey = make([]byte, 0)
+
+	yesLog.Debug("DhtSetValue: get out from putValChan, result: %t, ok: %t", result, ok)
+
 	if !ok {
 		return errors.New("DhtSetValue: failed, channel closed")
 	}
@@ -657,8 +673,13 @@ func (yeShMgr *YeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 }
 
 func (yeShMgr *YeShellManager)dhtEvProc() {
+
 	evCh := yeShMgr.dhtEvChan
+
 	evHandler := func(evi *sch.MsgDhtShEventInd) error {
+
+		yesLog.Debug("evHandler: event: %d", evi.Evt)
+
 		eno := sch.SchEnoNone
 		switch evi.Evt {
 
@@ -696,6 +717,8 @@ func (yeShMgr *YeShellManager)dhtEvProc() {
 			yesLog.Debug("evHandler: invalid event: %d", evi.Evt)
 			eno = sch.SchEnoParameter
 		}
+
+		yesLog.Debug("evHandler: get out, event: %d", evi.Evt)
 
 		return eno
 	}
@@ -959,7 +982,7 @@ func (yeShMgr *YeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) s
 
 func (yeShMgr *YeShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 	yesLog.Debug("dhtMgrGetValueRsp: msg: %+v", *msg)
-	if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
+	if bytes.Compare(yeShMgr.getValKey[0:], msg.Key) != 0 {
 		yesLog.Debug("dhtMgrGetValueRsp: key mismatched")
 		return sch.SchEnoMismatched
 	}

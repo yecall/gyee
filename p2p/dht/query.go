@@ -329,7 +329,8 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 		return sch.SchEnoMismatched
 	}
 
-	qryLog.Debug("queryStartReq: sender: %p, msg: %+v", sender, msg)
+	qryLog.Debug("queryStartReq: ForWhat: %d, sender: %s",
+		msg.ForWhat, qryMgr.sdl.SchGetTaskName(sender))
 
 	var forWhat = msg.ForWhat
 	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno:DhtEnoUnknown.GetEno()}
@@ -413,6 +414,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		qryLog.Debug("rutNearestRsp: unknown what's for")
 		return sch.SchEnoMismatched
 	}
+
+	qryLog.Debug("rutNearestRsp: ForWhat: %d", msg.ForWhat)
 
 	forWhat := msg.ForWhat
 	target := msg.Target
@@ -738,6 +741,8 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		qryLog.Debug("instResultInd: mismatched, it's %d", msg.ForWhat)
 		return sch.SchEnoMismatched
 	}
+
+	qryLog.Debug("instResultInd: ForWhat: %d", msg.ForWhat)
 
 	var qcb *qryCtrlBlock= nil
 	var qpiList = make([]*qryPendingInfo, 0)
@@ -1309,7 +1314,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			conEndTime:	time.Time{},
 		}
 
-		qryLog.Debug("qryMgrQcbPutActived: icb: %+v", icb)
+		qryLog.Debug("qryMgrQcbPutActived: ForWhat: %d", icb.qryReq.ForWhat)
 
 		qryInst := NewQryInst()
 		qryInst.icb = &icb
@@ -1456,6 +1461,9 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 			ind.Peers[idx] = &v.node
 		}
 	}
+
+	qryLog.Debug("qryMgrResultReport: eno: %d, ForWhat: %d, task: %s",
+		ind.Eno, ind.ForWhat, qryMgr.sdl.SchGetTaskName(qcb.ptnOwner))
 
 	qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 	qryMgr.sdl.SchSendMessage(&msg)

@@ -149,6 +149,8 @@ func (shMgr *DhtShellManager)poweroff(ptn interface{}) sch.SchErrno {
 
 func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {
 
+	dhtLog.Debug("dhtShEventInd: event type: %d", ind.Evt)
+
 	evt := ind.Evt
 	msg := ind.Msg
 	eno := sch.SchEnoUnknown
@@ -193,6 +195,8 @@ func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 		return sch.SchEnoParameter
 	}
 
+	dhtLog.Debug("dhtTestEventCallback: event put to channel, type: %d", evt)
+
 	if eno == sch.SchEnoNone {
 		shMgr.evChan<-ind
 	}
@@ -201,42 +205,52 @@ func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 }
 
 func (shMgr *DhtShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
+	dhtLog.Debug("dhtBlindConnectRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+	dhtLog.Debug("dhtMgrFindPeerRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	dhtLog.Debug("dhtQryMgrQueryStartRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	dhtLog.Debug("dhtQryMgrQueryStopRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
+	dhtLog.Debug("dhtConMgrSendCfm: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+	dhtLog.Debug("dhtMgrPutProviderRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
+	dhtLog.Debug("dhtMgrGetProviderRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	dhtLog.Debug("dhtMgrPutValueRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+	dhtLog.Debug("dhtMgrGetValueRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+	dhtLog.Debug("dhtConMgrCloseRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
