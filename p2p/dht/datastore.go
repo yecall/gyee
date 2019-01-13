@@ -652,7 +652,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	}
 
 	dhtMsg := DhtMessage {
-		Mid:			MID_GETPROVIDER_RSP,
+		Mid:			MID_GETVALUE_RSP,
 		GetValueRsp:	&rsp,
 	}
 
