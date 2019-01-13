@@ -791,7 +791,15 @@ func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 	snid := ping.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
+		tabLog.Debug("tabMgrPingedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
+	}
+
+	if mgr == nil && tabMgr.cfg.bootstrapNode && tabMgr.snid == config.AnySubNet {
+		if mgr = tabMgr.SubNetMgrList[config.AnySubNet]; mgr == nil {
+			tabLog.Debug("tabMgrPingedInd: invalid snid: %x", snid)
+			return TabMgrEnoNotFound
+		}
 	}
 
 	if mgr.tabShouldBound(NodeID(ping.From.NodeId)) != true {
@@ -812,7 +820,15 @@ func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 	snid := pong.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
+		tabLog.Debug("tabMgrPongedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
+	}
+
+	if mgr == nil && tabMgr.cfg.bootstrapNode && tabMgr.snid == config.AnySubNet {
+		if mgr = tabMgr.SubNetMgrList[config.AnySubNet]; mgr == nil {
+			tabLog.Debug("tabMgrPongedInd: invalid snid: %x", snid)
+			return TabMgrEnoNotFound
+		}
 	}
 
 	if mgr.tabShouldBound(NodeID(pong.From.NodeId)) != true {
@@ -833,7 +849,15 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 	snid := findNode.SubNetId
 	mgr, ok := tabMgr.SubNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
+		tabLog.Debug("tabMgrQueriedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
+	}
+
+	if mgr == nil && tabMgr.cfg.bootstrapNode && tabMgr.snid == config.AnySubNet {
+		if mgr = tabMgr.SubNetMgrList[config.AnySubNet]; mgr == nil {
+			tabLog.Debug("tabMgrQueriedInd: invalid snid: %x", snid)
+			return TabMgrEnoNotFound
+		}
 	}
 
 	if mgr.tabShouldBound(NodeID(findNode.From.NodeId)) != true {

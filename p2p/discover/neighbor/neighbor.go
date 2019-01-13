@@ -952,12 +952,17 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 }
 
 func (ngbMgr *NeighborManager)checkDestNode(dst *um.Node, snid config.SubNetworkID) bool {
+	if snid == config.AnySubNet {
+		return true
+	}
+
 	cfg := ngbMgr.sdl.SchGetP2pConfig()
 	if cfg.BootstrapNode && ngbMgr.cfg.ID == dst.NodeId {
 		return true
 	} else if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
 		return me.ID == dst.NodeId
 	}
+
 	return false
 }
 
