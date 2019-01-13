@@ -34,7 +34,7 @@ type dhtShellLogger struct {
 }
 
 var dhtLog = dhtShellLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log dhtShellLogger)Debug(fmt string, args ... interface{}) {
@@ -84,6 +84,8 @@ func (shMgr *DhtShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMes
 //
 func (shMgr *DhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
+	dhtLog.Debug("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
+
 	eno := sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -121,6 +123,8 @@ func (shMgr *DhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 		dhtLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
+
+	dhtLog.Debug("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
 
 	return eno
 }

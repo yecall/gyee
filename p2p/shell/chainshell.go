@@ -24,6 +24,7 @@ import (
 	"time"
 	"fmt"
 	"sync"
+	"bytes"
 	"container/list"
 	"github.com/pkg/errors"
 	config	"github.com/yeeco/gyee/p2p/config"
@@ -31,7 +32,6 @@ import (
 	peer	"github.com/yeeco/gyee/p2p/peer"
 	dht		"github.com/yeeco/gyee/p2p/dht"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"bytes"
 )
 
 //
@@ -156,6 +156,7 @@ func (shMgr *ShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessag
 // Shell manager entry
 //
 func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+	chainLog.Debug("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
 	case sch.EvSchPoweron:
@@ -180,6 +181,7 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		chainLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
+	chainLog.Debug("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
 	return eno
 }
 
