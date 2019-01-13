@@ -692,27 +692,33 @@ const (
 
 func (shMgr *ShellManager)setKeyMap(k *config.DsKey) int {
 	shMgr.deDupKeyLock.Lock()
-	shMgr.deDupLock.Lock()
-	defer shMgr.deDupKeyLock.Unlock()
-	defer shMgr.deDupLock.Unlock()
-
 	if _, ok := shMgr.deDupKeyMap[*k]; ok {
+		shMgr.deDupKeyLock.Unlock()
 		return SKM_DUPLICATED
 	}
+
+	// deDupLock.Lock !!!
+	shMgr.deDupLock.Lock()
 
 	tm, err := shMgr.tmDedup.GetTimer(keyTime, nil, shMgr.deDupKeyCb)
 	if err != dht.TmEnoNone {
 		chainLog.Debug("setKeyMap: GetTimer failed, error: %s", err.Error())
+		shMgr.deDupLock.Unlock()
 		return SKM_FAILED
 	}
-
 	shMgr.tmDedup.SetTimerData(tm, k)
-	shMgr.deDupKeyMap[*k] = tm
-
 	if shMgr.tmDedup.StartTimer(tm); err != dht.TmEnoNone {
 		chainLog.Debug("setKeyMap: StartTimer failed, error: %s", err.Error())
+		shMgr.deDupLock.Unlock()
 		return SKM_FAILED
 	}
+
+	// deDupLock.Unlock !!!
+	shMgr.deDupLock.Unlock()
+
+	shMgr.deDupKeyLock.Lock()
+	shMgr.deDupKeyMap[*k] = tm
+	shMgr.deDupKeyLock.Unlock()
 
 	return SKM_OK
 }
