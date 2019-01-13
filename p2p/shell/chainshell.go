@@ -696,6 +696,7 @@ func (shMgr *ShellManager)setKeyMap(k *config.DsKey) int {
 		shMgr.deDupKeyLock.Unlock()
 		return SKM_DUPLICATED
 	}
+	shMgr.deDupKeyLock.Unlock()
 
 	// deDupLock.Lock !!!
 	shMgr.deDupLock.Lock()
