@@ -1326,6 +1326,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			endTime:	time.Time{},
 			conBegTime:	time.Time{},
 			conEndTime:	time.Time{},
+			depth:		pending.depth,
 		}
 
 		qryLog.Debug("qryMgrQcbPutActived: ForWhat: %d", icb.qryReq.ForWhat)
