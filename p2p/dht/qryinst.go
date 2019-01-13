@@ -38,7 +38,7 @@ type qiMgrLogger struct {
 }
 
 var qiLog = qiMgrLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log qiMgrLogger)Debug(fmt string, args ... interface{}) {
