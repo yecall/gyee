@@ -145,6 +145,7 @@ type DsMgr struct {
 	ptnDhtMgr	interface{}				// pointer to dht manager task node
 	ptnQryMgr	interface{}				// pointer to query manager task node
 	ptnRutMgr	interface{}				// pointer to route manager task node
+	getfromPeer	bool					// do not try getting value from local store, true for debug/test only
 	ds			Datastore				// data store
 	dsExp		Datastore				// data store for expired time
 	fdsCfg		FileDatastoreConfig		// file data store configuration
@@ -159,11 +160,12 @@ type DsMgr struct {
 func NewDsMgr() *DsMgr {
 
 	dsMgr := DsMgr{
-		name:		DsMgrName,
-		fdsCfg:		FileDatastoreConfig{},
-		ldsCfg:		LeveldbDatastoreConfig{},
-		tmMgr:		NewTimerManager(),
-		tidTick:	sch.SchInvalidTid,
+		name:			DsMgrName,
+		getfromPeer:	true,
+		fdsCfg:			FileDatastoreConfig{},
+		ldsCfg:			LeveldbDatastoreConfig{},
+		tmMgr:			NewTimerManager(),
+		tidTick:		sch.SchInvalidTid,
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -451,8 +453,10 @@ func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno 
 	// try local data store
 	//
 
-	if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
-		return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
+	if !dsMgr.getfromPeer {
+		if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
+			return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
+		}
 	}
 
 	//
