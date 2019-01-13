@@ -490,6 +490,23 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		nearestDist = []int{bn.dist}
 	}
 
+	if req.Filter != nil {
+		if filter, ok := req.Filter.(func(ns []*rutMgrBucketNode)); ok && filter != nil{
+			filter(nearest)
+		}
+	}
+
+	for idx, n := range nearest {
+		if bytes.Compare(n.node.ID[0:], rutMgr.localNodeId[0:]) == 0 {
+			if idx != len(nearest) - 1 {
+				nearest = append(nearest[0:idx], nearest[idx+1:]...)
+			} else {
+				nearest = append([]*rutMgrBucketNode{}, nearest[0:idx-1]...)
+			}
+			break
+		}
+	}
+
 	pcsTab := make([]int, 0)
 	rsp.Peers = nearest
 	rsp.Dists = nearestDist
@@ -525,6 +542,23 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 	why := req.Why
 	eno := req.Eno
 
+	doUpdate := func(shaLocal *Hash, n *config.Node, dur time.Duration, pcs conMgrPeerConnStat) {
+		hash := rutMgrNodeId2Hash(n.ID)
+		dist := rutMgr.rutMgrLog2Dist(shaLocal, hash)
+
+		rutMgr.rutMgrMetricSample(n.ID, dur)
+
+		bn := rutMgrBucketNode{
+			node:  *n,
+			hash:  *hash,
+			dist:  dist,
+			fails: 0,
+			pcs:   int(conInstStatus2PCS(CisHandshaked)),
+		}
+
+		rutMgr.update(&bn, dist)
+	}
+
 	//
 	// check "why" and "eno"
 	//
@@ -538,24 +572,9 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		//
 
 		rt := &rutMgr.rutTab
-
 		for idx, n := range req.Seens {
-
-			hash := rutMgrNodeId2Hash(n.ID)
-			dist := rutMgr.rutMgrLog2Dist(&rt.shaLocal, hash)
-			dur := req.Duras[idx]
-
-			rutMgr.rutMgrMetricSample(n.ID, dur)
-
-			bn := rutMgrBucketNode{
-				node:	n,
-				hash:	*hash,
-				dist:	dist,
-				fails:	0,
-				pcs:	int(conInstStatus2PCS(CisHandshaked)),
-			}
-
-			rutMgr.update(&bn, dist)
+			pcs := conInstStatus2PCS(CisHandshaked)
+			doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
 			rutMgr.showRoute("handshake-update")
 		}
 
@@ -635,6 +654,12 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		//
 
 		for idx, n := range req.Seens {
+
+			if bytes.Compare(n.ID[0:], rutMgr.localNodeId[0:]) == 0 {
+				rutLog.Debug("updateReq: local node seen")
+				continue
+			}
+
 			dur := req.Duras[idx]
 			rutMgr.rutMgrMetricSample(n.ID, dur)
 
@@ -644,6 +669,11 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			if eno, el := rutMgr.find(p, d); eno == DhtEnoNone {
 				bn := el.Value.(*rutMgrBucketNode)
 				bn.fails = 0
+			} else {
+				rt := &rutMgr.rutTab
+				pcs := conInstStatus2PCS(CisNull)
+				doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
+				rutMgr.showRoute("handshake-update")
 			}
 		}
 
@@ -1084,39 +1114,6 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 }
 
 //
-// Just for debug to show the route table
-//
-func (rutMgr *RutMgr)showRoute(tag string) {
-	if true {
-		dht := rutMgr.sdl.SchGetP2pCfgName()
-		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
-		rt := rutMgr.rutTab
-		for idx := 0; idx < len(rt.bucketTab); idx++ {
-			routInfo = routInfo + fmt.Sprintf("showRoute: "+
-				"=============================== tag: %s, dht: %s, bucket: %d ==============================\n",
-				tag, dht, idx)
-			li := rt.bucketTab[idx]
-			count := 0
-			for el := li.Front(); el != nil; el = el.Next() {
-				bn, ok := el.Value.(*rutMgrBucketNode)
-				if !ok {
-					golog.Printf("showRoute: dht: %s, invalid bucket node found, idx: %d", dht, idx)
-					continue
-				}
-				count++
-				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>\n", dht, count)
-				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: node: %+v\n", dht, bn.node)
-				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: hash: %x\n", dht, bn.hash)
-				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: dist: %d\n", dht, bn.dist)
-				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: fails: %d\n", dht, bn.fails)
-				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: pcs: %d\n", dht, bn.pcs)
-				golog.Printf("%s", routInfo)
-			}
-		}
-	}
-}
-
-//
 // Split the tail bucket
 //
 func (rutMgr *RutMgr)split(li *list.List, dist int) DhtErrno {
@@ -1386,5 +1383,38 @@ func (rutMgr *RutMgr)rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 	rutMgr.sdl.SchMakeMessage(&msg, rutMgr.ptnMe, rutMgr.ptnConMgr, sch.EvDhtRutPeerRemovedInd, &ind)
 	rutMgr.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
+}
+
+//
+// Just for debug to show the route table
+//
+func (rutMgr *RutMgr)showRoute(tag string) {
+	if true {
+		dht := rutMgr.sdl.SchGetP2pCfgName()
+		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
+		rt := rutMgr.rutTab
+		for idx := 0; idx < len(rt.bucketTab); idx++ {
+			routInfo = routInfo + fmt.Sprintf("showRoute: "+
+				"=============================== tag: %s, dht: %s, bucket: %d ==============================\n",
+				tag, dht, idx)
+			li := rt.bucketTab[idx]
+			count := 0
+			for el := li.Front(); el != nil; el = el.Next() {
+				bn, ok := el.Value.(*rutMgrBucketNode)
+				if !ok {
+					golog.Printf("showRoute: dht: %s, invalid bucket node found, idx: %d", dht, idx)
+					continue
+				}
+				count++
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: count: %d >>>>>>>>>>>>>>>>>>>>>>>\n", dht, count)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: node: %+v\n", dht, bn.node)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: hash: %x\n", dht, bn.hash)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: dist: %d\n", dht, bn.dist)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: fails: %d\n", dht, bn.fails)
+				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: pcs: %d\n", dht, bn.pcs)
+				golog.Printf("%s", routInfo)
+			}
+		}
+	}
 }
 

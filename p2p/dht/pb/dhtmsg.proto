@@ -151,8 +151,8 @@ message DhtMessage {
     message GetValueRsp {
         required Node           From            = 1;    // from whom
         required Node           To              = 2;    // to whom
-        required Value          Value           = 3;    // values to responsed
-        repeated Node           Nodes           = 4;    // neighbors
+        optional Value          Value           = 3;    // values to responsed
+        optional Node           Nodes           = 4;    // neighbors
         required uint64         Id              = 5;    // message identity
         optional bytes          Extra           = 6;    // extra info
     }

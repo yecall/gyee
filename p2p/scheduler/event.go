@@ -829,6 +829,7 @@ type MsgDhtRutMgrNearestReq struct {
 	Task		interface{}			// task who loves the notification
 	ForWhat		int					// what the request for
 	Msg			interface{}			// backup for original message
+	Filter		interface{}			// filter function
 }
 
 //

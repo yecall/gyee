@@ -487,6 +487,11 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 		dhtPrd = makeDhtPrd(&dsk, prdSet)
 	}
 
+	if dhtPrd == nil {
+		dhtLog.Debug("getProviderReq: no providers for key: %x", dsk)
+		return sch.SchEnoNotFound
+	}
+
 	rsp.Provider = dhtPrd
 
 	//
