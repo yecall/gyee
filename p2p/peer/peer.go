@@ -34,6 +34,7 @@ import (
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	"crypto/ecdsa"
 	"sync"
+	"bytes"
 )
 
 //
@@ -1197,13 +1198,14 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			Snid:		inst.snid,
 			Dir:		inst.dir,
 			NodeId:		inst.node.ID,
-			IP:			inst.node.IP,
+			IP:			net.IP{},
 			UDP:		uint32(inst.node.UDP),
 			TCP:		uint32(inst.node.TCP),
 			ProtoNum:	inst.protoNum,
 			Protocols:	inst.protocols,
 		},
 	}
+	i.PeerInfo.IP = append(i.PeerInfo.IP, inst.node.IP...)
 
 	if peMgr.ptnShell != nil {
 		ind2Sh := sch.MsgShellPeerActiveInd{
@@ -2053,8 +2055,9 @@ func (pi *PeerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 		eno PeMgrErrno = PeMgrEnoNone
 	)
 
-	pi.dialer.Timeout = pi.cto
+	peerLog.Debug("piConnOutReq: try to dial target: %s", addr.String())
 
+	pi.dialer.Timeout = pi.cto
 	if conn, err = pi.dialer.Dial("tcp", addr.String()); err != nil {
 		peerLog.Debug("piConnOutReq: dial failed, local: %s, to: %s, err: %s",
 			fmt.Sprintf("%s:%d", pi.node.IP.String(), pi.node.TCP),
@@ -2371,16 +2374,14 @@ func (pi *PeerInstance)piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 	}
 
 	// since it's an outbound peer, the peer node id is known before this
-	// handshake procedure carried out, we can check against these twos,
-	// and we update the remains.
-	if hs.NodeId != inst.node.ID {
-		peerLog.Debug("piHandshakeOutbound: node identity mismathced")
+	// handshake procedure carried out, we can check against these twos.
+	if hs.NodeId != inst.node.ID ||
+		inst.node.TCP != uint16(hs.TCP) ||
+		bytes.Compare(inst.node.IP, hs.IP) != 0	{
+		peerLog.Debug("piHandshakeOutbound: handshake mismathced, ip: %s, port: %d, id: %x",
+			hs.IP.String(), hs.TCP, hs.NodeId)
 		return PeMgrEnoMessage
 	}
-
-	inst.node.TCP = uint16(hs.TCP)
-	inst.node.UDP = uint16(hs.UDP)
-	inst.node.IP = append(inst.node.IP, hs.IP ...)
 
 	// backup info about protocols supported by peer;
 	// update instance state;

@@ -234,8 +234,8 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 	}
 	shMgr.peerActived[peerId] = &peerInst
 
-	chainLog.Debug("peerActiveInd: snid: %x, peer ip: %s, port: %d, id: %x",
-		peerInfo.Snid, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
+	chainLog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
+		peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
 
 	approc := func() {
 		for {
