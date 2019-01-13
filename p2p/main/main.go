@@ -326,7 +326,7 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 	}
 }
 
-func yeDhtProc(yeShMgr yep2p.Service) {
+func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep2p.Message, bk yep2p.Message) {
 	cnt := 0
 	cnt_max := 100 * 100 * 100
 
@@ -340,14 +340,22 @@ func yeDhtProc(yeShMgr yep2p.Service) {
 		bk.Key = append(bk.Key[0:0], key[0:]...)
 
 		if err := yeShMgr.DhtSetValue(bk.Key, bk.Data); err != nil {
+
 			log.Debug("yeDhtProc: DhtSetValue failed, err: %s", err.Error())
+
 		} else {
+
 			log.Debug("yeDhtProc: value put\nkey: %x\nvalue: %x\n", bk.Key, bk.Data)
 			time.Sleep(time.Millisecond * 1000)
+
 			if val, err := yeShMgr.DhtGetValue(bk.Key); err != nil {
+
 				log.Debug("yeDhtProc: DhtGetValue failed, err: %s", err.Error())
+
 			} else {
+
 				log.Debug("yeDhtProc: value got\nkey: %x\nvalue: %x\n", bk.Key, val)
+
 				if bytes.Compare(bk.Data, val) != 0 {
 					log.Debug("yeDhtProc: value mismatched")
 				}
@@ -469,7 +477,7 @@ func testCase9(tc *testCase) {
 
 	yesCfg := yep2p.DefaultYeShellConfig
 	//yesCfg.BootstrapNode = true
-	yesCfg.SubNetMaskBits = 4
+	yesCfg.SubNetMaskBits = 0
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 
@@ -485,10 +493,10 @@ func testCase9(tc *testCase) {
 	go subFunc(subBh, "bh")
 
 	if true {
-		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
+		waitInterruptWithCallback(yeShMgr, yeDhtProc, yeChainStop)
 	} else {
 		time.Sleep(time.Second * 10)
-		yeDhtProc(yeShMgr)
+		yeDhtProc(yeShMgr, ev, tx, bh, bk)
 		yeChainStop(yeShMgr, subEv, subTx, subBh)
 	}
 }
