@@ -35,7 +35,7 @@ type dsdbLogger struct {
 }
 
 var dsdbLog = dsdbLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log dsdbLogger)Debug(fmt string, args ... interface{}) {
