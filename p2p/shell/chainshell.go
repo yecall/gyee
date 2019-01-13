@@ -156,7 +156,7 @@ func (shMgr *ShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessag
 // Shell manager entry
 //
 func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	chainLog.Debug("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
+	//chainLog.Debug("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
 	case sch.EvSchPoweron:
@@ -181,7 +181,7 @@ func (shMgr *ShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		chainLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
-	chainLog.Debug("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
+	//chainLog.Debug("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
 	return eno
 }
 
@@ -234,7 +234,8 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 	}
 	shMgr.peerActived[peerId] = &peerInst
 
-	chainLog.Debug("peerActiveInd: peer info: %+v", *peerInfo)
+	chainLog.Debug("peerActiveInd: snid: %x, peer ip: %s, port: %d, id: %x",
+		peerInfo.Snid, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
 
 	approc := func() {
 		for {
