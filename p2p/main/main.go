@@ -321,7 +321,8 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 			log.Debug("yeChainProc: cnt: %d, loop BroadcastMessageOsn", cnt)
 		}
 
-		time.Sleep(time.Millisecond * /*20*/ 1000)
+		//time.Sleep(time.Millisecond * 20)
+		time.Sleep(time.Millisecond * 1000)
 	}
 }
 

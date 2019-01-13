@@ -193,6 +193,7 @@ type Config struct {
 	Local				Node					// local node struct
 	ProtoNum			uint32					// local protocol number
 	Protocols			[]Protocol				// local protocol table
+	SnidMaskBits		int						// mask bits for subnet identity
 	SubNetKeyList		map[SubNetworkID]ecdsa.PrivateKey // keys for sub-node
 	SubNetNodeList		map[SubNetworkID]Node	// sub-node identities
 	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be
@@ -275,6 +276,7 @@ type Cfg4TabManager struct {
 	NodeDB			string					// node database
 	NoHistory		bool					// do not use history of nodes
 	BootstrapNode	bool					// bootstrap node flag
+	SnidMaskBits	int						// mask bits for subnet identity
 	SubNetNodeList	map[SubNetworkID]Node	// sub network node identities
 	SubNetIdList	[]SubNetworkID			// sub network identity list. do not put the identity
 											// of the local node in this list.
@@ -396,6 +398,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		Local:					DefaultLocalNode,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
+		SnidMaskBits:			0,
 		SubNetKeyList:			map[SubNetworkID]ecdsa.PrivateKey{},
 		SubNetNodeList:			map[SubNetworkID]Node{},
 		SubNetMaxPeers:			map[SubNetworkID]int{},
@@ -466,6 +469,7 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		Local:					DefaultLocalNode,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
+		SnidMaskBits:			0,
 		SubNetKeyList:			map[SubNetworkID]ecdsa.PrivateKey{},
 		SubNetNodeList:			map[SubNetworkID]Node{},
 		SubNetMaxPeers:			map[SubNetworkID]int{},
@@ -997,6 +1001,7 @@ func P2pConfig4TabManager(name string) *Cfg4TabManager {
 		NoHistory:		config[name].NoNdbHistory,
 		BootstrapNode:	config[name].BootstrapNode,
 		NetworkType:	config[name].NetworkType,
+		SnidMaskBits:	config[name].SnidMaskBits,
 		SubNetNodeList:	config[name].SubNetNodeList,
 		SubNetIdList:	config[name].SubNetIdList,
 	}

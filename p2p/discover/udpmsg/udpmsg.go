@@ -107,6 +107,7 @@ type (
 		To				Node			// destination node
 		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
 		SubNetId		SubNetworkID	// sub network identity
+		MaskBits		int				// mask bits for subnet identity
 		Target			config.NodeID	// target node identity
 		Id				uint64			// message identity
 		Expiration		uint64			// time to expired of this message
@@ -383,6 +384,7 @@ func (pum *UdpMsg) GetFindNode() interface{} {
 	}
 
 	copy(fn.SubNetId[0:], pbFN.SubNetId.Id[:])
+	fn.MaskBits = int(*pbFN.MaskBits)
 
 	copy(fn.Target[:], pbFN.Target)
 
@@ -698,6 +700,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 			XXX_unrecognized:	make([]byte,0),
 		},
 
+		MaskBits: new(int32),
 		FromSubNetId: make([]*pb.UdpMessage_SubNetworkID, 0),
 		SubNetId: &pb.UdpMessage_SubNetworkID {
 			Id: make([]byte, 0),
@@ -733,6 +736,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 		pbFN.FromSubNetId = append(pbFN.FromSubNetId, pbSnid)
 	}
 
+	*pbFN.MaskBits = int32(fn.MaskBits)
 	subNetId := new(pb.UdpMessage_SubNetworkID)
 	subNetId.Id = append(subNetId.Id, fn.SubNetId[:]...)
 	pbFN.SubNetId = subNetId
@@ -947,11 +951,12 @@ func (findnode *FindNode)String() string {
 			FromSubNetId += fmt.Sprintf("%x", findnode.FromSubNetId[idx]) + ","
 		}
 		FromSubNetId += "\n"
+		MaskBits := "MaskBits: " + fmt.Sprintf("%d", findnode.MaskBits) + "\n"
 		SubNetId := "SubNetId: " + fmt.Sprintf("%x", findnode.SubNetId) + "\n"
 		Target := "Target: " + fmt.Sprintf("%x", findnode.Target) + "\n"
 		Id := "Id: " + fmt.Sprintf("%d", findnode.Id)
 		Expiration := "Expiration: " + fmt.Sprintf("%d", findnode.Expiration) + "\n"
-		strPing += From + To + FromSubNetId + SubNetId + Target + Id + Expiration
+		strPing += From + To + FromSubNetId + MaskBits + SubNetId + Target + Id + Expiration
 		return strPing
 	}
 }

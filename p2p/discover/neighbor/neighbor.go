@@ -587,6 +587,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		nodes = append(nodes,
 			mgr.TabClosest(tab.Closest4Queried,
 							tab.NodeID(findNode.Target),
+							findNode.MaskBits,
 							tab.TabInstQPendingMax)...)
 	} else {
 
@@ -602,6 +603,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 			nodes = append(nodes,
 				mgr.TabClosest(tab.Closest4Queried,
 					tab.NodeID(findNode.Target),
+					findNode.MaskBits,
 					tab.TabInstQPendingMax)...)
 		}
 	}

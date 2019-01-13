@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"sync"
 	"bytes"
+	"errors"
 	"crypto/sha256"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	config	"github.com/yeeco/gyee/p2p/config"
@@ -170,6 +171,7 @@ type tabConfig struct {
 	nodeDb			string							// node database
 	noHistory		bool							// no history node database
 	bootstrapNode	bool							// bootstrap flag of local node
+	snidMaskBits	int								// mask bits for subnet identity
 	subNetNodeList	map[SubNetworkID]config.Node	// sub network node identities
 	subNetIdList	[]SubNetworkID					// sub network identity list. do not put the identity
 													// of the local node in this list.
@@ -527,6 +529,13 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 			delete(tabMgr.SubNetMgrList, del)
 		}
 	}
+
+	tabLog.Debug("shellReconfigReq: subnet mask bits change, old: %d, %d, new: %d",
+		tabMgr.cfg.snidMaskBits,
+		tabMgr.sdl.SchGetP2pConfig().SnidMaskBits,
+		msg.MaskBits)
+	tabMgr.cfg.snidMaskBits = msg.MaskBits
+	tabMgr.sdl.SchGetP2pConfig().SnidMaskBits = msg.MaskBits
 
 	for _, add := range addList {
 		if _, ok := tabMgr.SubNetMgrList[add.SubNetId]; ok {
@@ -974,6 +983,7 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	tabCfg.nodeDb			= cfg.NodeDB
 	tabCfg.noHistory		= cfg.NoHistory
 	tabCfg.bootstrapNode	= cfg.BootstrapNode
+	tabCfg.snidMaskBits		= cfg.SnidMaskBits
 	tabCfg.subNetNodeList	= cfg.SubNetNodeList
 	tabCfg.subNetIdList		= cfg.SubNetIdList
 
@@ -1113,7 +1123,7 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 		target = *tid
 	}
 
-	if nodes = mgr.tabClosest(Closest4Querying, target, TabInstQPendingMax); len(nodes) == 0 {
+	if nodes = mgr.tabClosest(Closest4Querying, target, -1, TabInstQPendingMax); len(nodes) == 0 {
 
 		tabLog.Debug("tabRefresh: snid: %x, seems all buckets are empty, " +
 			"set local as target and try seeds from database and bootstrap nodes ...",
@@ -1184,7 +1194,7 @@ func (tabMgr *TableManager)tabLog2Dist(h1 Hash, h2 Hash) int {
 	return d
 }
 
-func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*Node {
+func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size int) []*Node {
 	// Notice: in this function, we got []*Node with a approximate order,
 	// since we do not sort the nodes in the first bank, see bellow pls.
 	var closest = make([]*Node, 0, maxBonding)
@@ -1198,23 +1208,66 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, size int) []*N
 	ht := TabNodeId2Hash(target)
 	dt := tabMgr.tabLog2Dist(tabMgr.shaLocal, *ht)
 
+	// get target subnet identity, see bellow pls
+	targetSnid := config.SubNetworkID{}
+	if forWhat == Closest4Queried &&
+		tabMgr.cfg.bootstrapNode &&
+		tabMgr.snid == config.AnySubNet {
+		var err error
+		targetSnid, err = GetSubnetIdentity(target, mbs)
+		if err != nil {
+			tabLog.Debug("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
+			return nil
+		}
+	}
+
 	var addClosest = func (bk *bucket) int {
 		count = len(closest)
 		if bk != nil {
 			for _, ne := range bk.nodes {
+
 				// if we are fetching nodes to which we would query, we need to check the time
 				// we had queried them last time to escape the case that query too frequency.
+
 				if forWhat == Closest4Querying {
 					if time.Now().Sub(ne.lastQuery) < findNodeMinInterval {
 						continue
 					}
 				}
-				closest = append(closest, &Node{
-					Node: ne.Node,
-					sha:  ne.sha,
-				})
-				if count++; count >= size {
-					break
+
+				// match the subnet identity to add closest set for bootstrap node when working
+				// with subnet identity as "AnySubNet". so it can play without a reconfiguration
+				// while others do.
+
+				if forWhat == Closest4Queried &&
+					tabMgr.cfg.bootstrapNode &&
+					tabMgr.snid == config.AnySubNet {
+
+					snid, err := GetSubnetIdentity(ne.ID, mbs)
+					if err != nil {
+						tabLog.Debug("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
+						continue
+					}
+
+					if snid == targetSnid {
+						closest = append(closest, &Node{
+							Node: ne.Node,
+							sha:  ne.sha,
+						})
+						if count++; count >= size {
+							break
+						}
+					}
+
+				} else {
+
+					closest = append(closest, &Node{
+						Node: ne.Node,
+						sha:  ne.sha,
+					})
+					if count++; count >= size {
+						break
+					}
 				}
 			}
 		}
@@ -2102,10 +2155,10 @@ func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgr
 const Closest4Querying	= 1
 const Closest4Queried	= 0
 
-func (tabMgr *TableManager)TabClosest(forWhat int, target NodeID, size int) []*Node {
+func (tabMgr *TableManager)TabClosest(forWhat int, target NodeID, mbs int, size int) []*Node {
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
-	return tabMgr.tabClosest(forWhat, target, size)
+	return tabMgr.tabClosest(forWhat, target, mbs, size)
 }
 
 func TabBuildNode(pn *config.Node) *Node {
@@ -2130,8 +2183,12 @@ func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManage
 	// should be called with the "root" manager
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
-	if tabMgr.snid != AnySubNet {
-		return tabMgr.SubNetMgrList[*snid]
+	if *snid != AnySubNet {
+		mgr := tabMgr.SubNetMgrList[*snid]
+		if mgr == nil && tabMgr.cfg.bootstrapNode {
+			mgr = tabMgr.SubNetMgrList[AnySubNet]
+		}
+		return mgr
 	}
 	return tabMgr.SubNetMgrList[AnySubNet]
 }
@@ -2141,4 +2198,22 @@ func (tabMgr *TableManager)TabGetInstAll() *map[SubNetworkID]*TableManager {
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	return &tabMgr.SubNetMgrList
+}
+
+func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, error) {
+	const MaxSubNetMaskBits = config.SubNetIdBytes * 8
+	if maskBits < 0 || maskBits > MaxSubNetMaskBits {
+		return config.SubNetworkID{}, errors.New("invalid mask bits")
+	} else if maskBits == 0 {
+		return config.AnySubNet, nil
+	}
+	end := len(id) - 1
+	snw := uint16((id[end-1] << 8) | id[end])
+	snw = snw << uint(16 - maskBits)
+	snw = snw >> uint(16 - maskBits)
+	snid := config.SubNetworkID {
+		byte((snw >> 8) & 0xff),
+		byte(snw & 0xff),
+	}
+	return snid, nil
 }

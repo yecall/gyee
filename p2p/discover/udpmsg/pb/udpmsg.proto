@@ -70,12 +70,13 @@ message UdpMessage {
     message FindNode {
         required Node           From            = 1;
         required Node           To              = 2;
-        repeated SubNetworkID   FromSubNetId    = 3;
+        required int32          MaskBits        = 3;
+        repeated SubNetworkID   FromSubNetId    = 4;
         required SubNetworkID   SubNetId        = 5;
         required bytes          Target          = 6;
-        required uint64         Id              = 4;
-        optional uint64         Expiration      = 7;
-        optional bytes          Extra           = 8;
+        required uint64         Id              = 7;
+        optional uint64         Expiration      = 8;
+        optional bytes          Extra           = 9;
     }
 
     message Neighbors {

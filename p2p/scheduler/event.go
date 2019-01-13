@@ -139,7 +139,8 @@ type SingleSubnetDescriptor struct {
 
 type MsgShellReconfigReq struct {
 	SnidAdd		[]SingleSubnetDescriptor	// common sub network identities to be added
-	SnidDel		[]config.SubNetworkID	// common sub network identities to be deleted
+	SnidDel		[]config.SubNetworkID		// common sub network identities to be deleted
+	MaskBits	int							// mask bits for subnet identity
 }
 
 //

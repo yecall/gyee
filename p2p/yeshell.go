@@ -422,6 +422,7 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	req := sch.MsgShellReconfigReq {
 		SnidAdd: SnidAdd,
 		SnidDel: SnidDel,
+		MaskBits: reCfg.SubnetMaskBits,
 	}
 
 	msg := sch.SchMessage{}
@@ -1279,6 +1280,7 @@ func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
 			count--
 		}
 	}
+	cfg.SnidMaskBits = mbs
 	return nil
 }
 
