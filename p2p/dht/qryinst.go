@@ -647,6 +647,11 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 		if gpr.Provider != nil {
 
+			if bytes.Equal(gpr.Key, icb.target[0:]) == false {
+				qiLog.Debug("protoMsgInd: key mismatched")
+				return sch.SchEnoMismatched
+			}
+
 			ind := sch.MsgDhtQryInstResultInd{
 				From:		gpr.From,
 				Target:		icb.target,

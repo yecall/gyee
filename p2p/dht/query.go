@@ -835,8 +835,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	// check if target found: if true, query should be stopped, result should be reported
 	//
 
-	if msg.ForWhat == sch.EvDhtConInstNeighbors ||
-		msg.ForWhat == sch.EvDhtConInstGetProviderRsp {
+	if msg.ForWhat == sch.EvDhtConInstNeighbors {
 
 		for _, peer := range msg.Peers {
 
@@ -844,7 +843,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 			if bytes.Compare((*key)[0:], target[0:]) == 0 {
 
-				qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), peer, msg.Value, msg.Provider)
+				qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, msg.Value, msg.Provider)
 
 				if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
 					qryLog.Debug("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
@@ -859,7 +858,20 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 		if msg.Value != nil && len(msg.Value) > 0 {
 
-			qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), peer, msg.Value, msg.Provider)
+			qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, msg.Value, nil)
+
+			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
+				qryLog.Debug("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
+				return sch.SchEnoUserTask
+			}
+
+			return sch.SchEnoNone
+		}
+	} else if msg.ForWhat == sch.EvDhtConInstGetProviderRsp {
+
+		if msg.Provider != nil {
+
+			qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, msg.Provider)
 
 			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4TargetFound, qcb.target); dhtEno != DhtEnoNone {
 				qryLog.Debug("instResultInd: qryMgrDelQcb failed, eno: %d", dhtEno)
@@ -1451,6 +1463,8 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 	//
 	// the event EvDhtQryMgrQueryResultInd handler should take the above into account to deal
 	// with this event when it's received in the owner task of the "qcb".
+	//
+	// notice: "peer" passed in is not used, the "qcb.qryResult"
 	//
 
 	var msg = sch.SchMessage{}
