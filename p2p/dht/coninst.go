@@ -473,6 +473,11 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 //
 func (conInst *ConInst)txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno {
 
+	if s := conInst.getStatus(); s != CisInService {
+		ciLog.Debug("txDataReq: not it CisInService, status: %d", s)
+		return sch.SchEnoUserTask
+	}
+
 	pkg := conInstTxPkg {
 		task:		msg.Task,
 		responsed:	nil,

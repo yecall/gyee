@@ -510,9 +510,10 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 	for _, v := range pv.Values {
 
 		copy(dsk[0:], v.Key)
+		dsLog.Debug("putValReq: key: %x", dsk)
 
-		if eno := dsMgr.ds.Put(dsk[0:], v.Val, pv.KT); eno != DhtEnoNone {
-			dsLog.Debug("putValReq: put failed, eno: %d", eno)
+		if eno := dsMgr.store(&dsk, v.Val, pv.KT); eno != DhtEnoNone {
+			dsLog.Debug("putValReq: store failed, eno: %d", eno)
 		}
 	}
 
@@ -542,6 +543,8 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	dsk := DsKey{}
 	copy(dsk[0:], gvReq.Key)
+
+	dsLog.Debug("getValReq: key: %x", dsk)
 
 	rsp2Peer := func() sch.SchErrno {
 
