@@ -98,7 +98,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase8"
+var tgtCase = "testCase9"
 
 //
 // switch for playing go-monitors, related commands:
