@@ -768,6 +768,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		if bytes.Compare(peer.ID[0:], qryMgr.qmCfg.local.ID[0:]) == 0 {
 			msg.Peers = append(msg.Peers[0:idx], msg.Peers[idx+1:]...)
 			msg.Pcs = append(msg.Pcs[0:idx], msg.Pcs[idx+1:]...)
+			break
 		}
 	}
 
