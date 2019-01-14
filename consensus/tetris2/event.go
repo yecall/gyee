@@ -31,8 +31,8 @@ const COMMITTABLE_UNDECIDED = -1
 
 type EventBody struct {
 	H  uint64        //Block Height
-	N  uint64        //Sequence Number, M和N唯一决定一个Event
-	T  int64         //Timestamps, 用unixNano时间, 一秒等于10的9次方nano，只能表示到1678-2262年
+	N  uint64        //Sequence Number
+	T  int64         //Timestamps, unix nano, can only represent year 1678-2262
 	Tx []common.Hash //Transactions List
 	E  []common.Hash //Parents Events, 0 for self parent
 	P  bool          //HeartBeat Pulse
@@ -149,9 +149,9 @@ type Event struct {
 
 	//fields for hash & signature
 	signature *crypto.Signature
-	hash      common.Hash //带上签名的hash，因为dht中保存的是要带签名的消息
+	hash      common.Hash //hash for the body and signature, it is also the key of dht
 	//hex       string
-	vid string //这个从签名中恢复公钥，从公钥来计算出
+	vid string //It is derived from public key, public key is restored from signature
 
 	//fields for consensus computing
 	know        map[string]uint64

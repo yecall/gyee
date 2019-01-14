@@ -17,12 +17,6 @@
 
 package tetris2
 
-/*
-9. 需解决的工程问题：1）点火问题。2）区块同步效率问题。3）成员替换时的know清单问题。4）内存释放问题。5）fork检测后操作问题。6)调速问题。
-   7）metrics。8）块确认时中断问题。9）crash-recovery处理。10）上层协议member rotation。11）更换m的设计，直接用地址，hash用[]byte
-   12) H变化时中断开始新一轮共识
-*/
-
 import (
 	"encoding/hex"
 	"fmt"
@@ -68,20 +62,18 @@ type Tetris struct {
 	SendEventCh    chan []byte
 	RequestEventCh chan common.Hash
 
-	eventCache    *utils.LRU //收到过的events，用于去重
-	eventAccepted []*Event   //本次已经accept的events列表，发送event的时候，作为parent列表
-	//eventPending  *utils.LRU //因parents未到还没有加入到tetris的events
-	eventRequest *utils.LRU //请求过的event
-	//eventRequest  map[string]SyncRequest
+	eventCache    *utils.LRU
+	eventAccepted []*Event
+	eventRequest  *utils.LRU
 
-	txsCache     *utils.LRU                        //收到过的transactions，用于去重
-	txsAccepted  []common.Hash                     //本次收到的txs列表
-	txsCommitted *utils.LRU                        //已经进入了共识的tranactions，用于去重
-	txsPending   map[common.Hash]map[string]uint64 //交易在哪个member的哪个高度出现过, key1: hash of tx, key2:vid, value:height
+	txsCache     *utils.LRU //dedup for received txs
+	txsAccepted  []common.Hash
+	txsCommitted *utils.LRU                        //dedup for committed txs
+	txsPending   map[common.Hash]map[string]uint64 //tx appear at which validator's which height, key1: hash of tx, key2:vid, value:height
 
 	//currentEvent Event
 	ticker    *time.Ticker
-	heartBeat map[string]time.Time //从不同validators收到消息的最近时间，key:vid
+	heartBeat map[string]time.Time //time of receive event from every validators，key:vid
 
 	//params
 	params *Params
@@ -209,7 +201,7 @@ func (t *Tetris) Start() error {
 	return nil
 }
 
-func (t *Tetris) Stop() error { //TODO: stop是channel中还有消息怎么处理？需要关闭么？
+func (t *Tetris) Stop() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	//logging.Logger.Info("Tetris Stop...")
@@ -258,13 +250,6 @@ func (t *Tetris) loop() {
 		}
 	}
 }
-
-//Receive transaction send to me
-/*
-发送速率控制，tx数到上限，间隔时间>min, event数目>min
-没有tx的时候，如果有未确认的，继续低速。如果已全部确认，保持最低速10分钟出一块。
-不同member的tx的同步问题，f+1个member同时存在，可以在当前h下面多深还有效？
-*/
 
 func (t *Tetris) sendPlaceholderEvent() {
 	event := NewEvent(t.vid, t.h, t.n)
@@ -404,9 +389,7 @@ func (t *Tetris) receiveEvent(event *Event) {
 	}
 
 	if event.Body.H > t.h {
-		//自己的区块高度已低于对方，需要同步区块
-		//但如果这个地方自己总是慢而不采用共识输出，最终半数的签名数可能要不够？
-		//所以如果收到可以确认的区块签名，这儿可以跳过，到最新的块高度
+		//TODO: if the block has sealed, here can interrupt and jump to new height
 		//return
 	}
 	if event.Body.N <= t.h {
@@ -495,12 +478,12 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 			newReadyThisRound := false
 			minReadyHeight := uint64(math.MaxUint64)
 			for k, v := range searchHeight {
-				if t.validators[k][v] == nil {  //It is not possible for an event to be ready if it's parent not exist. so stop search any more.
+				if t.validators[k][v] == nil { //It is not possible for an event to be ready if it's parent not exist. so stop search any more.
 					delete(searchHeight, k)
 					continue
 				}
 
-				if v < newHeight {  //search height under the new ready event, it is impossible to be ready.
+				if v < newHeight { //search height under the new ready event, it is impossible to be ready.
 					delete(searchHeight, k)
 					continue
 				}
@@ -547,7 +530,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		}
 	}
 
-    if len(unpending) == 0 {
+	if len(unpending) == 0 {
 		for k, v := range t.validatorsHeight {
 			if v <= t.h {
 				v = t.h
@@ -572,7 +555,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 							if ok {
 								er := eri.(*SyncRequest)
 								now := time.Now()
-								if now.Sub(er.time) > time.Duration(er.count * 500) * time.Millisecond  && er.count < 10 {
+								if now.Sub(er.time) > time.Duration(er.count*500)*time.Millisecond && er.count < 10 {
 									t.RequestEventCh <- peh
 									t.TrafficOut += 32
 									//logging.Logger.Debug("resend request for ", peh)
@@ -644,7 +627,6 @@ func (t *Tetris) prepare() {
 	//todo: update know while members rotated
 
 }
-
 
 func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 	newWitness := false
@@ -838,8 +820,7 @@ func (t *Tetris) consensusComputing() {
 		}
 	}
 
-	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！已确认交易只有一个cache来去重。
-	//todo:fair排序问题？
+	//todo:fair order
 
 	begin := time.Now()
 
