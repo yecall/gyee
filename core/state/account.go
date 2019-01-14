@@ -21,38 +21,73 @@
 package state
 
 import (
+	"errors"
 	"math/big"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/pb"
 )
 
-type account struct {
-	address common.Hash
-	balance *big.Int
+type accountObj struct {
+	trie    *accountTrie
+	dirty   bool
+	deleted bool
+
+	address common.Address
+
 	nonce   uint64
+	balance big.Int
+
 	//TODO: contract部分的数据
 }
 
-func (acc *account) ToBytes() ([]byte, error) {
-	return nil, nil
+func newAccount(trie *accountTrie, address common.Address) *accountObj {
+	return &accountObj{
+		trie:    trie,
+		address: address,
+	}
 }
 
-func (acc *account) FromBytes(bytes []byte) error {
-	return nil
-}
-
-func (acc *account) Balance() *big.Int {
-	return acc.balance
-}
-
-func (acc *account) Address() common.Hash {
+func (acc *accountObj) Address() common.Address {
 	return acc.address
 }
 
-func (acc *account) Nonce() uint64 {
+func (acc *accountObj) Nonce() uint64 {
 	return acc.nonce
 }
 
-func (acc *account) NonceInc() {
+func (acc *accountObj) Balance() big.Int {
+	return acc.balance
+}
+
+func (acc *accountObj) ToBytes() ([]byte, error) {
+	pbAcc := &corepb.Account{
+		Nonce:   acc.nonce,
+		Balance: acc.balance.Bytes(),
+	}
+	bytes, err := proto.Marshal(pbAcc)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+func (acc *accountObj) setBytes(bytes []byte) error {
+	pbAcc := &corepb.Account{}
+	if err := proto.Unmarshal(bytes, pbAcc); err != nil {
+		return err
+	}
+	var value big.Int
+	value.SetBytes(bytes)
+	if value.BitLen() > 256 {
+		return errors.New("balance out of range")
+	}
+	acc.nonce = pbAcc.Nonce
+	acc.balance = value
+	return nil
+}
+
+func (acc *accountObj) NonceInc() {
 	acc.nonce++
 }
