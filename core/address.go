@@ -85,7 +85,6 @@ func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {
 		return nil, errors.New("error public key length")
 	}
 	return newAddressFromPublicKey(AddressTypeAccount, pubkey)
-	return nil, nil
 }
 
 func NewContractAddressFromData() (*Address, error) {

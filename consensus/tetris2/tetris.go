@@ -26,10 +26,10 @@ package tetris2
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 	"time"
-	"math"
 
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
@@ -94,13 +94,12 @@ type Tetris struct {
 	lastSendTime time.Time
 
 	//metrics or test
-	requestCount   int
-	parentCountRaw int
-	parentCount    int
-	eventCount     int
-	txCount        int
-	TrafficIn      int
-	TrafficOut     int
+	requestCount int
+	parentCount  int
+	eventCount   int
+	txCount      int
+	TrafficIn    int
+	TrafficOut   int
 
 	//request map[string]int
 	level       int
@@ -121,14 +120,13 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		ParentEventCh: make(chan []byte, 10),
 		TxsCh:         make(chan common.Hash, 2000),
 
-		OutputCh:       make(chan *ConsensusOutput, 10), //TODO：这种指针可能有问题吧？
+		OutputCh:       make(chan *ConsensusOutput, 10),
 		SendEventCh:    make(chan []byte, 10),
 		RequestEventCh: make(chan common.Hash, 10),
 
 		eventCache:    utils.NewLRU(10000, nil),
 		eventAccepted: make([]*Event, 0),
-		//eventPending:  utils.NewLRU(10000, nil),
-		eventRequest: utils.NewLRU(10000, nil),
+		eventRequest:  utils.NewLRU(10000, nil),
 
 		txsCache:     utils.NewLRU(10000, nil),
 		txsAccepted:  make([]common.Hash, 0),
@@ -145,7 +143,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 
 	tetris.signer = core.GetSigner()
 	pk, _ := core.GetPrivateKeyOfDefaultAccount()
-	tetris.signer.InitSigner(pk) //TODO: 初始化要取缺省账户的私钥
+	tetris.signer.InitSigner(pk) //TODO: get the key of default account
 
 	for _, value := range validatorList {
 		tetris.validators[value] = make(map[uint64]*Event)
@@ -198,6 +196,8 @@ func (t *Tetris) MemberRotate(joins []string, quits []string) {
 
 	for _, vid := range joins {
 		t.validators[vid] = make(map[uint64]*Event)
+		t.validatorsHeight[vid] = 0
+		t.pendingHeight[vid] = 0
 	}
 }
 
@@ -227,18 +227,20 @@ func (t *Tetris) loop() {
 		case <-t.quitCh:
 			//logging.Logger.Info("Tetris loop end.")
 			return
+
 		case eventMsg := <-t.EventCh:
 			var event Event
 			t.TrafficIn += len(eventMsg)
 			event.Unmarshal(eventMsg)
 			if t.checkEvent(&event) {
 				t.heartBeat[event.vid] = time.Now()
-				if event.Body.P { //如果是心跳，更新心跳时间表
-					//logging.Logger.Info("receive heartbeat:", event.vid)
+				if event.Body.P {
+					//it is a heartbeat event
 				} else {
 					t.receiveEvent(&event)
 				}
 			}
+
 		case eventMsg := <-t.ParentEventCh:
 			var event Event
 			t.TrafficIn += len(eventMsg)
@@ -246,9 +248,11 @@ func (t *Tetris) loop() {
 			if t.checkEvent(&event) {
 				t.receiveParentEvent(&event)
 			}
+
 		case tx := <-t.TxsCh:
 			t.TrafficIn += len(tx)
 			t.receiveTx(tx)
+
 		case time := <-t.ticker.C:
 			t.receiveTicker(time)
 		}
@@ -265,10 +269,12 @@ func (t *Tetris) loop() {
 func (t *Tetris) sendPlaceholderEvent() {
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
-	event.ready = true
 	event.Sign(t.signer)
+	eb := event.Marshal()
+	t.TrafficOut += len(eb)
+	t.SendEventCh <- eb
 
-	t.SendEventCh <- event.Marshal()
+	event.ready = true
 	t.validators[t.vid][t.n] = event
 	t.validatorsHeight[t.vid] = t.n
 	t.pendingHeight[t.vid] = t.n
@@ -287,11 +293,12 @@ func (t *Tetris) sendEvent() {
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.AddParents(t.eventAccepted)
 	event.AddTransactions(t.txsAccepted)
-	event.ready = true
 	event.Sign(t.signer)
 	eb := event.Marshal()
 	t.TrafficOut += len(eb)
 	t.SendEventCh <- eb
+
+	event.ready = true
 	t.validators[t.vid][t.n] = event
 	t.validatorsHeight[t.vid] = t.n
 	t.pendingHeight[t.vid] = t.n
@@ -318,12 +325,6 @@ func (t *Tetris) receiveTicker(ttime time.Time) {
 	if ttime.Sub(t.lastSendTime) > 1*time.Second {
 		t.sendHeartbeat()
 	}
-	//if strings.Contains(t.vid, "3038") || strings.Contains(t.vid, "3039") {
-	//	fmt.Println()
-	//	fmt.Println(t.vid[2:4], "------>")
-	//	fmt.Println("sendEventCh:",len(t.SendEventCh), "requestEventCh:", len(t.RequestEventCh), "outputCh:", len(t.OutputCh))
-	//	fmt.Println("EventCh:", len(t.EventCh), "TxsCh:", len(t.TxsCh), "ParentCh:",len(t.ParentEventCh))
-	//}
 }
 
 func (t *Tetris) receiveTx(tx common.Hash) {
@@ -358,14 +359,22 @@ func (t *Tetris) checkEvent(event *Event) bool {
 		return false
 	}
 
-	//TODO：从公钥计算address vid
 	addr, err := t.core.AddressFromPublicKey(pk)
+	if err != nil {
+		logging.Logger.Warn("can not get address from public key.", err)
+		return false
+	}
+
 	event.vid = hex.EncodeToString(addr)
-	//TODO: 检查是否属于当前validators
 
-	ret := event.SignVerify(pk, t.signer)
+	if t.validators[event.vid] == nil {
+		logging.Logger.Warn("the sender of event is not validators.", event.vid)
+		return false
+	}
 
-	if ret {
+	ok := event.SignVerify(pk, t.signer)
+
+	if ok {
 		event.know = make(map[string]uint64)
 		event.fork = make([]common.Hash, 0)
 		event.know[event.vid] = event.Body.N
@@ -373,32 +382,16 @@ func (t *Tetris) checkEvent(event *Event) bool {
 		event.witness = false
 		event.vote = 0
 		event.committable = COMMITTABLE_UNDECIDED
+	} else {
+		logging.Logger.Warn("fail for sign verification", event.vid)
+		return false
 	}
 
-	return ret
+	return ok
 }
 
-//Receive Event, if the parents not exists, send request
 func (t *Tetris) receiveEvent(event *Event) {
-	//event要来自合法的validator
-	//比较event的h，及n。如果h比自己大，说明需要同步区块，如果n比自己大，需要发新event，
-	//要检测是否恶意快速发送，需要核对min，max
-	//t.currentEvent.appendEvent(event)
-	//放入cache
-	//放入unsettled，检查parent是否有到齐
-	//放入currentEvent
 	t.eventCount++
-	//if t.eventCount % 100 == 0 {
-	//	logging.Logger.WithFields(logrus.Fields{
-	//		"tm":     t.m,
-	//		"tn":     t.n,
-	//		"eventCh": len(t.EventCh),
-	//		"sendCh": len(t.SendEventCh),
-	//		"txCh": len(t.TxsCh),
-	//		"c":      t.eventCount,
-	//		"pending": t.eventPending.Len(),
-	//	}).Info("Event count")
-	//}
 
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
@@ -410,27 +403,23 @@ func (t *Tetris) receiveEvent(event *Event) {
 		return
 	}
 
-	//logging.Logger.WithFields(logrus.Fields{
-	//	"m":  event.Body.M,
-	//	"n": event.Body.N,
-	//}).Info("receive event")
-
 	if event.Body.H > t.h {
 		//自己的区块高度已低于对方，需要同步区块
 		//但如果这个地方自己总是慢而不采用共识输出，最终半数的签名数可能要不够？
+		//所以如果收到可以确认的区块签名，这儿可以跳过，到最新的块高度
 		//return
 	}
 	if event.Body.N <= t.h {
-		//过久以前的消息，可以丢弃
+		//discard old enough event
+		logging.Logger.Debug("event too old, discard.", event.Body.N, t.h)
 		return
 	}
 
-	//t.eventPending.Add(event.Hash(), event)
 	t.addReceivedEventToTetris(event)
 }
 
 func (t *Tetris) receiveParentEvent(event *Event) {
-	t.parentCountRaw++
+	t.parentCount++
 
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
@@ -440,25 +429,9 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 		}).Debug("Recevie already existed parent event")
 		return
 	}
-	//logging.Logger.WithFields(logrus.Fields{
-	//	"m":  event.Body.M,
-	//	"n": event.Body.N,
-	//}).Info("receive parent event")
-	t.parentCount++
-	//if t.parentCount % 300 == 0 {
-	//	logging.Logger.WithFields(logrus.Fields{
-	//		"em":     event.Body.M,
-	//		"en":     event.Body.N,
-	//		"tm":     t.m,
-	//		"tn":     t.n,
-	//		"c":      t.parentCount,
-	//		"pending": t.eventPending.Len(),
-	//	}).Info("Parent count")
-	//}
 
 	if event.Body.N <= t.h {
-		//过久以前的消息，可以丢弃
-		//TODO:这个可能还不能丢
+		//TODO: parent event can not discard even if it is too old. It is needed to check ready status of valid event.
 		//logging.Logger.Info("old parent event:", event)
 	}
 
@@ -466,31 +439,19 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 }
 
 func (t *Tetris) addReceivedEventToTetris(event *Event) {
-	me := t.validators[event.vid][event.Body.N] //TODO：去重可能还有pending中的。
+	t.eventCache.Add(event.Hash(), event)
+	me := t.validators[event.vid][event.Body.N]
 	if me != nil {
-		//fmt.Println("*****")
-		//fmt.Println(me.vid, me.Body.N, me.Hash(), t.vid)
-		//fmt.Println(event.vid, event.Body.N, event.Hash())
 		if me.Hash() != event.Hash() {
 			logging.Logger.WithFields(logrus.Fields{
 				"event": event.Hash(),
 				"me":    me.Hash(),
 			}).Warn("Receive event with different hash, fork detected.")
+			//TODO: fork process
+			me.fork = append(me.fork, event.Hash())
 		}
 		return
 	}
-
-
-	t.eventCache.Add(event.Hash(), event)
-	/*
-		新来一个event，可能是request来的，也可能是pending的
-		检查event的parent是否都在，如果有不在的，发request
-		宽度优先搜索parent的parent，如果有不在的，发request。这种网格结构深度优先算法效率低。
-		直到event不但在，而且在member height之下。
-		这个可以搞个时间控制限制执行频率
-		这里有个问题是一个member一直没上，最后发一条event出来，其他member要等很长时间才能将它同步
-		pending要搞个超时丢弃
-	*/
 
 	/*
 		性能改进方案：
@@ -509,19 +470,20 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		4. ready的时候，updateKnow，加入eventAccepted，修改vheight，pendingHeight
 		5. 没有到达的event request
 	*/
+
 	begin := time.Now()
 	unpending := make([]*Event, 0)
 
 	event.ready = false
-	if event.Body.N > t.h {
+	if event.Body.N > t.h { //valid event add to the tetris
 		t.validators[event.vid][event.Body.N] = event
 	}
 
-	if t.pendingHeight[event.vid] < event.Body.N {
+	if t.pendingHeight[event.vid] < event.Body.N { //update the pending height
 		t.pendingHeight[event.vid] = event.Body.N
 	}
 
-	//如果是base event，则标识为ready
+	//tag the base event as ready,
 	if event.Body.N == t.h+1 {
 		event.ready = true
 		t.eventAccepted = append(t.eventAccepted, event)
@@ -529,13 +491,13 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		unpending = append(unpending, event)
 	}
 
-	//如果新event在height上一个，或者event是base已被标为ready，则计算下一轮。否则，不可能有新的ready。
-	//第三个条件是权宜之计，有一种可能产生ready是共识结束一轮后，base在prepare中被表示为ready，这个情况需要这儿处理。
-	//还有一种情况，就是n.h以下的到来，可以使event ready的，这儿没算。主要是vh下面都ready的假设有问题。。。所以干脆全部情况搜一遍
-	//再改进一下，就是vh以上2个以上的还是不用搜索，但以下的要搜
-	if event.Body.N <= t.h || event.Body.N == t.validatorsHeight[event.vid]+1 || event.ready || t.validatorsHeight[event.vid] == t.h+1 {
+	//Here we check all the probabilities that an event could become ready
+	if event.Body.N <= t.h || //1. Parent event under base, should be used when check upper events' ready status.
+		event.ready || //2. Event is base event and has tagged as ready above.
+		event.Body.N == t.validatorsHeight[event.vid]+1 || //3. Events just above the validators height
+		t.validatorsHeight[event.vid] == t.h+1 { //4. An base event has tagged as ready in t.prepare() after consensus got.
 		searchHeight := make(map[string]uint64)
-		newHeight := t.h + 1 //这儿本来可以是event.body.N，但有可能t.h在上一轮共识达成时+1了，导致有base event此时ready
+		newHeight := t.h + 1 //because the condition 4
 		for k, v := range t.validatorsHeight {
 			if v >= newHeight {
 				searchHeight[k] = v + 1
@@ -547,17 +509,17 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 			newReadyThisRound := false
 			minReadyHeight := uint64(math.MaxUint64)
 			for k, v := range searchHeight {
-				if t.validators[k][v] == nil {
+				if t.validators[k][v] == nil {  //It is not possible for an event to be ready if it's parent not exist. so stop search any more.
 					delete(searchHeight, k)
 					continue
 				}
 
-				if v < newHeight {
+				if v < newHeight {  //search height under the new ready event, it is impossible to be ready.
 					delete(searchHeight, k)
 					continue
 				}
 				ev := t.validators[k][v]
-				//检查ev的parent是否都在ready区域
+				//if all the parents of ev is under validators height, it will be ready.
 				isReady := true
 				for _, peh := range ev.Body.E {
 					pei, ok := t.eventCache.Get(peh)
@@ -591,7 +553,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 					unpending = append(unpending, ev)
 				}
 			}
-			//如果这一轮没有新ready的，则跳出循环
+			//break if no new ready events this round
 			if !newReadyThisRound {
 				break loop
 			}
@@ -599,7 +561,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		}
 	}
 
-	//开始request, 这个地方可以考虑做个频率控制
+
 	for k, v := range t.validatorsHeight {
 		if v <= t.h {
 			v = t.h
@@ -693,10 +655,10 @@ func (t *Tetris) prepare() {
 	}
 	t.witness = make([]map[string]*Event, 1)
 
-	//todo:如果有member切换，这儿要重新update know
+	//todo: update know while members rotated
+
 }
 
-//有新event加入tetris的时候，
 
 func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 	newWitness := false
@@ -708,7 +670,6 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 	}
 
 	if n <= t.h {
-		//已沉没的event，没必要算。原来pending没处理时可能会进入这儿
 		logging.Logger.Info("update: event.n<t.n", me.vid, me.Body.N)
 		return false
 	}
@@ -732,39 +693,21 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 						maxr = pme.round
 					}
 				} else {
-					//这儿是me的parent pme的n已经在base之下，在t.validators中已经delete。
-					//因为me的self parent应该必然存在，所以round肯定可以得到
-					//fmt.Println("t.vid=", t.vid[2:4], "me.vid=", me.vid[2:4], "pme==nil", "pe=", pe)
-					//fmt.Println("n=", n, "pe.n=", pe.(*Event).Body.N, "h=", t.h)
+					//It is ok and possible here, when pme is below base.
+					//logging.Logger.Debug("parent not in tetris.")
 				}
 			} else {
-				//缓存中已经没有这个event，
-				fmt.Println("eventCache no existed:", e)
+				//event not existed, it is possible when eventCache overflow! It will cause problems!
+				logging.Logger.Warn("eventCache no existed:", e)
 				continue
 			}
 		}
 		me.round = maxr
 		if me.round == ROUND_UNDECIDED {
-			fmt.Println("t.vid:", t.vid[2:4], "me.vid", me.vid[2:4])
-			fmt.Println(me.Body)
-			fmt.Println(t.eventCache.Len())
-			pe, _ := t.eventCache.Get(me.Body.E[0])
-			pme := pe.(*Event)
-			fmt.Println(pme.round)
-			pme = t.validators[pme.vid][pme.Body.N]
-			fmt.Println(pme.round)
-			for k, v := range t.validators {
-				fmt.Print(k[2:4], ": ")
-				for nn := uint64(t.h); nn < t.n+10; nn++ { //怀疑可能是updateall时的高度不够，就是自身n不是最大的时候，会有event没update
-					ee := v[nn]
-					if ee != nil {
-						fmt.Print(ee.round, " ")
-					}
-				}
-				fmt.Println()
-			}
+			logging.Logger.Warn("me.round undecided")
 		}
-		if len(t.witness[me.round]) >= t.params.superMajority { //todo:这个地方有过一次panic，out of range, 原因是placeholder miss了update
+
+		if len(t.witness[me.round]) >= t.params.superMajority {
 			c := 0
 			for _, v := range t.witness[me.round] {
 				if t.knowWell(me, v) {
@@ -792,13 +735,11 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 				newWitness = true
 			}
 		} else {
-			fmt.Println("这儿应该不会跑到的。。。")
-			fmt.Println("t.vid=", t.vid[2:4], "me.vid=", me.vid[2:4], n)
-			//return
+			logging.Logger.Warn("pme==nil, It is impossible to here!")
 		}
 	}
 
-	//如果发现新的witness，就计算一次共识
+	//consensus computing while new witness found.
 	if newWitness && !fromAll {
 		t.consensusComputing()
 	}
@@ -807,7 +748,6 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 }
 
 func (t *Tetris) updateAll() {
-	//计算round， witness，
 	newWitness := false
 	maxh := uint64(0)
 	for _, vh := range t.validatorsHeight {
@@ -826,7 +766,7 @@ func (t *Tetris) updateAll() {
 		}
 	}
 
-	//如果发现新的witness，就计算一次共识
+	//consensus computing while new witness found.
 	if newWitness {
 		t.consensusComputing()
 	}
@@ -867,6 +807,7 @@ func (t *Tetris) consensusComputing() {
 				w.vote = 1
 			}
 		}
+
 	loop:
 		for i := 3; i < len(t.witness); i++ {
 			if len(t.witness[i]) == 0 {
@@ -911,9 +852,10 @@ func (t *Tetris) consensusComputing() {
 		}
 	}
 
-	//用txsPending来实现, txsPending的hash写到区块里面，新成员加入时可直接获取。另一个做法是有新成员时的stage清除pending检查
 	//todo:pending也要有一个深度限制，防止恶意无效txs堆积.另、现在已确认交易的后续消息也会进入pending！已确认交易只有一个cache来去重。
 	//todo:fair排序问题？
+
+	begin := time.Now()
 
 	c := make([]string, 0)
 	cs := ""
@@ -941,27 +883,6 @@ func (t *Tetris) consensusComputing() {
 		}
 	}
 
-	//fmt.Println("pending tx:", len(t.PendingTxs))
-
-	//if len(txc) == 0 {
-	//	for _, w := range t.witness[0] {
-	//		if w.committable == 1 {
-	//			fmt.Println(w.vid, ":", len(w.Body.Tx))
-	//		}
-	//	}
-	//}
-	//fmt.Println()
-	//fmt.Println("*****node:", t.vid[2:4])
-	//for _, w := range t.witness[0] {
-	//	fmt.Print(w.vid[2:4], "(", w.Body.N, ")", ", ")
-	//}
-	//fmt.Println()
-	//for _, w := range t.witness[1] {
-	//	fmt.Print(w.vid[2:4], "(", w.Body.N, ")", ",")
-	//}
-	//fmt.Println()
-
-	//sort.Strings(txc)
 	sort.Slice(txc, func(i, j int) bool {
 		for k := 0; k < common.HashLength; k++ {
 			if txc[i][k] < txc[j][k] {
@@ -979,18 +900,17 @@ func (t *Tetris) consensusComputing() {
 		cs = cs + c[i]
 	}
 
-	//if t.h < 10 {
-	//	fmt.Println(t.vid[0:4], "'s consensus events:", cs)
-	//}
-	//fmt.Print("******************* consensus reached ******************* ")
-	//fmt.Println("m=", t.m, " n=", t.h+1, ":", cs)
+	end := time.Now()
+	duration := end.Sub(begin)
+	if duration > time.Millisecond {
+		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
+	}
 
 	o := &ConsensusOutput{h: t.h + 1, output: cs, Tx: txc}
 	t.OutputCh <- o
-	//deadlock的问题在这儿，当一个event触发大量的共识时，由于这儿是递归，一直没有返回，但在发output，导致外部程序的loop处理不了output而死锁！
 
 	t.h++
-	t.prepare() //开始下一轮
+	t.prepare() //start next stage
 	t.updateAll()
 }
 
@@ -1028,26 +948,11 @@ func (t Tetris) DebugPrint() {
 	fmt.Println("tx:", t.txCount, "event:", t.eventCount, "parent:", t.parentCount)
 	fmt.Println("txCh:", len(t.TxsCh), "eventCh:", len(t.EventCh), "sendCh:", len(t.SendEventCh))
 
-	//allt := make(map[string]map[uint64]*Event)
-	//height := make(map[string]uint64)
-	//
 	keys := []string{}
 	for k := range t.validators {
 		keys = append(keys, k)
-		//allt[k] = make(map[uint64]*Event)
 	}
 	sort.Strings(keys)
-	//
-	//for _, key := range t.eventPending.Keys() {
-	//	ei, ok := t.eventPending.Get(key)
-	//	if ok {
-	//		ev := ei.(*Event)
-	//		allt[ev.vid][ev.Body.N] = ev
-	//		if ev.Body.N > height[ev.vid] {
-	//			height[ev.vid] = ev.Body.N
-	//		}
-	//	}
-	//}
 
 	for _, key := range keys {
 		fmt.Print(key[2:4], ":")
