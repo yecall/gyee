@@ -21,10 +21,9 @@ import (
 	"crypto/sha256"
 	"time"
 
+	"encoding/binary"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto"
-	//"github.com/yeeco/gyee/utils/logging"
-	"encoding/binary"
 )
 
 const ROUND_UNDECIDED = -1
@@ -44,7 +43,7 @@ func (ev *EventBody) Hash() common.Hash {
 }
 
 func (ev *EventBody) MarshalLength() int {
-	return 25 + 2 + 32 * len(ev.Tx) + 2 + 32 * len(ev.E) + 1
+	return 25 + 2 + 32*len(ev.Tx) + 2 + 32*len(ev.E) + 1
 }
 
 func (ev *EventBody) MarshalTo(buf []byte) {
@@ -53,13 +52,13 @@ func (ev *EventBody) MarshalTo(buf []byte) {
 	binary.BigEndian.PutUint64(buf[16:24], uint64(ev.T))
 	binary.BigEndian.PutUint16(buf[24:26], uint16(len(ev.Tx)))
 	p := 26
-	for i:=0; i<len(ev.Tx); i++ {
+	for i := 0; i < len(ev.Tx); i++ {
 		copy(buf[p:p+32], ev.Tx[i][:])
 		p += 32
 	}
 	binary.BigEndian.PutUint16(buf[p:p+2], uint16(len(ev.E)))
 	p += 2
-	for i:=0; i<len(ev.E); i++ {
+	for i := 0; i < len(ev.E); i++ {
 		copy(buf[p:p+32], ev.E[i][:])
 		p += 32
 	}
@@ -78,14 +77,6 @@ func (ev *EventBody) Marshal() []byte {
 
 	ev.MarshalTo(buf)
 	return buf
-	/*
-	b, err := json.Marshal(ev)
-	if err != nil {
-		logging.Logger.Error("json encode error")
-		return nil
-	}
-	return b
-	*/
 }
 
 func (ev *EventBody) Unmarshal(data []byte) {
@@ -95,14 +86,14 @@ func (ev *EventBody) Unmarshal(data []byte) {
 	p := 26
 	l := binary.BigEndian.Uint16(data[24:26])
 	ev.Tx = make([]common.Hash, l)
-	for i:=uint16(0); i<l; i++ {
+	for i := uint16(0); i < l; i++ {
 		copy(ev.Tx[i][:], data[p:p+32])
 		p += 32
 	}
-	l = binary.BigEndian.Uint16(data[p:p+2])
+	l = binary.BigEndian.Uint16(data[p : p+2])
 	p += 2
 	ev.E = make([]common.Hash, l)
-	for i:=uint16(0); i<l; i++ {
+	for i := uint16(0); i < l; i++ {
 		copy(ev.E[i][:], data[p:p+32])
 		p += 32
 	}
@@ -122,13 +113,13 @@ type EventMessage struct {
 func (em *EventMessage) Marshal() []byte {
 	bl := em.Body.MarshalLength()
 
-    sl := 1 + len(em.Signature.Signature)
-    l := 8 + bl + sl
+	sl := 1 + len(em.Signature.Signature)
+	l := 8 + bl + sl
 	buf := make([]byte, l)
 	p := 0
 	binary.BigEndian.PutUint32(buf[p:p+4], uint32(bl))
 	p += 4
-	em.Body.MarshalTo(buf[p:p+bl])
+	em.Body.MarshalTo(buf[p : p+bl])
 	p += bl
 	binary.BigEndian.PutUint32(buf[p:p+4], uint32(sl))
 	p += 4
@@ -136,32 +127,21 @@ func (em *EventMessage) Marshal() []byte {
 	p += 1
 	copy(buf[p:p+len(em.Signature.Signature)], em.Signature.Signature)
 	return buf
-	/*
-	b, err := json.Marshal(em)
-	if err != nil {
-		logging.Logger.Error("json encode error")
-		return nil
-	}
-	return b
-	*/
 }
 
 func (em *EventMessage) Unmarshal(data []byte) {
 	p := 0
-    l := binary.BigEndian.Uint32(data[p:p+4])
-    p += 4
-    em.Body = &EventBody{}
-    em.Body.Unmarshal(data[p:p+int(l)])
-    p += int(l)
-    l = binary.BigEndian.Uint32(data[p:p+4])
-    p += 4
-    em.Signature = &crypto.Signature{}
-    em.Signature.Algorithm = crypto.Algorithm(data[p])
-    p += 1
-    em.Signature.Signature = data[p:p+int(l)-1]
-	/*
-	json.Unmarshal(data, em)
-	*/
+	l := binary.BigEndian.Uint32(data[p : p+4])
+	p += 4
+	em.Body = &EventBody{}
+	em.Body.Unmarshal(data[p : p+int(l)])
+	p += int(l)
+	l = binary.BigEndian.Uint32(data[p : p+4])
+	p += 4
+	em.Signature = &crypto.Signature{}
+	em.Signature.Algorithm = crypto.Algorithm(data[p])
+	p += 1
+	em.Signature.Signature = data[p : p+int(l)-1]
 }
 
 type Event struct {
@@ -200,6 +180,7 @@ func NewEvent(vid string, height uint64, sequenceNumber uint64) *Event {
 		witness:     false,
 		vote:        0,
 		committable: COMMITTABLE_UNDECIDED,
+		fork:        make([]common.Hash, 0),
 	}
 
 	event.know[vid] = sequenceNumber
@@ -268,12 +249,10 @@ func (e *Event) Unmarshal(data []byte) {
 	em.Unmarshal(data)
 	e.Body = em.Body
 	e.signature = em.Signature
-	//fmt.Println("len:", len(data))
-	//fmt.Println("raw:", len(e.Body.Tx)*32 + len(e.Body.E)*32 + 100)
 }
 
 func (e *Event) Sign(signer crypto.Signer) error {
-	h :=  e.Body.Hash()
+	h := e.Body.Hash()
 	sig, err := signer.Sign(h[:])
 	if err != nil {
 		return err
@@ -307,8 +286,6 @@ func (e *Event) totalEvent() int {
 }
 
 func (e *Event) updateKnow(event *Event) {
-	//TODO:updateKnow(nil)可以改在new里头
-	e.know[e.vid] = e.Body.N
 	if event != nil {
 		for key, value := range event.know {
 			if value > e.know[key] {

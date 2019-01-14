@@ -29,13 +29,13 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"math"
 
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
-	"math"
 )
 
 var HASH0 = [common.HashLength]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -365,6 +365,16 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 	ret := event.SignVerify(pk, t.signer)
 
+	if ret {
+		event.know = make(map[string]uint64)
+		event.fork = make([]common.Hash, 0)
+		event.know[event.vid] = event.Body.N
+		event.round = ROUND_UNDECIDED
+		event.witness = false
+		event.vote = 0
+		event.committable = COMMITTABLE_UNDECIDED
+	}
+
 	return ret
 }
 
@@ -450,8 +460,6 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 		//过久以前的消息，可以丢弃
 		//TODO:这个可能还不能丢
 		//logging.Logger.Info("old parent event:", event)
-		t.eventCache.Add(event.Hash(), event)
-		return
 	}
 
 	t.addReceivedEventToTetris(event)
@@ -472,11 +480,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		return
 	}
 
-	event.know = make(map[string]uint64)
-	event.round = ROUND_UNDECIDED
-	event.witness = false
-	event.vote = 0
-	event.committable = COMMITTABLE_UNDECIDED
+
 	t.eventCache.Add(event.Hash(), event)
 	/*
 		新来一个event，可能是request来的，也可能是pending的
@@ -509,7 +513,10 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	unpending := make([]*Event, 0)
 
 	event.ready = false
-	t.validators[event.vid][event.Body.N] = event
+	if event.Body.N > t.h {
+		t.validators[event.vid][event.Body.N] = event
+	}
+
 	if t.pendingHeight[event.vid] < event.Body.N {
 		t.pendingHeight[event.vid] = event.Body.N
 	}
@@ -517,7 +524,6 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	//如果是base event，则标识为ready
 	if event.Body.N == t.h+1 {
 		event.ready = true
-		event.updateKnow(nil)
 		t.eventAccepted = append(t.eventAccepted, event)
 		t.validatorsHeight[event.vid] = event.Body.N
 		unpending = append(unpending, event)
@@ -527,7 +533,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	//第三个条件是权宜之计，有一种可能产生ready是共识结束一轮后，base在prepare中被表示为ready，这个情况需要这儿处理。
 	//还有一种情况，就是n.h以下的到来，可以使event ready的，这儿没算。主要是vh下面都ready的假设有问题。。。所以干脆全部情况搜一遍
 	//再改进一下，就是vh以上2个以上的还是不用搜索，但以下的要搜
-	if true || event.Body.N == t.validatorsHeight[event.vid]+1 || event.ready || t.validatorsHeight[event.vid] == t.h+1 {
+	if event.Body.N <= t.h || event.Body.N == t.validatorsHeight[event.vid]+1 || event.ready || t.validatorsHeight[event.vid] == t.h+1 {
 		searchHeight := make(map[string]uint64)
 		newHeight := t.h + 1 //这儿本来可以是event.body.N，但有可能t.h在上一轮共识达成时+1了，导致有base event此时ready
 		for k, v := range t.validatorsHeight {
@@ -569,9 +575,6 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 					}
 				}
 
-				if len(ev.Body.E) == 1 && t.vid[2:4] == "39" && !isReady && t.validatorsHeight[ev.vid] == t.h+1{
-					fmt.Println("*****", ev.Body.N)
-				}
 				if isReady {
 					ev.ready = true
 					for ev.Body.N >= t.n {
@@ -596,7 +599,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		}
 	}
 
-	//开始request
+	//开始request, 这个地方可以考虑做个频率控制
 	for k, v := range t.validatorsHeight {
 		if v <= t.h {
 			v = t.h
@@ -636,135 +639,10 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		}
 	}
 
-	/*
-		begin := time.Now()
-		unpending := make([]*Event, 0)
-		for _, key := range t.eventPending.Keys() {
-			ei, ok := t.eventPending.Get(key)
-			if ok {
-				ev := ei.(*Event)
-				//如果event已经到达base之下，则不再需要处理
-				if ev.Body.N <= t.h {
-					t.eventPending.Remove(key)
-					continue
-				}
-				//广度优先搜索，[]bs为每一层，bsl为根
-				bsl := make(map[common.Hash]*Event)
-				bsl[ev.Hash()] = ev
-				bs := append([]map[common.Hash]*Event{}, bsl)
-				l := 0
-				//搜索到level中所有的event或者不存在，或者都在member中为止
-				for {
-					currentL := bs[l]
-					nextL := make(map[common.Hash]*Event)
-					//当前level的events, 如果都在member中，结束。
-					allReady := true
-					for _, e := range currentL {
-						//如果event都在member中，
-						if !e.ready {
-							allReady = false
-							for _, peh := range e.Body.E {
-								if peh == HASH0 {
-									continue
-								}
-								//如果parent还没到，request，如果到了，加入下一level列表
-								pei, ok := t.eventCache.Get(peh)
-								if ok {
-									pe := pei.(*Event)
-									if pe.Body.N > t.h {
-										nextL[peh] = pe
-									}
-								} else {
-									//parent event还没收到，发起一个请求，//TODO：这儿还需要控制请求规则
-									eri, ok := t.eventRequest.Get(peh)
-									if ok {
-										er := eri.(*SyncRequest)
-										er.count++
-									} else {
-										t.RequestEventCh <- peh
-										t.TrafficOut += 32
-										t.eventRequest.Add(peh, &SyncRequest{count: 1, time: time.Now()})
-									}
-								}
-							}
-						}
-					}
-					//当前level的events，已经都ready了，停止搜索
-					if allReady || len(nextL) == 0 {
-						break
-					}
-
-					//计算下一level events，如果空，结束。
-					l++
-					bs = append(bs, nextL)
-				}
-
-				for li := l; li >= 0; li-- {
-					//l层如果ready了，
-					currentL := bs[li]
-					for _, e := range currentL {
-						if !e.ready {
-							pAllReady := true
-							if e.Body.N > t.h+1 { //如果是base event，标识为ready
-								for _, peh := range e.Body.E {
-									if peh == HASH0 {
-										e.updateKnow(nil)
-										continue
-									}
-									//如果parent还没到，request，如果到了，加入下一level列表
-									pei, ok := t.eventCache.Get(peh)
-									if ok {
-										pe := pei.(*Event)
-										if !pe.ready && pe.Body.N > t.h {
-											pAllReady = false
-										} else {
-											e.updateKnow(pe)
-										}
-									} else {
-										pAllReady = false
-										//e.updateKnow(nil) //这个可能不一定需要
-									}
-								}
-							}
-
-							if pAllReady {
-								e.ready = true
-								t.validators[e.vid][e.Body.N] = e
-								t.validatorsHeight[e.vid] = e.Body.N
-								//t.memberHeight[e.Body.M] = e.Body.N
-								if t.eventPending.Contains(e.Hash()) {
-									//if t.currentEvent.Body.N-e.Body.N < 20 { //试验
-									if e.Body.N >= t.n {
-										//对方的seq num超过本地，本地需要发出Event并生成新的currentEvent
-										//
-										//logging.Logger.WithFields(logrus.Fields{
-										//	"t.vid": t.vid[2:4],
-										//	"e.vid": e.vid[2:4],
-										//	"t.n":   t.n,
-										//	"e.n":   e.Body.N,
-										//}).Info("event.n >= t.n send placeholder:", e.Body.N-t.n)
-
-										for e.Body.N >= t.n {
-											t.sendPlaceholderEvent()
-										}
-									}
-
-									t.eventAccepted = append(t.eventAccepted, e)
-									t.eventPending.Remove(e.Hash())
-									//unpending = true
-								}
-								unpending = append(unpending, e)
-							}
-						}
-					}
-				}
-			}
-		}
-	*/
 	end := time.Now()
 	duration := end.Sub(begin)
 	if duration > 10*time.Millisecond {
-		logging.Logger.Info(t.vid[2:4], "pending process:", duration.Nanoseconds())
+		logging.Logger.Info(t.vid[2:4], "pending process:", duration.Nanoseconds(), "uppend:", len(unpending))
 	}
 	//如果有event已经可以被加入到tetris中，update一次状态
 	if len(unpending) > 0 {
@@ -802,7 +680,6 @@ func (t *Tetris) prepare() {
 		be := value[t.h+1]
 		if be != nil && !be.ready {
 			be.ready = true
-			be.updateKnow(nil)
 			t.validatorsHeight[be.vid] = be.Body.N
 			t.eventAccepted = append(t.eventAccepted, be)
 		}
