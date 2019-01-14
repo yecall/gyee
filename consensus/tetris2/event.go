@@ -24,6 +24,8 @@ import (
 	"encoding/binary"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto"
+	"errors"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 const ROUND_UNDECIDED = -1
@@ -38,71 +40,101 @@ type EventBody struct {
 	P  bool          //HeartBeat Pulse
 }
 
-func (ev *EventBody) Hash() common.Hash {
-	return sha256.Sum256(ev.Marshal())
+func (eb *EventBody) Hash() common.Hash {
+	m, err := eb.Marshal()
+	if err != nil {
+		logging.Logger.Warn("eventbody marshal error", err)
+	}
+
+	return sha256.Sum256(m)
 }
 
-func (ev *EventBody) MarshalLength() int {
-	return 25 + 2 + 32*len(ev.Tx) + 2 + 32*len(ev.E) + 1
+func (eb *EventBody) EmptyLength() int {
+	return 8 + 8 + 8 + 2 + 2 + 1
 }
 
-func (ev *EventBody) MarshalTo(buf []byte) {
-	binary.BigEndian.PutUint64(buf[0:8], ev.H)
-	binary.BigEndian.PutUint64(buf[8:16], ev.N)
-	binary.BigEndian.PutUint64(buf[16:24], uint64(ev.T))
-	binary.BigEndian.PutUint16(buf[24:26], uint16(len(ev.Tx)))
+func (eb *EventBody) MarshalLength() int {
+	return eb.EmptyLength() + 32*len(eb.Tx) + 32*len(eb.E)
+}
+
+func (eb *EventBody) MarshalTo(buf []byte) error{
+	if eb.MarshalLength() != len(buf) {
+		return errors.New("error buffer length for eventbody marshal")
+	}
+
+	binary.BigEndian.PutUint64(buf[0:8], eb.H)
+	binary.BigEndian.PutUint64(buf[8:16], eb.N)
+	binary.BigEndian.PutUint64(buf[16:24], uint64(eb.T))
+	binary.BigEndian.PutUint16(buf[24:26], uint16(len(eb.Tx)))
 	p := 26
-	for i := 0; i < len(ev.Tx); i++ {
-		copy(buf[p:p+32], ev.Tx[i][:])
+	for i := 0; i < len(eb.Tx); i++ {
+		copy(buf[p:p+32], eb.Tx[i][:])
 		p += 32
 	}
-	binary.BigEndian.PutUint16(buf[p:p+2], uint16(len(ev.E)))
+	binary.BigEndian.PutUint16(buf[p:p+2], uint16(len(eb.E)))
 	p += 2
-	for i := 0; i < len(ev.E); i++ {
-		copy(buf[p:p+32], ev.E[i][:])
+	for i := 0; i < len(eb.E); i++ {
+		copy(buf[p:p+32], eb.E[i][:])
 		p += 32
 	}
-	if ev.P {
+	if eb.P {
 		buf[p] = 1
 	} else {
 		buf[p] = 0
 	}
 
-	p++
+	return nil
 }
 
-func (ev *EventBody) Marshal() []byte {
-	l := ev.MarshalLength()
+func (eb *EventBody) Marshal() ([]byte, error) {
+	l := eb.MarshalLength()
 	buf := make([]byte, l)
 
-	ev.MarshalTo(buf)
-	return buf
+	err := eb.MarshalTo(buf)
+	return buf, err
 }
 
-func (ev *EventBody) Unmarshal(data []byte) {
-	ev.H = binary.BigEndian.Uint64(data[0:8])
-	ev.N = binary.BigEndian.Uint64(data[8:16])
-	ev.T = int64(binary.BigEndian.Uint64(data[16:24]))
+func (eb *EventBody) Unmarshal(data []byte) error {
+	if len(data) < eb.EmptyLength() {
+		return errors.New("error with data length")
+	}
+
+	eb.H = binary.BigEndian.Uint64(data[0:8])
+	eb.N = binary.BigEndian.Uint64(data[8:16])
+	eb.T = int64(binary.BigEndian.Uint64(data[16:24]))
 	p := 26
-	l := binary.BigEndian.Uint16(data[24:26])
-	ev.Tx = make([]common.Hash, l)
-	for i := uint16(0); i < l; i++ {
-		copy(ev.Tx[i][:], data[p:p+32])
+	tl := binary.BigEndian.Uint16(data[24:26])
+
+	if len(data) < eb.EmptyLength() + 32 * int(tl) {
+		return errors.New("error with data length")
+	}
+
+	eb.Tx = make([]common.Hash, tl)
+	for i := uint16(0); i < tl; i++ {
+		copy(eb.Tx[i][:], data[p:p+32])
 		p += 32
 	}
-	l = binary.BigEndian.Uint16(data[p : p+2])
+
+	el := binary.BigEndian.Uint16(data[p : p+2])
 	p += 2
-	ev.E = make([]common.Hash, l)
-	for i := uint16(0); i < l; i++ {
-		copy(ev.E[i][:], data[p:p+32])
+
+	if len(data) < eb.EmptyLength() + 32 * int(tl) + 32 * int(el) {
+		return errors.New("error with data length")
+	}
+
+	eb.E = make([]common.Hash, el)
+	for i := uint16(0); i < el; i++ {
+		copy(eb.E[i][:], data[p:p+32])
 		p += 32
 	}
 
 	if data[p] == 1 {
-		ev.P = true
+		eb.P = true
 	} else {
-		ev.P = false
+		eb.P = false
 	}
+
+	return nil
 }
 
 type EventMessage struct {
@@ -129,19 +161,44 @@ func (em *EventMessage) Marshal() []byte {
 	return buf
 }
 
-func (em *EventMessage) Unmarshal(data []byte) {
+func (em *EventMessage) Unmarshal(data []byte) error {
+	dl := len(data)
+
 	p := 0
-	l := binary.BigEndian.Uint32(data[p : p+4])
+
+	if dl < 4 {
+		return errors.New("error with data length")
+	}
+
+	ebl := binary.BigEndian.Uint32(data[p : p+4])
 	p += 4
+
+	if dl < 4 + int(ebl) {
+		return errors.New("error with data length")
+	}
+
 	em.Body = &EventBody{}
-	em.Body.Unmarshal(data[p : p+int(l)])
-	p += int(l)
-	l = binary.BigEndian.Uint32(data[p : p+4])
+	em.Body.Unmarshal(data[p : p+int(ebl)])
+	p += int(ebl)
+
+	if dl < 4 + int(ebl) + 4 {
+		return errors.New("error with data length")
+	}
+
+	sl := binary.BigEndian.Uint32(data[p : p+4])
 	p += 4
+
+
+	if dl <  4 + int(ebl) + 4 + int(sl) {
+		return errors.New("error with data length")
+	}
+
 	em.Signature = &crypto.Signature{}
 	em.Signature.Algorithm = crypto.Algorithm(data[p])
 	p += 1
-	em.Signature.Signature = data[p : p+int(l)-1]
+	em.Signature.Signature = data[p : p+int(sl)-1]
+
+	return nil
 }
 
 type Event struct {
@@ -246,7 +303,11 @@ func (e *Event) Marshal() []byte {
 
 func (e *Event) Unmarshal(data []byte) {
 	em := &EventMessage{}
-	em.Unmarshal(data)
+	err := em.Unmarshal(data)
+	if err != nil {
+		logging.Logger.Warn("event unmarshal error.", err)
+	}
+
 	e.Body = em.Body
 	e.signature = em.Signature
 }

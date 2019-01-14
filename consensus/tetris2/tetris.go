@@ -478,16 +478,20 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 			newReadyThisRound := false
 			minReadyHeight := uint64(math.MaxUint64)
 			for k, v := range searchHeight {
-				if t.validators[k][v] == nil { //It is not possible for an event to be ready if it's parent not exist. so stop search any more.
+				//It is not possible for an event to be ready if it's parent not exist. so stop search any more.
+				if t.validators[k][v] == nil {
 					delete(searchHeight, k)
 					continue
 				}
 
-				if v < newHeight { //search height under the new ready event, it is impossible to be ready.
+				//search height under the new ready event, it is impossible to be ready. so stop search any more.
+				if v < newHeight {
 					delete(searchHeight, k)
 					continue
 				}
+
 				ev := t.validators[k][v]
+
 				//if all the parents of ev is under validators height, it will be ready.
 				isReady := true
 				for _, peh := range ev.Body.E {
@@ -581,9 +585,6 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	}
 
 	if len(unpending) > 0 {
-		//sort.Slice(unpending, func(i, j int) bool {
-		//	return unpending[i].Body.N < unpending[j].Body.N
-		//})
 		newWitness := false
 		for _, event := range unpending {
 			if t.update(event, true) {
@@ -690,16 +691,10 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 		if pme != nil {
 			if me.round > pme.round {
 				me.witness = true
-				//if t.witness[me.round] == nil {
-				//      t.witness[me.round] = make(map[uint32]*Event)
-				//}
 				if len(t.witness) <= me.round {
 					t.witness = append(t.witness, make(map[string]*Event))
 				}
 				t.witness[me.round][me.vid] = me
-				//if me.round == 0 {
-				//	fmt.Println("*************", me.round, pme.round, pme.Body.N)
-				//}
 				newWitness = true
 			}
 		} else {
@@ -824,13 +819,9 @@ func (t *Tetris) consensusComputing() {
 
 	begin := time.Now()
 
-	c := make([]string, 0)
-	cs := ""
 	txc := make([]common.Hash, 0)
-
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
-			c = append(c, w.vid[0:4])
 			for _, tx := range w.Body.Tx {
 				if t.txsCommitted.Contains(tx) {
 					continue
@@ -862,10 +853,6 @@ func (t *Tetris) consensusComputing() {
 		}
 		return false
 	})
-	sort.Strings(c)
-	for i := 0; i < len(c); i++ {
-		cs = cs + c[i]
-	}
 
 	end := time.Now()
 	duration := end.Sub(begin)
@@ -873,7 +860,7 @@ func (t *Tetris) consensusComputing() {
 		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
 	}
 
-	o := &ConsensusOutput{h: t.h + 1, output: cs, Tx: txc}
+	o := &ConsensusOutput{h: t.h + 1, output: "", Tx: txc}
 	t.OutputCh <- o
 
 	t.h++
