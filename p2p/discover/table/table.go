@@ -96,6 +96,8 @@ const (
 // Some constants about buckets, timers, ...
 //
 const (
+	switch2Root			= true					// switch to root
+	nodeId2SubnetId		= true					// subnet identity is masked from node identity
 	bucketSize			= 32					// max nodes can be held for one bucket
 	nBuckets			= HashBits + 1			// total number of buckets
 	maxBonding			= 16					// max concurrency bondings
@@ -2225,8 +2227,17 @@ func (tabMgr *TableManager)TabGetInstAll() *map[SubNetworkID]*TableManager {
 }
 
 func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, error) {
+
+	//
 	// caller should check the error returned, for empty {0x00,0x00} return
 	// when errors happened.
+	//
+
+	if !nodeId2SubnetId {
+		tabLog.Debug("GetSubnetIdentity: not supported")
+		return SubNetworkID{}, errors.New("not supported")
+	}
+
 	const MaxSubNetMaskBits = config.SubNetIdBytes * 8
 	if maskBits < 0 || maskBits > MaxSubNetMaskBits {
 		return config.SubNetworkID{}, errors.New("invalid mask bits")
@@ -2245,11 +2256,20 @@ func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, err
 }
 
 func (tabMgr *TableManager)switch2RootInst() *TableManager {
+
+	//
 	// notice: "tabMgr" must be the root instance to call this function. This is for
 	// bootstrap node configed as "AnySubNet", while other nodes query/ping/pong with
 	// their subnet identities. In this case, since the bootstrap node has only table
 	// manager instance, it has to switch to the only one root instance. when subnets
 	// are reconfigurated, the bootstarp node can ignor it and stay as an "AnySubNet".
+	//
+
+	if !switch2Root {
+		tabLog.Debug("switch2RootInst: not supported")
+		return nil
+	}
+
 	mgr := (*TableManager)(nil)
 	if tabMgr.cfg.bootstrapNode {
 		if tabMgr.snid == config.AnySubNet {
