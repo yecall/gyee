@@ -1247,8 +1247,6 @@ _txLoop:
 		// fetch pending signal
 		//
 
-		ciLog.Debug("txProc: 0, peer: %x", conInst.hsInfo.peer.ID)
-
 		inf, ok := <-conInst.txChan
 		if !ok {
 			goto _checkDone
