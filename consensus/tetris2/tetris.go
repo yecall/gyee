@@ -39,6 +39,11 @@ type SyncRequest struct {
 	time  time.Time
 }
 
+type ValidatorRotateRequest struct {
+	joins []string
+	quits []string
+}
+
 type Tetris struct {
 	core   ICore
 	signer crypto.Signer
@@ -51,6 +56,9 @@ type Tetris struct {
 	validatorsHeight map[string]uint64            //validator's current height
 	pendingHeight    map[string]uint64            //current pending event height
 	witness          []map[string]*Event          //witness of each round.
+
+	//Member Rotate
+	validatorRotateRequest *ValidatorRotateRequest
 
 	//Input Channel
 	EventCh       chan []byte
@@ -71,7 +79,6 @@ type Tetris struct {
 	txsCommitted *utils.LRU                        //dedup for committed txs
 	txsPending   map[common.Hash]map[string]uint64 //tx appear at which validator's which height, key1: hash of tx, key2:vid, value:height
 
-	//currentEvent Event
 	ticker    *time.Ticker
 	heartBeat map[string]time.Time //time of receive event from every validators，key:vid
 
@@ -107,6 +114,8 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		validators:       make(map[string]map[uint64]*Event, len(validatorList)),
 		validatorsHeight: make(map[string]uint64, len(validatorList)),
 		pendingHeight:    make(map[string]uint64, len(validatorList)),
+
+		validatorRotateRequest: &ValidatorRotateRequest{},
 
 		EventCh:       make(chan []byte, 10),
 		ParentEventCh: make(chan []byte, 10),
@@ -178,19 +187,35 @@ func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
 	return true, now.Sub(times[t.params.superMajority-2])
 }
 
+//This is a test function to control the member rotate from outside.
+//In release version, member rotate is fired by consensus output depend on the upper level protocol.
+//That protocol need performance metrics of the current members and new request of candidates.
 func (t *Tetris) MemberRotate(joins []string, quits []string) {
-	for _, vid := range quits {
+	t.validatorRotateRequest.joins = joins
+	t.validatorRotateRequest.quits = quits
+}
+
+func (t *Tetris) memberRotate() bool {
+	if len(t.validatorRotateRequest.joins) == 0 && len(t.validatorRotateRequest.quits) == 0 {
+		return false
+	}
+
+	for _, vid := range t.validatorRotateRequest.quits {
 		delete(t.validators, vid)
 		delete(t.validatorsHeight, vid)
 		delete(t.pendingHeight, vid)
 		delete(t.heartBeat, vid)
 	}
 
-	for _, vid := range joins {
+	for _, vid := range t.validatorRotateRequest.joins {
 		t.validators[vid] = make(map[uint64]*Event)
 		t.validatorsHeight[vid] = 0
 		t.pendingHeight[vid] = 0
 	}
+
+	t.validatorRotateRequest.joins = []string{}
+	t.validatorRotateRequest.quits = []string{}
+	return true
 }
 
 func (t *Tetris) Start() error {
@@ -626,7 +651,26 @@ func (t *Tetris) prepare() {
 	t.witness = make([]map[string]*Event, 1)
 
 	//todo: update know while members rotated
+	if t.memberRotate() {
+		maxh := uint64(0)
+		for _, vh := range t.validatorsHeight {
+			if maxh < vh {
+				maxh = vh
+			}
+		}
+		for n := t.h + 1; n <= maxh; n++ {
+			for m, _ := range t.validators {
+				me := t.validators[m][n]
+				if me != nil {
+               //if me is base, then me know itself's height
+               //else search for me's parents. if the parents is the quit one, then ignore it.
+               
+				}
+			}
+		}
+	}
 
+	//todo: remain issue: self parent of crash-recovery situation
 }
 
 func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
