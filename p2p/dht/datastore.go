@@ -161,7 +161,7 @@ func NewDsMgr() *DsMgr {
 
 	dsMgr := DsMgr{
 		name:			DsMgrName,
-		getfromPeer:	true,
+		getfromPeer:	false,
 		fdsCfg:			FileDatastoreConfig{},
 		ldsCfg:			LeveldbDatastoreConfig{},
 		tmMgr:			NewTimerManager(),

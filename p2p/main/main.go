@@ -98,7 +98,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase9"
+var tgtCase = "testCase7"
 
 //
 // switch for playing go-monitors, related commands:
@@ -354,7 +354,7 @@ func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep
 
 			} else {
 
-				log.Debug("yeDhtProc: good got:\n\tkey: %x\n\tvalue: %x", bk.Key, val)
+				log.Debug("yeDhtProc: value got:\n\tkey: %x\n\tvalue: %x", bk.Key, val)
 
 				if bytes.Compare(bk.Data, val) != 0 {
 					log.Debug("yeDhtProc: value mismatched")
@@ -432,7 +432,7 @@ func testCase7(tc *testCase) {
 	go subFunc(subTx, "tx")
 	go subFunc(subBh, "bh")
 
-	if false {
+	if true {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
 	} else {
 		time.Sleep(time.Second * 10)
