@@ -161,7 +161,7 @@ func NewDsMgr() *DsMgr {
 
 	dsMgr := DsMgr{
 		name:			DsMgrName,
-		getfromPeer:	true,
+		getfromPeer:	false,
 		fdsCfg:			FileDatastoreConfig{},
 		ldsCfg:			LeveldbDatastoreConfig{},
 		tmMgr:			NewTimerManager(),
@@ -453,10 +453,8 @@ func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno 
 	// try local data store
 	//
 
-	if !dsMgr.getfromPeer {
-		if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
-			return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
-		}
+	if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
+		return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
 	}
 
 	//
@@ -689,6 +687,10 @@ func (dsMgr *DsMgr)qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno 
 // get value from store by key
 //
 func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
+
+	if !dsMgr.getfromPeer {
+		return nil
+	}
 
 	eno, val := dsMgr.ds.Get(k[0:])
 	if eno != DhtEnoNone {

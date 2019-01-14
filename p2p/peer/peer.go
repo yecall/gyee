@@ -2292,6 +2292,21 @@ func (pi *PeerInstance)piRxDataInd(msg interface{}) PeMgrErrno {
 	return pi.piP2pPkgProc(msg.(*P2pPackage))
 }
 
+func (pi *PeerInstance)checkHandshakeInfo(hs *Handshake) bool {
+	pass := false
+	if pi.peMgr.dynamicSubNetIdExist(&hs.Snid) {
+		pass = true
+	} else if pi.peMgr.staticSubNetIdExist(&hs.Snid){
+		for _, sn := range pi.peMgr.cfg.staticNodes {
+			if bytes.Compare(sn.ID[0:], hs.NodeId[0:]) == 0 {
+				pass = true
+				break
+			}
+		}
+	}
+	return pass
+}
+
 func (pi *PeerInstance)piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 	var eno PeMgrErrno = PeMgrEnoNone
 	var pkg = new(P2pPackage)
@@ -2302,11 +2317,12 @@ func (pi *PeerInstance)piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 		return eno
 	}
 
-	peerLog.Debug("piHandshakeInbound: snid: %x, peer-ip: %s, hs: %+v", hs.Snid, hs.IP.String(), *hs)
+	peerLog.Debug("piHandshakeInbound: snid: %x, peer-ip: %s, hs: %+v",
+		hs.Snid, hs.IP.String(), *hs)
 
-	if inst.peMgr.dynamicSubNetIdExist(&hs.Snid) == false &&
-		inst.peMgr.staticSubNetIdExist(&hs.Snid) == false {
-		peerLog.Debug("piHandshakeInbound: local node does not attach to subnet: %x", hs.Snid)
+	if pi.checkHandshakeInfo(hs) != true {
+		peerLog.Debug("piHandshakeInbound: checkHandshakeInfo failed, snid: %x, peer-ip: %s, hs: %+v",
+			hs.Snid, hs.IP.String(), *hs)
 		return PeMgrEnoNotfound
 	}
 
@@ -2365,6 +2381,13 @@ func (pi *PeerInstance)piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
 		peerLog.Debug("piHandshakeOutbound: read inbound Handshake message failed, eno: %d", eno)
 		return eno
+	}
+
+	// check handshake
+	if pi.checkHandshakeInfo(hs) != true {
+		peerLog.Debug("piHandshakeOutbound: checkHandshakeInfo failed, snid: %x, peer-ip: %s, hs: %+v",
+			hs.Snid, hs.IP.String(), *hs)
+		return PeMgrEnoNotfound
 	}
 
 	// check sub network identity
@@ -2832,11 +2855,8 @@ func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
 	peMgr.lock.Lock()
 	defer peMgr.lock.Unlock()
 	if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
-		for _, id := range peMgr.cfg.subNetIdList {
-			if id == *snid {
-				return true
-			}
-		}
+		_, ok := peMgr.cfg.subNetNodeList[*snid]
+		return ok
 	}
 	return false
 }

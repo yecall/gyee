@@ -360,6 +360,8 @@ func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep
 					log.Debug("yeDhtProc: value mismatched")
 				}
 			}
+
+			time.Sleep(time.Millisecond * 2000)
 		}
 
 		if cnt & 0x7f == 0 {
