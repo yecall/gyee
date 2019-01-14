@@ -25,3 +25,57 @@ message Account {
     // account balance encoded big-endian bytes with math/big/Int.Bytes()
     bytes balance = 2;
 }
+
+// signature for a block header or transaction
+message Signature {
+    // signer address
+    // may be omitted if address can be inferred from signature
+    bytes signer = 1;
+
+    // signature algorithm
+    // may be omitted for default algorithm
+    uint32 sigAlgorithm = 2;
+
+    // encoded signature bytes
+    bytes signature = 3;
+}
+
+message Transaction {
+    // chain ID
+    uint32 chainId = 1;
+
+    // transaction nonce
+    uint64 nonce = 2;
+
+    // transaction recipient
+    bytes recipient = 3;
+
+    // transaction amount
+    bytes amount = 4;
+
+    // signature with LAST MESSAGE TAG of one byte
+    Signature signature = 15;
+}
+
+// message for
+//   block header
+//   bloom filter for related addresses
+//   multiple signatures from validator
+message SignedBlockHeader {
+    // embedded encoded block header
+    bytes header = 1;
+
+    // block tx bloom filter
+    bytes bloom = 2;
+
+    // header signature for hash(hash(header) + bloom)
+    repeated Signature signatures = 3;
+}
+
+message Block {
+    SignedBlockHeader header = 1;
+
+    repeated Transaction transactions = 2;
+
+    // TODO: receipts
+}

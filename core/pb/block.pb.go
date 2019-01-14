@@ -32,7 +32,7 @@ func (m *Account) Reset()         { *m = Account{} }
 func (m *Account) String() string { return proto.CompactTextString(m) }
 func (*Account) ProtoMessage()    {}
 func (*Account) Descriptor() ([]byte, []int) {
-	return fileDescriptor_block_92d9987c7cae431d, []int{0}
+	return fileDescriptor_block_b16927741ae16368, []int{0}
 }
 func (m *Account) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Account.Unmarshal(m, b)
@@ -66,19 +66,278 @@ func (m *Account) GetBalance() []byte {
 	return nil
 }
 
-func init() {
-	proto.RegisterType((*Account)(nil), "corepb.Account")
+// signature for a block header or transaction
+type Signature struct {
+	// signer address
+	// may be omitted if address can be inferred from signature
+	Signer []byte `protobuf:"bytes,1,opt,name=signer,proto3" json:"signer,omitempty"`
+	// signature algorithm
+	// may be omitted for default algorithm
+	SigAlgorithm uint32 `protobuf:"varint,2,opt,name=sigAlgorithm,proto3" json:"sigAlgorithm,omitempty"`
+	// encoded signature bytes
+	Signature            []byte   `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func init() { proto.RegisterFile("block.proto", fileDescriptor_block_92d9987c7cae431d) }
+func (m *Signature) Reset()         { *m = Signature{} }
+func (m *Signature) String() string { return proto.CompactTextString(m) }
+func (*Signature) ProtoMessage()    {}
+func (*Signature) Descriptor() ([]byte, []int) {
+	return fileDescriptor_block_b16927741ae16368, []int{1}
+}
+func (m *Signature) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Signature.Unmarshal(m, b)
+}
+func (m *Signature) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Signature.Marshal(b, m, deterministic)
+}
+func (dst *Signature) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Signature.Merge(dst, src)
+}
+func (m *Signature) XXX_Size() int {
+	return xxx_messageInfo_Signature.Size(m)
+}
+func (m *Signature) XXX_DiscardUnknown() {
+	xxx_messageInfo_Signature.DiscardUnknown(m)
+}
 
-var fileDescriptor_block_92d9987c7cae431d = []byte{
-	// 97 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4e, 0xca, 0xc9, 0x4f,
-	0xce, 0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x4b, 0xce, 0x2f, 0x4a, 0x2d, 0x48, 0x52,
-	0xb2, 0xe4, 0x62, 0x77, 0x4c, 0x4e, 0xce, 0x2f, 0xcd, 0x2b, 0x11, 0x12, 0xe1, 0x62, 0xcd, 0xcb,
-	0xcf, 0x4b, 0x4e, 0x95, 0x60, 0x54, 0x60, 0xd4, 0x60, 0x09, 0x82, 0x70, 0x84, 0x24, 0xb8, 0xd8,
-	0x93, 0x12, 0x73, 0x12, 0x41, 0xe2, 0x4c, 0x0a, 0x8c, 0x1a, 0x3c, 0x41, 0x30, 0x6e, 0x12, 0x1b,
-	0xd8, 0x24, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x78, 0xc9, 0xd1, 0x13, 0x58, 0x00, 0x00,
-	0x00,
+var xxx_messageInfo_Signature proto.InternalMessageInfo
+
+func (m *Signature) GetSigner() []byte {
+	if m != nil {
+		return m.Signer
+	}
+	return nil
+}
+
+func (m *Signature) GetSigAlgorithm() uint32 {
+	if m != nil {
+		return m.SigAlgorithm
+	}
+	return 0
+}
+
+func (m *Signature) GetSignature() []byte {
+	if m != nil {
+		return m.Signature
+	}
+	return nil
+}
+
+type Transaction struct {
+	// chain ID
+	ChainId uint32 `protobuf:"varint,1,opt,name=chainId,proto3" json:"chainId,omitempty"`
+	// transaction nonce
+	Nonce uint64 `protobuf:"varint,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	// transaction recipient
+	Recipient []byte `protobuf:"bytes,3,opt,name=recipient,proto3" json:"recipient,omitempty"`
+	// transaction amount
+	Amount []byte `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	// signature with LAST MESSAGE TAG of one byte
+	Signature            *Signature `protobuf:"bytes,15,opt,name=signature,proto3" json:"signature,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
+	XXX_unrecognized     []byte     `json:"-"`
+	XXX_sizecache        int32      `json:"-"`
+}
+
+func (m *Transaction) Reset()         { *m = Transaction{} }
+func (m *Transaction) String() string { return proto.CompactTextString(m) }
+func (*Transaction) ProtoMessage()    {}
+func (*Transaction) Descriptor() ([]byte, []int) {
+	return fileDescriptor_block_b16927741ae16368, []int{2}
+}
+func (m *Transaction) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Transaction.Unmarshal(m, b)
+}
+func (m *Transaction) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Transaction.Marshal(b, m, deterministic)
+}
+func (dst *Transaction) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Transaction.Merge(dst, src)
+}
+func (m *Transaction) XXX_Size() int {
+	return xxx_messageInfo_Transaction.Size(m)
+}
+func (m *Transaction) XXX_DiscardUnknown() {
+	xxx_messageInfo_Transaction.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Transaction proto.InternalMessageInfo
+
+func (m *Transaction) GetChainId() uint32 {
+	if m != nil {
+		return m.ChainId
+	}
+	return 0
+}
+
+func (m *Transaction) GetNonce() uint64 {
+	if m != nil {
+		return m.Nonce
+	}
+	return 0
+}
+
+func (m *Transaction) GetRecipient() []byte {
+	if m != nil {
+		return m.Recipient
+	}
+	return nil
+}
+
+func (m *Transaction) GetAmount() []byte {
+	if m != nil {
+		return m.Amount
+	}
+	return nil
+}
+
+func (m *Transaction) GetSignature() *Signature {
+	if m != nil {
+		return m.Signature
+	}
+	return nil
+}
+
+// message for
+//   block header
+//   bloom filter for related addresses
+//   multiple signatures from validator
+type SignedBlockHeader struct {
+	// embedded encoded block header
+	Header []byte `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	// block tx bloom filter
+	Bloom []byte `protobuf:"bytes,2,opt,name=bloom,proto3" json:"bloom,omitempty"`
+	// header signature for hash(hash(header) + bloom)
+	Signatures           []*Signature `protobuf:"bytes,3,rep,name=signatures,proto3" json:"signatures,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
+}
+
+func (m *SignedBlockHeader) Reset()         { *m = SignedBlockHeader{} }
+func (m *SignedBlockHeader) String() string { return proto.CompactTextString(m) }
+func (*SignedBlockHeader) ProtoMessage()    {}
+func (*SignedBlockHeader) Descriptor() ([]byte, []int) {
+	return fileDescriptor_block_b16927741ae16368, []int{3}
+}
+func (m *SignedBlockHeader) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SignedBlockHeader.Unmarshal(m, b)
+}
+func (m *SignedBlockHeader) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SignedBlockHeader.Marshal(b, m, deterministic)
+}
+func (dst *SignedBlockHeader) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SignedBlockHeader.Merge(dst, src)
+}
+func (m *SignedBlockHeader) XXX_Size() int {
+	return xxx_messageInfo_SignedBlockHeader.Size(m)
+}
+func (m *SignedBlockHeader) XXX_DiscardUnknown() {
+	xxx_messageInfo_SignedBlockHeader.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SignedBlockHeader proto.InternalMessageInfo
+
+func (m *SignedBlockHeader) GetHeader() []byte {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
+func (m *SignedBlockHeader) GetBloom() []byte {
+	if m != nil {
+		return m.Bloom
+	}
+	return nil
+}
+
+func (m *SignedBlockHeader) GetSignatures() []*Signature {
+	if m != nil {
+		return m.Signatures
+	}
+	return nil
+}
+
+type Block struct {
+	Header               *SignedBlockHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	Transactions         []*Transaction     `protobuf:"bytes,2,rep,name=transactions,proto3" json:"transactions,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
+	XXX_unrecognized     []byte             `json:"-"`
+	XXX_sizecache        int32              `json:"-"`
+}
+
+func (m *Block) Reset()         { *m = Block{} }
+func (m *Block) String() string { return proto.CompactTextString(m) }
+func (*Block) ProtoMessage()    {}
+func (*Block) Descriptor() ([]byte, []int) {
+	return fileDescriptor_block_b16927741ae16368, []int{4}
+}
+func (m *Block) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Block.Unmarshal(m, b)
+}
+func (m *Block) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Block.Marshal(b, m, deterministic)
+}
+func (dst *Block) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Block.Merge(dst, src)
+}
+func (m *Block) XXX_Size() int {
+	return xxx_messageInfo_Block.Size(m)
+}
+func (m *Block) XXX_DiscardUnknown() {
+	xxx_messageInfo_Block.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Block proto.InternalMessageInfo
+
+func (m *Block) GetHeader() *SignedBlockHeader {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
+func (m *Block) GetTransactions() []*Transaction {
+	if m != nil {
+		return m.Transactions
+	}
+	return nil
+}
+
+func init() {
+	proto.RegisterType((*Account)(nil), "corepb.Account")
+	proto.RegisterType((*Signature)(nil), "corepb.Signature")
+	proto.RegisterType((*Transaction)(nil), "corepb.Transaction")
+	proto.RegisterType((*SignedBlockHeader)(nil), "corepb.SignedBlockHeader")
+	proto.RegisterType((*Block)(nil), "corepb.Block")
+}
+
+func init() { proto.RegisterFile("block.proto", fileDescriptor_block_b16927741ae16368) }
+
+var fileDescriptor_block_b16927741ae16368 = []byte{
+	// 312 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x52, 0x4d, 0x4b, 0xc3, 0x30,
+	0x18, 0xa6, 0xfb, 0x64, 0x6f, 0x3b, 0x64, 0x51, 0x24, 0xc2, 0x0e, 0xa5, 0xa7, 0x9d, 0x26, 0x9b,
+	0x07, 0xf1, 0x38, 0x4f, 0x7a, 0x8d, 0xfe, 0x81, 0x34, 0x0b, 0x5d, 0xb0, 0x4b, 0x46, 0x92, 0xfd,
+	0x23, 0x7f, 0xa8, 0x24, 0x59, 0xda, 0x14, 0xbc, 0xf5, 0x79, 0xc8, 0xfb, 0x7c, 0x51, 0xc8, 0xeb,
+	0x56, 0xb1, 0x9f, 0xed, 0x45, 0x2b, 0xab, 0xd0, 0x8c, 0x29, 0xcd, 0x2f, 0x75, 0xf5, 0x06, 0xf3,
+	0x03, 0x63, 0xea, 0x2a, 0x2d, 0x7a, 0x80, 0xa9, 0x54, 0x92, 0x71, 0x9c, 0x95, 0xd9, 0x66, 0x42,
+	0x02, 0x40, 0x18, 0xe6, 0x35, 0x6d, 0xa9, 0xe3, 0x47, 0x65, 0xb6, 0x29, 0x48, 0x84, 0x15, 0x87,
+	0xc5, 0x97, 0x68, 0x24, 0xb5, 0x57, 0xcd, 0xd1, 0x23, 0xcc, 0x8c, 0x68, 0x24, 0xd7, 0xfe, 0xba,
+	0x20, 0x37, 0x84, 0x2a, 0x28, 0x8c, 0x68, 0x0e, 0x6d, 0xa3, 0xb4, 0xb0, 0xa7, 0xb3, 0xd7, 0x58,
+	0x92, 0x01, 0x87, 0xd6, 0xb0, 0x30, 0x51, 0x08, 0x8f, 0xfd, 0x79, 0x4f, 0x54, 0xbf, 0x19, 0xe4,
+	0xdf, 0x9a, 0x4a, 0x43, 0x99, 0x15, 0x4a, 0xba, 0x40, 0xec, 0x44, 0x85, 0xfc, 0x3c, 0x7a, 0xab,
+	0x25, 0x89, 0xb0, 0x2f, 0x30, 0x4a, 0x0b, 0xac, 0x61, 0xa1, 0x39, 0x13, 0x17, 0xc1, 0xa5, 0x8d,
+	0xea, 0x1d, 0xe1, 0x72, 0xd3, 0xb3, 0xab, 0x8f, 0x27, 0x21, 0x77, 0x40, 0xe8, 0x39, 0xcd, 0x74,
+	0x57, 0x66, 0x9b, 0x7c, 0xbf, 0xda, 0x86, 0xcd, 0xb6, 0x5d, 0xeb, 0x34, 0xa6, 0x85, 0x95, 0xe3,
+	0xf9, 0xf1, 0xdd, 0xad, 0xfc, 0xc1, 0xe9, 0x91, 0x6b, 0xa7, 0x7e, 0xf2, 0x5f, 0x71, 0x95, 0x80,
+	0x5c, 0xd2, 0xba, 0x55, 0xea, 0x7c, 0x9b, 0x34, 0x00, 0xb4, 0x03, 0xe8, 0xf4, 0x0c, 0x1e, 0x97,
+	0xe3, 0xff, 0x4d, 0x93, 0x47, 0x95, 0x81, 0xa9, 0xf7, 0x43, 0xbb, 0x81, 0x53, 0xbe, 0x7f, 0x4a,
+	0xef, 0x06, 0xa1, 0xba, 0x10, 0xaf, 0x50, 0xd8, 0x7e, 0x57, 0x83, 0x47, 0xde, 0xf0, 0x3e, 0x1e,
+	0x26, 0x9b, 0x93, 0xc1, 0xc3, 0x7a, 0xe6, 0x7f, 0xa1, 0x97, 0xbf, 0x00, 0x00, 0x00, 0xff, 0xff,
+	0xd4, 0x3d, 0x22, 0x5f, 0x51, 0x02, 0x00, 0x00,
 }

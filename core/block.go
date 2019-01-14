@@ -21,28 +21,47 @@
 package core
 
 import (
+	"sync/atomic"
+
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/pb"
+	"github.com/yeeco/gyee/core/state"
 )
 
-/*
-
- */
-
+// Block Header of yee chain
+// Encoded with RLP into byte[] for hashing
+// stored as value in Storage, with hash as key
 type BlockHeader struct {
-	previousHash common.Hash
-	stateRoot    common.Hash
-	txsRoot      common.Hash
-	eventsRoot   common.Hash
+	// chain
+	ChainID    uint32      `json:"chainID"`
+	Number     uint64      `json:"number"`
+	ParentHash common.Hash `json:"parentHash"`
+
+	// trie root hashes
+	StateRoot    common.Hash `json:"stateRoot"`
+	TxsRoot      common.Hash `json:"transactionsRoot"`
+	ReceiptsRoot common.Hash `json:"receiptsRoot"`
+
+	// block time in milli seconds
+	Time int64 `json:"timestamp"`
+
+	// extra binary data
+	Extra []byte `json:"extraData"`
 }
 
-type BlockHeaderSignature struct {
-	Index     int
-	Validator []byte
-	Signature string
-	Blooms    []byte
-}
-
+// In-memory representative for the block concept
 type Block struct {
+	// header
 	header    *BlockHeader
-	signature *[]BlockHeaderSignature
+	signature *corepb.SignedBlockHeader
+
+	stateTrie    *state.AccountTrie
+	transactions []*Transaction
+	// TODO: receipts
+
+	// cache
+	hash atomic.Value
+}
+
+func (b *Block) Seal() {
 }
