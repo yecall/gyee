@@ -471,6 +471,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		rutLog.Debug("nearestReq: empty nearest set from buckets, bootstrap node applied")
 		bsns, ok := bootstrapNodes[rutMgr.sdlName]
 		if !ok || bsns == nil {
+			rutLog.Debug("nearestReq: not found")
 			rsp.Eno = int(DhtEnoNotFound)
 			rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
 			return rutMgr.sdl.SchSendMessage(&schMsg)
@@ -496,15 +497,31 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 		}
 	}
 
+	if len(nearest) == 0 {
+		rutLog.Debug("nearestReq: not found")
+		rsp.Eno = int(DhtEnoNotFound)
+		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
+		return rutMgr.sdl.SchSendMessage(&schMsg)
+	}
+
 	for idx, n := range nearest {
 		if bytes.Compare(n.node.ID[0:], rutMgr.localNodeId[0:]) == 0 {
 			if idx != len(nearest) - 1 {
 				nearest = append(nearest[0:idx], nearest[idx+1:]...)
+			} else if idx > 0{
+				nearest = nearest[0:idx-1]
 			} else {
-				nearest = append([]*rutMgrBucketNode{}, nearest[0:idx-1]...)
+				nearest = nil
 			}
 			break
 		}
+	}
+
+	if len(nearest) == 0 {
+		rutLog.Debug("nearestReq: not found")
+		rsp.Eno = int(DhtEnoNotFound)
+		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
+		return rutMgr.sdl.SchSendMessage(&schMsg)
 	}
 
 	pcsTab := make([]int, 0)
