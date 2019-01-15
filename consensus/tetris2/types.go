@@ -31,6 +31,6 @@ type ICore interface {
 //type ConsensusOutput string
 type ConsensusOutput struct {
 	Tx     []common.Hash
-	h      uint64
-	output string
+	H      uint64
+	Output string
 }
