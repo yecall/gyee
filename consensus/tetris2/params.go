@@ -26,5 +26,4 @@ type Params struct {
 	minEventPerEvent  int
 	maxPeriodForEvent int //ms
 	minPeriodForEvent int
-	maxSunk           int
 }

@@ -161,7 +161,6 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		minEventPerEvent:  2,
 		maxPeriodForEvent: 2000,
 		minPeriodForEvent: 20,
-		maxSunk:           0,
 	}
 
 	tetris.prepare()
@@ -187,7 +186,7 @@ func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
 	return true, now.Sub(times[t.params.superMajority-2])
 }
 
-//This is a test function to control the member rotate from outside.
+//This is a test function to control the member rotate from outside. It should do on certain block height.
 //In release version, member rotate is fired by consensus output depend on the upper level protocol.
 //That protocol need performance metrics of the current members and new request of candidates.
 func (t *Tetris) MemberRotate(joins []string, quits []string) {
@@ -196,25 +195,73 @@ func (t *Tetris) MemberRotate(joins []string, quits []string) {
 }
 
 func (t *Tetris) memberRotate() bool {
-	if len(t.validatorRotateRequest.joins) == 0 && len(t.validatorRotateRequest.quits) == 0 {
+	joins := t.validatorRotateRequest.joins
+	quits := t.validatorRotateRequest.quits
+
+	if len(joins) == 0 && len(quits) == 0 {
 		return false
 	}
 
-	for _, vid := range t.validatorRotateRequest.quits {
+	for _, vid := range quits {
 		delete(t.validators, vid)
 		delete(t.validatorsHeight, vid)
 		delete(t.pendingHeight, vid)
 		delete(t.heartBeat, vid)
 	}
 
-	for _, vid := range t.validatorRotateRequest.joins {
+	//todo: validatorHeight might change after delete some member? but it will be handled when addEventToTetris
+
+	for _, vid := range joins {
 		t.validators[vid] = make(map[uint64]*Event)
 		t.validatorsHeight[vid] = 0
 		t.pendingHeight[vid] = 0
 	}
 
+	maxh := uint64(0)
+	for _, vh := range t.validatorsHeight {
+		if maxh < vh {
+			maxh = vh
+		}
+	}
+	for n := t.h + 1; n <= maxh; n++ {
+		for m, _ := range t.validators {
+			me := t.validators[m][n]
+			if me != nil {
+				//if me is base, then me know itself's height
+				//else search for me's parents. if the parents is the quit one, then ignore it.
+				me.know = make(map[string]uint64)
+
+				if n == t.h+1 {
+					me.know[me.vid] = me.Body.N
+					continue
+				}
+loop:
+				for _, peh := range me.Body.E {
+					pei, ok := t.eventCache.Get(peh)
+					if ok {
+						pe := pei.(*Event)
+						for _, quit := range quits {
+							if pe.vid == quit {
+                                  continue loop
+							}
+						}
+						me.updateKnow(pe)
+					} else {
+                          logging.Logger.Info("not in eventcache:", peh)
+					}
+				}
+			}
+		}
+	}
+
 	t.validatorRotateRequest.joins = []string{}
 	t.validatorRotateRequest.quits = []string{}
+
+	//todo: adjust the params, the total member number is controled by the consensus protocol.
+	t.params.f = (len(t.validators) - 1) / 3
+	t.params.superMajority = 2*len(t.validators)/3 + 1
+	t.params.maxEventPerEvent =  len(t.validators)
+
 	return true
 }
 
@@ -650,25 +697,7 @@ func (t *Tetris) prepare() {
 	}
 	t.witness = make([]map[string]*Event, 1)
 
-	//todo: update know while members rotated
-	if t.memberRotate() {
-		maxh := uint64(0)
-		for _, vh := range t.validatorsHeight {
-			if maxh < vh {
-				maxh = vh
-			}
-		}
-		for n := t.h + 1; n <= maxh; n++ {
-			for m, _ := range t.validators {
-				me := t.validators[m][n]
-				if me != nil {
-               //if me is base, then me know itself's height
-               //else search for me's parents. if the parents is the quit one, then ignore it.
-               
-				}
-			}
-		}
-	}
+	t.memberRotate()
 
 	//todo: remain issue: self parent of crash-recovery situation
 }
@@ -906,8 +935,15 @@ func (t *Tetris) consensusComputing() {
 
 	o := &ConsensusOutput{h: t.h + 1, output: "", Tx: txc}
 	t.OutputCh <- o
-
 	t.h++
+	if t.h == 70 {
+		t.MemberRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
+		t.memberRotate()
+		if t.vid == "30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037" {
+			t.Stop()
+		}
+	}
+
 	t.prepare() //start next stage
 	t.updateAll()
 }
