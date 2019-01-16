@@ -23,6 +23,8 @@ package core
 import (
 	"sync/atomic"
 
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
@@ -49,6 +51,22 @@ type BlockHeader struct {
 	Extra []byte `json:"extraData"`
 }
 
+func CopyHeader(header *BlockHeader) *BlockHeader {
+	cpy := *header
+	return &cpy
+}
+
+func (bh *BlockHeader) toSignedProto() (*corepb.SignedBlockHeader, error) {
+	enc, err := rlp.EncodeToBytes(bh)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: bloom signature
+	return &corepb.SignedBlockHeader{
+		Header: enc,
+	}, nil
+}
+
 // In-memory representative for the block concept
 type Block struct {
 	// header
@@ -63,5 +81,57 @@ type Block struct {
 	hash atomic.Value
 }
 
+func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
+	b := &Block{header: CopyHeader(header)}
+
+	if len(txs) == 0 {
+		// TODO: header TxsRoot for empty txs
+	} else {
+		// TODO: header TxsRoot for txs
+		b.transactions = make([]*Transaction, len(txs))
+		copy(b.transactions, txs)
+	}
+
+	return b
+}
+
 func (b *Block) Seal() {
+}
+
+func (b *Block) ToBytes() ([]byte, error) {
+	pbSignedHeader, err := b.header.toSignedProto()
+	if err != nil {
+		return nil, err
+	}
+	pbBlock := &corepb.Block{
+		Header: pbSignedHeader,
+		// TODO: txs
+	}
+	enc, err := proto.Marshal(pbBlock)
+	if err != nil {
+		return nil, err
+	}
+	return enc, nil
+}
+
+func (b *Block) setBytes(enc []byte) error {
+	pbBlock := &corepb.Block{}
+	if err := proto.Unmarshal(enc, pbBlock); err != nil {
+		return err
+	}
+	header := new(BlockHeader)
+	if err := rlp.DecodeBytes(pbBlock.Header.Header, header); err != nil {
+		return err
+	}
+	b.header = header
+	// TODO: txs
+	return nil
+}
+
+func ParseBlock(enc []byte) (*Block, error) {
+	b := new(Block)
+	if err := b.setBytes(enc); err != nil {
+		return nil, err
+	}
+	return b, nil
 }
