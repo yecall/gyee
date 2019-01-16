@@ -54,6 +54,11 @@ type testCase struct {
 //
 var testCaseTable = []testCase{
 	{
+		name:			"testCase0",
+		description:	"bootstrap node with SubNetMaskBits == 0",
+		entry:			testCase0,
+	},
+	{
 		name:			"testCase5",
 		description:	"yee chain start/stop test, SubNetMaskBits == 0",
 		entry:			testCase5,
@@ -98,7 +103,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase7"
+var tgtCase = "testCase8"
 
 //
 // switch for playing go-monitors, related commands:
@@ -154,8 +159,12 @@ func waitInterruptWithCallback(srv yep2p.Service, workp appWorkProc, stopp appSt
 	signal.Notify(sigc, os.Interrupt)
 	defer signal.Stop(sigc)
 	<-sigc
-	workp(srv, ev, tx, bh, bk)
-	stopp(srv, subEv, subTx, subBh)
+	if workp != nil {
+		workp(srv, ev, tx, bh, bk)
+	}
+	if stopp != nil {
+		stopp(srv, subEv, subTx, subBh)
+	}
 }
 
 var (
@@ -321,8 +330,10 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 			log.Debug("yeChainProc: cnt: %d, loop BroadcastMessageOsn", cnt)
 		}
 
-		//time.Sleep(time.Millisecond * 20)
-		time.Sleep(time.Millisecond * 1000)
+		time.Sleep(time.Millisecond * 20)
+		//time.Sleep(time.Millisecond * 50)
+		//time.Sleep(time.Millisecond * 100)
+		//time.Sleep(time.Millisecond * 1000)
 	}
 }
 
@@ -377,6 +388,20 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 	yeShMgr.UnRegister(&subTx)
 	close(subBh.MsgChan)
 	yeShMgr.UnRegister(&subBh)
+	yeShMgr.Stop()
+}
+
+
+//
+// testCase0
+//
+func testCase0(tc *testCase) {
+	yesCfg := yep2p.DefaultYeShellConfig
+	yesCfg.BootstrapNode = true
+	yesCfg.SubNetMaskBits = 0
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+	waitInterrupt()
 	yeShMgr.Stop()
 }
 
