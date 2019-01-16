@@ -30,7 +30,7 @@ import (
 // NO CONCURRENCY is allowed
 type Account interface {
 	// account address
-	Address() common.Address
+	Address() *common.Address
 
 	// account transaction nonce start from 0
 	Nonce() uint64

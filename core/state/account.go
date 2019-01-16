@@ -49,8 +49,8 @@ func newAccount(trie *accountTrie, address common.Address) *accountObj {
 	}
 }
 
-func (acc *accountObj) Address() common.Address {
-	return acc.address
+func (acc *accountObj) Address() *common.Address {
+	return &acc.address
 }
 
 func (acc *accountObj) Nonce() uint64 {

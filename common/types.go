@@ -22,6 +22,7 @@ package common
 
 import (
 	"encoding/hex"
+
 	"github.com/mr-tron/base58/base58"
 )
 
@@ -87,6 +88,10 @@ func BytesToAddress(b []byte) Address {
 // HexToAddress returns Address with byte values of s.
 // If s is larger than len(h), s will be cropped from the left.
 func HexToAddress(s string) Address { return BytesToAddress(FromHex(s)) }
+
+func (a Address) Hex() string {
+	return hex.EncodeToString(a[:])
+}
 
 func (a *Address) SetBytes(b []byte) {
 	if len(b) > len(a) {

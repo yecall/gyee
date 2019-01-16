@@ -20,7 +20,15 @@
 
 package core
 
-import "github.com/yeeco/gyee/p2p"
+import (
+	"errors"
+
+	"github.com/yeeco/gyee/p2p"
+)
+
+var (
+	ErrInvalidProtoToTransaction = errors.New("failed to parse ProtoBuf msg to Transaction")
+)
 
 type INode interface {
 	NodeID() string
