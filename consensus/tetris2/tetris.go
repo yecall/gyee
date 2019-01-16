@@ -66,8 +66,8 @@ type Tetris struct {
 	eventAccepted []*Event
 	eventRequest  *utils.LRU
 
-	txsCache     *utils.LRU //dedup for received txs
-	txsAccepted  []common.Hash
+	txsCache     *utils.LRU                        //dedup for received txs
+	txsAccepted  []common.Hash                     //for new event
 	txsCommitted *utils.LRU                        //dedup for committed txs
 	txsPending   map[common.Hash]map[string]uint64 //tx appear at which validator's which height, key1: hash of tx, key2:vid, value:height
 
@@ -134,7 +134,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 
 	tetris.signer = core.GetSigner()
 	pk, _ := core.GetPrivateKeyOfDefaultAccount()
-	tetris.signer.InitSigner(pk) //TODO: get the key of default account
+	tetris.signer.InitSigner(pk)
 
 	for _, value := range validatorList {
 		tetris.validators[value] = make(map[uint64]*Event)
@@ -229,6 +229,7 @@ func (t *Tetris) validatorRotate(joins []string, quits []string) bool {
 						}
 						me.updateKnow(pe)
 					} else {
+						//it is possible for pending event, ignore it safely.
 						//logging.Logger.Info("not in eventcache:", peh, t.eventCache.Len(), t.vid[2:4])
 					}
 				}
@@ -405,7 +406,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 	if t.validators[event.vid] == nil {
 		t.eventCache.Add(event.Hash(), event) //if it is parent, should cache for following task
-		logging.Logger.Warn("the sender of event is not validators.", event.vid[2:4])
+		//logging.Logger.Warn("the sender of event is not validators.", event.vid[2:4])
 		return false
 	}
 
@@ -680,6 +681,7 @@ func (t *Tetris) prepare() {
 	}
 	t.witness = make([]map[string]*Event, 1)
 
+	//test validator quit, this is controlled by consensus output in the future
 	if t.h == 70 {
 		t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
 	}
@@ -918,7 +920,7 @@ func (t *Tetris) consensusComputing() {
 
 	end := time.Now()
 	duration := end.Sub(begin)
-	if duration > time.Millisecond {
+	if duration > 10*time.Millisecond {
 		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
 	}
 
