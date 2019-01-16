@@ -490,7 +490,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	}
 
 	begin := time.Now()
-	unpending := make([]*Event, 0)
+	newReady := make([]*Event, 0)
 
 	event.ready = false
 	if event.Body.N > t.h { //valid event add to the tetris
@@ -506,91 +506,21 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 		event.ready = true
 		t.eventAccepted = append(t.eventAccepted, event)
 		t.validatorsHeight[event.vid] = event.Body.N
-		unpending = append(unpending, event)
+		newReady = append(newReady, event)
 	}
 
 	//Here we check all the probabilities that an event could become ready
 	//1. Parent event under base, should be used when check upper events' ready status.
 	//2. Event is base event and has tagged as ready above.
 	//3. Events just above the validators height
-	//4. An base event has tagged as ready in t.prepare() after consensus got.
+	//4. An base event has tagged as ready in t.prepare() after consensus got. this will treated in prepare()
 	if event.Body.N <= t.h ||
 		event.ready ||
-		event.Body.N == t.validatorsHeight[event.vid]+1 ||
-		t.validatorsHeight[event.vid] == t.h+1 {
-		searchHeight := make(map[string]uint64)
-		newHeight := t.h + 1 //because the condition 4
-		for k, v := range t.validatorsHeight {
-			if v >= newHeight {
-				searchHeight[k] = v + 1
-			}
-		}
-
-	loop:
-		for {
-			newReadyThisRound := false
-			minReadyHeight := uint64(math.MaxUint64)
-			for k, v := range searchHeight {
-				//It is not possible for an event to be ready if it's parent not exist. so stop search any more.
-				if t.validators[k][v] == nil {
-					delete(searchHeight, k)
-					continue
-				}
-
-				//search height under the new ready event, it is impossible to be ready. so stop search any more.
-				if v < newHeight {
-					delete(searchHeight, k)
-					continue
-				}
-
-				ev := t.validators[k][v]
-
-				//if all the parents of ev is under validators height, it will be ready.
-				isReady := true
-				for _, peh := range ev.Body.E {
-					pei, ok := t.eventCache.Get(peh)
-					if ok {
-						pe := pei.(*Event)
-						if t.validators[pe.vid] == nil { //ignore parent with validators has quitted
-							continue
-						}
-						if pe.Body.N > t.validatorsHeight[pe.vid] {
-							isReady = false
-							break
-						} else {
-							ev.updateKnow(pe)
-						}
-					} else {
-						isReady = false
-						break
-					}
-				}
-
-				if isReady {
-					ev.ready = true
-					for ev.Body.N >= t.n {
-						t.sendPlaceholderEvent()
-					}
-
-					t.eventAccepted = append(t.eventAccepted, ev)
-					t.validatorsHeight[ev.vid] = ev.Body.N
-					searchHeight[ev.vid] = ev.Body.N + 1
-					newReadyThisRound = true
-					if ev.Body.N < minReadyHeight {
-						minReadyHeight = ev.Body.N
-					}
-					unpending = append(unpending, ev)
-				}
-			}
-			//break if no new ready events this round
-			if !newReadyThisRound {
-				break loop
-			}
-			newHeight = minReadyHeight
-		}
+		event.Body.N == t.validatorsHeight[event.vid]+1  {
+        newReady = append(newReady, t.findNewReady()...)
 	}
 
-	if len(unpending) == 0 {
+	if len(newReady) == 0 {
 		for k, v := range t.validatorsHeight {
 			if v <= t.h {
 				v = t.h
@@ -637,12 +567,12 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	end := time.Now()
 	duration := end.Sub(begin)
 	if duration > 10*time.Millisecond {
-		logging.Logger.Info(t.vid[2:4], "pending process:", duration.Nanoseconds(), " unpend:", len(unpending))
+		logging.Logger.Info(t.vid[2:4], "pending process:", duration.Nanoseconds(), " unpend:", len(newReady))
 	}
 
-	if len(unpending) > 0 {
+	if len(newReady) > 0 {
 		newWitness := false
-		for _, event := range unpending {
+		for _, event := range newReady {
 			if t.update(event, true) {
 				newWitness = true
 			}
@@ -655,6 +585,82 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 
 }
 
+
+func (t *Tetris) findNewReady() []*Event {
+	var newReady []*Event
+	searchHeight := make(map[string]uint64)
+	newHeight := t.h + 1 //because the condition 4
+	for k, v := range t.validatorsHeight {
+		if v >= newHeight {
+			searchHeight[k] = v + 1
+		}
+	}
+
+loop:
+	for {
+		newReadyThisRound := false
+		minReadyHeight := uint64(math.MaxUint64)
+		for k, v := range searchHeight {
+			//It is not possible for an event to be ready if it's parent not exist. so stop search any more.
+			if t.validators[k][v] == nil {
+				delete(searchHeight, k)
+				continue
+			}
+
+			//search height under the new ready event, it is impossible to be ready. so stop search any more.
+			if v < newHeight {
+				delete(searchHeight, k)
+				continue
+			}
+
+			ev := t.validators[k][v]
+
+			//if all the parents of ev is under validators height, it will be ready.
+			isReady := true
+			for _, peh := range ev.Body.E {
+				pei, ok := t.eventCache.Get(peh)
+				if ok {
+					pe := pei.(*Event)
+					if t.validators[pe.vid] == nil { //ignore parent with validators has quitted
+						continue
+					}
+					if pe.Body.N > t.validatorsHeight[pe.vid] {
+						isReady = false
+						break
+					} else {
+						ev.updateKnow(pe)
+					}
+				} else {
+					isReady = false
+					break
+				}
+			}
+
+			if isReady {
+				ev.ready = true
+				for ev.Body.N >= t.n {
+					t.sendPlaceholderEvent()
+				}
+
+				t.eventAccepted = append(t.eventAccepted, ev)
+				t.validatorsHeight[ev.vid] = ev.Body.N
+				searchHeight[ev.vid] = ev.Body.N + 1
+				newReadyThisRound = true
+				if ev.Body.N < minReadyHeight {
+					minReadyHeight = ev.Body.N
+				}
+				newReady = append(newReady, ev)
+			}
+		}
+		//break if no new ready events this round
+		if !newReadyThisRound {
+			break loop
+		}
+		newHeight = minReadyHeight
+	}
+
+	return newReady
+}
 ////Process peer request for the parents for events
 //func (t *Tetris) ReceiveSyncRequest() {
 //
@@ -670,6 +676,7 @@ func (t *Tetris) prepare() {
 			be.ready = true
 			t.validatorsHeight[be.vid] = be.Body.N
 			t.eventAccepted = append(t.eventAccepted, be)
+			t.findNewReady()
 		}
 
 		for _, me := range value {
@@ -682,7 +689,7 @@ func (t *Tetris) prepare() {
 	t.witness = make([]map[string]*Event, 1)
 
 	//test validator quit, this is controlled by consensus output in the future
-	if t.h == 70 {
+	if t.h == 20 {
 		t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
 	}
 
