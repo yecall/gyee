@@ -57,7 +57,7 @@ type Core struct {
 	config         *config.Config
 	tetris         *tetris.Tetris
 	tetrisOutputCh chan tetris.ConsensusOutput
-	storage        persistent.Storage
+	storage        *persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
 	subscriber     *p2p.Subscriber

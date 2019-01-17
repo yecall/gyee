@@ -21,85 +21,192 @@
 package core
 
 import (
+	"encoding/binary"
+	"errors"
 	"sync"
 
-	"github.com/yeeco/gyee/utils/logging"
+	"github.com/gogo/protobuf/proto"
+	"github.com/yeeco/gyee/common"
+	sha3 "github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/log"
+	"github.com/yeeco/gyee/persistent"
 )
 
+const (
+	KeyChainID = "ChainID"
+
+	KeyPrefixTx     = "tx"
+	KeyPrefixHeader = "bh"
+)
+
+var (
+	ErrBlockChainNoStorage = errors.New("must provide block chain storage")
+)
+
+// BlockChain is a Data Manager that
+//   created with a Storage, for chain trie/data storage
+//   created with a Genesis block
+//   handles tx / block lookup within the chain
+//   check on  block arrival, receive block on signatures confirmation
+//   notify sub routines to stop, while wait for them to stop
 type BlockChain struct {
 	core    *Core
+	storage *persistent.Storage
 	chainID uint32
 	genesis *Block
 
-	blockPool *BlockPool
-	txPool    *TransactionPool
+	lastBlockHash   common.Hash
+	lastBlockHeight uint64
 
-	lock   sync.RWMutex
-	quitCh chan struct{}
-	wg     sync.WaitGroup
+	//blockPool *BlockPool
+	//txPool    *TransactionPool
+
+	lock    sync.RWMutex
+	running bool
+	quitCh  chan struct{}
+	wg      sync.WaitGroup
 }
 
 func NewBlockChain(core *Core) (*BlockChain, error) {
-	logging.Logger.Info("Create New Blockchain")
-	bp, err := NewBlockPool(core)
-	if err != nil {
+	log.Info("Create New Blockchain")
 
+	// check storage
+	storage := core.storage
+	if storage == nil {
+		return nil, ErrBlockChainNoStorage
 	}
 
-	tp, err := NewTransactionPool(core)
-	if err != nil {
+	chainID := core.config.Chain.ChainID
 
+	// check storage content
+	err := checkChainStorage(*storage, chainID)
+	if err != nil {
+		return nil, err
 	}
 
 	bc := &BlockChain{
-		core:      core,
-		chainID:   0,
-		blockPool: bp,
-		txPool:    tp,
-		quitCh:    make(chan struct{}),
+		core:    core,
+		storage: storage,
+		chainID: chainID,
+		quitCh:  make(chan struct{}),
 	}
+
 	return bc, nil
 }
 
-func (b *BlockChain) Start() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	logging.Logger.Info("BlockChain Start...")
-	b.blockPool.Start()
-	b.txPool.Start()
-
-	go b.loop()
+func checkChainStorage(storage persistent.Storage, chainID uint32) error {
+	if encChainID, err := storage.Get([]byte(KeyChainID)); err != nil {
+		return err
+	} else {
+		decoded := binary.BigEndian.Uint32(encChainID)
+		if decoded != chainID {
+			return errors.New("chainID mismatch go")
+		}
+	}
+	return nil
 }
 
-func (b *BlockChain) Stop() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	logging.Logger.Info("BlockChain Stop...")
-	close(b.quitCh)
-	b.blockPool.Stop()
-	b.txPool.Stop()
-	b.wg.Wait()
+func (bc *BlockChain) Start() error {
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
+	if bc.running {
+		return errors.New("block chain already started")
+	}
+
+	log.Info("BlockChain Start...")
+
+	go bc.loop()
+
+	return nil
 }
 
-func (b *BlockChain) loop() {
-	logging.Logger.Info("BlockChain loop...")
-	b.wg.Add(1)
-	defer b.wg.Done()
+func (bc *BlockChain) Stop() {
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
+	log.Info("BlockChain Stop...")
+	close(bc.quitCh)
+	bc.wg.Wait()
+}
+
+func (bc *BlockChain) Wait() {
+	bc.lock.RLock()
+	if !bc.running {
+		bc.lock.RUnlock()
+		return
+	}
+	stop := bc.quitCh
+	bc.lock.RUnlock()
+
+	// wait for close
+	<-stop
+}
+
+// add a checked block to block chain
+func (bc *BlockChain) AddBlock(b *Block) error {
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
+	storage := *bc.storage
+
+	// add block txs to storage, key "tx"+tx.hash
+	for _, tx := range b.transactions {
+		key := append([]byte(KeyPrefixTx), tx.hash[:]...)
+		pb, err := tx.ToProto()
+		if err != nil {
+			return err
+		}
+		value, err := proto.Marshal(pb)
+		if err != nil {
+			return err
+		}
+		if err = storage.Put(key, value); err != nil {
+			return err
+		}
+	}
+
+	// add block header to storage
+	pbHeader, err := b.header.toSignedProto()
+	if err != nil {
+		return err
+	}
+	encHeader, err := proto.Marshal(pbHeader)
+	if err != nil {
+		return err
+	}
+
+	hashHeader := sha3.Sha3256(encHeader)
+	key := append([]byte(KeyPrefixHeader), hashHeader...)
+	if err := storage.Put(key, encHeader); err != nil {
+		return err
+	}
+
+	bc.lastBlockHash.SetBytes(hashHeader)
+	bc.lastBlockHeight = b.header.Number
+
+	return nil
+}
+
+func (bc *BlockChain) loop() {
+	log.Info("BlockChain loop...")
+	bc.wg.Add(1)
+	defer bc.wg.Done()
 
 	for {
 		select {
-		case <-b.quitCh:
-			logging.Logger.Info("BlockChain loop end.")
+		case <-bc.quitCh:
+			log.Info("BlockChain loop end.")
 			return
 		}
 	}
 }
 
-func (b *BlockChain) CurrentBlockHeight() uint64 {
+func (bc *BlockChain) CurrentBlockHeight() uint64 {
 	return 0
 }
 
-func (b *BlockChain) GetValidators() map[string]uint {
+func (bc *BlockChain) GetValidators() map[string]uint {
 	//从state取
 	//测试先取一个固定的
 	return map[string]uint{
