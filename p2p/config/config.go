@@ -554,7 +554,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 
 	if cap(cfg.StaticNodes) == 0 {
-		cfgLog.Debug("P2pSetConfig: StaticNodes is empty")
+		cfgLog.Debug("P2pSetConfig: StaticNodes empty")
 	}
 
 	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
@@ -596,7 +596,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		cfgLog.Debug("P2pSetConfig: invalid ip address")
 		return name, PcfgEnoNodeId
 	}
-	cfgLog.Debug("P2pSetConfig: local node identity: %s", P2pNodeId2HexString(cfg.Local.ID))
+	cfgLog.Debug("P2pSetConfig: local node identity: \n\t%s", P2pNodeId2HexString(cfg.Local.ID))
 
 	cfg.DhtLocal.ID = cfg.Local.ID
 	config[name] = cfg

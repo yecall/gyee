@@ -128,7 +128,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var tgtCase = "testCase8"
+var tgtCase = "testCase0"
 
 //
 // switch for playing go-monitors, related commands:
@@ -424,6 +424,8 @@ func testCase0(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.BootstrapNode = true
 	yesCfg.SubNetMaskBits = 0
+	yesCfg.LocalNodeIp = "192.168.1.102"
+	yesCfg.LocalDhtIp = "192.168.1.102"
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 	waitInterrupt()
@@ -437,6 +439,8 @@ func testCase0Ex(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.BootstrapNode = true
 	yesCfg.SubNetMaskBits = 4
+	yesCfg.LocalNodeIp = "192.168.1.102"
+	yesCfg.LocalDhtIp = "192.168.1.102"
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 	waitInterrupt()

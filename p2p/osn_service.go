@@ -34,10 +34,12 @@ type OsnService struct {
 	yeShMgr		Service
 }
 
-func OsnServiceConfig(cfg *YeShellConfig) error {
+func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	//
-	// 在本函数进行服务参数配置。一般而言，可先取了P2P中缺省的配置之后进行适当的修改，即调用本函数，见下面的
-	// NewOsnService函数。下面是对目前各个可配参数的说明：
+	// 在本函数进行服务参数配置。一般而言，可先从配置文件中得到P2P的各项配置，具体的结构由应用决定并以
+	// "cfgFromFile"为参数；其次取P2P中缺省的配置DefaultYeShellConfig之后进行适当的修改，以参数
+	// "cfg"指定，调用本函数。后面是对目标配置中各个参数的说明，本函数由应用根据具体情况（cfgFromFie
+	// 的结构设计）实现。完成对目标配置的设置之后，即可调用NewOsnService生成一个服务实例。
 	//
 	// 名称					类型					描述
 	//-------------------------------------------------------------------------------------
@@ -58,6 +60,16 @@ func OsnServiceConfig(cfg *YeShellConfig) error {
 	//
 	// DhtBootstrapNodes	[]string			dht部分的bootstrap节点列表；
 	//
+	// LocalNodeIp			string				本地peer部分的IP地址
+	//
+	// LocalUdpPort			uint16				本地peer部分的UDP端口
+	//
+	// LocalTcpPort			uint16				本地peer部分的TCP端口
+	//
+	// LocalDhtIp			string				本地dht部分的IP地址
+	//
+	// LocalDhtPort			uint16				本地dht部分的TCP端口
+	//
 	// NodeDataDir			string				本次实例的数据目录；
 	//
 	// NodeDatabase			string				本次实例的leveldb数据库名称（数据库所在目录）；
@@ -72,6 +84,12 @@ func OsnServiceConfig(cfg *YeShellConfig) error {
 	//											周期性的从BootstrapNodes中随机挑选节点进行连接，
 	//											连接成功之后，该时钟停止。
 	//
+	// 注：如前所述，本函数应由应用根据具体情况（cfgFromFie的结构设计）实现并调用，但这不是必须的，应用
+	// 可以用任何方法构造合理的YeShellConfig结构，然后调用NewOsnService得到服务实例。
+	//
+
+	_ = cfg
+	_ = cfgFromFie
 
 	return nil
 }
