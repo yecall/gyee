@@ -84,9 +84,9 @@ type RpcConfig struct {
 	HttpListen []string `toml:"http_listen"`
 }
 
-//Genesis, ChainId, Keydir, Coinbase, gas...
+//Genesis, ChainID, Keydir, Coinbase, gas...
 type ChainConfig struct {
-	ChainId uint32 `toml:"chain_id"`
+	ChainID uint32 `toml:"chain_id"`
 	DataDir string `toml:"data_dir"`
 	KeyDir  string `toml:"key_dir"`
 	Genesis string `toml:"genesis"`

@@ -34,8 +34,8 @@ const (
 func TestNewTransaction(t *testing.T) {
 	address := common.HexToAddress(txTestAddress)
 	tx1 := NewTransaction(255, 128, &address, big.NewInt(10000))
-	if tx1.ChainId() != 255 {
-		t.Errorf("wrong chainId")
+	if tx1.ChainID() != 255 {
+		t.Errorf("wrong chainID")
 	}
 	if tx1.Nonce() != 128 {
 		t.Errorf("wrong nonce")
@@ -59,7 +59,7 @@ func TestTxDecode(t *testing.T) {
 	if err != nil {
 		t.Errorf("tx FromProto failed %v", err)
 	}
-	match := (tx.chainId == 255) &&
+	match := (tx.chainID == 255) &&
 		(tx.nonce == 128) &&
 		(tx.to.Hex() == txTestAddress) &&
 		(tx.amount.Cmp(big.NewInt(10000)) == 0)

@@ -29,7 +29,7 @@ import (
 )
 
 type Transaction struct {
-	chainId uint32
+	chainID uint32
 	nonce   uint64
 	to      *common.Address
 	amount  *big.Int
@@ -41,9 +41,9 @@ type Transaction struct {
 
 //最小transaction字节数？
 
-func NewTransaction(chainId uint32, nonce uint64, recipient *common.Address, amount *big.Int) *Transaction {
+func NewTransaction(chainID uint32, nonce uint64, recipient *common.Address, amount *big.Int) *Transaction {
 	tx := &Transaction{
-		chainId: chainId,
+		chainID: chainID,
 		nonce:   nonce,
 		to:      recipient,
 		amount:  new(big.Int),
@@ -63,8 +63,8 @@ func NewTransactionFromProto(msg proto.Message) (*Transaction, error) {
 	return tx, nil
 }
 
-func (t *Transaction) ChainId() uint32 {
-	return t.chainId
+func (t *Transaction) ChainID() uint32 {
+	return t.chainID
 }
 
 func (t *Transaction) Nonce() uint64 {
@@ -81,7 +81,7 @@ func (t *Transaction) Amount() *big.Int {
 
 func (t *Transaction) ToProto() (*corepb.Transaction, error) {
 	pbTx := &corepb.Transaction{
-		ChainId: t.chainId,
+		ChainID: t.chainID,
 		Nonce:   t.nonce,
 	}
 	if t.to != nil {
@@ -102,7 +102,7 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 		return ErrInvalidProtoToTransaction
 	}
 	// copy value
-	t.chainId = pbt.ChainId
+	t.chainID = pbt.ChainID
 	t.nonce = pbt.Nonce
 	if pbt.Recipient != nil {
 		t.to = new(common.Address)

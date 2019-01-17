@@ -42,7 +42,7 @@ message Signature {
 
 message Transaction {
     // chain ID
-    uint32 chainId = 1;
+    uint32 chainID = 1;
 
     // transaction nonce
     uint64 nonce = 2;

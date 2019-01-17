@@ -55,7 +55,7 @@ func printVersion(ctx *cli.Context) error {
 	//}
 	//fmt.Println("Protocol Versions:", node.NebProtocolID)
 	//fmt.Println("Protocol ClientVersion:", net.ClientVersion)
-	//fmt.Printf("Chain Id: %d\n", node.Config().Chain.ChainId)
+	//fmt.Printf("Chain Id: %d\n", node.Config().Chain.ChainID)
 	//fmt.Println("Go Version:", runtime.Version())
 	//fmt.Println("Operating System:", runtime.GOOS)
 	//fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))

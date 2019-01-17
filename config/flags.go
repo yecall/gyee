@@ -115,14 +115,14 @@ var (
 
 	//ChainConfig Flags
 	ChainFlags = []cli.Flag{
-		ChainIdFlag,
+		ChainIDFlag,
 		ChainDataDirFlag,
 		ChainKeyDirFlag,
 		ChainGenesisFlag,
 		ChainMineFlag,
 	}
 
-	ChainIdFlag = cli.IntFlag{
+	ChainIDFlag = cli.IntFlag{
 		Name: "chainid",
 		Usage: "chain id",
 	}
@@ -232,8 +232,8 @@ func getChainConfig(ctx *cli.Context, cfg *Config) {
 		cfg.Chain = &ChainConfig{}
 	}
 
-	if ctx.GlobalIsSet(FlagName(ChainIdFlag.Name)) {
-		cfg.Chain.ChainId = uint32(ctx.GlobalInt(FlagName(ChainIdFlag.Name)))
+	if ctx.GlobalIsSet(FlagName(ChainIDFlag.Name)) {
+		cfg.Chain.ChainID = uint32(ctx.GlobalInt(FlagName(ChainIDFlag.Name)))
 	}
 
 	if ctx.GlobalIsSet(FlagName(ChainDataDirFlag.Name)) {
