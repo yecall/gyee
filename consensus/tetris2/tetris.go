@@ -430,6 +430,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 func (t *Tetris) receiveEvent(event *Event) {
 	t.eventCount++
+	event.isParent = false
 
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
@@ -451,11 +452,13 @@ func (t *Tetris) receiveEvent(event *Event) {
 		return
 	}
 
+
 	t.addReceivedEventToTetris(event)
 }
 
 func (t *Tetris) receiveParentEvent(event *Event) {
 	t.parentCount++
+    event.isParent = true
 
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
@@ -504,7 +507,9 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	//tag the base event as ready,
 	if event.Body.N == t.h+1 {
 		event.ready = true
-		t.eventAccepted = append(t.eventAccepted, event)
+		if !event.isParent {
+			t.eventAccepted = append(t.eventAccepted, event)
+		}
 		t.validatorsHeight[event.vid] = event.Body.N
 		newReady = append(newReady, event)
 	}
@@ -642,7 +647,9 @@ loop:
 					t.sendPlaceholderEvent()
 				}
 
-				t.eventAccepted = append(t.eventAccepted, ev)
+				if !ev.isParent {
+					t.eventAccepted = append(t.eventAccepted, ev)
+				}
 				t.validatorsHeight[ev.vid] = ev.Body.N
 				searchHeight[ev.vid] = ev.Body.N + 1
 				newReadyThisRound = true
@@ -675,7 +682,9 @@ func (t *Tetris) prepare() {
 		if be != nil && !be.ready {
 			be.ready = true
 			t.validatorsHeight[be.vid] = be.Body.N
-			t.eventAccepted = append(t.eventAccepted, be)
+			if !be.isParent {
+				t.eventAccepted = append(t.eventAccepted, be)
+			}
 			t.findNewReady()
 		}
 

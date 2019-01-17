@@ -218,6 +218,7 @@ type Event struct {
 	vote        int
 	committable int
 
+	isParent    bool
 	fork []common.Hash //Fork Events, as Invalid
 }
 
