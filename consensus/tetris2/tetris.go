@@ -276,6 +276,7 @@ func (t *Tetris) loop() {
 			var event Event
 			t.TrafficIn += len(eventMsg)
 			event.Unmarshal(eventMsg)
+			event.isParent = false
 			if t.checkEvent(&event) {
 				t.heartBeat[event.vid] = time.Now()
 				if event.Body.P {
@@ -289,6 +290,7 @@ func (t *Tetris) loop() {
 			var event Event
 			t.TrafficIn += len(eventMsg)
 			event.Unmarshal(eventMsg)
+			event.isParent = true
 			if t.checkEvent(&event) {
 				t.receiveParentEvent(&event)
 			}
@@ -405,7 +407,9 @@ func (t *Tetris) checkEvent(event *Event) bool {
 	event.vid = hex.EncodeToString(addr)
 
 	if t.validators[event.vid] == nil {
-		t.eventCache.Add(event.Hash(), event) //if it is parent, should cache for following task
+		if event.isParent {
+			t.eventCache.Add(event.Hash(), event) //if it is parent, should cache for following task
+		}
 		//logging.Logger.Warn("the sender of event is not validators.", event.vid[2:4])
 		return false
 	}
@@ -430,7 +434,6 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 func (t *Tetris) receiveEvent(event *Event) {
 	t.eventCount++
-	event.isParent = false
 
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
@@ -458,7 +461,6 @@ func (t *Tetris) receiveEvent(event *Event) {
 
 func (t *Tetris) receiveParentEvent(event *Event) {
 	t.parentCount++
-    event.isParent = true
 
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
