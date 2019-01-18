@@ -148,22 +148,11 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	bc.lock.Lock()
 	defer bc.lock.Unlock()
 
-	storage := *bc.storage
+	batch := (*bc.storage).NewBatch()
 
 	// add block txs to storage, key "tx"+tx.hash
-	for _, tx := range b.transactions {
-		key := append([]byte(KeyPrefixTx), tx.hash[:]...)
-		pb, err := tx.ToProto()
-		if err != nil {
-			return err
-		}
-		value, err := proto.Marshal(pb)
-		if err != nil {
-			return err
-		}
-		if err = storage.Put(key, value); err != nil {
-			return err
-		}
+	if err := b.transactions.addToBatch(batch); err != nil {
+		return err
 	}
 
 	// add block header to storage
@@ -178,7 +167,12 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 
 	hashHeader := sha3.Sha3256(encHeader)
 	key := append([]byte(KeyPrefixHeader), hashHeader...)
-	if err := storage.Put(key, encHeader); err != nil {
+	if err := batch.Put(key, encHeader); err != nil {
+		return err
+	}
+
+	// batch writing to storage
+	if err := batch.Write(); err != nil {
 		return err
 	}
 

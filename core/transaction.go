@@ -26,6 +26,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
+	"github.com/yeeco/gyee/persistent"
 )
 
 type Transaction struct {
@@ -114,4 +115,32 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 	}
 
 	return nil
+}
+
+type Transactions []*Transaction
+
+func (txs Transactions) addToBatch(batch persistent.Batch) error {
+	for _, tx := range txs {
+		key := append([]byte(KeyPrefixTx), tx.hash[:]...)
+		pb, err := tx.ToProto()
+		if err != nil {
+			return err
+		}
+		value, err := proto.Marshal(pb)
+		if err != nil {
+			return err
+		}
+		if err = batch.Put(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (txs Transactions) addToStorage(storage persistent.Storage) error {
+	batch := storage.NewBatch()
+	if err := txs.addToBatch(batch); err != nil {
+		return err
+	}
+	return batch.Write()
 }

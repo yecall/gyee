@@ -74,7 +74,7 @@ type Block struct {
 	signature *corepb.SignedBlockHeader
 
 	stateTrie    *state.AccountTrie
-	transactions []*Transaction
+	transactions Transactions
 	// TODO: receipts
 
 	// cache
