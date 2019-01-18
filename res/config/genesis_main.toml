@@ -1,26 +1,26 @@
 
 
-[consensus]
-[consensus.tetris]
-validators = [
+[Consensus]
+[Consensus.Tetris]
+Validators = [
 "0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21",
 "01054cb35f520b97e018ca45f4159993a9bd0f5f4f9c9c5c0f01",
 "0105f3efe55400b2035eaf0d0671db0b4f313b560b5b6d01837b",
 "01053c8a7b9771aff03fa75e4e897b246cdf40f7c645bd0fc3ad"
 ]
 
-[[init_token_dist]]
+[[InitYeeDist]]
 address = "0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21"
 value = "10000000000000000000000000"
 
-[[init_token_dist]]
+[[InitYeeDist]]
 address = "01054cb35f520b97e018ca45f4159993a9bd0f5f4f9c9c5c0f01"
 value = "10000000000000000000000000"
 
-[[init_token_dist]]
+[[InitYeeDist]]
 address = "0105f3efe55400b2035eaf0d0671db0b4f313b560b5b6d01837b"
 value = "10000000000000000000000000"
 
-[[init_token_dist]]
+[[InitYeeDist]]
 address = "01053c8a7b9771aff03fa75e4e897b246cdf40f7c645bd0fc3ad"
 value = "10000000000000000000000000"

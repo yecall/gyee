@@ -21,12 +21,32 @@
 package core
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestLoadGenesis(t *testing.T) {
-	genesis, _ := LoadGenesis()
+	genesis, _ := LoadGenesis(MainNetID)
 
 	fmt.Printf("%v\n", genesis)
+}
+
+func TestMainNetGenesis(t *testing.T) {
+	genesis, err := LoadGenesis(MainNetID)
+	if err != nil {
+		t.Errorf("failed to decode genesis toml: %v", err)
+	}
+	if count := len(genesis.Consensus.Tetris.Validators); count != 4 {
+		t.Errorf("wrong validator count %v", count)
+	}
+}
+
+func TestTestNetGenesis(t *testing.T) {
+	genesis, err := LoadGenesis(TestNetID)
+	if err != nil {
+		t.Errorf("failed to decode genesis toml: %v", err)
+	}
+	if count := len(genesis.Consensus.Tetris.Validators); count != 4 {
+		t.Errorf("wrong validator count %v", count)
+	}
 }

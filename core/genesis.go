@@ -23,28 +23,42 @@ package core
 import (
 	"fmt"
 
-	"github.com/yeeco/gyee/res"
 	"github.com/BurntSushi/toml"
+	"github.com/yeeco/gyee/res"
 )
 
 type Genesis struct {
-	Consensus struct{Tetris struct{Validators []string}}
-	Init_Token_Dist []*struct{Address,Value string}
+	Consensus struct {
+		Tetris struct {
+			Validators []string
+		}
+	}
+	InitYeeDist []struct {
+		Address, Value string
+	}
 }
 
-func LoadGenesis() (*Genesis, error) {
-	var genesis Genesis
-	data, err := res.Asset("config/genesis.toml")
-	if err != nil {
-		// Asset was not found.
-		return nil, err
+func LoadGenesis(id ChainID) (*Genesis, error) {
+	switch id {
+	case MainNetID:
+		return loadGenesis("config/genesis_main.toml")
+	case TestNetID:
+		return loadGenesis("config/genesis_test.toml")
+	default:
+		panic(fmt.Errorf("unknown chainID %v", id))
 	}
+}
 
-	if _, err := toml.Decode(string(data), &genesis); err != nil {
-		fmt.Println(err)
+func loadGenesis(fn string) (*Genesis, error) {
+	data, err := res.Asset(fn)
+	if err != nil {
 		return nil, err
 	}
-	return &genesis, nil
+	genesis := new(Genesis)
+	if err := toml.Unmarshal(data, genesis); err != nil {
+		return nil, err
+	}
+	return genesis, nil
 }
 
 func NewGenesisBlock() {
