@@ -17,5 +17,49 @@
 
 package tetris2
 
+import "time"
+
 type Metrics struct {
+	startTime     time.Time
+	TrafficIn     uint64
+	TrafficOut    uint64
+	EventIn       uint64
+	ParentEventIn uint64
+	EventOut      uint64
+	EventRequest  uint64
+	TxIn          uint64
+}
+
+func NewMetrics() *Metrics {
+	metrics := &Metrics{}
+	metrics.startTime = time.Now()
+	return metrics
+}
+
+func (m *Metrics) AddTrafficIn(traffic uint64) {
+	m.TrafficIn += traffic
+}
+
+func (m *Metrics) AddTrafficOut(traffic uint64) {
+	m.TrafficOut += traffic
+}
+
+func (m *Metrics) AddEventIn(num uint64) {
+	m.EventIn += num
+}
+
+func (m *Metrics) AddParentEventIn(num uint64) {
+	m.ParentEventIn += num
+}
+
+func (m *Metrics) AddEventOut(num uint64) {
+	m.EventOut += num
+}
+
+func (m *Metrics) AddEventRequest(num uint64) {
+	m.EventRequest += num
+}
+
+func (m *Metrics) AddTxIn(num uint64) {
+	m.TxIn += num
 }

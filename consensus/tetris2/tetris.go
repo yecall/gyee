@@ -85,16 +85,14 @@ type Tetris struct {
 	lastSendTime time.Time
 
 	//metrics or test
-	requestCount int
-	parentCount  int
-	eventCount   int
-	txCount      int
-	TrafficIn    int
-	TrafficOut   int
+	Metrics *Metrics
 
-	//request map[string]int
-	level       int
-	noRecvCount int
+	//requestCount int
+	//parentCount  int
+	//eventCount   int
+	//txCount      int
+	//TrafficIn    int
+	//TrafficOut   int
 }
 
 func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint64) (*Tetris, error) {
@@ -130,6 +128,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		quitCh: make(chan struct{}),
 
 		lastSendTime: time.Now(),
+		Metrics:      NewMetrics(),
 	}
 
 	tetris.signer = core.GetSigner()
@@ -274,7 +273,7 @@ func (t *Tetris) loop() {
 
 		case eventMsg := <-t.EventCh:
 			var event Event
-			t.TrafficIn += len(eventMsg)
+			t.Metrics.AddTrafficIn(uint64(len(eventMsg)))
 			event.Unmarshal(eventMsg)
 			event.isParent = false
 			if t.checkEvent(&event) {
@@ -288,7 +287,7 @@ func (t *Tetris) loop() {
 
 		case eventMsg := <-t.ParentEventCh:
 			var event Event
-			t.TrafficIn += len(eventMsg)
+			t.Metrics.AddTrafficIn(uint64(len(eventMsg)))
 			event.Unmarshal(eventMsg)
 			event.isParent = true
 			if t.checkEvent(&event) {
@@ -296,7 +295,7 @@ func (t *Tetris) loop() {
 			}
 
 		case tx := <-t.TxsCh:
-			t.TrafficIn += len(tx)
+			t.Metrics.AddTrafficIn(uint64(len(tx)))
 			t.receiveTx(tx)
 
 		case time := <-t.ticker.C:
@@ -314,7 +313,7 @@ func (t *Tetris) sendPlaceholderEvent() {
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.Sign(t.signer)
 	eb := event.Marshal()
-	t.TrafficOut += len(eb)
+	t.Metrics.AddTrafficOut(uint64(len(eb)))
 	t.SendEventCh <- eb
 
 	event.ready = true
@@ -342,7 +341,7 @@ func (t *Tetris) sendEvent() {
 	event.AddTransactions(t.txsAccepted)
 	event.Sign(t.signer)
 	eb := event.Marshal()
-	t.TrafficOut += len(eb)
+	t.Metrics.AddTrafficOut(uint64(len(eb)))
 	t.SendEventCh <- eb
 
 	event.ready = true
@@ -364,7 +363,7 @@ func (t *Tetris) sendHeartbeat() {
 	pulse := NewPulse()
 	pulse.Sign(t.signer)
 	pb := pulse.Marshal()
-	t.TrafficOut += len(pb)
+	t.Metrics.AddTrafficOut(uint64(len(pb)))
 	t.SendEventCh <- pb
 }
 
@@ -376,15 +375,16 @@ func (t *Tetris) receiveTicker(ttime time.Time) {
 
 func (t *Tetris) receiveTx(tx common.Hash) {
 	if !t.txsCache.Contains(tx) {
-		t.txCount++
-		if t.txCount%30000 == 0 {
-			//logging.Logger.WithFields(logrus.Fields{
-			//	"vid":     t.vid[0:4],
-			//	"n":       t.n,
-			//	"c":       t.txCount,
-			//	"pending": t.eventPending.Len(),
-			//}).Info("Tx count")
-		}
+		t.Metrics.AddTxIn(1)
+		//t.txCount++
+		//if t.txCount%30000 == 0 {
+		//	//logging.Logger.WithFields(logrus.Fields{
+		//	//	"vid":     t.vid[0:4],
+		//	//	"n":       t.n,
+		//	//	"c":       t.txCount,
+		//	//	"pending": t.eventPending.Len(),
+		//	//}).Info("Tx count")
+		//}
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
 
@@ -441,8 +441,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 }
 
 func (t *Tetris) receiveEvent(event *Event) {
-	t.eventCount++
-
+    t.Metrics.AddEventIn(1)
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
 			"event": event.Hash(),
@@ -463,13 +462,11 @@ func (t *Tetris) receiveEvent(event *Event) {
 		return
 	}
 
-
 	t.addReceivedEventToTetris(event)
 }
 
 func (t *Tetris) receiveParentEvent(event *Event) {
-	t.parentCount++
-
+    t.Metrics.AddParentEventIn(1)
 	if t.eventCache.Contains(event.Hash()) {
 		logging.Logger.WithFields(logrus.Fields{
 			"event": event.Hash(),
@@ -531,8 +528,8 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	//4. An base event has tagged as ready in t.prepare() after consensus got. this will treated in prepare()
 	if event.Body.N <= t.h ||
 		event.ready ||
-		event.Body.N == t.validatorsHeight[event.vid]+1  {
-        newReady = append(newReady, t.findNewReady()...)
+		event.Body.N == t.validatorsHeight[event.vid]+1 {
+		newReady = append(newReady, t.findNewReady()...)
 	}
 
 	if len(newReady) == 0 {
@@ -562,13 +559,13 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 								now := time.Now()
 								if now.Sub(er.time) > time.Duration(er.count*500)*time.Millisecond && er.count < 10 {
 									t.RequestEventCh <- peh
-									t.TrafficOut += 32
+									t.Metrics.AddTrafficOut(32)
 									//logging.Logger.Debug("resend request for ", peh)
 								}
 								er.count++
 							} else {
 								t.RequestEventCh <- peh
-								t.TrafficOut += 32
+								t.Metrics.AddTrafficOut(32)
 								t.eventRequest.Add(peh, &SyncRequest{count: 1, time: time.Now()})
 							}
 						}
@@ -599,7 +596,6 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	}
 
 }
-
 
 func (t *Tetris) findNewReady() []*Event {
 	var newReady []*Event
@@ -678,6 +674,7 @@ loop:
 
 	return newReady
 }
+
 ////Process peer request for the parents for events
 //func (t *Tetris) ReceiveSyncRequest() {
 //
@@ -989,7 +986,7 @@ func (t *Tetris) knowWell(x, y *Event) bool {
 func (t Tetris) DebugPrint() {
 	fmt.Println()
 	fmt.Println("t.vid:", t.vid[2:4], "t.h:", t.h, "t.n", t.n)
-	fmt.Println("tx:", t.txCount, "event:", t.eventCount, "parent:", t.parentCount)
+	fmt.Println("tx:", t.Metrics.TxIn, "event:", t.Metrics.EventIn, "parent:", t.Metrics.ParentEventIn )
 	fmt.Println("txCh:", len(t.TxsCh), "eventCh:", len(t.EventCh), "sendCh:", len(t.SendEventCh))
 
 	keys := []string{}
