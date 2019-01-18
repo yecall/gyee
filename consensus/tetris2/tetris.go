@@ -306,6 +306,10 @@ func (t *Tetris) loop() {
 }
 
 func (t *Tetris) sendPlaceholderEvent() {
+	if t.validators[t.vid] == nil { //self has quit the validators
+		return
+	}
+
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.Sign(t.signer)
@@ -328,6 +332,10 @@ func (t *Tetris) sendPlaceholderEvent() {
 
 func (t *Tetris) sendEvent() {
 	//logging.Logger.Info("sendEvent:", t.vid, "txs:",len(t.txsAccepted))
+	if t.validators[t.vid] == nil { //self has quit the validators
+		return
+	}
+
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.AddParents(t.eventAccepted)
