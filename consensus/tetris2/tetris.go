@@ -282,7 +282,6 @@ func (t *Tetris) receiveTicker(ttime time.Time) {
 func (t *Tetris) receiveTx(tx common.Hash) {
 	if !t.txsCache.Contains(tx) {
 		t.Metrics.AddTxIn(1)
-		//t.txCount++
 		//if t.txCount%30000 == 0 {
 		//	//logging.Logger.WithFields(logrus.Fields{
 		//	//	"vid":     t.vid[0:4],
@@ -1037,3 +1036,14 @@ func (t Tetris) DebugPrint() {
 	}
 	fmt.Println()
 }
+
+
+/*
+How to handle fork events
+1. when forked event detected, put it in the origin event's fork list.
+2. the forked event is treated as normal event for: request parent, until it is ready, updateKnow as normal.
+3. current event's F list, add the forked event.
+4. modify updateKnow function, know[vid of Fs]=-1, and this -1 is prior to others
+5. if consensus base event include F, then all vid for F quit at next stage
+
+ */

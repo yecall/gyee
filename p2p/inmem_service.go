@@ -22,10 +22,10 @@ package p2p
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
-	"fmt"
 )
 
 type InmemService struct {
