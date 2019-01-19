@@ -28,6 +28,7 @@ import (
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
+	sha3 "github.com/yeeco/gyee/crypto/hash"
 )
 
 // Block Header of yee chain
@@ -45,7 +46,7 @@ type BlockHeader struct {
 	ReceiptsRoot common.Hash `json:"receiptsRoot"`
 
 	// block time in milli seconds
-	Time int64 `json:"timestamp"`
+	Time uint64 `json:"timestamp"`
 
 	// extra binary data
 	Extra []byte `json:"extraData"`
@@ -56,8 +57,20 @@ func CopyHeader(header *BlockHeader) *BlockHeader {
 	return &cpy
 }
 
+func (bh *BlockHeader) Hash() ([]byte, error) {
+	enc, err := bh.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+	return sha3.Sha3256(enc), nil
+}
+
+func (bh *BlockHeader) ToBytes() ([]byte, error) {
+	return rlp.EncodeToBytes(bh)
+}
+
 func (bh *BlockHeader) toSignedProto() (*corepb.SignedBlockHeader, error) {
-	enc, err := rlp.EncodeToBytes(bh)
+	enc, err := bh.ToBytes()
 	if err != nil {
 		return nil, err
 	}

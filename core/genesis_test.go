@@ -21,6 +21,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 )
@@ -29,11 +30,39 @@ func getGenesis(t *testing.T, cid ChainID) *Genesis {
 	g, err := LoadGenesis(cid)
 	if err != nil {
 		t.Errorf("failed to decode genesis toml: %v", err)
+		return nil
 	}
 	if count := len(g.Consensus.Tetris.Validators); count <= 0 {
 		t.Errorf("wrong validator count %v", count)
 	}
 	return g
+}
+
+func getGenesisBlock(t *testing.T, cid ChainID) (*Genesis, *Block) {
+	genesis := getGenesis(t, cid)
+	if genesis == nil {
+		return nil, nil
+	}
+	block, err := genesis.genBlock(nil)
+	if err != nil {
+		t.Errorf("failed to build genesis block %v", err)
+		return nil, nil
+	}
+	hash, err := block.header.Hash()
+	if err != nil {
+		t.Errorf("failed to calculate block hash %v", err)
+		return nil, nil
+	}
+	hashHex := hex.EncodeToString(hash)
+	if hashHex != genesis.Hash {
+		// ON TEST FAIL:
+		//   - if genesis block content is INTENTIONALLY modified, with confidence:
+		//     modify genesis toml accordingly
+		//   - if not, some encoding / hashing change is not backward compatible and MUST BE FIXED
+		t.Errorf("genesis hash mismatch: need %v got %v", genesis.Hash, hashHex)
+		return nil, nil
+	}
+	return genesis, block
 }
 
 func TestLoadGenesis(t *testing.T) {
@@ -43,28 +72,26 @@ func TestLoadGenesis(t *testing.T) {
 }
 
 func TestMainNetGenesis(t *testing.T) {
-	genesis := getGenesis(t, MainNetID)
-	if count := len(genesis.Consensus.Tetris.Validators); count != 4 {
-		t.Errorf("wrong validator count %v", count)
+	genesis, block := getGenesisBlock(t, MainNetID)
+	if genesis == nil || block == nil {
+		return
 	}
 
-	block, err := genesis.genBlock(nil)
-	if err != nil {
-		t.Errorf("failed to build genesis block %v", err)
+	if count := len(genesis.Consensus.Tetris.Validators); count != 4 {
+		t.Errorf("wrong validator count %v", count)
 	}
 
 	fmt.Printf("block: %v\n", block)
 }
 
 func TestTestNetGenesis(t *testing.T) {
-	genesis := getGenesis(t, TestNetID)
-	if count := len(genesis.Consensus.Tetris.Validators); count != 4 {
-		t.Errorf("wrong validator count %v", count)
+	genesis, block := getGenesisBlock(t, TestNetID)
+	if genesis == nil || block == nil {
+		return
 	}
 
-	block, err := genesis.genBlock(nil)
-	if err != nil {
-		t.Errorf("failed to build genesis block %v", err)
+	if count := len(genesis.Consensus.Tetris.Validators); count != 4 {
+		t.Errorf("wrong validator count %v", count)
 	}
 
 	fmt.Printf("block: %v\n", block)

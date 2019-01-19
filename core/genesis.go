@@ -43,6 +43,8 @@ type Genesis struct {
 	InitYeeDist []struct {
 		Address, Value string
 	}
+	// block header hash generated with info above
+	Hash string
 }
 
 func LoadGenesis(id ChainID) (*Genesis, error) {
