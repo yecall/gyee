@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"encoding/binary"
+	"errors"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto"
-	"errors"
 	"github.com/yeeco/gyee/utils/logging"
 )
 
@@ -57,7 +57,7 @@ func (eb *EventBody) MarshalLength() int {
 	return eb.EmptyLength() + 32*len(eb.Tx) + 32*len(eb.E)
 }
 
-func (eb *EventBody) MarshalTo(buf []byte) error{
+func (eb *EventBody) MarshalTo(buf []byte) error {
 	if eb.MarshalLength() != len(buf) {
 		return errors.New("error buffer length for eventbody marshal")
 	}
@@ -105,7 +105,7 @@ func (eb *EventBody) Unmarshal(data []byte) error {
 	p := 26
 	tl := binary.BigEndian.Uint16(data[24:26])
 
-	if len(data) < eb.EmptyLength() + 32 * int(tl) {
+	if len(data) < eb.EmptyLength()+32*int(tl) {
 		return errors.New("error with data length")
 	}
 
@@ -118,7 +118,7 @@ func (eb *EventBody) Unmarshal(data []byte) error {
 	el := binary.BigEndian.Uint16(data[p : p+2])
 	p += 2
 
-	if len(data) < eb.EmptyLength() + 32 * int(tl) + 32 * int(el) {
+	if len(data) < eb.EmptyLength()+32*int(tl)+32*int(el) {
 		return errors.New("error with data length")
 	}
 
@@ -173,7 +173,7 @@ func (em *EventMessage) Unmarshal(data []byte) error {
 	ebl := binary.BigEndian.Uint32(data[p : p+4])
 	p += 4
 
-	if dl < 4 + int(ebl) {
+	if dl < 4+int(ebl) {
 		return errors.New("error with data length")
 	}
 
@@ -181,15 +181,14 @@ func (em *EventMessage) Unmarshal(data []byte) error {
 	em.Body.Unmarshal(data[p : p+int(ebl)])
 	p += int(ebl)
 
-	if dl < 4 + int(ebl) + 4 {
+	if dl < 4+int(ebl)+4 {
 		return errors.New("error with data length")
 	}
 
 	sl := binary.BigEndian.Uint32(data[p : p+4])
 	p += 4
 
-
-	if dl <  4 + int(ebl) + 4 + int(sl) {
+	if dl < 4+int(ebl)+4+int(sl) {
 		return errors.New("error with data length")
 	}
 
@@ -218,8 +217,8 @@ type Event struct {
 	vote        int
 	committable int
 
-	isParent    bool
-	fork []common.Hash //Fork Events, as Invalid
+	isParent bool
+	fork     []*Event //Fork Events, as Invalid
 }
 
 func NewEvent(vid string, height uint64, sequenceNumber uint64) *Event {
@@ -238,7 +237,7 @@ func NewEvent(vid string, height uint64, sequenceNumber uint64) *Event {
 		witness:     false,
 		vote:        0,
 		committable: COMMITTABLE_UNDECIDED,
-		fork:        make([]common.Hash, 0),
+		fork:        make([]*Event, 0),
 	}
 
 	event.know[vid] = sequenceNumber

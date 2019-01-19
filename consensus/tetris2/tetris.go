@@ -305,6 +305,15 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 }
 
 func (t *Tetris) checkEvent(event *Event) bool {
+	if t.eventCache.Contains(event.Hash()) {
+		logging.Logger.WithFields(logrus.Fields{
+			"event": event.Hash(),
+			"vid":   event.vid,
+			"n":     event.Body.N,
+		}).Debug("Recevie already existed event")
+		return false
+	}
+
 	pk, err := event.RecoverPublicKey(t.signer)
 	if err != nil {
 		logging.Logger.Warn("event check error.", err)
@@ -331,7 +340,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 	if ok {
 		event.know = make(map[string]uint64)
-		event.fork = make([]common.Hash, 0)
+		event.fork = make([]*Event, 0)
 		event.know[event.vid] = event.Body.N
 		event.round = ROUND_UNDECIDED
 		event.witness = false
@@ -347,15 +356,6 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 func (t *Tetris) receiveEvent(event *Event) {
     t.Metrics.AddEventIn(1)
-	if t.eventCache.Contains(event.Hash()) {
-		logging.Logger.WithFields(logrus.Fields{
-			"event": event.Hash(),
-			"vid":   event.vid,
-			"n":     event.Body.N,
-		}).Debug("Recevie already existed event")
-
-		return
-	}
 
 	if event.Body.H > t.h {
 		//TODO: if the block has sealed, here can interrupt and jump to new height
@@ -372,18 +372,9 @@ func (t *Tetris) receiveEvent(event *Event) {
 
 func (t *Tetris) receiveParentEvent(event *Event) {
     t.Metrics.AddParentEventIn(1)
-	if t.eventCache.Contains(event.Hash()) {
-		logging.Logger.WithFields(logrus.Fields{
-			"event": event.Hash(),
-			"vid":   event.vid,
-			"n":     event.Body.N,
-		}).Debug("Recevie already existed parent event")
-		return
-	}
 
 	if event.Body.N <= t.h {
 		//TODO: parent event can not discard even if it is too old. It is needed to check ready status of valid event.
-		//logging.Logger.Info("old parent event:", event)
 	}
 
 	t.addReceivedEventToTetris(event)
@@ -391,6 +382,7 @@ func (t *Tetris) receiveParentEvent(event *Event) {
 
 func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	t.eventCache.Add(event.Hash(), event)
+
 	me := t.validators[event.vid][event.Body.N]
 	if me != nil {
 		if me.Hash() != event.Hash() {
@@ -399,7 +391,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 				"me":    me.Hash(),
 			}).Warn("Receive event with different hash, fork detected.")
 			//TODO: fork process
-			me.fork = append(me.fork, event.Hash())
+			me.fork = append(me.fork, event)
 		}
 		return
 	}
