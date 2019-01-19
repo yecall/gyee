@@ -77,15 +77,16 @@ type Tetris struct {
 	//params
 	params *Params
 
+	//metrics or test
+	Metrics *Metrics
+
 	lock   sync.RWMutex
 	quitCh chan struct{}
 	wg     sync.WaitGroup
 
 	//time
 	lastSendTime time.Time
-
-	//metrics or test
-	Metrics *Metrics
+    newReadyBaseEvent bool
 }
 
 func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint64) (*Tetris, error) {
@@ -425,7 +426,9 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	//4. An base event has tagged as ready in t.prepare() after consensus got. this will treated in prepare()
 	if event.Body.N <= t.h ||
 		event.ready ||
-		event.Body.N == t.validatorsHeight[event.vid]+1 {
+		event.Body.N == t.validatorsHeight[event.vid]+1 ||
+			t.newReadyBaseEvent {
+				t.newReadyBaseEvent = false
 		newReady = append(newReady, t.findNewReady()...)
 	}
 
@@ -589,7 +592,8 @@ func (t *Tetris) prepare() {
 			if !be.isParent {
 				t.eventAccepted = append(t.eventAccepted, be)
 			}
-			t.findNewReady()
+			t.newReadyBaseEvent = true
+			//t.findNewReady() //here cause a problem for reentry update
 		}
 
 		for _, me := range value {
@@ -657,7 +661,31 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 		}
 		me.round = maxr
 		if me.round == ROUND_UNDECIDED {
-			logging.Logger.Warn("me.round undecided")
+			logging.Logger.Warn("me.round undecided,", t.vid[2:4], me.vid[2:4], me.Body.N)
+			//for _, e := range me.Body.E {
+			//	pei, ok := t.eventCache.Get(e)
+			//	if ok {
+			//		pe := pei.(*Event)
+			//		if t.validators[pe.vid] == nil {
+			//			fmt.Println(pe.vid[2:4], " has quit")
+			//			continue //ignore event for parents of quitted validators
+			//		}
+			//		pme := t.validators[pe.vid][pe.Body.N]
+			//		fmt.Println("pme:", pe.vid[2:4], pe.Body.N, pme)
+			//		if pme != nil {
+			//			if pme.round > maxr {
+			//				maxr = pme.round
+			//			}
+			//		} else {
+			//			//It is ok and possible here, when pme is below base.
+			//			//logging.Logger.Debug("parent not in tetris.")
+			//		}
+			//	} else {
+			//		//event not existed, it is possible when eventCache overflow! It will cause problems!
+			//		logging.Logger.Warn("eventCache no existed:", e)
+			//		continue
+			//	}
+			//}
 		}
 
 		if len(t.witness[me.round]) >= t.params.superMajority {
@@ -1029,6 +1057,39 @@ func (t Tetris) DebugPrint() {
 	fmt.Println()
 }
 
+func (t Tetris) DebugPrintDetail() {
+	keys := []string{}
+	for k := range t.validators {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		fmt.Println(key[2:4], ": ")
+		for h := t.h + 1; h <= t.validatorsHeight[key]; h++ {
+			if t.validators[key][h] != nil {
+				ev := t.validators[key][h]
+				fmt.Print(ev.Body.N,"(")
+				for _, peh := range ev.Body.E {
+					pei, ok := t.eventCache.Get(peh)
+					if ok {
+						pe := pei.(*Event)
+						fmt.Print(pe.vid[2:4],":", pe.Body.N, ",")
+					} else {
+						//it is possible for pending event, ignore it safely.
+						//logging.Logger.Info("not in eventcache:", peh, t.eventCache.Len(), t.vid[2:4])
+					}
+				}
+				fmt.Print(") ")
+
+			} else {
+				fmt.Print("-")
+			}
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}
 
 /*
 How to handle fork events
