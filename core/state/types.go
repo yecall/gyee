@@ -36,7 +36,8 @@ type Account interface {
 	Nonce() uint64
 
 	// account balance in minimum unit
-	Balance() big.Int
+	Balance() *big.Int
+	SetBalance(*big.Int)
 
 	// binary representation for account used as trie value
 	ToBytes() ([]byte, error)

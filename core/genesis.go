@@ -22,12 +22,19 @@ package core
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/BurntSushi/toml"
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/state"
+	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/res"
 )
 
 type Genesis struct {
+	ChainID   ChainID
+	Time      int64
+	Extra     string
 	Consensus struct {
 		Tetris struct {
 			Validators []string
@@ -41,15 +48,15 @@ type Genesis struct {
 func LoadGenesis(id ChainID) (*Genesis, error) {
 	switch id {
 	case MainNetID:
-		return loadGenesis("config/genesis_main.toml")
+		return loadGenesis(id, "config/genesis_main.toml")
 	case TestNetID:
-		return loadGenesis("config/genesis_test.toml")
+		return loadGenesis(id, "config/genesis_test.toml")
 	default:
 		panic(fmt.Errorf("unknown chainID %v", id))
 	}
 }
 
-func loadGenesis(fn string) (*Genesis, error) {
+func loadGenesis(id ChainID, fn string) (*Genesis, error) {
 	data, err := res.Asset(fn)
 	if err != nil {
 		return nil, err
@@ -58,7 +65,41 @@ func loadGenesis(fn string) (*Genesis, error) {
 	if err := toml.Unmarshal(data, genesis); err != nil {
 		return nil, err
 	}
+	genesis.ChainID = id
 	return genesis, nil
+}
+
+func (g *Genesis) genBlock(storage persistent.Storage) (*Block, error) {
+	if storage == nil {
+		storage, _ = persistent.NewMemoryStorage()
+	}
+	accountTrie, err := state.NewAccountTrie(common.Hash{}, state.NewDatabase(storage))
+	if err != nil {
+		return nil, err
+	}
+	for _, dist := range g.InitYeeDist {
+		addr, err := AddressParse(dist.Address)
+		if err != nil {
+			return nil, err
+		}
+		value, ok := new(big.Int).SetString(dist.Value, 0)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse value %v", dist.Value)
+		}
+		account := accountTrie.GetAccount(addr.CommonAddress(), true)
+		account.SetBalance(value)
+	}
+	hash, err := accountTrie.Commit()
+	if err != nil {
+		return nil, err
+	}
+	h := &BlockHeader{
+		ChainID:   uint32(g.ChainID),
+		StateRoot: hash,
+	}
+	b := NewBlock(h, nil)
+	b.stateTrie = &accountTrie
+	return b, nil
 }
 
 func NewGenesisBlock() {

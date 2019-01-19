@@ -42,6 +42,7 @@ import (
 	"encoding/hex"
 
 	"github.com/pkg/errors"
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 )
@@ -99,6 +100,11 @@ func (a *Address) Bytes() []byte {
 // String returns address string
 func (a *Address) String() string {
 	return hex.EncodeToString(a.address)
+}
+
+func (a *Address) CommonAddress() (ret common.Address) {
+	ret.SetBytes(a.address[AddressContentIndex:AddressChecksumIndex])
+	return ret
 }
 
 // AddressParse parse address string.

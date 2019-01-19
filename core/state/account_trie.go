@@ -35,7 +35,10 @@ type accountTrie struct {
 
 // Create account trie with root hash and backing database
 func NewAccountTrie(root common.Hash, db Database) (AccountTrie, error) {
-	at := &accountTrie{db: db}
+	at := &accountTrie{
+		db:       db,
+		accounts: make(map[common.Address]*accountObj),
+	}
 	if err := at.Reset(root); err != nil {
 		return nil, err
 	}
@@ -82,6 +85,13 @@ func (at *accountTrie) GetAccount(address common.Address, createIfMissing bool) 
 	}
 	// create
 	account := newAccount(at, address)
+	enc, err := account.ToBytes()
+	if err != nil {
+		panic("failed to encode empty account")
+	}
+	if err := at.trie.TryUpdate(address[:], enc); err != nil {
+		return nil
+	}
 	at.accounts[address] = account
 	return account
 }

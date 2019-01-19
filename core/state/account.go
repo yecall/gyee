@@ -37,7 +37,7 @@ type accountObj struct {
 	address common.Address
 
 	nonce   uint64
-	balance big.Int
+	balance *big.Int
 
 	//TODO: contract部分的数据
 }
@@ -46,6 +46,7 @@ func newAccount(trie *accountTrie, address common.Address) *accountObj {
 	return &accountObj{
 		trie:    trie,
 		address: address,
+		balance: new(big.Int),
 	}
 }
 
@@ -57,8 +58,16 @@ func (acc *accountObj) Nonce() uint64 {
 	return acc.nonce
 }
 
-func (acc *accountObj) Balance() big.Int {
+func (acc *accountObj) Balance() *big.Int {
 	return acc.balance
+}
+
+func (acc *accountObj) SetBalance(value *big.Int) {
+	if acc.balance.Cmp(value) == 0 {
+		return
+	}
+	acc.balance.Set(value)
+	acc.dirty = true
 }
 
 func (acc *accountObj) ToBytes() ([]byte, error) {
@@ -78,13 +87,13 @@ func (acc *accountObj) setBytes(bytes []byte) error {
 	if err := proto.Unmarshal(bytes, pbAcc); err != nil {
 		return err
 	}
-	var value big.Int
+	value := new(big.Int)
 	value.SetBytes(bytes)
 	if value.BitLen() > 256 {
 		return errors.New("balance out of range")
 	}
 	acc.nonce = pbAcc.Nonce
-	acc.balance = value
+	acc.balance.Set(value)
 	return nil
 }
 
