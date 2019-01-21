@@ -242,6 +242,8 @@ func (t *Tetris) sendEvent() {
 		return
 	}
 
+	//todo: eventAccepted should filter old parents?
+
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.AddParents(t.eventAccepted)
@@ -1076,8 +1078,6 @@ func (t Tetris) DebugPrintDetail() {
 						pe := pei.(*Event)
 						fmt.Print(pe.vid[2:4],":", pe.Body.N, ",")
 					} else {
-						//it is possible for pending event, ignore it safely.
-						//logging.Logger.Info("not in eventcache:", peh, t.eventCache.Len(), t.vid[2:4])
 					}
 				}
 				fmt.Print(") ")
@@ -1093,10 +1093,10 @@ func (t Tetris) DebugPrintDetail() {
 
 /*
 How to handle fork events
-1. when forked event detected, put it in the origin event's fork list.
-2. the forked event is treated as normal event for: request parent, until it is ready, updateKnow as normal.
-3. current event's F list, add the forked event.
-4. modify updateKnow function, know[vid of Fs]=-1, and this -1 is prior to others
-5. if consensus base event include F, then all vid for F quit at next stage
-
+1. when forked event detected, if is parent, put it in the origin event's fork list. else discard
+2. the forked event may be ready or not ready, may be all be witness, but will never committable.
+3. the forked event is treated as normal event for: request parent, until it is ready, updateKnow as normal.
+4. current event's F list, add the forked event.
+5. modify updateKnow function, know[vid of Fs]=-1, and this -1 is prior to others
+6. if consensus base event include F, then all vid for F quit at next stage
  */
