@@ -21,7 +21,6 @@
 package core
 
 import (
-	"encoding/binary"
 	"errors"
 	"sync"
 
@@ -32,15 +31,9 @@ import (
 	"github.com/yeeco/gyee/persistent"
 )
 
-const (
-	KeyChainID = "ChainID"
-
-	KeyPrefixTx     = "tx"
-	KeyPrefixHeader = "bh"
-)
-
 var (
-	ErrBlockChainNoStorage = errors.New("must provide block chain storage")
+	ErrBlockChainNoStorage  = errors.New("must provide block chain storage")
+	ErrBlockChainIDMismatch = errors.New("chainID mismatch")
 )
 
 // BlockChain is a Data Manager that
@@ -50,9 +43,8 @@ var (
 //   check on  block arrival, receive block on signatures confirmation
 //   notify sub routines to stop, while wait for them to stop
 type BlockChain struct {
-	core    *Core
-	storage *persistent.Storage
-	chainID uint32
+	chainID ChainID
+	storage persistent.Storage
 	genesis *Block
 
 	lastBlockHash   common.Hash
@@ -67,43 +59,29 @@ type BlockChain struct {
 	wg      sync.WaitGroup
 }
 
-func NewBlockChain(core *Core) (*BlockChain, error) {
+func NewBlockChainWithCore(core *Core) (*BlockChain, error) {
+	return NewBlockChain(ChainID(core.config.Chain.ChainID), core.storage)
+}
+
+func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, error) {
 	log.Info("Create New Blockchain")
 
 	// check storage
-	storage := core.storage
 	if storage == nil {
 		return nil, ErrBlockChainNoStorage
 	}
 
-	chainID := core.config.Chain.ChainID
-
-	// check storage content
-	err := checkChainStorage(*storage, chainID)
-	if err != nil {
+	if err := prepareStorage(storage, chainID); err != nil {
 		return nil, err
 	}
 
 	bc := &BlockChain{
-		core:    core,
-		storage: storage,
 		chainID: chainID,
+		storage: storage,
 		quitCh:  make(chan struct{}),
 	}
 
 	return bc, nil
-}
-
-func checkChainStorage(storage persistent.Storage, chainID uint32) error {
-	if encChainID, err := storage.Get([]byte(KeyChainID)); err != nil {
-		return err
-	} else {
-		decoded := binary.BigEndian.Uint32(encChainID)
-		if decoded != chainID {
-			return errors.New("chainID mismatch go")
-		}
-	}
-	return nil
 }
 
 func (bc *BlockChain) Start() error {
@@ -148,7 +126,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	bc.lock.Lock()
 	defer bc.lock.Unlock()
 
-	batch := (*bc.storage).NewBatch()
+	batch := bc.storage.NewBatch()
 
 	// add block txs to storage, key "tx"+tx.hash
 	if err := b.transactions.addToBatch(batch); err != nil {
@@ -165,9 +143,8 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		return err
 	}
 
-	hashHeader := sha3.Sha3256(encHeader)
-	key := append([]byte(KeyPrefixHeader), hashHeader...)
-	if err := batch.Put(key, encHeader); err != nil {
+	hashHeader := common.BytesToHash(sha3.Sha3256(encHeader))
+	if err := batch.Put(keyHeader(hashHeader), encHeader); err != nil {
 		return err
 	}
 
@@ -176,7 +153,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		return err
 	}
 
-	bc.lastBlockHash.SetBytes(hashHeader)
+	bc.lastBlockHash.SetBytes(hashHeader[:])
 	bc.lastBlockHeight = b.header.Number
 
 	return nil

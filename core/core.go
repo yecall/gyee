@@ -45,11 +45,11 @@ import (
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus/tetris"
 	"github.com/yeeco/gyee/core/yvm"
+	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/p2p"
 	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/utils/logging"
-	"github.com/yeeco/gyee/crypto"
-	"github.com/yeeco/gyee/crypto/secp256k1"
 )
 
 type Core struct {
@@ -57,7 +57,7 @@ type Core struct {
 	config         *config.Config
 	tetris         *tetris.Tetris
 	tetrisOutputCh chan tetris.ConsensusOutput
-	storage        *persistent.Storage
+	storage        persistent.Storage
 	blockChain     *BlockChain
 	yvm            yvm.YVM
 	subscriber     *p2p.Subscriber
@@ -74,7 +74,7 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 		config: conf,
 		quitCh: make(chan struct{}),
 	}
-	bc, err := NewBlockChain(core)
+	bc, err := NewBlockChainWithCore(core)
 	if err != nil {
 
 	}
@@ -148,18 +148,18 @@ func (c *Core) loop() {
 
 //ICORE
 func (c *Core) GetSigner() crypto.Signer {
-    return secp256k1.NewSecp256k1Signer()
+	return secp256k1.NewSecp256k1Signer()
 }
 
 func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) { //从node的accountManager取
-    return nil, nil
+	return nil, nil
 }
 
 func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {
-    ad, err := NewAddressFromPublicKey(publicKey)
-    if err != nil {
-    	logging.Logger.Warn("New address from public key error", err)
-    	return nil, err
+	ad, err := NewAddressFromPublicKey(publicKey)
+	if err != nil {
+		logging.Logger.Warn("New address from public key error", err)
+		return nil, err
 	}
 	return ad.address, nil
 }
