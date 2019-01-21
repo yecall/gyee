@@ -24,9 +24,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/yeeco/gyee/common"
-	sha3 "github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
@@ -138,13 +136,14 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	if err != nil {
 		return err
 	}
-	encHeader, err := proto.Marshal(pbHeader)
+	hashHeader, err := putHeader(batch, pbHeader)
 	if err != nil {
 		return err
 	}
 
-	hashHeader := common.BytesToHash(sha3.Sha3256(encHeader))
-	if err := batch.Put(keyHeader(hashHeader), encHeader); err != nil {
+	// add block body to storage
+	body := b.getBody()
+	if err := putBlockBody(batch, hashHeader, body); err != nil {
 		return err
 	}
 
@@ -156,6 +155,14 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	bc.lastBlockHash.SetBytes(hashHeader[:])
 	bc.lastBlockHeight = b.header.Number
 
+	return nil
+}
+
+func (bc *BlockChain) GetBlockByNumber(number uint64) *Block {
+	return nil
+}
+
+func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 	return nil
 }
 

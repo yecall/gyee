@@ -72,10 +72,16 @@ message SignedBlockHeader {
     repeated Signature signatures = 3;
 }
 
+// message for
+//   block body = block - header
+message BlockBody {
+    repeated Transaction transactions = 1;
+
+    // TODO: receipts
+}
+
 message Block {
     SignedBlockHeader header = 1;
 
-    repeated Transaction transactions = 2;
-
-    // TODO: receipts
+    BlockBody body = 2;
 }

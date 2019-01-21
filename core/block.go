@@ -86,6 +86,9 @@ type Block struct {
 	header    *BlockHeader
 	signature *corepb.SignedBlockHeader
 
+	// body
+	body *corepb.BlockBody
+
 	stateTrie    *state.AccountTrie
 	transactions Transactions
 	// TODO: receipts
@@ -108,6 +111,10 @@ func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
 	return b
 }
 
+func (b *Block) getBody() *corepb.BlockBody {
+	return b.body
+}
+
 func (b *Block) Seal() {
 }
 
@@ -118,7 +125,7 @@ func (b *Block) ToBytes() ([]byte, error) {
 	}
 	pbBlock := &corepb.Block{
 		Header: pbSignedHeader,
-		// TODO: txs
+		Body:   b.body,
 	}
 	enc, err := proto.Marshal(pbBlock)
 	if err != nil {
@@ -137,7 +144,7 @@ func (b *Block) setBytes(enc []byte) error {
 		return err
 	}
 	b.header = header
-	// TODO: txs
+	b.body = pbBlock.Body
 	return nil
 }
 
