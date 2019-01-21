@@ -50,7 +50,7 @@ type Tetris struct {
 	validators       map[string]map[uint64]*Event //key: validator address, value map of event of n
 	validatorsHeight map[string]uint64            //validator's current height
 	pendingHeight    map[string]uint64            //current pending event height
-	witness          []map[string]*Event          //witness of each round.
+	witness          [][]*Event          //witness of each round.
 
 	//Input Channel
 	EventCh       chan []byte
@@ -605,7 +605,7 @@ func (t *Tetris) prepare() {
 			me.committable = COMMITTABLE_UNDECIDED
 		}
 	}
-	t.witness = make([]map[string]*Event, 1)
+	t.witness = make([][]*Event, 1)
 
 	//test validator quit, this is controlled by consensus output in the future
 	if t.h == 20 {
@@ -634,9 +634,9 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 		me.witness = true
 
 		if t.witness[0] == nil {
-			t.witness[0] = make(map[string]*Event)
+			t.witness[0] = make([]*Event,0)
 		}
-		t.witness[0][me.vid] = me
+		t.witness[0] = append(t.witness[0], me)
 	} else {
 		maxr := me.round
 		for _, e := range me.Body.E {
@@ -706,9 +706,9 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 			if me.round > pme.round {
 				me.witness = true
 				if len(t.witness) <= me.round {
-					t.witness = append(t.witness, make(map[string]*Event))
+					t.witness = append(t.witness, make([]*Event, 0))
 				}
-				t.witness[me.round][me.vid] = me
+				t.witness[me.round] = append(t.witness[me.round], me)
 				newWitness = true
 			}
 		} else {
