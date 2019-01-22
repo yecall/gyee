@@ -27,12 +27,16 @@ import (
 	"github.com/yeeco/gyee/persistent"
 )
 
+// Key / KeyPrefix for blockchain used in persistent.Storage
 const (
 	KeyChainID = "ChainID"
 
-	KeyPrefixTx     = "tx"
-	KeyPrefixHeader = "bh"
-	KeyPrefixBody   = "bb"
+	KeyPrefixTx     = "tx" // txHash => encodedTx
+	KeyPrefixHeader = "bh" // blockHash => encodedBlockHeader
+	KeyPrefixBody   = "bb" // blockHash => encodedBlockBody
+
+	KeyPrefixBlockNum2Hash = "bn2h" // blockNum => blockHash
+	KeyPrefixBlockHash2Num = "bh2n" // blockHash => blockNum
 )
 
 func prepareStorage(storage persistent.Storage, id ChainID) error {
@@ -107,6 +111,29 @@ func putBlockBody(putter persistent.Putter, hash common.Hash, body *corepb.Block
 	return nil
 }
 
+func getBlockHash2Num(getter persistent.Getter, hash common.Hash) *uint64 {
+	enc, err := getter.Get(keyBlockHash2Num(hash))
+	if err != nil {
+		return nil
+	}
+	value := binary.BigEndian.Uint64(enc)
+	return &value
+}
+
+func putBlockHash2Num(putter persistent.Putter, hash common.Hash, num uint64) error {
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, num)
+	return putter.Put(keyBlockHash2Num(hash), buf)
+}
+
+func getBlockNum2Hash(getter persistent.Getter, num uint64) common.Hash {
+	return EmptyHash
+}
+
+func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) error {
+	return putter.Put(keyBlockNum2Hash(num), hash[:])
+}
+
 func keyChainID() []byte {
 	return []byte(KeyChainID)
 }
@@ -117,4 +144,14 @@ func keyHeader(hash common.Hash) []byte {
 
 func keyBlockBody(hash common.Hash) []byte {
 	return append([]byte(KeyPrefixBody), hash[:]...)
+}
+
+func keyBlockHash2Num(hash common.Hash) []byte {
+	return append([]byte(KeyPrefixBlockHash2Num), hash[:]...)
+}
+
+func keyBlockNum2Hash(num uint64) []byte {
+	buf := append([]byte(KeyPrefixBlockNum2Hash), make([]byte, 8)...)
+	binary.BigEndian.PutUint64(buf[len(buf)-8:], num)
+	return buf
 }

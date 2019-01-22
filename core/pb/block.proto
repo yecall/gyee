@@ -75,7 +75,8 @@ message SignedBlockHeader {
 // message for
 //   block body = block - header
 message BlockBody {
-    repeated Transaction transactions = 1;
+    // encoded transaction bytes
+    repeated bytes raw_transactions = 1;
 
     // TODO: receipts
 }
