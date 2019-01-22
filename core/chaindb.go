@@ -41,19 +41,23 @@ const (
 
 func prepareStorage(storage persistent.Storage, id ChainID) error {
 	key := keyChainID()
-	encChainID, err := storage.Get(key)
+	exists, err := storage.Has(key)
 	if err != nil {
-		if err != persistent.ErrKeyNotFound {
+		return err
+	}
+	if exists {
+		encChainID, err := storage.Get(key)
+		if err != nil {
 			return err
 		}
-		// not found
+		decoded := binary.BigEndian.Uint32(encChainID)
+		if ChainID(decoded) != id {
+			return ErrBlockChainIDMismatch
+		}
+	} else {
 		encChainID := make([]byte, 4)
 		binary.BigEndian.PutUint32(encChainID, uint32(id))
 		return storage.Put(key, encChainID)
-	}
-	decoded := binary.BigEndian.Uint32(encChainID)
-	if ChainID(decoded) != id {
-		return ErrBlockChainIDMismatch
 	}
 	return nil
 }
@@ -86,11 +90,11 @@ func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) (comm
 }
 
 func getBlockBody(getter persistent.Getter, hash common.Hash) (*corepb.BlockBody, error) {
+	if exists, err := getter.Has(keyBlockBody(hash)); !exists || err != nil {
+		return nil, err
+	}
 	enc, err := getter.Get(keyBlockBody(hash))
 	if err != nil {
-		if err == persistent.ErrKeyNotFound {
-			return nil, nil
-		}
 		return nil, err
 	}
 	pb := new(corepb.BlockBody)

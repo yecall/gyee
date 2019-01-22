@@ -48,7 +48,7 @@ func NewMemoryStorage() (*MemoryStorage, error) {
 }
 
 func (db *MemoryStorage) Has(key []byte) (bool, error) {
-	_, ok := db.data.Load(key)
+	_, ok := db.data.Load(hex.EncodeToString(key))
 	return ok, nil
 }
 

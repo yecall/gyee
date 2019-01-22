@@ -18,6 +18,9 @@
 package core
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/yeeco/gyee/persistent"
@@ -52,6 +55,62 @@ func TestBlockChainStorageCheck(t *testing.T) {
 	if err != ErrBlockChainIDMismatch {
 		t.Fatalf("prepareStorage %v", err)
 	}
+}
+
+func benchAddBlock(b *testing.B, storage persistent.Storage, cnt int) {
+	if err := prepareStorage(storage, TestNetID); err != nil {
+		b.Fatalf("prepareStorage() failed %v", err)
+	}
+	chain, err := NewBlockChain(TestNetID, storage)
+	if err != nil {
+		b.Fatalf("NewBlockChain() failed %v", err)
+	}
+	genesis := chain.GetBlockByNumber(0)
+	if genesis == nil {
+		b.Fatalf("missing genesis")
+	}
+
+	hash := genesis.Hash()
+	for n := int(1); n < cnt; n++ {
+		header := &BlockHeader{
+			ChainID:    genesis.header.ChainID,
+			Number:     uint64(n),
+			ParentHash: hash,
+		}
+		bytes, err := header.Hash()
+		if err != nil {
+			b.Fatalf("header hash: %v", err)
+		}
+		hash.SetBytes(bytes)
+
+		block := NewBlock(header, nil)
+		if err := chain.AddBlock(block); err != nil {
+			b.Errorf("AddBlock(): %v", err)
+		}
+	}
+	fmt.Println(hash)
+}
+
+func benchWriteBlock(b *testing.B, cnt int) {
+	dir, err := ioutil.TempDir("", "yee-chain-bench")
+	if err != nil {
+		b.Fatalf("create tempDir failed: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	lvldb, err := persistent.NewLevelStorage(dir)
+	if err != nil {
+		b.Fatalf("create leveldb failed: %v", err)
+	}
+	benchAddBlock(b, lvldb, cnt)
+}
+
+func Benchmark_Write_50k(b *testing.B) {
+	benchWriteBlock(b, 50000)
+}
+
+func Benchmark_Write_100k(b *testing.B) {
+	benchWriteBlock(b, 100000)
 }
 
 // TODO: test for blockchain rejects storage with wrong genesis block

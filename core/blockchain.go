@@ -81,6 +81,21 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 		quitCh:  make(chan struct{}),
 	}
 
+	bc.genesis = bc.GetBlockByNumber(0)
+	if bc.genesis == nil {
+		genesis, err := LoadGenesis(chainID)
+		if err != nil {
+			return nil, err
+		}
+		bc.genesis, err = genesis.genBlock(storage)
+		if err != nil {
+			return nil, err
+		}
+		if err = bc.AddBlock(bc.genesis); err != nil {
+			return nil, err
+		}
+	}
+
 	return bc, nil
 }
 
@@ -144,9 +159,10 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	}
 
 	// add block body to storage
-	body := b.getBody()
-	if err := putBlockBody(batch, hashHeader, body); err != nil {
-		return err
+	if body := b.getBody(); body != nil {
+		if err := putBlockBody(batch, hashHeader, body); err != nil {
+			return err
+		}
 	}
 
 	// block mapping
@@ -194,7 +210,6 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 		signature: signedHeader,
 		body:      body,
 	}
-	return nil
 }
 
 func (bc *BlockChain) loop() {

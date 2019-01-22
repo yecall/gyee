@@ -111,6 +111,17 @@ func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
 	return b
 }
 
+func (b *Block) Hash() common.Hash {
+	if hash := b.hash.Load(); hash != nil {
+		return hash.(common.Hash)
+	}
+	bytes, _ := b.header.Hash()
+	hash := common.Hash{}
+	hash.SetBytes(bytes)
+	b.hash.Store(hash)
+	return hash
+}
+
 func (b *Block) getBody() *corepb.BlockBody {
 	return b.body
 }
