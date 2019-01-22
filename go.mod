@@ -5,7 +5,6 @@ require (
 	github.com/allegro/bigcache v1.1.0
 	github.com/ethereum/go-ethereum v1.8.20
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gofrs/flock v0.7.0 // indirect
 	github.com/gogo/protobuf v1.2.0
 	github.com/golang/protobuf v1.2.0
