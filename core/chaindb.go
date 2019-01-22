@@ -126,8 +126,13 @@ func putBlockHash2Num(putter persistent.Putter, hash common.Hash, num uint64) er
 	return putter.Put(keyBlockHash2Num(hash), buf)
 }
 
-func getBlockNum2Hash(getter persistent.Getter, num uint64) common.Hash {
-	return EmptyHash
+func getBlockNum2Hash(getter persistent.Getter, num uint64) (hash common.Hash) {
+	enc, err := getter.Get(keyBlockNum2Hash(num))
+	if err != nil {
+		return EmptyHash
+	}
+	hash.SetBytes(enc)
+	return
 }
 
 func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) error {

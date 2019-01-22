@@ -21,9 +21,11 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
@@ -147,6 +149,14 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		return err
 	}
 
+	// block mapping
+	if err := putBlockHash2Num(batch, hashHeader, b.header.Number); err != nil {
+		return err
+	}
+	if err := putBlockNum2Hash(batch, b.header.Number, hashHeader); err != nil {
+		return err
+	}
+
 	// batch writing to storage
 	if err := batch.Write(); err != nil {
 		return err
@@ -159,10 +169,31 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 }
 
 func (bc *BlockChain) GetBlockByNumber(number uint64) *Block {
-	return nil
+	hash := getBlockNum2Hash(bc.storage, number)
+	if bytes.Equal(hash[:], EmptyHash[:]) {
+		return nil
+	}
+	return bc.GetBlockByHash(hash)
 }
 
 func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
+	signedHeader, err := getHeader(bc.storage, hash)
+	if err != nil {
+		return nil
+	}
+	body, err := getBlockBody(bc.storage, hash)
+	if err != nil {
+		return nil
+	}
+	header := new(BlockHeader)
+	if err := rlp.DecodeBytes(signedHeader.Header, header); err != nil {
+		return nil
+	}
+	return &Block{
+		header:    header,
+		signature: signedHeader,
+		body:      body,
+	}
 	return nil
 }
 
