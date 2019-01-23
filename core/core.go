@@ -40,6 +40,7 @@ package core
 
 */
 import (
+	"path/filepath"
 	"sync"
 
 	"github.com/yeeco/gyee/config"
@@ -69,16 +70,24 @@ type Core struct {
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
 	logging.Logger.Info("Create new core")
-	core := &Core{
-		node:   node,
-		config: conf,
-		quitCh: make(chan struct{}),
-	}
-	bc, err := NewBlockChainWithCore(core)
-	if err != nil {
 
+	// prepare chain db
+	dbPath := filepath.Join(conf.NodeDir, "chaindata")
+	storage, err := persistent.NewLevelStorage(dbPath)
+	if err != nil {
+		return nil, err
 	}
-	core.blockChain = bc
+
+	core := &Core{
+		node:    node,
+		config:  conf,
+		storage: storage,
+		quitCh:  make(chan struct{}),
+	}
+	core.blockChain, err = NewBlockChainWithCore(core)
+	if err != nil {
+		return nil, err
+	}
 
 	return core, nil
 }
