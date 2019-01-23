@@ -50,7 +50,7 @@ type Tetris struct {
 	validators       map[string]map[uint64]*Event //key: validator address, value map of event of n
 	validatorsHeight map[string]uint64            //validator's current height
 	pendingHeight    map[string]uint64            //current pending event height
-	witness          [][]*Event          //witness of each round.
+	witness          [][]*Event                   //witness of each round.
 
 	//Input Channel
 	EventCh       chan []byte
@@ -85,8 +85,8 @@ type Tetris struct {
 	wg     sync.WaitGroup
 
 	//time
-	lastSendTime time.Time
-    newReadyBaseEvent bool
+	lastSendTime     time.Time
+	possibleNewReady bool
 }
 
 func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint64) (*Tetris, error) {
@@ -358,7 +358,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 }
 
 func (t *Tetris) receiveEvent(event *Event) {
-    t.Metrics.AddEventIn(1)
+	t.Metrics.AddEventIn(1)
 
 	if event.Body.H > t.h {
 		//TODO: if the block has sealed, here can interrupt and jump to new height
@@ -374,7 +374,7 @@ func (t *Tetris) receiveEvent(event *Event) {
 }
 
 func (t *Tetris) receiveParentEvent(event *Event) {
-    t.Metrics.AddParentEventIn(1)
+	t.Metrics.AddParentEventIn(1)
 
 	if event.Body.N <= t.h {
 		//TODO: parent event can not discard even if it is too old. It is needed to check ready status of valid event.
@@ -425,12 +425,13 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	//1. Parent event under base, should be used when check upper events' ready status.
 	//2. Event is base event and has tagged as ready above.
 	//3. Events just above the validators height
-	//4. An base event has tagged as ready in t.prepare() after consensus got. this will treated in prepare()
+	//4. An base event has tagged as ready in t.prepare() after consensus got.
+	//5. After t.prepare() or validator rotate, new ready is possible
 	if event.Body.N <= t.h ||
 		event.ready ||
 		event.Body.N == t.validatorsHeight[event.vid]+1 ||
-			t.newReadyBaseEvent {
-				t.newReadyBaseEvent = false
+		t.possibleNewReady {
+		t.possibleNewReady = false
 		newReady = append(newReady, t.findNewReady()...)
 	}
 
@@ -462,12 +463,14 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 								if now.Sub(er.time) > time.Duration(er.count*500)*time.Millisecond && er.count < 10 {
 									t.RequestEventCh <- peh
 									t.Metrics.AddTrafficOut(32)
+									t.Metrics.AddEventRequest(1)
 									//logging.Logger.Debug("resend request for ", peh)
 								}
 								er.count++
 							} else {
 								t.RequestEventCh <- peh
 								t.Metrics.AddTrafficOut(32)
+								t.Metrics.AddEventRequest(1)
 								t.eventRequest.Add(peh, &SyncRequest{count: 1, time: time.Now()})
 							}
 						}
@@ -521,7 +524,7 @@ loop:
 			}
 
 			//search height under the new ready event, it is impossible to be ready. so stop search any more.
-			if v < newHeight {
+			if v <= newHeight {
 				delete(searchHeight, k)
 				continue
 			}
@@ -541,6 +544,7 @@ loop:
 						isReady = false
 						break
 					} else {
+						//here if pe under base, it's possible not ready
 						ev.updateKnow(pe)
 					}
 				} else {
@@ -594,7 +598,6 @@ func (t *Tetris) prepare() {
 			if !be.isParent {
 				t.eventAccepted = append(t.eventAccepted, be)
 			}
-			t.newReadyBaseEvent = true
 			//t.findNewReady() //here cause a problem for reentry update
 		}
 
@@ -611,6 +614,8 @@ func (t *Tetris) prepare() {
 	if t.h == 20 {
 		t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
 	}
+
+	t.possibleNewReady = true
 
 	//todo: remain issue: self parent of crash-recovery situation
 }
@@ -634,7 +639,7 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 		me.witness = true
 
 		if t.witness[0] == nil {
-			t.witness[0] = make([]*Event,0)
+			t.witness[0] = make([]*Event, 0)
 		}
 		t.witness[0] = append(t.witness[0], me)
 	} else {
@@ -996,12 +1001,11 @@ func (t *Tetris) validatorRotate(joins []string, quits []string) bool {
 	return true
 }
 
-
 //Print info for debug
 func (t Tetris) DebugPrint() {
 	fmt.Println()
 	fmt.Println("t.vid:", t.vid[2:4], "t.h:", t.h, "t.n", t.n)
-	fmt.Println("tx:", t.Metrics.TxIn, "event:", t.Metrics.EventIn, "parent:", t.Metrics.ParentEventIn )
+	fmt.Println("tx:", t.Metrics.TxIn, "event:", t.Metrics.EventIn, "parent:", t.Metrics.ParentEventIn, "requst", t.Metrics.EventRequest)
 	fmt.Println("txCh:", len(t.TxsCh), "eventCh:", len(t.EventCh), "sendCh:", len(t.SendEventCh))
 
 	keys := []string{}
@@ -1068,15 +1072,15 @@ func (t Tetris) DebugPrintDetail() {
 
 	for _, key := range keys {
 		fmt.Println(key[2:4], ": ")
-		for h := t.h + 1; h <= t.validatorsHeight[key]; h++ {
+		for h := t.h + 1; h <= t.validatorsHeight[key]+1; h++ {
 			if t.validators[key][h] != nil {
 				ev := t.validators[key][h]
-				fmt.Print(ev.Body.N,"(")
+				fmt.Print(ev.Body.N, "(")
 				for _, peh := range ev.Body.E {
 					pei, ok := t.eventCache.Get(peh)
 					if ok {
 						pe := pei.(*Event)
-						fmt.Print(pe.vid[2:4],":", pe.Body.N, ",")
+						fmt.Print(pe.vid[2:4], ":", pe.Body.N, ",")
 					} else {
 					}
 				}
@@ -1096,7 +1100,7 @@ How to handle fork events
 1. when forked event detected, if is parent, put it in the origin event's fork list. else discard
 2. the forked event may be ready or not ready, may be all be witness, but will never committable.
 3. the forked event is treated as normal event for: request parent, until it is ready, updateKnow as normal.
-4. current event's F list, add the forked event.
+4. current event's F list, add the forked event when it is ready.
 5. modify updateKnow function, know[vid of Fs]=-1, and this -1 is prior to others
 6. if consensus base event include F, then all vid for F quit at next stage
- */
+*/
