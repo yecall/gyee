@@ -781,7 +781,7 @@ func testCase13(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	if true {
+	if false {
 		time.Sleep(time.Second * 10)
 		reCfgCmd := yep2p.RecfgCommand{
 			Validator:      false,
@@ -806,7 +806,7 @@ func testCase14(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	if true {
+	if false {
 		time.Sleep(time.Second * 10)
 		reCfgCmd := yep2p.RecfgCommand{
 			Validator:      true,
@@ -831,7 +831,7 @@ func testCase15(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	if true {
+	if false {
 		time.Sleep(time.Second * 10)
 		reCfgCmd := yep2p.RecfgCommand{
 			Validator:      true,
