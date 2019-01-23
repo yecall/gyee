@@ -123,6 +123,11 @@ var testCaseTable = []testCase{
 		description:	"multiple yee chain OSN test on one host",
 		entry:			testCase12,
 	},
+	{
+		name:			"testCase13",
+		description:	"reconfig",
+		entry:			testCase13,
+	},
 }
 
 //
@@ -416,7 +421,6 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 	yeShMgr.Stop()
 }
 
-
 //
 // testCase0
 //
@@ -424,8 +428,8 @@ func testCase0(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.BootstrapNode = true
 	yesCfg.SubNetMaskBits = 0
-	yesCfg.LocalNodeIp = "192.168.1.102"
-	yesCfg.LocalDhtIp = "192.168.1.102"
+	yesCfg.LocalNodeIp = "192.168.1.109"
+	yesCfg.LocalDhtIp = "192.168.1.109"
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 	waitInterrupt()
@@ -755,4 +759,29 @@ func testCase12(tc *testCase) {
 	}
 
 	waitInterrupt()
+}
+
+//
+// testCase13
+//
+func testCase13(tc *testCase) {
+	osnCfg := yep2p.DefaultYeShellConfig
+	osnCfg.Validator = false
+	osnCfg.SubNetMaskBits = 2
+	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
+	osnSrv.Start()
+
+	waitInterrupt()
+
+	reCfgCmd := yep2p.RecfgCommand{
+		Validator: true,
+		SubnetMaskBits: 4,
+	}
+
+	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
+		log.Debug("testCase13: Reconfig failed, err: %s", err.Error())
+		return
+	}
+
+	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
 }
