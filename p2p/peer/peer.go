@@ -1666,6 +1666,11 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 				return PeMgrEnoScheduler
 			}
 		}
+
+		if tid, ok := peMgr.tidFindNode[del]; ok && tid != sch.SchInvalidTid {
+			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
+			delete(peMgr.tidFindNode, del)
+		}
 	}
 
 	// start timer for remain peer instances of deleting part

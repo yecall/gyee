@@ -225,7 +225,7 @@ var ZeroSubNet = config.ZeroSubNet
 var AnySubNet = config.AnySubNet
 
 type TableManager struct {
-	lock			sync.Mutex			// lock for sync
+	lock			*sync.Mutex			// lock for sync
 	sdl				*sch.Scheduler		// scheduler pointer
 	name			string				// name
 	tep				sch.SchUserTaskEp	// entry
@@ -268,28 +268,10 @@ type TableManager struct {
 }
 
 func NewTabMgr() *TableManager {
-
-	var tabMgr = TableManager {
-		name:			TabMgrName,
-		cfg:			tabConfig{},
-		shaLocal:		Hash{},
-		buckets:		[nBuckets]*bucket{},
-		queryIcb:		make([]*instCtrlBlock, 0, TabInstQueringMax),
-		boundIcb:		make([]*instCtrlBlock, 0, TabInstBondingMax),
-		queryPending:	make([]*queryPendingEntry, 0, TabInstQPendingMax),
-		boundPending:	make([]*Node, 0, TabInstBPendingMax),
-		dlkTab:			make([]int, 256),
-		refreshing:		false,
-		dataDir:		"",
-		arfTid:			sch.SchInvalidTid,
-		networkType:	p2pTypeDynamic,
-		snid:			AnySubNet,
-		SubNetMgrList:	map[SubNetworkID]*TableManager{},
-	}
-
+	tabMgr := newTabMgrWithoutLock()
+	tabMgr.lock = new(sync.Mutex)
 	tabMgr.tep = tabMgr.tabMgrProc
-
-	return &tabMgr
+	return tabMgr
 }
 
 func (tabMgr *TableManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
@@ -469,8 +451,34 @@ func (tabMgr *TableManager)startSubnetRefresh() TabMgrErrno {
 	return TabMgrEnoNone
 }
 
+func newTabMgrWithoutLock() *TableManager {
+
+	var tabMgr = TableManager {
+		lock:			nil,
+		name:			TabMgrName,
+		cfg:			tabConfig{},
+		shaLocal:		Hash{},
+		buckets:		[nBuckets]*bucket{},
+		queryIcb:		make([]*instCtrlBlock, 0, TabInstQueringMax),
+		boundIcb:		make([]*instCtrlBlock, 0, TabInstBondingMax),
+		queryPending:	make([]*queryPendingEntry, 0, TabInstQPendingMax),
+		boundPending:	make([]*Node, 0, TabInstBPendingMax),
+		dlkTab:			make([]int, 256),
+		refreshing:		false,
+		dataDir:		"",
+		arfTid:			sch.SchInvalidTid,
+		networkType:	p2pTypeDynamic,
+		snid:			AnySubNet,
+		SubNetMgrList:	map[SubNetworkID]*TableManager{},
+	}
+
+	tabMgr.tep = tabMgr.tabMgrProc
+
+	return &tabMgr
+}
+
 func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
-	mgr := NewTabMgr()
+	mgr := newTabMgrWithoutLock()
 	*mgr = *tabMgr
 	mgr.snid			= snid
 	mgr.cfg.local		= tabMgr.cfg.subNetNodeList[snid]
@@ -529,10 +537,22 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 			}
 			delete(tabMgr.cfg.subNetNodeList, del)
 			delete(tabMgr.SubNetMgrList, del)
+			tabLog.Debug("shellReconfigReq: subnet deleted: %x", del)
+		}
+		for idx, snid := range tabMgr.cfg.subNetIdList {
+			if snid == del {
+				if idx != len(tabMgr.cfg.subNetIdList) - 1 {
+					tabMgr.cfg.subNetIdList = append(tabMgr.cfg.subNetIdList[0:idx],
+						tabMgr.cfg.subNetIdList[idx+1:]...)
+				} else {
+					tabMgr.cfg.subNetIdList = tabMgr.cfg.subNetIdList[0:idx]
+				}
+				break
+			}
 		}
 	}
 
-	tabLog.Debug("shellReconfigReq: subnet mask bits change, old: %d, %d, new: %d",
+	tabLog.Debug("shellReconfigReq: subnet mask bits, old: %d, %d, new: %d",
 		tabMgr.cfg.snidMaskBits,
 		tabMgr.sdl.SchGetP2pConfig().SnidMaskBits,
 		msg.MaskBits)
@@ -545,6 +565,8 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 			continue
 		}
 		tabMgr.cfg.subNetNodeList[add.SubNetId] = add.SubNetNode
+		tabMgr.cfg.subNetIdList = append(tabMgr.cfg.subNetIdList, add.SubNetId)
+		tabLog.Debug("shellReconfigReq: subnet added: %x", add.SubNetId)
 	}
 
 	for _, add := range addList {
@@ -554,11 +576,13 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 		}
 		mgr := tabMgr.mgr4Subnet(add.SubNetId)
 		tabMgr.SubNetMgrList[add.SubNetId] = mgr
+		tabLog.Debug("shellReconfigReq: subnet manager added: %x", add.SubNetId)
 
 		if eno := mgr.startSubnetRefresh(); eno != TabMgrEnoNone {
 			tabLog.Debug("shellReconfigReq: failed, eno: %d, snid: %x", eno, mgr.snid)
 			return eno
 		}
+		tabLog.Debug("shellReconfigReq: refreshing started for subnet added: %x", add.SubNetId)
 	}
 
 	return TabMgrEnoNone

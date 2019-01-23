@@ -781,16 +781,16 @@ func testCase13(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	waitInterrupt()
-
-	reCfgCmd := yep2p.RecfgCommand{
-		Validator: false,
-		SubnetMaskBits: 4,
-	}
-
-	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
-		log.Debug("testCase13: Reconfig failed, err: %s", err.Error())
-		return
+	if true {
+		time.Sleep(time.Second * 10)
+		reCfgCmd := yep2p.RecfgCommand{
+			Validator:      false,
+			SubnetMaskBits: 4,
+		}
+		if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
+			log.Debug("testCase13: Reconfig failed, err: %s", err.Error())
+			return
+		}
 	}
 
 	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
@@ -806,16 +806,16 @@ func testCase14(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	waitInterrupt()
-
-	reCfgCmd := yep2p.RecfgCommand{
-		Validator: true,
-		SubnetMaskBits: 4,
-	}
-
-	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
-		log.Debug("testCase14: Reconfig failed, err: %s", err.Error())
-		return
+	if true {
+		time.Sleep(time.Second * 10)
+		reCfgCmd := yep2p.RecfgCommand{
+			Validator:      true,
+			SubnetMaskBits: 4,
+		}
+		if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
+			log.Debug("testCase14: Reconfig failed, err: %s", err.Error())
+			return
+		}
 	}
 
 	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
@@ -831,16 +831,16 @@ func testCase15(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	waitInterrupt()
-
-	reCfgCmd := yep2p.RecfgCommand{
-		Validator: true,
-		SubnetMaskBits: 4,
-	}
-
-	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
-		log.Debug("testCase15: Reconfig failed, err: %s", err.Error())
-		return
+	if true {
+		time.Sleep(time.Second * 10)
+		reCfgCmd := yep2p.RecfgCommand{
+			Validator:      true,
+			SubnetMaskBits: 4,
+		}
+		if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
+			log.Debug("testCase15: Reconfig failed, err: %s", err.Error())
+			return
+		}
 	}
 
 	waitInterruptWithCallback(osnSrv, nil, yeChainStop)

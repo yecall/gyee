@@ -418,7 +418,14 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	SnidDel := make([]config.SubNetworkID, 0)
 	SnidDel = append(SnidDel, thisCfg.localSnid...)
 
-	sd := new(SubnetDescriptor)
+	sd := &SubnetDescriptor {
+		SubNetKeyList: make(map[config.SubNetworkID]ecdsa.PrivateKey, 0),
+		SubNetNodeList: make(map[config.SubNetworkID]config.Node, 0),
+		SubNetMaxPeers: make(map[config.SubNetworkID]int, 0),
+		SubNetMaxOutbounds: make(map[config.SubNetworkID]int, 0),
+		SubNetMaxInBounds: make(map[config.SubNetworkID]int, 0),
+		SubNetIdList: make([]config.SubNetworkID, 0),
+	}
 	local := yeShMgr.GetLocalNode()
 	priKey := yeShMgr.GetLocalPrivateKey()
 
