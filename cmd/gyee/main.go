@@ -1,4 +1,4 @@
-// Copyright (C) 2018 gyee authors
+// Copyright (C) 2017 gyee authors
 //
 // This file is part of the gyee library.
 //
@@ -17,5 +17,83 @@
 
 package main
 
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+
+	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/node"
+	"github.com/yeeco/gyee/utils/logging"
+	"github.com/yeeco/gyee/version"
+)
+
+var (
+	app = cli.NewApp()
+)
+
+func init() {
+	app.Name = filepath.Base(os.Args[0])
+	app.Author = ""
+	app.Email = ""
+	app.Version = version.Version
+	app.Usage = "The gyee command line interface"
+	app.HideVersion = true
+	app.Copyright = "Copyright 2017-2018 The gyee Authors"
+	app.Flags = []cli.Flag{
+		config.TestnetFlag,
+		config.NodeConfigFlag,
+		config.NodeNameFlag,
+		config.NodeDirFlag,
+	}
+	app.Flags = append(app.Flags, config.AppFlags...)
+	app.Flags = append(app.Flags, config.NetworkFlags...)
+	app.Flags = append(app.Flags, config.RpcFlags...)
+	app.Flags = append(app.Flags, config.ChainFlags...)
+	app.Flags = append(app.Flags, config.MetricsFlags...)
+	app.Flags = append(app.Flags, config.MiscFlags...)
+	sort.Sort(cli.FlagsByName(app.Flags))
+
+	app.Commands = []cli.Command{
+		consoleCommand,
+		configCommand,
+		accountCommand,
+		licenseCommand,
+		versionCommand,
+	}
+	sort.Sort(cli.CommandsByName(app.Commands))
+
+	app.Before = func(ctx *cli.Context) error {
+		return nil
+	}
+	app.After = func(ctx *cli.Context) error {
+		return nil
+	}
+	app.Action = gyee
+}
+
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	if err := app.Run(os.Args); err != nil {
+		logging.Logger.Fatal(err)
+	}
+}
+
+//gyee is the main entry point
+func gyee(ctx *cli.Context) error {
+	//create and start the node
+	//logging.Logger.SetLevel(logrus.WarnLevel)
+
+	config := config.GetConfig(ctx)
+	node, err := node.NewNode(config)
+	if err != nil {
+		logging.Logger.Fatal(err)
+	}
+
+	node.Start()
+	node.WaitForShutdown()
+	return nil
 }
