@@ -125,15 +125,25 @@ var testCaseTable = []testCase{
 	},
 	{
 		name:			"testCase13",
-		description:	"reconfig",
+		description:	"reconfiguration: validator => little-white with same mask bits",
 		entry:			testCase13,
+	},
+	{
+		name:			"testCase14",
+		description:	"reconfiguration: little-white => validator with same mask bits",
+		entry:			testCase14,
+	},
+	{
+		name:			"testCase15",
+		description:	"reconfiguration: little-white => validator with defferent mask bits",
+		entry:			testCase15,
 	},
 }
 
 //
 // target case
 //
-var tgtCase = "testCase0"
+var targetCase = "testCase13"
 
 //
 // switch for playing go-monitors, related commands:
@@ -153,12 +163,12 @@ func main() {
 	}
 
 	for _, tc := range testCaseTable {
-		if tc.name == tgtCase {
+		if tc.name == targetCase {
 			tc.entry(&tc)
 			return
 		}
 	}
-	log.Debug("main: target case not found: %s", tgtCase)
+	log.Debug("main: target case not found: %s", targetCase)
 }
 
 func startGoMemoryMonitor() {
@@ -766,6 +776,56 @@ func testCase12(tc *testCase) {
 //
 func testCase13(tc *testCase) {
 	osnCfg := yep2p.DefaultYeShellConfig
+	osnCfg.Validator = true
+	osnCfg.SubNetMaskBits = 4
+	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
+	osnSrv.Start()
+
+	waitInterrupt()
+
+	reCfgCmd := yep2p.RecfgCommand{
+		Validator: false,
+		SubnetMaskBits: 4,
+	}
+
+	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
+		log.Debug("testCase13: Reconfig failed, err: %s", err.Error())
+		return
+	}
+
+	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
+}
+
+//
+// testCase14
+//
+func testCase14(tc *testCase) {
+	osnCfg := yep2p.DefaultYeShellConfig
+	osnCfg.Validator = false
+	osnCfg.SubNetMaskBits = 4
+	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
+	osnSrv.Start()
+
+	waitInterrupt()
+
+	reCfgCmd := yep2p.RecfgCommand{
+		Validator: true,
+		SubnetMaskBits: 4,
+	}
+
+	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
+		log.Debug("testCase14: Reconfig failed, err: %s", err.Error())
+		return
+	}
+
+	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
+}
+
+//
+// testCase15
+//
+func testCase15(tc *testCase) {
+	osnCfg := yep2p.DefaultYeShellConfig
 	osnCfg.Validator = false
 	osnCfg.SubNetMaskBits = 2
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
@@ -779,7 +839,7 @@ func testCase13(tc *testCase) {
 	}
 
 	if err := osnSrv.Reconfig(&reCfgCmd); err != nil {
-		log.Debug("testCase13: Reconfig failed, err: %s", err.Error())
+		log.Debug("testCase15: Reconfig failed, err: %s", err.Error())
 		return
 	}
 
