@@ -443,8 +443,8 @@ func testCase0Ex(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.BootstrapNode = true
 	yesCfg.SubNetMaskBits = 4
-	yesCfg.LocalNodeIp = "192.168.1.102"
-	yesCfg.LocalDhtIp = "192.168.1.102"
+	yesCfg.LocalNodeIp = "192.168.1.109"
+	yesCfg.LocalDhtIp = "192.168.1.109"
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 	waitInterrupt()

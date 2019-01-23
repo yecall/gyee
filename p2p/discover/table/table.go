@@ -1143,11 +1143,15 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	var nodes []*Node
 	var target NodeID
 
+	// if target identity is nil, create randomly, and always force the target
+	// identity to get a same subnet identity specified.
 	if tid == nil {
 		rand.Read(target[:])
 	} else {
 		target = *tid
 	}
+	target[config.NodeIDBytes - 2] = snid[0]
+	target[config.NodeIDBytes - 1] = snid[1]
 
 	if nodes = mgr.tabClosest(Closest4Querying, target, -1, TabInstQPendingMax); len(nodes) == 0 {
 
@@ -1417,6 +1421,7 @@ func (tabMgr *TableManager)tabQuery(target *NodeID, nodes []*Node) TabMgrErrno {
 
 			msg.FromSubNetId	= tabMgr.cfg.subNetIdList
 			msg.SubNetId		= tabMgr.snid
+			msg.MaskBits		= tabMgr.cfg.snidMaskBits
 			msg.Target			= config.NodeID(*target)
 			msg.Id				= uint64(time.Now().UnixNano())
 			msg.Expiration		= 0
