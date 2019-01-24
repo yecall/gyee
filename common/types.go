@@ -37,6 +37,10 @@ const (
 // Storage for SHA3 256 hash
 type Hash [HashLength]byte
 
+var (
+	EmptyHash = Hash{}
+)
+
 // BytesToHash sets b to hash.
 // If b is larger than len(h), b will be cropped from the left.
 func BytesToHash(b []byte) Hash {

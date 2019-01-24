@@ -23,13 +23,10 @@ package core
 import (
 	"errors"
 
-	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/p2p"
 )
 
 var (
-	EmptyHash = common.Hash{}
-
 	ErrInvalidProtoToTransaction = errors.New("failed to parse ProtoBuf msg to Transaction")
 )
 

@@ -21,19 +21,20 @@
 package core
 
 import (
-	"bytes"
 	"errors"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
 
 var (
-	ErrBlockChainNoStorage  = errors.New("must provide block chain storage")
-	ErrBlockChainIDMismatch = errors.New("chainID mismatch")
+	ErrBlockChainNoStorage    = errors.New("core.chain: must provide block chain storage")
+	ErrBlockChainIDMismatch   = errors.New("core.chain: chainID mismatch")
+	ErrBlockStateTrieMismatch = errors.New("core.chain: trie root hash mismatch")
 )
 
 // BlockChain is a Data Manager that
@@ -45,6 +46,7 @@ var (
 type BlockChain struct {
 	chainID ChainID
 	storage persistent.Storage
+	stateDB state.Database
 	genesis *Block
 
 	lastBlockHash   common.Hash
@@ -78,6 +80,8 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 	bc := &BlockChain{
 		chainID: chainID,
 		storage: storage,
+		// TODO: stateDB cache
+		stateDB: state.NewDatabaseWithCache(storage, 0),
 		quitCh:  make(chan struct{}),
 	}
 
@@ -87,7 +91,7 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 		if err != nil {
 			return nil, err
 		}
-		bc.genesis, err = genesis.genBlock(storage)
+		bc.genesis, err = genesis.genBlock(bc.stateDB)
 		if err != nil {
 			return nil, err
 		}
@@ -158,6 +162,19 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		return err
 	}
 
+	// commit account state trie
+	if stateTrie := b.stateTrie; stateTrie != nil {
+		stateRoot, err := stateTrie.Commit()
+		if err != nil {
+			return nil
+		}
+		if stateRoot != b.header.StateRoot {
+			return ErrBlockStateTrieMismatch
+		}
+	} else {
+		b.stateTrie, err = state.NewAccountTrie(b.header.StateRoot, bc.stateDB)
+	}
+
 	// add block body to storage
 	if body := b.getBody(); body != nil {
 		if err := putBlockBody(batch, hashHeader, body); err != nil {
@@ -186,7 +203,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 
 func (bc *BlockChain) GetBlockByNumber(number uint64) *Block {
 	hash := getBlockNum2Hash(bc.storage, number)
-	if bytes.Equal(hash[:], EmptyHash[:]) {
+	if hash == common.EmptyHash {
 		return nil
 	}
 	return bc.GetBlockByHash(hash)

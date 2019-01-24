@@ -80,11 +80,11 @@ func getHeader(getter persistent.Getter, hash common.Hash) (*corepb.SignedBlockH
 func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) (common.Hash, error) {
 	enc, err := proto.Marshal(header)
 	if err != nil {
-		return EmptyHash, err
+		return common.EmptyHash, err
 	}
 	hash := common.BytesToHash(sha3.Sha3256(enc))
 	if err := putter.Put(keyHeader(hash), enc); err != nil {
-		return EmptyHash, err
+		return common.EmptyHash, err
 	}
 	return hash, nil
 }
@@ -133,7 +133,7 @@ func putBlockHash2Num(putter persistent.Putter, hash common.Hash, num uint64) er
 func getBlockNum2Hash(getter persistent.Getter, num uint64) (hash common.Hash) {
 	enc, err := getter.Get(keyBlockNum2Hash(num))
 	if err != nil {
-		return EmptyHash
+		return common.EmptyHash
 	}
 	hash.SetBytes(enc)
 	return

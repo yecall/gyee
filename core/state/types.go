@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
 
+// Package state implements block chain state trie
 package state
 
 import (
@@ -23,11 +24,10 @@ import (
 	"github.com/yeeco/gyee/common"
 )
 
-// interface for single account
+// interface for single account, NO CONCURRENCY
 // 1. cache existing account data in memory
 // 2. cache created / updated account, also providing such operations
 // 3. TODO: handle account storage trie
-// NO CONCURRENCY is allowed
 type Account interface {
 	// account address
 	Address() *common.Address
@@ -43,10 +43,9 @@ type Account interface {
 	ToBytes() ([]byte, error)
 }
 
-// interface for account trie
+// interface for account trie, NO CONCURRENCY
 // 1. cache existing account trie in memory
 // 2. cache created / updated trie, also providing such operations
-// NO CONCURRENCY is allowed
 type AccountTrie interface {
 	// Reset trie to a trie root hash
 	Reset(root common.Hash) error

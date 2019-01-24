@@ -71,11 +71,12 @@ func loadGenesis(id ChainID, fn string) (*Genesis, error) {
 	return genesis, nil
 }
 
-func (g *Genesis) genBlock(storage persistent.Storage) (*Block, error) {
-	if storage == nil {
-		storage, _ = persistent.NewMemoryStorage()
+func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
+	if stateDB == nil {
+		// mem storage needs no cache in state.Database
+		stateDB = state.NewDatabase(persistent.NewMemoryStorage())
 	}
-	accountTrie, err := state.NewAccountTrie(common.Hash{}, state.NewDatabase(storage))
+	accountTrie, err := state.NewAccountTrie(common.Hash{}, stateDB)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ func (g *Genesis) genBlock(storage persistent.Storage) (*Block, error) {
 		StateRoot: hash,
 	}
 	b := NewBlock(h, nil)
-	b.stateTrie = &accountTrie
+	b.stateTrie = accountTrie
 	return b, nil
 }
 

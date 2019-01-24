@@ -22,6 +22,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/golang/protobuf/proto"
@@ -63,6 +64,9 @@ func (acc *accountObj) Balance() *big.Int {
 }
 
 func (acc *accountObj) SetBalance(value *big.Int) {
+	if value.Sign() < 0 {
+		panic(fmt.Errorf("negative balance %v", value))
+	}
 	if acc.balance.Cmp(value) == 0 {
 		return
 	}

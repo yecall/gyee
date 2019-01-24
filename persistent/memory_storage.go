@@ -41,10 +41,10 @@ type memoryBatch struct {
 	size    int
 }
 
-func NewMemoryStorage() (*MemoryStorage, error) {
+func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
 		data: new(sync.Map),
-	}, nil
+	}
 }
 
 func (db *MemoryStorage) Has(key []byte) (bool, error) {

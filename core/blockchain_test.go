@@ -27,7 +27,7 @@ import (
 )
 
 func TestNewBlockChain(t *testing.T) {
-	storage, _ := persistent.NewMemoryStorage()
+	storage := persistent.NewMemoryStorage()
 	_, err := NewBlockChain(MainNetID, storage)
 	if err != nil {
 		t.Fatalf("NewBlockChain %v", err)
@@ -35,7 +35,7 @@ func TestNewBlockChain(t *testing.T) {
 }
 
 func TestPrepareStorage(t *testing.T) {
-	storage, _ := persistent.NewMemoryStorage()
+	storage := persistent.NewMemoryStorage()
 	if err := prepareStorage(storage, MainNetID); err != nil {
 		t.Fatalf("prepareStorage %v", err)
 	}
@@ -46,7 +46,7 @@ func TestPrepareStorage(t *testing.T) {
 }
 
 func TestBlockChainStorageCheck(t *testing.T) {
-	storage, _ := persistent.NewMemoryStorage()
+	storage := persistent.NewMemoryStorage()
 	if err := prepareStorage(storage, MainNetID); err != nil {
 		t.Fatalf("prepareStorage %v", err)
 	}

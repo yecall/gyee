@@ -32,6 +32,7 @@ import (
 )
 
 // Block Header of yee chain
+//
 // Encoded with RLP into byte[] for hashing
 // stored as value in Storage, with hash as key
 type BlockHeader struct {
@@ -89,7 +90,7 @@ type Block struct {
 	// body
 	body *corepb.BlockBody
 
-	stateTrie    *state.AccountTrie
+	stateTrie    state.AccountTrie
 	transactions Transactions
 	// TODO: receipts
 
