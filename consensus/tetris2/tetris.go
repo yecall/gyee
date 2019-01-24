@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -98,6 +99,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		validators:       make(map[string]map[uint64]*Event, len(validatorList)),
 		validatorsHeight: make(map[string]uint64, len(validatorList)),
 		pendingHeight:    make(map[string]uint64, len(validatorList)),
+		witness:          make([][]*Event, 1),
 
 		EventCh:       make(chan []byte, 10),
 		ParentEventCh: make(chan []byte, 10),
@@ -146,7 +148,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		minPeriodForEvent: 20,
 	}
 
-	tetris.prepare()
+	//tetris.prepare()
 
 	return &tetris, nil
 }
@@ -612,7 +614,11 @@ func (t *Tetris) prepare() {
 
 	//test validator quit, this is controlled by consensus output in the future
 	if t.h == 20 {
-		t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
+		//t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
+		t.validatorRotate([]string{"30393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039"},
+			[]string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
+		//todo: pending txs need clear then member rotate joins
+		t.txsPending = make(map[common.Hash]map[string]uint64)
 	}
 
 	t.possibleNewReady = true
@@ -835,12 +841,13 @@ func (t *Tetris) consensusComputing() {
 	}
 
 	//todo:fair order
-
 	begin := time.Now()
 
+	cs := make([]string, 0)
 	txc := make([]common.Hash, 0)
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
+			cs = append(cs, w.vid[2:4])
 			for _, tx := range w.Body.Tx {
 				if t.txsCommitted.Contains(tx) {
 					continue
@@ -873,17 +880,20 @@ func (t *Tetris) consensusComputing() {
 		return false
 	})
 
+	sort.Strings(cs)
+	css := strings.Join(cs, " ")
 	end := time.Now()
 	duration := end.Sub(begin)
 	if duration > 10*time.Millisecond {
 		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
 	}
 
-	o := &ConsensusOutput{H: t.h + 1, Output: "", Tx: txc}
+	o := &ConsensusOutput{H: t.h + 1, Output: css, Tx: txc}
 	t.OutputCh <- o
 	t.h++
 
 	t.prepare() //start next stage
+
 	t.updateAll()
 }
 
