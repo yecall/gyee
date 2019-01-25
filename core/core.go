@@ -48,9 +48,9 @@ import (
 	"github.com/yeeco/gyee/core/yvm"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/secp256k1"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
 	"github.com/yeeco/gyee/persistent"
-	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Core struct {
@@ -63,13 +63,14 @@ type Core struct {
 	yvm            yvm.YVM
 	subscriber     *p2p.Subscriber
 
-	lock   sync.RWMutex
-	quitCh chan struct{}
-	wg     sync.WaitGroup
+	lock    sync.RWMutex
+	running bool
+	quitCh  chan struct{}
+	wg      sync.WaitGroup
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
-	logging.Logger.Info("Create new core")
+	log.Info("Create new core")
 
 	// prepare chain db
 	dbPath := filepath.Join(conf.NodeDir, "chaindata")
@@ -95,8 +96,11 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 func (c *Core) Start() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	logging.Logger.Info("Core Start...")
-	c.blockChain.Start()
+
+	if c.running {
+		return nil
+	}
+	log.Info("Core Start...")
 
 	//如果开启挖矿
 	if c.config.Chain.Mine {
@@ -117,37 +121,50 @@ func (c *Core) Start() error {
 	}
 
 	go c.loop()
+
+	c.running = true
 	return nil
 }
 
 func (c *Core) Stop() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	logging.Logger.Info("Core Stop...")
 
-	p2p := c.node.P2pService()
-	p2p.UnRegister(c.subscriber)
+	if !c.running {
+		return nil
+	}
+	log.Info("Core Stop...")
 
-	c.tetris.Stop()
+	// unsubscribe from p2p net
+	c.node.P2pService().UnRegister(c.subscriber)
+
+	// stop chain also wait for cache flush
 	c.blockChain.Stop()
-	//c.quitCh <- struct{}{}
+	if err := c.storage.Close(); err != nil {
+		log.Error("core: storage.Close():", err)
+	}
+
+	// stop tetris
+	err := c.tetris.Stop()
+
+	// notify loop and wait
 	close(c.quitCh)
 	c.wg.Wait()
-	return nil
+	return err
 }
 
 func (c *Core) loop() {
 	c.wg.Add(1)
 	defer c.wg.Done()
-	logging.Logger.Info("Core loop...")
+	log.Info("Core loop...")
 	for {
 		select {
 		case <-c.quitCh:
-			logging.Logger.Info("Core loop end.")
+			log.Info("Core loop end.")
 			return
 		case <-c.tetrisOutputCh:
 		case msg := <-c.subscriber.MsgChan:
-			logging.Logger.Info("core receive ", msg.MsgType, " ", msg.From)
+			log.Info("core receive ", msg.MsgType, " ", msg.From)
 		}
 
 	}
@@ -167,7 +184,7 @@ func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) { //从node的acc
 func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {
 	ad, err := NewAddressFromPublicKey(publicKey)
 	if err != nil {
-		logging.Logger.Warn("New address from public key error", err)
+		log.Warn("New address from public key error", err)
 		return nil, err
 	}
 	return ad.address, nil

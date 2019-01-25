@@ -23,6 +23,7 @@ package core
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
@@ -55,10 +56,11 @@ type BlockChain struct {
 	//blockPool *BlockPool
 	//txPool    *TransactionPool
 
-	lock    sync.RWMutex
-	running bool
-	quitCh  chan struct{}
-	wg      sync.WaitGroup
+	chainmu sync.RWMutex
+
+	stopped int32          // state
+	quitCh  chan struct{}  // loop stop notifier
+	wg      sync.WaitGroup // sub routine wait group
 }
 
 func NewBlockChainWithCore(core *Core) (*BlockChain, error) {
@@ -100,50 +102,31 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 		}
 	}
 
+	go bc.loop()
 	return bc, nil
 }
 
-func (bc *BlockChain) Start() error {
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
-
-	if bc.running {
-		return errors.New("block chain already started")
-	}
-
-	log.Info("BlockChain Start...")
-
-	go bc.loop()
-
-	return nil
-}
-
 func (bc *BlockChain) Stop() {
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
-
-	log.Info("BlockChain Stop...")
-	close(bc.quitCh)
-	bc.wg.Wait()
-}
-
-func (bc *BlockChain) Wait() {
-	bc.lock.RLock()
-	if !bc.running {
-		bc.lock.RUnlock()
+	if !atomic.CompareAndSwapInt32(&bc.stopped, 0, 1) {
+		// already stopped
 		return
 	}
-	stop := bc.quitCh
-	bc.lock.RUnlock()
+	log.Info("BlockChain Stop...")
 
-	// wait for close
-	<-stop
+	close(bc.quitCh)
+	bc.wg.Wait()
+
+	// flush caches to storage
 }
 
 // add a checked block to block chain
 func (bc *BlockChain) AddBlock(b *Block) error {
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	// make chain wait for block commit
+	bc.wg.Add(1)
+	defer bc.wg.Done()
 
 	batch := bc.storage.NewBatch()
 
