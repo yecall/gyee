@@ -31,12 +31,12 @@ import (
 const (
 	KeyChainID = "ChainID"
 
-	KeyPrefixTx     = "tx" // txHash => encodedTx
-	KeyPrefixHeader = "bh" // blockHash => encodedBlockHeader
-	KeyPrefixBody   = "bb" // blockHash => encodedBlockBody
+	KeyPrefixTx     = "tx-" // txHash => encodedTx
+	KeyPrefixHeader = "blkH-" // blockHash => encodedBlockHeader
+	KeyPrefixBody   = "blkB-" // blockHash => encodedBlockBody
 
-	KeyPrefixBlockNum2Hash = "bn2h" // blockNum => blockHash
-	KeyPrefixBlockHash2Num = "bh2n" // blockHash => blockNum
+	KeyPrefixBlockNum2Hash = "bn2h-" // blockNum => blockHash
+	KeyPrefixBlockHash2Num = "bh2n-" // blockHash => blockNum
 )
 
 func prepareStorage(storage persistent.Storage, id ChainID) error {

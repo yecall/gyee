@@ -51,9 +51,9 @@ import (
 	"github.com/yeeco/gyee/accounts"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
 	grpc "github.com/yeeco/gyee/rpc"
-	"github.com/yeeco/gyee/utils/logging"
 )
 
 type Node struct {
@@ -71,11 +71,11 @@ type Node struct {
 }
 
 func NewNode(conf *config.Config) (*Node, error) {
-	logging.Logger.Info("Create new node")
+	log.Info("Create new node")
 	if conf.NodeDir != "" {
 		absdatadir, err := filepath.Abs(conf.NodeDir)
 		if err != nil {
-			logging.Logger.Panic(err)
+			log.Crit("node: config path: ", err)
 		}
 		conf.NodeDir = absdatadir
 	}
@@ -83,43 +83,58 @@ func NewNode(conf *config.Config) (*Node, error) {
 	node := &Node{
 		config: conf,
 	}
+	var err error
 
-	am, err := accounts.NewAccountManager(conf)
+	node.accountManager, err = accounts.NewAccountManager(conf)
 	if err != nil {
-		logging.Logger.Panic(err)
+		log.Crit("node: accountMgr: ", err)
 	}
-	node.accountManager = am
 
-	p2p, err := p2p.NewInmemService()
+	node.core, err = core.NewCore(node, conf)
 	if err != nil {
-		logging.Logger.Panic(err)
+		log.Crit("node: core: ", err)
 	}
-	node.p2p = p2p
 
-	core, err := core.NewCore(node, conf)
+	node.p2p, err = p2p.NewInmemService()
 	if err != nil {
-		logging.Logger.Panic(err)
+		log.Crit("node: p2p: ", err)
 	}
-	node.core = core
 
 	node.stop = make(chan struct{})
 	return node, nil
 }
 
-func (n *Node) Start() error {
+func (n *Node) Start() (err error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	logging.Logger.Info("Node Start...")
+	log.Info("Node Start...")
 
-	if err := n.lockDataDir(); err != nil {
-		logging.Logger.Fatal(err)
+	if err = n.lockDataDir(); err != nil {
+		log.Error("node: lockDataDir(): ", err)
+		return err
 	}
 
-	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
-	n.p2p.Start()
-	n.core.Start()
+	// defer stop if anything failed to start
+	defer func() {
+		if err != nil {
+			if errStop := n.Stop(); errStop != nil {
+				log.Error("node: stop for failed start:", errStop)
+			}
+		}
+	}()
 
-	n.startIPC()
+	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
+	if err = n.core.Start(); err != nil {
+		return err
+	}
+
+	if err = n.p2p.Start(); err != nil {
+		return err
+	}
+
+	if err = n.startIPC(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -127,12 +142,15 @@ func (n *Node) Start() error {
 func (n *Node) Stop() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	logging.Logger.Info("Node Stop...")
-	n.core.Stop()
+	log.Info("Node Stop...")
+
 	n.p2p.Stop()
+	if err := n.core.Stop(); err != nil {
+		return err
+	}
 
 	if err := n.unlockDataDir(); err != nil {
-		logging.Logger.Println(err)
+		log.Error("node: unlockDataDir():", err)
 		return err
 	}
 	close(n.stop)
@@ -140,13 +158,13 @@ func (n *Node) Stop() error {
 }
 
 func (n *Node) WaitForShutdown() {
-	logging.Logger.Info("Node Wait for shutdown...")
+	log.Info("Node Wait for shutdown...")
 	go func() {
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 		defer signal.Stop(sigc)
 		<-sigc
-		logging.Logger.Info("Got interrupt, shutting down...")
+		log.Info("Got interrupt, shutting down...")
 		n.Stop()
 	}()
 
@@ -160,16 +178,13 @@ func (n *Node) lockDataDir() error {
 		return err
 	}
 
-	filelock := flock.NewFlock(filepath.Join(instDir, "LOCK"))
+	filelock := flock.New(filepath.Join(instDir, "LOCK"))
 	locked, err := filelock.TryLock()
 	if err != nil {
-		logging.Logger.Println(err)
+		return err
 	}
-	if locked {
-		logging.Logger.Println("filelock locked")
-	} else {
-		logging.Logger.Println("filelock can not lock")
-		return errors.New("filelock can not lock")
+	if !locked {
+		return errors.New("node: failed to acquire node file lock")
 	}
 	return nil
 }
@@ -177,7 +192,7 @@ func (n *Node) lockDataDir() error {
 func (n *Node) unlockDataDir() error {
 	if n.filelock != nil {
 		if err := n.filelock.Unlock(); err != nil {
-			logging.Logger.Println(err)
+			return err
 		}
 		n.filelock = nil
 	}
@@ -200,7 +215,6 @@ func (n *Node) startIPC() error {
 	os.Remove(endpoint) //TODO:?为什么？确定目录在，但把文件删掉
 	listener, err := net.Listen("unix", endpoint)
 	if err != nil {
-		logging.Logger.Println(err)
 		return err
 	}
 
@@ -210,7 +224,7 @@ func (n *Node) startIPC() error {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				logging.Logger.Println(err)
+				log.Error("IPC loop: %v", err)
 				continue
 			}
 			go handler.ServeConn(conn)
@@ -248,7 +262,7 @@ type Args struct {
 }
 
 func (js *JSService) Hello(args *Args, reply *string) error {
-	logging.Logger.Println(args.S)
+	log.Info(args.S)
 	*reply = args.S + "how are you"
 	return nil
 }
