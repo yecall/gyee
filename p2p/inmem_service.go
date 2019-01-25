@@ -26,6 +26,8 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"github.com/yeeco/gyee/persistent"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 type InmemService struct {
@@ -143,6 +145,7 @@ type InmemHub struct {
 	nodes map[*InmemService]bool
 	dht   map[string][]byte
 	lock  sync.RWMutex
+	ldb   *persistent.LevelStorage
 }
 
 var instance *InmemHub
@@ -153,6 +156,11 @@ func GetInmemHub() *InmemHub {
 		instance = &InmemHub{
 			nodes: make(map[*InmemService]bool),
 			dht:   make(map[string][]byte),
+		}
+		var err error
+		instance.ldb, err = persistent.NewLevelStorage("db")
+		if err != nil {
+			logging.Logger.Error(err)
 		}
 	})
 	return instance
@@ -192,9 +200,9 @@ func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
 func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
 	ih.lock.RLock()
 	defer ih.lock.RUnlock()
-
-	v, ok := ih.dht[string(key)]
-	if ok {
+    v, err := ih.ldb.Get(key)
+	//v, ok := ih.dht[string(key)]
+	if err == nil {
 		return v, nil
 	}
 	l := fmt.Sprintf("%d", len(ih.dht))
@@ -205,6 +213,7 @@ func (ih *InmemHub) SetValue(key []byte, value []byte) error {
 	ih.lock.Lock()
 	defer ih.lock.Unlock()
 
-	ih.dht[string(key)] = value
+	ih.ldb.Put(key, value)
+	//ih.dht[string(key)] = value
 	return nil
 }

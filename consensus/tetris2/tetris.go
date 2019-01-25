@@ -1092,6 +1092,7 @@ func (t Tetris) DebugPrintDetail() {
 						pe := pei.(*Event)
 						fmt.Print(pe.vid[2:4], ":", pe.Body.N, ",")
 					} else {
+						fmt.Print("*")
 					}
 				}
 				fmt.Print(") ")
