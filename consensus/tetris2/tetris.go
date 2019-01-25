@@ -133,8 +133,8 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 
 	for _, value := range validatorList {
 		tetris.validators[value] = make(map[uint64]*Event)
-		tetris.validatorsHeight[value] = 0
-		tetris.pendingHeight[value] = 0
+		tetris.validatorsHeight[value] = blockHeight
+		tetris.pendingHeight[value] = blockHeight
 	}
 
 	tetris.params = &Params{
@@ -336,6 +336,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 	if t.validators[event.vid] == nil {
 		if event.isParent {
 			t.eventCache.Add(event.Hash(), event) //if it is parent, should cache for following task
+			t.possibleNewReady = true
 		}
 		//logging.Logger.Warn("the sender of event is not validators.", event.vid[2:4])
 		return false
@@ -466,9 +467,10 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 									t.RequestEventCh <- peh
 									t.Metrics.AddTrafficOut(32)
 									t.Metrics.AddEventRequest(1)
-									//logging.Logger.Debug("resend request for ", peh)
+									er.count++
+									//logging.Logger.Info("resend request for ", er.count, er.time)
 								}
-								er.count++
+
 							} else {
 								t.RequestEventCh <- peh
 								t.Metrics.AddTrafficOut(32)
@@ -540,6 +542,9 @@ loop:
 				if ok {
 					pe := pei.(*Event)
 					if t.validators[pe.vid] == nil { //ignore parent with validators has quitted
+						continue
+					}
+					if pe.Body.N <= t.h {
 						continue
 					}
 					if pe.Body.N > t.validatorsHeight[pe.vid] {
@@ -961,8 +966,8 @@ func (t *Tetris) validatorRotate(joins []string, quits []string) bool {
 
 	for _, vid := range joins {
 		t.validators[vid] = make(map[uint64]*Event)
-		t.validatorsHeight[vid] = 0
-		t.pendingHeight[vid] = 0
+		t.validatorsHeight[vid] = t.h
+		t.pendingHeight[vid] = t.h
 	}
 
 	maxh := uint64(0)
@@ -1090,9 +1095,9 @@ func (t Tetris) DebugPrintDetail() {
 					pei, ok := t.eventCache.Get(peh)
 					if ok {
 						pe := pei.(*Event)
-						fmt.Print(pe.vid[2:4], ":", pe.Body.N, ",")
+						fmt.Print(pe.vid[2:4], ":", pe.Body.N, ", ")
 					} else {
-						fmt.Print("*")
+						fmt.Print("*, ")
 					}
 				}
 				fmt.Print(") ")
