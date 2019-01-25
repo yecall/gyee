@@ -241,6 +241,11 @@ func (ks *Keystore) loadKeyFiles() {
 	)
 
 	files, err := ioutil.ReadDir(ks.ksDirPath)
+	if err != nil && os.IsNotExist(err) {
+		if err = os.MkdirAll(ks.ksDirPath, 0755); err != nil {
+			files, err = ioutil.ReadDir(ks.ksDirPath)
+		}
+	}
 	if err != nil {
 		logging.Logger.WithFields(logrus.Fields{
 			"dir": ks.ksDirPath,
