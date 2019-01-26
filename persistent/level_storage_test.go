@@ -47,7 +47,7 @@ func TestNewLevelStorage(t *testing.T) {
 		t.Error(err1)
 	}
 	if !bytes.Equal(value1, values[0]) {
-		t.Error("not equal %x %x", value1, values[0])
+		t.Errorf("not equal %x %x", value1, values[0])
 	}
 	storage.Del(keys[1])
 	_, err2 := storage.Get(keys[1])
@@ -116,7 +116,7 @@ func TestLeveldbBenchmark(t *testing.T) {
 				t.Error(err)
 			}
 			if !bytes.Equal(tt.value, value) {
-				t.Error("not equal %x %x", tt.value, value)
+				t.Errorf("not equal %x %x", tt.value, value)
 			}
 
 			t.Log("count:", count, "duration:", duration, " Nano")

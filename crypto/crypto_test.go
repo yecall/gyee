@@ -56,17 +56,17 @@ func TestNewKey(t *testing.T) {
 	}
 
 	pkey := util.PaddedBigBytes(privateKeyECDSA.D, 32)
-	fmt.Println("private key:%v", pkey)
+	fmt.Printf("private key:%v\n", pkey)
 
 	pubkeyx := util.PaddedBigBytes(privateKeyECDSA.PublicKey.X, 32)
-	fmt.Println("x:%v", pubkeyx)
+	fmt.Printf("x:%v", pubkeyx)
 
 	pubkeyy := util.PaddedBigBytes(privateKeyECDSA.PublicKey.Y, 32)
-	fmt.Println("y:%v", pubkeyy)
+	fmt.Printf("y:%v", pubkeyy)
 
 	m := elliptic.Marshal(secp256k1.S256(), privateKeyECDSA.PublicKey.X, privateKeyECDSA.PublicKey.Y)
-	fmt.Println("m:%v", m)
+	fmt.Printf("m:%v", m)
 
 	pubkey, err := secp256k1.GetPublicKey(pkey)
-	fmt.Println("public key:%v", pubkey)
+	fmt.Printf("public key:%v", pubkey)
 }

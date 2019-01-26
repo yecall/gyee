@@ -482,7 +482,7 @@ func (yeShMgr *YeShellManager)BroadcastMessage(message Message) error {
 	case 	MessageTypeBlock:
 		err = yeShMgr.broadcastBk(&message)
 	default:
-		return errors.New(fmt.Sprintf("BroadcastMessage: invalid type: %d", message.MsgType))
+		return errors.New(fmt.Sprintf("BroadcastMessage: invalid type: %v", message.MsgType))
 	}
 	return err
 }
@@ -499,7 +499,7 @@ func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
 	case MessageTypeBlock:
 		err = yeShMgr.broadcastBkOsn(&message, nil)
 	default:
-		return errors.New(fmt.Sprintf("BroadcastMessageOsn: invalid type: %d", message.MsgType))
+		return errors.New(fmt.Sprintf("BroadcastMessageOsn: invalid type: %v", message.MsgType))
 	}
 	return err
 }

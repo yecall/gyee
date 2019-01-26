@@ -1556,13 +1556,10 @@ func (tabMgr *TableManager)tabUpdateNodeDb4Query(inst *instCtrlBlock, result int
 	case (inst.state == TabInstStateQuering || inst.state == TabInstStateQTimeout) &&
 		result == TabMgrEnoTimeout:
 		return fnFailUpdate()
-
-	default:
-		tabLog.Debug("tabUpdateNodeDb4Query: nvalid context, update nothing, state: %d, result: %d",
-			inst.state, result)
-		return TabMgrEnoInternal
 	}
 
+	tabLog.Debug("tabUpdateNodeDb4Query: nvalid context, update nothing, state: %d, result: %d",
+		inst.state, result)
 	return TabMgrEnoInternal
 }
 

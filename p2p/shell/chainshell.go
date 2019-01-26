@@ -311,7 +311,7 @@ func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErr
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
 	panic("peerCloseInd: should never be called!!!")
-	return sch.SchEnoInternal
+	//return sch.SchEnoInternal
 }
 
 func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {

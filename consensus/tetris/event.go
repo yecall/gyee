@@ -111,8 +111,6 @@ func (e *Event) Hash() []byte {
 		e.hash = h[:]
 	}
 
-	return e.hash
-
 	//if len(e.hash) == 0 {
 	//	var b bytes.Buffer
 	//	enc := json.NewEncoder(&b)

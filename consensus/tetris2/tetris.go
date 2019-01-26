@@ -1017,7 +1017,7 @@ func (t *Tetris) validatorRotate(joins []string, quits []string) bool {
 }
 
 //Print info for debug
-func (t Tetris) DebugPrint() {
+func (t *Tetris) DebugPrint() {
 	fmt.Println()
 	fmt.Println("t.vid:", t.vid[2:4], "t.h:", t.h, "t.n", t.n)
 	fmt.Println("tx:", t.Metrics.TxIn, "event:", t.Metrics.EventIn, "parent:", t.Metrics.ParentEventIn, "requst", t.Metrics.EventRequest)
@@ -1078,7 +1078,7 @@ func (t Tetris) DebugPrint() {
 	fmt.Println()
 }
 
-func (t Tetris) DebugPrintDetail() {
+func (t *Tetris) DebugPrintDetail() {
 	keys := []string{}
 	for k := range t.validators {
 		keys = append(keys, k)

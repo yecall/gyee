@@ -465,7 +465,7 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoNone
 	}
 
-	if (msg.Eno == DhtEnoNone.GetEno()) && (msg.Peers == nil || msg.Pcs == nil || msg.Peers == nil) {
+	if (msg.Eno == DhtEnoNone.GetEno()) && (msg.Peers == nil || msg.Pcs == nil) {
 		qryLog.Debug("rutNearestRsp: invalid empty nearest set reported")
 		qryFailed2Sender(DhtEnoRoute)
 		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
