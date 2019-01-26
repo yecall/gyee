@@ -23,9 +23,12 @@ package p2p
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/utils/logging"
 )
@@ -157,8 +160,11 @@ func GetInmemHub() *InmemHub {
 			nodes: make(map[*InmemService]bool),
 			dht:   make(map[string][]byte),
 		}
-		var err error
-		instance.ldb, err = persistent.NewLevelStorage("db")
+		dbPath, err := ioutil.TempDir("", "yee-inmemdb")
+		if err != nil {
+			log.Error("TempDir()", err)
+		}
+		instance.ldb, err = persistent.NewLevelStorage(dbPath)
 		if err != nil {
 			logging.Logger.Error(err)
 		}
@@ -200,7 +206,7 @@ func (ih *InmemHub) Broadcast(from *InmemService, message Message) error {
 func (ih *InmemHub) GetValue(key []byte) ([]byte, error) {
 	ih.lock.RLock()
 	defer ih.lock.RUnlock()
-    v, err := ih.ldb.Get(key)
+	v, err := ih.ldb.Get(key)
 	//v, ok := ih.dht[string(key)]
 	if err == nil {
 		return v, nil

@@ -34,4 +34,3 @@ doc/
 # the core consensus package will open source after finished
 # consensus/tetris/
 cmd/gyee/debug
-cmd/gyee/db/*
