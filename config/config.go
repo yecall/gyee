@@ -21,18 +21,18 @@
 package config
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"io/ioutil"
 
 	"github.com/BurntSushi/toml"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/res"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
-	"github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -58,23 +58,23 @@ type P2pConfig struct {
 	BootNode []string `toml:"bootnode"`
 	Listen   []string `toml:"listen"`
 
-	AppType				int			`toml:"app_type"`
-	Name				string		`toml:"name"`
-	Validator			bool		`toml:"validator"`
-	BootstrapNode		bool		`toml:"bootstrap_node"`
-	BootstrapNodes		[]string	`toml:"bootstrap_nodes"`
-	DhtBootstrapNodes	[]string	`toml:"dht_bootstrap_nodes"`
-	LocalNodeIp			string		`toml:"local_node_ip"`
-	LocalUdpPort		uint16		`toml:"local_udp_port"`
-	LocalTcpPort		uint16		`toml:"local_tcp_port"`
-	LocalDhtIp			string		`toml:"local_dht_ip"`
-	LocalDhtPort		uint16		`toml:"local_dht_port"`
-	NodeDataDir			string		`toml:"node_data_path"`
-	NodeDatabase		string		`toml:"node_database"`
-	SubNetMaskBits		int			`toml:"subnet_mask_bits"`
-	EvKeepTime			int			`toml:"ev_keep_time"`
-	DedupTime			int			`toml:"dedup_time"`
-	BootstrapTime		int			`toml:"bootstrap_time"`
+	AppType           int      `toml:"app_type"`
+	Name              string   `toml:"name"`
+	Validator         bool     `toml:"validator"`
+	BootstrapNode     bool     `toml:"bootstrap_node"`
+	BootstrapNodes    []string `toml:"bootstrap_nodes"`
+	DhtBootstrapNodes []string `toml:"dht_bootstrap_nodes"`
+	LocalNodeIp       string   `toml:"local_node_ip"`
+	LocalUdpPort      uint16   `toml:"local_udp_port"`
+	LocalTcpPort      uint16   `toml:"local_tcp_port"`
+	LocalDhtIp        string   `toml:"local_dht_ip"`
+	LocalDhtPort      uint16   `toml:"local_dht_port"`
+	NodeDataDir       string   `toml:"node_data_path"`
+	NodeDatabase      string   `toml:"node_database"`
+	SubNetMaskBits    int      `toml:"subnet_mask_bits"`
+	EvKeepTime        int      `toml:"ev_keep_time"`
+	DedupTime         int      `toml:"dedup_time"`
+	BootstrapTime     int      `toml:"bootstrap_time"`
 }
 
 //Listen addr, modules, access right
@@ -95,14 +95,13 @@ type ChainConfig struct {
 
 //cpu, mem, disk profile,
 type MetricsConfig struct {
-	EnableMetrics bool `toml:"enable_metrics"`
-	EnableMetricsReport bool `toml:"enable_metrics_report"`
-	MetricsReportUrl []string `toml:"metrics_report_url"`
+	EnableMetrics       bool     `toml:"enable_metrics"`
+	EnableMetricsReport bool     `toml:"enable_metrics_report"`
+	MetricsReportUrl    []string `toml:"metrics_report_url"`
 }
 
 type MiscConfig struct {
 }
-
 
 func GetConfig(ctx *cli.Context) *Config {
 	config := GetDefaultConfig()
@@ -174,7 +173,7 @@ func GetConfigFromFile(file string, config *Config) *Config {
 }
 
 func SaveConfigToFile(file string, config *Config) error {
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE,0766)
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0766)
 
 	if err != nil {
 		logging.Logger.WithFields(logrus.Fields{
@@ -182,18 +181,18 @@ func SaveConfigToFile(file string, config *Config) error {
 		}).Fatalf("Failed to write the config file: %s", file)
 	}
 
-    encoder := toml.NewEncoder(f)
+	encoder := toml.NewEncoder(f)
 
-    err = encoder.Encode(config)
+	err = encoder.Encode(config)
 	if err != nil {
 		logging.Logger.WithFields(logrus.Fields{
 			"err": err,
 		}).Fatal("Failed to encode the config")
 	}
 
-    f.Close()
+	f.Close()
 
-    return nil
+	return nil
 }
 
 func (c *Config) IPCEndpoint() string {
@@ -217,4 +216,3 @@ func (c *Config) IPCEndpoint() string {
 	}
 	return c.Rpc.IpcPath
 }
-

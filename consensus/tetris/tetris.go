@@ -218,16 +218,16 @@ func NewTetris(core ICore, members map[string]uint, blockHeight uint64, mid stri
 }
 
 func (c *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
-    if len(c.heartBeat) < c.params.superMajority {
-    	return false, 0
+	if len(c.heartBeat) < c.params.superMajority {
+		return false, 0
 	}
 
-    var times []time.Time
-    for _, time := range c.heartBeat {
-    	times = append(times, time)
+	var times []time.Time
+	for _, time := range c.heartBeat {
+		times = append(times, time)
 	}
 
-	sort.Slice(times, func(i,j int) bool{
+	sort.Slice(times, func(i, j int) bool {
 		return times[i].Before(times[j])
 	})
 

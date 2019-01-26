@@ -52,8 +52,8 @@ import (
 	"os/signal"
 	"reflect"
 	"strconv"
-	"syscall"
 	"strings"
+	"syscall"
 )
 
 const TNUM = 10

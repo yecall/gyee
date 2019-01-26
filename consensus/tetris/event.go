@@ -83,7 +83,7 @@ func NewEvent(height uint64, member uint, sequenceNumber uint64) Event {
 	return event
 }
 
-func NewPulse(member uint) Event{
+func NewPulse(member uint) Event {
 	body := EventBody{
 		M: member,
 		T: time.Now().UnixNano(),
@@ -135,7 +135,7 @@ func (e *Event) Marshal() []byte {
 }
 
 func (e *Event) Unmarshal(data []byte) {
-    json.Unmarshal(data, &e.Body)
+	json.Unmarshal(data, &e.Body)
 }
 
 func (e *Event) totalTxAndEvent() int {

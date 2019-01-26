@@ -21,8 +21,8 @@
 package config
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestGetDefaultConfig(t *testing.T) {

@@ -56,22 +56,22 @@ var (
 	}
 
 	AppLogLevelFlag = cli.StringFlag{
-		Name: "loglevel",
+		Name:  "loglevel",
 		Usage: "log level",
 	}
 
 	AppLogFileFlag = cli.StringFlag{
-		Name: "logfile",
+		Name:  "logfile",
 		Usage: "log file",
 	}
 
 	AppEnableCrashReportFlag = cli.BoolFlag{
-		Name: "enable_crash_report",
+		Name:  "enable_crash_report",
 		Usage: "enable crash report",
 	}
 
 	AppCrashReportUrlFlag = cli.StringSliceFlag{
-		Name: "crash_report_url",
+		Name:  "crash_report_url",
 		Usage: "crash report url",
 	}
 
@@ -82,12 +82,12 @@ var (
 	}
 
 	NetworkBootNodeFlag = cli.StringSliceFlag{
-		Name: "bootnode",
+		Name:  "bootnode",
 		Usage: "boot node",
 	}
 
 	NetworkListenFlag = cli.StringSliceFlag{
-		Name: "p2p_listen",
+		Name:  "p2p_listen",
 		Usage: "p2p netowrk listen port",
 	}
 
@@ -99,17 +99,17 @@ var (
 	}
 
 	RpcIpcPathFlag = cli.StringFlag{
-		Name: "ipcpath",
+		Name:  "ipcpath",
 		Usage: "ipc path",
 	}
 
 	RpcListenFlag = cli.StringSliceFlag{
-		Name: "rpc_listen",
+		Name:  "rpc_listen",
 		Usage: "rpc listen",
 	}
 
 	RpcHttpListenFlag = cli.StringSliceFlag{
-		Name: "http_listen",
+		Name:  "http_listen",
 		Usage: "http listen",
 	}
 
@@ -123,27 +123,27 @@ var (
 	}
 
 	ChainIDFlag = cli.IntFlag{
-		Name: "chainid",
+		Name:  "chainid",
 		Usage: "chain id",
 	}
 
 	ChainDataDirFlag = cli.StringFlag{
-		Name: "datadir",
+		Name:  "datadir",
 		Usage: "chain data dir",
 	}
 
 	ChainKeyDirFlag = cli.StringFlag{
-		Name: "keydir",
+		Name:  "keydir",
 		Usage: "key dir",
 	}
 
 	ChainGenesisFlag = cli.StringFlag{
-		Name: "genesis",
+		Name:  "genesis",
 		Usage: "genesis file path",
 	}
 
 	ChainMineFlag = cli.BoolFlag{
-		Name: "mine",
+		Name:  "mine",
 		Usage: "mine",
 	}
 
@@ -155,17 +155,17 @@ var (
 	}
 
 	MetricsEnableFlag = cli.BoolFlag{
-		Name: "metrics_enable",
+		Name:  "metrics_enable",
 		Usage: "metrics enable",
 	}
 
 	MetricsEnableReportFlag = cli.BoolFlag{
-		Name: "metrics_report",
+		Name:  "metrics_report",
 		Usage: "metrics enable report",
 	}
 
 	MetricsReportUrlFlag = cli.StringSliceFlag{
-		Name: "metrics_report_url",
+		Name:  "metrics_report_url",
 		Usage: "metrics report url",
 	}
 

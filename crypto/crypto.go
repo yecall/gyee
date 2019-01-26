@@ -20,7 +20,6 @@
 
 package crypto
 
-
 //TODO: config crypto params: hash, keystore.cipher, keystore.kdf, curve,
 //TODO: 支持将来这个模块可以升级配置，算法内容的自描述
 
@@ -33,8 +32,8 @@ const (
 )
 
 type Signature struct {
-	Algorithm  Algorithm
-	Signature  []byte
+	Algorithm Algorithm
+	Signature []byte
 }
 
 type Signer interface {
