@@ -31,7 +31,9 @@ import (
 const (
 	KeyChainID = "ChainID"
 
-	KeyPrefixTx     = "tx-" // txHash => encodedTx
+	KeyPrefixStateTrie = "sTrie-" // stateTrie Hash => trie node
+
+	KeyPrefixTx     = "tx-"   // txHash => encodedTx
 	KeyPrefixHeader = "blkH-" // blockHash => encodedBlockHeader
 	KeyPrefixBody   = "blkB-" // blockHash => encodedBlockBody
 

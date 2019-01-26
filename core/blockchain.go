@@ -79,11 +79,14 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 		return nil, err
 	}
 
+	// TODO: stateDB cache
+	stateDB := state.NewDatabaseWithCache(
+		persistent.NewTable(storage, KeyPrefixStateTrie),
+		0)
 	bc := &BlockChain{
 		chainID: chainID,
 		storage: storage,
-		// TODO: stateDB cache
-		stateDB: state.NewDatabaseWithCache(storage, 0),
+		stateDB: stateDB,
 		quitCh:  make(chan struct{}),
 	}
 
