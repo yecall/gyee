@@ -22,6 +22,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -117,10 +118,17 @@ func (bc *BlockChain) loadLastBlock() error {
 	}
 	lastBlock := bc.GetBlockByHash(lastHash)
 	if lastBlock == nil {
-		log.Warn("GetBlockByHash() nil, reset chain")
+		log.Warn("GetBlockByHash() nil, reset chain",
+			"hash", lastHash)
 		return bc.Reset()
 	}
-	// TODO: try load & verify state trie of lastBlock
+	if _, err := state.NewAccountTrie(lastBlock.StateRoot(), bc.stateDB); err != nil {
+		log.Warn("lastBlock state trie missing",
+			"number", lastBlock.Number(), "hash", lastBlock.Hash())
+		if err := bc.repair(&lastBlock); err != nil {
+			return err
+		}
+	}
 
 	// lastBlock verified
 	bc.lastBlock.Store(lastBlock)
@@ -129,6 +137,27 @@ func (bc *BlockChain) loadLastBlock() error {
 		"number", lastBlock.Number(), "Hash", lastBlock.Hash())
 
 	return nil
+}
+
+// repair broken lastBlock trie, by rewinding through chain
+func (bc *BlockChain) repair(head **Block) error {
+	for {
+		parentHash := (*head).ParentHash()
+		if parentHash == common.EmptyHash {
+			log.Warn("genesis trie broken, resetting")
+			return bc.Reset()
+		}
+		b := bc.GetBlockByHash(parentHash)
+		if b == nil {
+			return fmt.Errorf("broken chain %d %x", (*head).Number()-1, parentHash)
+		}
+		*head = b
+		if _, err := state.NewAccountTrie(b.StateRoot(), bc.stateDB); err == nil {
+			log.Info("Rewond chain",
+				"number", b.Number(), "hash", b.Hash())
+			return nil
+		}
+	}
 }
 
 func (bc *BlockChain) Stop() {
@@ -146,7 +175,15 @@ func (bc *BlockChain) Stop() {
 
 // reset chain to genesis block
 func (bc *BlockChain) Reset() error {
-	// TODO:
+	genesis := bc.genesis
+
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
+	if err := genesis.Write(bc.storage); err != nil {
+		return err
+	}
+	putLastBlock(bc.storage, genesis.Hash())
 	return nil
 }
 

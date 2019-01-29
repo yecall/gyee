@@ -114,7 +114,16 @@ func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
 	return b
 }
 
-func (b *Block) Number() uint64 { return b.header.Number }
+func (b *Block) ChainID() uint32         { return b.header.ChainID }
+func (b *Block) Number() uint64          { return b.header.Number }
+func (b *Block) ParentHash() common.Hash { return b.header.ParentHash }
+
+func (b *Block) StateRoot() common.Hash    { return b.header.StateRoot }
+func (b *Block) TxsRoot() common.Hash      { return b.header.TxsRoot }
+func (b *Block) ReceiptsRoot() common.Hash { return b.header.ReceiptsRoot }
+
+func (b *Block) Time() uint64  { return b.header.Time }
+func (b *Block) Extra() []byte { return b.header.Extra }
 
 func (b *Block) Hash() common.Hash {
 	if hash := b.hash.Load(); hash != nil {
