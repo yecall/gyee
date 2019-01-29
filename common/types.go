@@ -56,13 +56,11 @@ func HexToHash(s string) Hash { return BytesToHash(FromHex(s)) }
 // Bytes gets the byte representation of the underlying hash.
 func (h Hash) Bytes() []byte { return h[:] }
 
-func (h Hash) Hex() string {
-	return hex.EncodeToString(h[:])
-}
+func (h Hash) Hex() string { return hex.EncodeToString(h[:]) }
 
-func (h Hash) Base58() string {
-	return base58.Encode(h[:])
-}
+func (h Hash) Base58() string { return base58.Encode(h[:]) }
+
+func (h Hash) String() string { return h.Hex() }
 
 func (h Hash) Equals(b Hash) bool {
 	return h == b

@@ -21,6 +21,7 @@
 package core
 
 import (
+	"errors"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -29,6 +30,7 @@ import (
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/persistent"
 )
 
 // Block Header of yee chain
@@ -112,6 +114,8 @@ func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
 	return b
 }
 
+func (b *Block) Number() uint64 { return b.header.Number }
+
 func (b *Block) Hash() common.Hash {
 	if hash := b.hash.Load(); hash != nil {
 		return hash.(common.Hash)
@@ -157,6 +161,40 @@ func (b *Block) setBytes(enc []byte) error {
 	}
 	b.header = header
 	b.body = pbBlock.Body
+	return nil
+}
+
+func (b *Block) Write(putter persistent.Putter) error {
+	// commit account state trie
+	if b.stateTrie == nil {
+		return errors.New("nil stateTrie")
+	} else {
+		stateRoot, err := b.stateTrie.Commit()
+		if err != nil {
+			return err
+		}
+		if stateRoot != b.header.StateRoot {
+			return ErrBlockStateTrieMismatch
+		}
+	}
+	// add block header to storage
+	pbHeader, err := b.header.toSignedProto()
+	if err != nil {
+		return err
+	}
+	hashHeader := putHeader(putter, pbHeader)
+	// add block body to storage
+	if body := b.getBody(); body != nil {
+		putBlockBody(putter, hashHeader, body)
+	}
+	// block mapping
+	putBlockHash2Num(putter, hashHeader, b.header.Number)
+	putBlockNum2Hash(putter, b.header.Number, hashHeader)
+	// add block txs to storage, key "tx"+tx.hash
+	if err := b.transactions.Write(putter); err != nil {
+		return err
+	}
+
 	return nil
 }
 

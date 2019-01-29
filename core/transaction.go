@@ -119,7 +119,7 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 
 type Transactions []*Transaction
 
-func (txs Transactions) addToBatch(batch persistent.Batch) error {
+func (txs Transactions) Write(putter persistent.Putter) error {
 	for _, tx := range txs {
 		key := append([]byte(KeyPrefixTx), tx.hash[:]...)
 		pb, err := tx.ToProto()
@@ -130,7 +130,7 @@ func (txs Transactions) addToBatch(batch persistent.Batch) error {
 		if err != nil {
 			return err
 		}
-		if err = batch.Put(key, value); err != nil {
+		if err = putter.Put(key, value); err != nil {
 			return err
 		}
 	}
@@ -139,7 +139,7 @@ func (txs Transactions) addToBatch(batch persistent.Batch) error {
 
 func (txs Transactions) addToStorage(storage persistent.Storage) error {
 	batch := storage.NewBatch()
-	if err := txs.addToBatch(batch); err != nil {
+	if err := txs.Write(batch); err != nil {
 		return err
 	}
 	return batch.Write()

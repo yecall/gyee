@@ -105,6 +105,19 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 	return b, nil
 }
 
+// commit genesis to stateDB, assuming service not started, no lock required
+func (g *Genesis) Commit(stateDB state.Database, putter persistent.Putter) (*Block, error) {
+	b, err := g.genBlock(stateDB)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.Write(putter); err != nil {
+		return nil, err
+	}
+	putLastBlock(putter, b.Hash())
+	return b, nil
+}
+
 func NewGenesisBlock() {
 
 }

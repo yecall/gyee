@@ -24,12 +24,15 @@ import (
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
 
 // Key / KeyPrefix for blockchain used in persistent.Storage
 const (
 	KeyChainID = "ChainID"
+
+	KeyLastBlock = "LastBlock"
 
 	KeyPrefixStateTrie = "sTrie-" // stateTrie Hash => trie node
 
@@ -64,6 +67,24 @@ func prepareStorage(storage persistent.Storage, id ChainID) error {
 	return nil
 }
 
+func getLastBlock(getter persistent.Getter) common.Hash {
+	enc, err := getter.Get(keyLastBlock())
+	if err != nil {
+		log.Error("getLastBlock()", err)
+		return common.EmptyHash
+	}
+	if len(enc) == 0 {
+		return common.EmptyHash
+	}
+	return common.BytesToHash(enc)
+}
+
+func putLastBlock(putter persistent.Putter, hash common.Hash) {
+	if err := putter.Put(keyLastBlock(), hash[:]); err != nil {
+		log.Crit("putLastBlock()", err)
+	}
+}
+
 func getHeader(getter persistent.Getter, hash common.Hash) (*corepb.SignedBlockHeader, error) {
 	enc, err := getter.Get(keyHeader(hash))
 	if err != nil {
@@ -79,16 +100,16 @@ func getHeader(getter persistent.Getter, hash common.Hash) (*corepb.SignedBlockH
 	return pb, nil
 }
 
-func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) (common.Hash, error) {
+func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) common.Hash {
 	enc, err := proto.Marshal(header)
 	if err != nil {
-		return common.EmptyHash, err
+		log.Crit("putHeader()", err)
 	}
-	hash := common.BytesToHash(sha3.Sha3256(enc))
+	hash := common.BytesToHash(sha3.Sha3256(header.Header))
 	if err := putter.Put(keyHeader(hash), enc); err != nil {
-		return common.EmptyHash, err
+		log.Crit("putHeader()", err)
 	}
-	return hash, nil
+	return hash
 }
 
 func getBlockBody(getter persistent.Getter, hash common.Hash) (*corepb.BlockBody, error) {
@@ -106,15 +127,14 @@ func getBlockBody(getter persistent.Getter, hash common.Hash) (*corepb.BlockBody
 	return pb, nil
 }
 
-func putBlockBody(putter persistent.Putter, hash common.Hash, body *corepb.BlockBody) error {
+func putBlockBody(putter persistent.Putter, hash common.Hash, body *corepb.BlockBody) {
 	enc, err := proto.Marshal(body)
 	if err != nil {
-		return err
+		log.Crit("putBlockBody()", err)
 	}
 	if err := putter.Put(keyBlockBody(hash), enc); err != nil {
-		return err
+		log.Crit("putBlockBody()", err)
 	}
-	return nil
 }
 
 func getBlockHash2Num(getter persistent.Getter, hash common.Hash) *uint64 {
@@ -126,10 +146,12 @@ func getBlockHash2Num(getter persistent.Getter, hash common.Hash) *uint64 {
 	return &value
 }
 
-func putBlockHash2Num(putter persistent.Putter, hash common.Hash, num uint64) error {
+func putBlockHash2Num(putter persistent.Putter, hash common.Hash, num uint64) {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, num)
-	return putter.Put(keyBlockHash2Num(hash), buf)
+	if err := putter.Put(keyBlockHash2Num(hash), buf); err != nil {
+		log.Crit("putBlockHash2Num()", err)
+	}
 }
 
 func getBlockNum2Hash(getter persistent.Getter, num uint64) (hash common.Hash) {
@@ -141,12 +163,18 @@ func getBlockNum2Hash(getter persistent.Getter, num uint64) (hash common.Hash) {
 	return
 }
 
-func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) error {
-	return putter.Put(keyBlockNum2Hash(num), hash[:])
+func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) {
+	if err := putter.Put(keyBlockNum2Hash(num), hash[:]); err != nil {
+		log.Crit("putBlockNum2Hash()", err)
+	}
 }
 
 func keyChainID() []byte {
 	return []byte(KeyChainID)
+}
+
+func keyLastBlock() []byte {
+	return []byte(KeyLastBlock)
 }
 
 func keyHeader(hash common.Hash) []byte {

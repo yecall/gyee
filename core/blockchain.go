@@ -50,8 +50,7 @@ type BlockChain struct {
 	stateDB state.Database
 	genesis *Block
 
-	lastBlockHash   common.Hash
-	lastBlockHeight uint64
+	lastBlock atomic.Value
 
 	//blockPool *BlockPool
 	//txPool    *TransactionPool
@@ -96,17 +95,40 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 		if err != nil {
 			return nil, err
 		}
-		bc.genesis, err = genesis.genBlock(bc.stateDB)
+		bc.genesis, err = genesis.Commit(bc.stateDB, storage)
 		if err != nil {
-			return nil, err
-		}
-		if err = bc.AddBlock(bc.genesis); err != nil {
 			return nil, err
 		}
 	}
 
+	if err := bc.loadLastBlock(); err != nil {
+		return nil, err
+	}
+
 	go bc.loop()
 	return bc, nil
+}
+
+func (bc *BlockChain) loadLastBlock() error {
+	lastHash := getLastBlock(bc.storage)
+	if lastHash == common.EmptyHash {
+		log.Warn("getLastBlock() empty, reset chain")
+		return bc.Reset()
+	}
+	lastBlock := bc.GetBlockByHash(lastHash)
+	if lastBlock == nil {
+		log.Warn("GetBlockByHash() nil, reset chain")
+		return bc.Reset()
+	}
+	// TODO: try load & verify state trie of lastBlock
+
+	// lastBlock verified
+	bc.lastBlock.Store(lastBlock)
+
+	log.Info("Loaded local block",
+		"number", lastBlock.Number(), "Hash", lastBlock.Hash())
+
+	return nil
 }
 
 func (bc *BlockChain) Stop() {
@@ -122,6 +144,12 @@ func (bc *BlockChain) Stop() {
 	// flush caches to storage
 }
 
+// reset chain to genesis block
+func (bc *BlockChain) Reset() error {
+	// TODO:
+	return nil
+}
+
 // add a checked block to block chain
 func (bc *BlockChain) AddBlock(b *Block) error {
 	bc.chainmu.Lock()
@@ -131,48 +159,17 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
-	batch := bc.storage.NewBatch()
-
-	// add block txs to storage, key "tx"+tx.hash
-	if err := b.transactions.addToBatch(batch); err != nil {
-		return err
-	}
-
-	// add block header to storage
-	pbHeader, err := b.header.toSignedProto()
-	if err != nil {
-		return err
-	}
-	hashHeader, err := putHeader(batch, pbHeader)
-	if err != nil {
-		return err
-	}
-
-	// commit account state trie
-	if stateTrie := b.stateTrie; stateTrie != nil {
-		stateRoot, err := stateTrie.Commit()
-		if err != nil {
-			return nil
-		}
-		if stateRoot != b.header.StateRoot {
-			return ErrBlockStateTrieMismatch
-		}
-	} else {
+	if b.stateTrie == nil {
+		var err error
 		b.stateTrie, err = state.NewAccountTrie(b.header.StateRoot, bc.stateDB)
-	}
-
-	// add block body to storage
-	if body := b.getBody(); body != nil {
-		if err := putBlockBody(batch, hashHeader, body); err != nil {
+		if err != nil {
 			return err
 		}
 	}
 
-	// block mapping
-	if err := putBlockHash2Num(batch, hashHeader, b.header.Number); err != nil {
-		return err
-	}
-	if err := putBlockNum2Hash(batch, b.header.Number, hashHeader); err != nil {
+	batch := bc.storage.NewBatch()
+
+	if err := b.Write(batch); err != nil {
 		return err
 	}
 
@@ -181,8 +178,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		return err
 	}
 
-	bc.lastBlockHash.SetBytes(hashHeader[:])
-	bc.lastBlockHeight = b.header.Number
+	bc.lastBlock.Store(b)
 
 	return nil
 }
