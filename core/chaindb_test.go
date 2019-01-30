@@ -21,6 +21,10 @@ import (
 	"encoding/binary"
 	"math/rand"
 	"testing"
+
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/pb"
+	"github.com/yeeco/gyee/persistent"
 )
 
 func TestDBKeys(t *testing.T) {
@@ -32,5 +36,33 @@ func TestDBKeys(t *testing.T) {
 	keyNum2Hash := keyBlockNum2Hash(num)
 	if binary.BigEndian.Uint64(keyNum2Hash[len(keyNum2Hash)-8:]) != num {
 		t.Errorf("wrong keyBlockNum2Hash()")
+	}
+}
+
+func TestChainDB(t *testing.T) {
+	mem := persistent.NewMemoryStorage()
+
+	keyNonExist := common.BytesToHash([]byte("test key"))
+	if h := getHeader(mem, keyNonExist); h != nil {
+		t.Errorf("getHeader() non-exist got %v", h)
+	}
+	if b := getBlockBody(mem, keyNonExist); b != nil {
+		t.Errorf("getBlockBody() non-exist got %v", b)
+	}
+
+	// header
+	key := putHeader(mem, &corepb.SignedBlockHeader{
+		Header: []byte("test header bytes"),
+	})
+	if h := getHeader(mem, key); h == nil {
+		t.Errorf("getHeader() exist got %v", h)
+	}
+
+	// body
+	putBlockBody(mem, key, &corepb.BlockBody{
+		RawTransactions: [][]byte{[]byte("test tx bytes")},
+	})
+	if b := getBlockBody(mem, key); b == nil {
+		t.Errorf("getBlockBody() exist got %v", b)
 	}
 }

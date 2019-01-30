@@ -85,61 +85,43 @@ func putLastBlock(putter persistent.Putter, hash common.Hash) {
 	}
 }
 
-func getHeader(getter persistent.Getter, hash common.Hash) (*corepb.SignedBlockHeader, error) {
-	enc, err := getter.Get(keyHeader(hash))
-	if err != nil {
-		if err == persistent.ErrKeyNotFound {
-			return nil, nil
-		}
-		return nil, err
+func getHeader(getter persistent.Getter, hash common.Hash) *corepb.SignedBlockHeader {
+	enc, _ := getter.Get(keyHeader(hash))
+	if len(enc) == 0 {
+		return nil
 	}
 	pb := new(corepb.SignedBlockHeader)
 	if err := proto.Unmarshal(enc, pb); err != nil {
-		return nil, err
+		log.Crit("getHeader.Unmarshal failed", "hash", hash, "value", enc)
 	}
-	return pb, nil
+	return pb
 }
 
 func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) common.Hash {
-	enc, err := proto.Marshal(header)
-	if err != nil {
-		log.Crit("putHeader()", err)
-	}
 	hash := common.BytesToHash(sha3.Sha3256(header.Header))
-	if err := putter.Put(keyHeader(hash), enc); err != nil {
-		log.Crit("putHeader()", err)
-	}
+	putProtoMsg(putter, keyHeader(hash), header)
 	return hash
 }
 
-func getBlockBody(getter persistent.Getter, hash common.Hash) (*corepb.BlockBody, error) {
-	if exists, err := getter.Has(keyBlockBody(hash)); !exists || err != nil {
-		return nil, err
-	}
-	enc, err := getter.Get(keyBlockBody(hash))
-	if err != nil {
-		return nil, err
+func getBlockBody(getter persistent.Getter, hash common.Hash) *corepb.BlockBody {
+	enc, _ := getter.Get(keyBlockBody(hash))
+	if len(enc) == 0 {
+		return nil
 	}
 	pb := new(corepb.BlockBody)
 	if err := proto.Unmarshal(enc, pb); err != nil {
-		return nil, err
+		log.Crit("getBlockBody.Unmarshal failed", "hash", hash, "value", enc)
 	}
-	return pb, nil
+	return pb
 }
 
 func putBlockBody(putter persistent.Putter, hash common.Hash, body *corepb.BlockBody) {
-	enc, err := proto.Marshal(body)
-	if err != nil {
-		log.Crit("putBlockBody()", err)
-	}
-	if err := putter.Put(keyBlockBody(hash), enc); err != nil {
-		log.Crit("putBlockBody()", err)
-	}
+	putProtoMsg(putter, keyBlockBody(hash), body)
 }
 
 func getBlockHash2Num(getter persistent.Getter, hash common.Hash) *uint64 {
-	enc, err := getter.Get(keyBlockHash2Num(hash))
-	if err != nil {
+	enc, _ := getter.Get(keyBlockHash2Num(hash))
+	if len(enc) == 0 {
 		return nil
 	}
 	value := binary.BigEndian.Uint64(enc)
@@ -155,8 +137,8 @@ func putBlockHash2Num(putter persistent.Putter, hash common.Hash, num uint64) {
 }
 
 func getBlockNum2Hash(getter persistent.Getter, num uint64) (hash common.Hash) {
-	enc, err := getter.Get(keyBlockNum2Hash(num))
-	if err != nil {
+	enc, _ := getter.Get(keyBlockNum2Hash(num))
+	if len(enc) == 0 {
 		return common.EmptyHash
 	}
 	hash.SetBytes(enc)
@@ -166,6 +148,16 @@ func getBlockNum2Hash(getter persistent.Getter, num uint64) (hash common.Hash) {
 func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) {
 	if err := putter.Put(keyBlockNum2Hash(num), hash[:]); err != nil {
 		log.Crit("putBlockNum2Hash()", err)
+	}
+}
+
+func putProtoMsg(putter persistent.Putter, key []byte, message proto.Message) {
+	enc, err := proto.Marshal(message)
+	if err != nil {
+		log.Crit("putProtoMsg() %T %v", message, err)
+	}
+	if err := putter.Put(key, enc); err != nil {
+		log.Crit("putProtoMsg() %T %v", message, err)
 	}
 }
 

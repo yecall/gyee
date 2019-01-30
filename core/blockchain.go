@@ -229,12 +229,12 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *Block {
 }
 
 func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
-	signedHeader, err := getHeader(bc.storage, hash)
-	if err != nil {
+	signedHeader := getHeader(bc.storage, hash)
+	if signedHeader == nil {
 		return nil
 	}
-	body, err := getBlockBody(bc.storage, hash)
-	if err != nil {
+	body := getBlockBody(bc.storage, hash)
+	if body == nil {
 		return nil
 	}
 	header := new(BlockHeader)
