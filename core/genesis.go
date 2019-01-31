@@ -76,7 +76,7 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 		// mem storage needs no cache in state.Database
 		stateDB = state.NewDatabase(persistent.NewMemoryStorage())
 	}
-	accountTrie, err := state.NewAccountTrie(common.Hash{}, stateDB)
+	accountTrie, err := state.NewAccountTrie(common.EmptyHash, stateDB)
 	if err != nil {
 		return nil, err
 	}
@@ -92,16 +92,23 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 		account := accountTrie.GetAccount(addr.CommonAddress(), true)
 		account.SetBalance(value)
 	}
-	hash, err := accountTrie.Commit()
+	consensusTrie, err := state.NewConsensusTrie(common.EmptyHash, stateDB)
 	if err != nil {
 		return nil, err
 	}
+	consensusTrie.SetValidators(g.Consensus.Tetris.Validators)
 	h := &BlockHeader{
-		ChainID:   uint32(g.ChainID),
-		StateRoot: hash,
+		ChainID: uint32(g.ChainID),
+	}
+	if h.StateRoot, err = accountTrie.Commit(); err != nil {
+		return nil, err
+	}
+	if h.ConsensusRoot, err = consensusTrie.Commit(); err != nil {
+		return nil, err
 	}
 	b := NewBlock(h, nil)
 	b.stateTrie = accountTrie
+	b.consensusTrie = consensusTrie
 	return b, nil
 }
 

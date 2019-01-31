@@ -68,10 +68,13 @@ func (at *accountTrie) Commit() (common.Hash, error) {
 		// TODO: mark account trie node reference to parent Hash
 		return nil
 	})
+	if err != nil {
+		return common.EmptyHash, err
+	}
 	if err := at.db.TrieDB().Commit(root, true); err != nil {
 		return common.EmptyHash, err
 	}
-	return root, err
+	return root, nil
 }
 
 func (at *accountTrie) GetAccount(address common.Address, createIfMissing bool) Account {

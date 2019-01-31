@@ -44,9 +44,10 @@ type BlockHeader struct {
 	ParentHash common.Hash `json:"parentHash"`
 
 	// trie root hashes
-	StateRoot    common.Hash `json:"stateRoot"`
-	TxsRoot      common.Hash `json:"transactionsRoot"`
-	ReceiptsRoot common.Hash `json:"receiptsRoot"`
+	ConsensusRoot common.Hash `json:"consensusRoot"`
+	StateRoot     common.Hash `json:"stateRoot"`
+	TxsRoot       common.Hash `json:"transactionsRoot"`
+	ReceiptsRoot  common.Hash `json:"receiptsRoot"`
 
 	// block time in milli seconds
 	Time uint64 `json:"timestamp"`
@@ -92,8 +93,9 @@ type Block struct {
 	// body
 	body *corepb.BlockBody
 
-	stateTrie    state.AccountTrie
-	transactions Transactions
+	stateTrie     state.AccountTrie
+	consensusTrie state.ConsensusTrie
+	transactions  Transactions
 	// TODO: receipts
 
 	// cache

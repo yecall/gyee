@@ -43,16 +43,30 @@ type Account interface {
 	ToBytes() ([]byte, error)
 }
 
-// interface for account trie, NO CONCURRENCY
-// 1. cache existing account trie in memory
-// 2. cache created / updated trie, also providing such operations
-type AccountTrie interface {
+type managedTrie interface {
 	// Reset trie to a trie root hash
 	Reset(root common.Hash) error
 
 	// Commit trie to backing storage
 	Commit() (root common.Hash, err error)
+}
+
+// interface for account trie, NO CONCURRENCY
+// 1. cache existing account trie in memory
+// 2. cache created / updated trie, also providing such operations
+type AccountTrie interface {
+	managedTrie
 
 	// Get account from trie, create if requested
 	GetAccount(address common.Address, createIfMissing bool) Account
+}
+
+type ConsensusTrie interface {
+	managedTrie
+
+	// Get validator address list
+	GetValidators() []string
+
+	// Set validator address list
+	SetValidators([]string)
 }
