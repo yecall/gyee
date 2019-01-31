@@ -59,7 +59,7 @@ func (log yesLogger)Debug(fmt string, args ... interface{}) {
 //
 
 const (
-	yesKeyBytes = config.DhtKeyLength											// key length in bytes
+	yesKeyBytes = config.DhtKeyLength							// key length in bytes
 	yesMaxFindNode = 4											// max find node commands in pending
 	yesMaxGetProvider = 4										// max get provider commands in pending
 	yesMaxPutProvider = 4										// max put provider commands in pending
@@ -90,7 +90,7 @@ type SubnetDescriptor struct {
 
 type SingleSubnetDescriptor = sch.SingleSubnetDescriptor			// single subnet descriptor
 
-type yesKey = config.DsKey										// key type
+type yesKey = config.DsKey											// key type
 
 type YeShellManager struct {
 	name				string									// unique name of the shell manager

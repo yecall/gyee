@@ -781,8 +781,8 @@ func testCase13(tc *testCase) {
 	osnSrv, _ := yep2p.NewOsnService(&osnCfg)
 	osnSrv.Start()
 
-	if false {
-		time.Sleep(time.Second * 10)
+	if true {
+		time.Sleep(time.Second * 20)
 		reCfgCmd := yep2p.RecfgCommand{
 			Validator:      false,
 			SubnetMaskBits: 4,
