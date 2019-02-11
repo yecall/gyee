@@ -52,7 +52,11 @@ func (storage *LevelStorage) Has(key []byte) (bool, error) {
 }
 
 func (storage *LevelStorage) Get(key []byte) ([]byte, error) {
-	return storage.db.Get(key, nil)
+	val, err := storage.db.Get(key, nil)
+	if err == leveldb.ErrNotFound {
+		err = ErrKeyNotFound
+	}
+	return val, err
 }
 
 func (storage *LevelStorage) Put(key []byte, value []byte) error {

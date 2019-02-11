@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
@@ -235,7 +236,7 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 	}
 	body := getBlockBody(bc.storage, hash)
 	if body == nil {
-		return nil
+		body = new(corepb.BlockBody)
 	}
 	header := new(BlockHeader)
 	if err := rlp.DecodeBytes(signedHeader.Header, header); err != nil {

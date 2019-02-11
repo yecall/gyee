@@ -19,6 +19,7 @@ package core
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
@@ -46,23 +47,25 @@ const (
 
 func prepareStorage(storage persistent.Storage, id ChainID) error {
 	key := keyChainID()
-	exists, err := storage.Has(key)
-	if err != nil {
+	if hasChainID, err := storage.Has(key); err != nil {
 		return err
-	}
-	if exists {
-		encChainID, err := storage.Get(key)
-		if err != nil {
-			return err
-		}
-		decoded := binary.BigEndian.Uint32(encChainID)
-		if ChainID(decoded) != id {
-			return ErrBlockChainIDMismatch
-		}
 	} else {
-		encChainID := make([]byte, 4)
-		binary.BigEndian.PutUint32(encChainID, uint32(id))
-		return storage.Put(key, encChainID)
+		if hasChainID {
+			encChainID, err := storage.Get(key)
+			if err != nil {
+				return err
+			}
+			decoded := binary.BigEndian.Uint32(encChainID)
+			if ChainID(decoded) != id {
+				return ErrBlockChainIDMismatch
+			}
+		} else {
+			encChainID := make([]byte, 4)
+			binary.BigEndian.PutUint32(encChainID, uint32(id))
+			if err := storage.Put(key, encChainID); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -86,15 +89,14 @@ func putLastBlock(putter persistent.Putter, hash common.Hash) {
 }
 
 func getHeader(getter persistent.Getter, hash common.Hash) *corepb.SignedBlockHeader {
-	enc, _ := getter.Get(keyHeader(hash))
-	if len(enc) == 0 {
+	msg := new(corepb.SignedBlockHeader)
+	if err := getProtoMsg(getter, keyHeader(hash), msg); err != nil {
+		if err != persistent.ErrKeyNotFound {
+			log.Error("getHeader()", "hash", hash, "err", err)
+		}
 		return nil
 	}
-	pb := new(corepb.SignedBlockHeader)
-	if err := proto.Unmarshal(enc, pb); err != nil {
-		log.Crit("getHeader.Unmarshal failed", "hash", hash, "value", enc)
-	}
-	return pb
+	return msg
 }
 
 func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) common.Hash {
@@ -104,15 +106,14 @@ func putHeader(putter persistent.Putter, header *corepb.SignedBlockHeader) commo
 }
 
 func getBlockBody(getter persistent.Getter, hash common.Hash) *corepb.BlockBody {
-	enc, _ := getter.Get(keyBlockBody(hash))
-	if len(enc) == 0 {
+	msg := new(corepb.BlockBody)
+	if err := getProtoMsg(getter, keyBlockBody(hash), msg); err != nil {
+		if err != persistent.ErrKeyNotFound {
+			log.Error("getHeader()", "hash", hash, "err", err)
+		}
 		return nil
 	}
-	pb := new(corepb.BlockBody)
-	if err := proto.Unmarshal(enc, pb); err != nil {
-		log.Crit("getBlockBody.Unmarshal failed", "hash", hash, "value", enc)
-	}
-	return pb
+	return msg
 }
 
 func putBlockBody(putter persistent.Putter, hash common.Hash, body *corepb.BlockBody) {
@@ -149,6 +150,19 @@ func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) {
 	if err := putter.Put(keyBlockNum2Hash(num), hash[:]); err != nil {
 		log.Crit("putBlockNum2Hash()", err)
 	}
+}
+
+func getProtoMsg(getter persistent.Getter, key []byte, message proto.Message) error {
+	enc, err := getter.Get(key)
+	if err != nil {
+		return err
+	}
+	if err := proto.Unmarshal(enc, message); err != nil {
+		log.Crit("getProtoMsg()",
+			"type", fmt.Sprintf("%T", message), "encoded", enc, "err", err)
+		return err
+	}
+	return nil
 }
 
 func putProtoMsg(putter persistent.Putter, key []byte, message proto.Message) {
