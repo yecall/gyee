@@ -195,9 +195,12 @@ func (b *Block) Write(putter persistent.Putter) error {
 	}
 	hashHeader := putHeader(putter, pbHeader)
 	// add block body to storage
-	if body := b.getBody(); body != nil {
-		putBlockBody(putter, hashHeader, body)
+	body := b.getBody()
+	if body == nil {
+		// write empty body if not provided
+		body = new(corepb.BlockBody)
 	}
+	putBlockBody(putter, hashHeader, body)
 	// block mapping
 	putBlockHash2Num(putter, hashHeader, b.header.Number)
 	putBlockNum2Hash(putter, b.header.Number, hashHeader)
