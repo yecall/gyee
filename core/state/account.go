@@ -120,7 +120,7 @@ func (acc *accountObj) setBytes(bytes []byte) error {
 		return err
 	}
 	value := new(big.Int)
-	value.SetBytes(bytes)
+	value.SetBytes(pbAcc.Balance)
 	if value.BitLen() > 256 {
 		return errors.New("balance out of range")
 	}

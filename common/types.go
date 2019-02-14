@@ -91,9 +91,9 @@ func BytesToAddress(b []byte) Address {
 // If s is larger than len(h), s will be cropped from the left.
 func HexToAddress(s string) Address { return BytesToAddress(FromHex(s)) }
 
-func (a Address) Hex() string {
-	return hex.EncodeToString(a[:])
-}
+func (a Address) Hex() string { return hex.EncodeToString(a[:]) }
+
+func (a Address) String() string { return a.Hex() }
 
 func (a *Address) SetBytes(b []byte) {
 	if len(b) > len(a) {
