@@ -102,7 +102,8 @@ func (a *Address) String() string {
 	return hex.EncodeToString(a.address)
 }
 
-func (a *Address) CommonAddress() (ret common.Address) {
+func (a *Address) CommonAddress() *common.Address {
+	ret := new(common.Address)
 	ret.SetBytes(a.address[AddressContentIndex:AddressChecksumIndex])
 	return ret
 }

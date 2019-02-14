@@ -26,6 +26,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
+	sha3 "github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
 
@@ -80,6 +82,18 @@ func (t *Transaction) Amount() *big.Int {
 	return t.amount
 }
 
+func (t *Transaction) Hash() *common.Hash {
+	if t.hash == nil {
+		enc, err := t.Encode()
+		if err != nil {
+			log.Crit("wrong tx hash")
+		}
+		t.hash = new(common.Hash)
+		t.hash.SetBytes(sha3.Sha3256(enc))
+	}
+	return t.hash
+}
+
 func (t *Transaction) ToProto() (*corepb.Transaction, error) {
 	pbTx := &corepb.Transaction{
 		ChainID: t.chainID,
@@ -117,11 +131,27 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 	return nil
 }
 
+func (t *Transaction) Encode() ([]byte, error) {
+	pb, err := t.ToProto()
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(pb)
+}
+
+func (t *Transaction) Decode(enc []byte) error {
+	pb := new(corepb.Transaction)
+	if err := proto.Unmarshal(enc, pb); err != nil {
+		return err
+	}
+	return t.FromProto(pb)
+}
+
 type Transactions []*Transaction
 
 func (txs Transactions) Write(putter persistent.Putter) error {
 	for _, tx := range txs {
-		key := append([]byte(KeyPrefixTx), tx.hash[:]...)
+		key := append([]byte(KeyPrefixTx), tx.Hash()[:]...)
 		pb, err := tx.ToProto()
 		if err != nil {
 			return err

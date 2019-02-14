@@ -112,6 +112,7 @@ func (at *accountTrie) setTrieErr(err error) {
 	}
 }
 
+// get account from mem cache or load from storage
 func (at *accountTrie) getAccount(address common.Address) *accountObj {
 	// try cached first
 	if cached := at.accounts[address]; cached != nil {

@@ -89,7 +89,7 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 		if !ok {
 			return nil, fmt.Errorf("failed to parse value %v", dist.Value)
 		}
-		account := accountTrie.GetAccount(addr.CommonAddress(), true)
+		account := accountTrie.GetAccount(*addr.CommonAddress(), true)
 		account.SetBalance(value)
 	}
 	consensusTrie, err := state.NewConsensusTrie(common.EmptyHash, stateDB)
@@ -100,15 +100,12 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 	h := &BlockHeader{
 		ChainID: uint32(g.ChainID),
 	}
-	if h.StateRoot, err = accountTrie.Commit(); err != nil {
-		return nil, err
-	}
-	if h.ConsensusRoot, err = consensusTrie.Commit(); err != nil {
-		return nil, err
-	}
 	b := NewBlock(h, nil)
 	b.stateTrie = accountTrie
 	b.consensusTrie = consensusTrie
+	if err := b.UpdateHeader(); err != nil {
+		return nil, err
+	}
 	return b, nil
 }
 

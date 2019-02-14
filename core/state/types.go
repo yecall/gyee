@@ -34,10 +34,14 @@ type Account interface {
 
 	// account transaction nonce start from 0
 	Nonce() uint64
+	SetNonce(uint64)
+	AddNonce(uint64)
 
 	// account balance in minimum unit
 	Balance() *big.Int
 	SetBalance(*big.Int)
+	AddBalance(*big.Int)
+	SubBalance(*big.Int)
 
 	// binary representation for account used as trie value
 	ToBytes() ([]byte, error)

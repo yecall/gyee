@@ -20,9 +20,11 @@ package core
 import (
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"testing"
 
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/persistent"
 )
 
@@ -55,6 +57,56 @@ func TestBlockChainStorageCheck(t *testing.T) {
 	if err != ErrBlockChainIDMismatch {
 		t.Fatalf("prepareStorage %v", err)
 	}
+}
+
+func TestBlockChainGrow(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "yee-chain-test")
+	if err != nil {
+		t.Fatalf("TempDir() %v", err)
+	}
+	storage, err := persistent.NewLevelStorage(tmpDir)
+	if err != nil {
+		t.Fatalf("newDB() %v", err)
+	}
+	chain, err := NewBlockChain(TestNetID, storage)
+	if err != nil {
+		t.Fatalf("newChain() %v", err)
+	}
+
+	lastBlock := chain.LastBlock()
+	trie := lastBlock.stateTrie
+	if trie == nil {
+		t.Fatalf("nil stateTrie")
+	}
+
+	account0, err := AddressParse("0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21")
+	if err != nil {
+		t.Fatalf("AddressParse %v", err)
+	}
+	addrFrom := account0.CommonAddress()
+	amount := big.NewInt(1)
+
+	nonce := uint64(0)
+	for i := 0; i < 100; i++ {
+		var txs Transactions
+		for j := 0; j < 100; j++ {
+			tx := new(Transaction)
+			tx.from = addrFrom
+			tx.to = new(common.Address)
+			tx.to[0] = byte(i)
+			tx.to[1] = byte(j)
+			tx.amount = amount
+			tx.nonce = nonce
+			nonce ++
+
+			txs = append(txs, tx)
+		}
+		lastBlock = chain.BuildNextBlock(lastBlock, txs)
+		if err := chain.AddBlock(lastBlock); err != nil {
+			t.Fatalf("AddBlock() %v", err)
+		}
+	}
+	fmt.Printf("end")
 }
 
 func benchAddBlock(b *testing.B, storage persistent.Storage, cnt int) {

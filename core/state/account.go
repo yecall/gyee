@@ -28,6 +28,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
+	"github.com/yeeco/gyee/log"
 )
 
 type accountObj struct {
@@ -59,6 +60,19 @@ func (acc *accountObj) Nonce() uint64 {
 	return acc.nonce
 }
 
+func (acc *accountObj) SetNonce(nonce uint64) {
+	acc.nonce = nonce
+	acc.dirty = true
+}
+
+func (acc *accountObj) AddNonce(value uint64) {
+	newNonce := acc.nonce + value
+	if newNonce < acc.nonce {
+		log.Crit("nonce overflow", "account", acc, "value", value)
+	}
+	acc.SetNonce(newNonce)
+}
+
 func (acc *accountObj) Balance() *big.Int {
 	return acc.balance
 }
@@ -72,6 +86,20 @@ func (acc *accountObj) SetBalance(value *big.Int) {
 	}
 	acc.balance.Set(value)
 	acc.dirty = true
+}
+
+func (acc *accountObj) AddBalance(value *big.Int) {
+	if value.Sign() < 0 {
+		panic(fmt.Errorf("negative balance %v", value))
+	}
+	acc.SetBalance(new(big.Int).Add(acc.balance, value))
+}
+
+func (acc *accountObj) SubBalance(value *big.Int) {
+	if value.Sign() < 0 {
+		panic(fmt.Errorf("negative balance %v", value))
+	}
+	acc.SetBalance(new(big.Int).Sub(acc.balance, value))
 }
 
 func (acc *accountObj) ToBytes() ([]byte, error) {

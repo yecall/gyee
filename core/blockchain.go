@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
@@ -122,13 +123,15 @@ func (bc *BlockChain) loadLastBlock() error {
 			"hash", lastHash)
 		return bc.Reset()
 	}
-	if _, err := state.NewAccountTrie(lastBlock.StateRoot(), bc.stateDB); err != nil {
+	trie, err := state.NewAccountTrie(lastBlock.StateRoot(), bc.stateDB)
+	if err != nil {
 		log.Warn("lastBlock state trie missing",
 			"number", lastBlock.Number(), "hash", lastBlock.Hash())
 		if err := bc.repair(&lastBlock); err != nil {
 			return err
 		}
 	}
+	lastBlock.stateTrie = trie
 
 	// lastBlock verified
 	bc.lastBlock.Store(lastBlock)
@@ -248,6 +251,67 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 	}
 }
 
+/*
+Build Next block from parent block, with transactions
+ */
+func (bc *BlockChain) BuildNextBlock(parent *Block, txs Transactions) *Block {
+	next := &Block{
+		header:       CopyHeader(parent.header),
+		body:         new(corepb.BlockBody),
+		transactions: make(Transactions, 0, len(txs)),
+	}
+	// next block number
+	next.header.Number ++
+
+	// state trie
+	stateTrie, err := state.NewAccountTrie(parent.StateRoot(), bc.stateDB)
+	if err != nil {
+		log.Crit("NewAccountTrie for next block", "error", err,
+			"parentHash", parent.Hash(), "trieRoot", parent.StateRoot())
+	}
+	next.stateTrie = stateTrie
+
+	// consensus trie
+	consensusTrie, err := state.NewConsensusTrie(parent.ConsensusRoot(), bc.stateDB)
+	if err != nil {
+		log.Crit("NewConsensusTrie for next block", "error", err,
+			"parentHash", parent.Hash(), "trieRoot", parent.ConsensusRoot())
+	}
+	next.consensusTrie = consensusTrie
+
+	// iterate txs for state changes
+	for _, tx := range txs {
+		next.transactions = append(next.transactions, tx)
+		accountFrom := stateTrie.GetAccount(*tx.from, false)
+		if accountFrom == nil {
+			// TODO: mark tx failure
+			continue
+		}
+		if accountFrom.Nonce() != tx.nonce {
+			// TODO: mark tx failure
+			continue
+		}
+		if accountFrom.Balance().Cmp(tx.amount) < 0 {
+			// TODO: mark tx failure
+			continue
+		}
+		accountTo := stateTrie.GetAccount(*tx.to, true)
+		// checked, update balance nonce
+		accountFrom.AddNonce(1)
+		accountFrom.SubBalance(tx.amount)
+		accountTo.AddBalance(tx.amount)
+	}
+
+	if err := next.UpdateHeader(); err != nil {
+		log.Crit("UpdateHeader for next block failed", "error", err)
+	}
+	return next
+}
+
+func (bc *BlockChain) LastBlock() *Block {
+	return bc.lastBlock.Load().(*Block)
+}
+
 func (bc *BlockChain) loop() {
 	log.Info("BlockChain loop...")
 	bc.wg.Add(1)
@@ -263,7 +327,7 @@ func (bc *BlockChain) loop() {
 }
 
 func (bc *BlockChain) CurrentBlockHeight() uint64 {
-	return 0
+	return bc.LastBlock().Number()
 }
 
 func (bc *BlockChain) GetValidators() map[string]uint {

@@ -30,6 +30,7 @@ import (
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
 
@@ -120,9 +121,10 @@ func (b *Block) ChainID() uint32         { return b.header.ChainID }
 func (b *Block) Number() uint64          { return b.header.Number }
 func (b *Block) ParentHash() common.Hash { return b.header.ParentHash }
 
-func (b *Block) StateRoot() common.Hash    { return b.header.StateRoot }
-func (b *Block) TxsRoot() common.Hash      { return b.header.TxsRoot }
-func (b *Block) ReceiptsRoot() common.Hash { return b.header.ReceiptsRoot }
+func (b *Block) ConsensusRoot() common.Hash { return b.header.ConsensusRoot }
+func (b *Block) StateRoot() common.Hash     { return b.header.StateRoot }
+func (b *Block) TxsRoot() common.Hash       { return b.header.TxsRoot }
+func (b *Block) ReceiptsRoot() common.Hash  { return b.header.ReceiptsRoot }
 
 func (b *Block) Time() uint64  { return b.header.Time }
 func (b *Block) Extra() []byte { return b.header.Extra }
@@ -142,7 +144,22 @@ func (b *Block) getBody() *corepb.BlockBody {
 	return b.body
 }
 
-func (b *Block) Seal() {
+/*
+Update contents of header to match with block body.
+State Trie should be already operated to match with txs.
+ */
+func (b *Block) UpdateHeader() error {
+	if b.header == nil {
+		log.Crit("must have header with essential data when sealing", "block", b)
+	}
+	var err error
+	if b.header.StateRoot, err = b.stateTrie.Commit(); err != nil {
+		return err
+	}
+	if b.header.ConsensusRoot, err = b.consensusTrie.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *Block) ToBytes() ([]byte, error) {
