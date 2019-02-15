@@ -40,6 +40,7 @@ type Transaction struct {
 	// caches
 	from *common.Address
 	hash *common.Hash
+	raw  []byte
 }
 
 //最小transaction字节数？
@@ -148,6 +149,10 @@ func (t *Transaction) Decode(enc []byte) error {
 }
 
 type Transactions []*Transaction
+
+func (txs Transactions) Len() int { return len(txs) }
+
+func (txs Transactions) GetEncoded(index int) []byte { return txs[index].raw }
 
 func (txs Transactions) Write(putter persistent.Putter) error {
 	for _, tx := range txs {

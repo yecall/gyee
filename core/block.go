@@ -34,6 +34,10 @@ import (
 	"github.com/yeeco/gyee/persistent"
 )
 
+var (
+	EmptyRootHash = DeriveHash(Transactions{})
+)
+
 // Block Header of yee chain
 //
 // Encoded with RLP into byte[] for hashing
@@ -159,6 +163,7 @@ func (b *Block) UpdateHeader() error {
 	if b.header.ConsensusRoot, err = b.consensusTrie.Commit(); err != nil {
 		return err
 	}
+	b.header.TxsRoot = DeriveHash(b.transactions)
 	return nil
 }
 

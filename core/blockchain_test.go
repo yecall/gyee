@@ -107,6 +107,7 @@ func TestBlockChainGrow(t *testing.T) {
 		}
 	}
 	fmt.Printf("end")
+	chain.Stop()
 }
 
 func benchAddBlock(b *testing.B, storage persistent.Storage, cnt int) {
