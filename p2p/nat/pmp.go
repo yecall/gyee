@@ -16,3 +16,30 @@
 // along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
 
 package nat
+
+
+import (
+	"time"
+	"net"
+	"github.com/jackpal/go-nat-pmp"
+)
+
+
+type pmpCtrlBlock struct {
+	gateWay	net.IP				// gateway ip address
+	client	*natpmp.Client		// client to interactive with the gateway
+}
+
+
+
+func (pmp *pmpCtrlBlock)makeMap(proto string, locPort int, pubPort int, durKeep time.Duration) NatEno {
+	return NatEnoNone
+}
+
+func (pmp *pmpCtrlBlock)removeMap(proto string, locPort int, pubPort int) NatEno {
+	return NatEnoNone
+}
+
+func (pmp *pmpCtrlBlock)getPublicIpAddr() (net.IP, NatEno) {
+	return nil, NatEnoNone
+}

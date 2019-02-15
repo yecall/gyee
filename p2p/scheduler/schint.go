@@ -199,4 +199,7 @@ const (
 	DhtRutMgrName		= "DhtRutMgr"		// dht route manager
 	DhtConMgrName		= "DhtConMgr"		// dht connection manager
 	DhtDsMgrName		= "DhtDsMgr"		// dht data store manager
+
+	// NAT
+	NatMgrName			= "NatMgr"			// nat manager
 )
