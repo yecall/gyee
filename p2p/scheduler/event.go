@@ -85,9 +85,7 @@ const (
 	EvShellSubnetUpdateReq		= EvShellBase + 7
 )
 
-//
 // EvShellPeerActiveInd
-//
 type MsgShellPeerActiveInd struct {
 	TxChan		interface{}			// channel for packages sending
 	RxChan		interface{}			// channel for packages received
@@ -95,9 +93,7 @@ type MsgShellPeerActiveInd struct {
 	PeerInst	interface{}			// peer instance
 }
 
-//
 // EvShellPeerCloseCfm
-//
 type MsgShellPeerCloseCfm struct {
 	Result	int						// result
 	Dir		int						// direction
@@ -105,9 +101,7 @@ type MsgShellPeerCloseCfm struct {
 	PeerId 	config.NodeID			// target node
 }
 
-//
 // EvShellPeerCloseInd
-//
 type MsgShellPeerCloseInd struct {
 	Cause	int						// tell why it's closed
 	Dir		int						// direction
@@ -115,9 +109,7 @@ type MsgShellPeerCloseInd struct {
 	PeerId 	config.NodeID			// target node
 }
 
-//
 // EvShellPeerAskToCloseInd
-//
 type MsgShellPeerAskToCloseInd struct {
 	Snid	config.SubNetworkID		// sub network identity
 	PeerId 	config.NodeID			// target node
@@ -125,9 +117,7 @@ type MsgShellPeerAskToCloseInd struct {
 	Why		interface{}				// tell why it's closed
 }
 
-//
 // EvShellReconfigReq
-//
 type SingleSubnetDescriptor struct {
 	SubNetKey			ecdsa.PrivateKey							// key for sub-node
 	SubNetNode			config.Node									// sub-node identity
@@ -143,9 +133,7 @@ type MsgShellReconfigReq struct {
 	MaskBits	int							// mask bits for subnet identity
 }
 
-//
 // EvShellBroadcastReq, see tcpmsg.proto please.
-//
 const (
 	MSBR_MT_TX		= 3					// tx type
 	MSBR_MT_EV		= 4					// event type
@@ -180,18 +168,14 @@ const (
 	EvTabRefreshRsp		= EvTabMgrBase + 2
 )
 
-//
 // EvTabRefreshReq
-//
 type MsgTabRefreshReq struct {
 	Snid	config.SubNetworkID	// sub network identity
 	Include	[]*config.NodeID	// wanted, it can be an advice for discover
 	Exclude	[]*config.NodeID	// filter out from response if any
 }
 
-//
 // EvTabRefreshRsp
-//
 type MsgTabRefreshRsp struct {
 	Snid	config.SubNetworkID	// sub network identity
 	Nodes	[]*config.Node		// nodes found
@@ -229,9 +213,7 @@ type MsgDcvFindNodeRsp struct {
 	Nodes	[]*config.Node		// nodes found
 }
 
-//
 // EvDcvReconfigReq
-//
 type MsgDcvReconfigReq struct {
 	DelList	map[config.SubNetworkID]interface{}	// sub networks to be deleted
 	AddList	map[config.SubNetworkID]interface{}	// sub networks to be added
@@ -257,41 +239,31 @@ const (
 	EvNblCleanMapReq		= EvNblUdpBase	+ 8
 )
 
-//
 // EvNblFindNodeRsp message
-//
 type NblFindNodeRsp struct {
 	Result		int					// result, 0: ok, others: errno
 	FindNode	*um.FindNode		// FindNode message from table task
 	Neighbors	*um.Neighbors		// Neighbors message from peer node
 }
 
-//
 // EvNblPingpongrRsp message
-//
 type NblPingRsp struct {
 	Result		int					// result, 0: ok, others: errno
 	Ping		*um.Ping			// Ping message from table task
 	Pong		*um.Pong			// Pong message from peer
 }
 
-//
 // EvNblPingedInd
-//
 type NblPingedInd struct {
 	Ping		*um.Ping			// ping from remote node
 }
 
-//
 // EvNblPongedInd
-//
 type NblPongedInd struct {
 	Pong		*um.Pong			// pong from remote node
 }
 
-//
 // EvNblQueriedInd
-//
 type NblQueriedInd struct {
 	FindNode	*um.FindNode		// findnode from remote node
 }
@@ -307,9 +279,7 @@ const (
 	EvNblDataReq		= EvNblListennerBase + 4
 )
 
-//
 // EvNblDataReq
-//
 type NblDataReq struct {
 	Payload	[]byte					// payload
 	TgtAddr	*net.UDPAddr			// target address
@@ -322,7 +292,6 @@ const (
 	EvPeerMgrBase = 1600
 )
 
-
 //
 // Peer listerner event
 //
@@ -333,9 +302,7 @@ const (
 	EvPeLsnStopReq			= EvPeerLsnBase + 3
 )
 
-//
 // Peer connection establishment event
-//
 const (
 	PePingpongTimerId		= 0
 	PeDcvFindNodeTimerId	= 1
@@ -366,9 +333,7 @@ const (
 	EvPeRxDataInd			= EvPeerEstBase + 14
 )
 
-//
 // EvPeCloseReq
-//
 type MsgPeCloseReq struct {
 	Ptn		interface{}				// pointer to peer task instance node
 	Snid	config.SubNetworkID		// sub network identity
@@ -377,9 +342,7 @@ type MsgPeCloseReq struct {
 	Why		interface{}				// cause
 }
 
-//
 // EvPeTxDataReq
-//
 type MsgPeDataReq struct {
 	SubNetId	config.SubNetworkID	// sub network identity
 	PeerId		config.NodeID		// peer node identity
@@ -406,66 +369,50 @@ const (
 	EvDhtBlindConnectRsp	= EvDhtMgrBase + 13
 )
 
-//
 // EvDhtMgrGetProviderReq
-//
 type MsgDhtMgrGetProviderReq struct {
 	Key			[]byte				// key wanted
 }
 
-//
 // EvDhtMgrPutProviderRsp
-//
 type MsgDhtMgrGetProviderRsp struct {
 	Eno			int					// result code
 	Key			[]byte				// key wanted
 	Prds		[]*config.Node		// providers
 }
 
-//
 // EvDhtMgrPutValueReq
-//
 type MsgDhtMgrPutValueReq struct {
 	Key			[]byte				// key wanted
 	Val			[]byte				// value
 	KeepTime	time.Duration		// duration for the value to be kept
 }
 
-//
 // EvDhtMgrPutValueRsp
-//
 type MsgDhtMgrPutValueRsp struct {
 	Eno			int					// result code
 	Key			[]byte				// key wanted
 	Peers		[]*config.Node		// extren peers where the value put beside local
 }
 
-//
 // EvDhtMgrGetValueReq
-//
 type MsgDhtMgrGetValueReq struct {
 	Key			[]byte				// key wanted
 }
 
-//
 // EvDhtMgrGetValueRsp
-//
 type MsgDhtMgrGetValueRsp struct {
 	Eno			int					// result code
 	Key			[]byte				// key wanted
 	Val			[]byte				// value
 }
 
-//
 // EvDhtBlindConnectReq
-//
 type MsgDhtBlindConnectReq struct {
 	Peer	*config.Node			// peer to be connected
 }
 
-//
 // EvDhtBlindConnectRsp
-//
 type MsgDhtBlindConnectRsp struct {
 	Eno		int						// result code
 	Peer	*config.Node			// peer to be connected
@@ -486,16 +433,12 @@ const (
 	EvDhtLsnMgrStatusInd	= EvDhtLsnMgrBase + 7
 )
 
-//
 // EvDhtLsnMgrAcceptInd
-//
 type MsgDhtLsnMgrAcceptInd struct {
 	Con			net.Conn			// connection accepted
 }
 
-//
 // EvDhtLsnMgrStatusInd
-//
 type MsgDhtLsnMgrStatusInd struct {
 	Status		int					// current listener manager status
 }
@@ -513,27 +456,21 @@ const (
 	EvDhtConMgrCloseRsp		= EvDhtConMgrBase + 6
 )
 
-//
 // EvDhtConMgrConnectReq
-//
 type MsgDhtConMgrConnectReq struct {
 	Task		interface{}				// pointer to task node
 	Peer		*config.Node			// peer to be connected
 	IsBlind		bool					// is blind
 }
 
-//
 // EvDhtConMgrConnectRsp
-//
 type MsgDhtConMgrConnectRsp struct {
 	Eno			int						// result code
 	Peer		*config.Node			// peer to be connected
 	Dir			int						// direction
 }
 
-//
 // EvDhtConMgrSendReq
-//
 type MsgDhtConMgrSendReq struct {
 	Task		interface{}				// pointer to task node
 	WaitRsp		bool					// wait response from peer
@@ -545,27 +482,21 @@ type MsgDhtConMgrSendReq struct {
 	Data		interface{}				// data to be sent
 }
 
-//
 // EvDhtConMgrSendCfm
-//
 type MsgDhtConMgrSendCfm struct {
 	Eno			int						// result
 	CfmInfo 	interface{}				// confirm owner with this
 	Peer		*config.Node			// peer where data sent to
 }
 
-//
 // EvDhtConMgrCloseReq
-//
 type MsgDhtConMgrCloseReq struct {
 	Task		string				// owner task name
 	Peer		*config.Node		// peer to be connected
 	Dir			int					// instance direction
 }
 
-//
 // EvDhtConMgrCloseRsp
-//
 type MsgDhtConMgrCloseRsp struct {
 	Eno			int						// result code
 	Peer		*config.Node			// peer to be connected
@@ -573,9 +504,7 @@ type MsgDhtConMgrCloseRsp struct {
 }
 
 
-//
 // DHT connection instance event
-//
 const DhtConInstTxTimerId = 0
 const (
 	EvDhtConInstBase			= 2200
@@ -592,16 +521,12 @@ const (
 	EvDhtConInstTxInd			= EvDhtConInstBase + 10
 )
 
-//
 // EvDhtConInstHandshakeReq
-//
 type MsgDhtConInstHandshakeReq struct {
 	DurHs		time.Duration			// timeout duration
 }
 
-//
 // EvDhtConInstHandshakeRsp
-//
 type MsgDhtConInstHandshakeRsp struct {
 	Eno			int						// result code
 	Inst		interface{}				// pointer connection instance
@@ -611,9 +536,7 @@ type MsgDhtConInstHandshakeRsp struct {
 	Dur			time.Duration			// duration for handshake
 }
 
-//
 // EvDhtConInstTxDataReq
-//
 type MsgDhtConInstTxDataReq struct {
 	Task		interface{}				// owner task node pointer
 	WaitRsp		bool					// wait response from peer
@@ -622,50 +545,38 @@ type MsgDhtConInstTxDataReq struct {
 	Payload		interface{}				// payload
 }
 
-//
 // EvDhtConInstCloseReq
-//
 type MsgDhtConInstCloseReq struct {
 	Peer		*config.NodeID			// peer identity
 	Why			int						// why to close
 }
 
-//
 // EvDhtConInstCloseRsp
-//
 type MsgDhtConInstCloseRsp struct {
 	Peer		*config.NodeID			// peer identity
 	Dir			int						// instance direction
 }
 
-//
 // EvDhtConInstStatusInd
-//
 type MsgDhtConInstStatusInd struct {
 	Peer		*config.NodeID			// peer identity
 	Dir			int						// instance direction
 	Status		int						// status
 }
 
-//
 // EvDhtConInstGetProviderRsp
-//
 type MsgDhtConInstGetProviderRsp struct {
 	ConInst		interface{}			// connection instance who sent this meeage
 	Msg			interface{}			// the message pointer
 }
 
-//
 // EvDhtConInstGetValRsp
-//
 type MsgDhtConInstGetValRsp struct {
 	ConInst		interface{}			// connection instance who sent this meeage
 	Msg			interface{}			// the message pointer
 }
 
-//
 // EvDhtConInstTxInd
-//
 type MsgDhtConInstTxInd struct {
 	Eno			int					// result code
 	WaitMid		int					// wait message identity
@@ -688,9 +599,7 @@ const (
 	EvDhtQryMgrQueryResultInd	= EvDhtQryMgrBase + 5
 )
 
-//
 // EvDhtQryMgrQueryStartReq
-//
 type MsgDhtQryMgrQueryStartReq struct {
 	Target		config.DsKey			// can be config.NodeID or [config.DhtKeyLength]byte as a key
 	Msg			interface{}				// original request which results this query
@@ -698,32 +607,24 @@ type MsgDhtQryMgrQueryStartReq struct {
 	Seq			int64					// sequence number
 }
 
-//
 // EvDhtQryMgrQueryStartRsp
-//
 type MsgDhtQryMgrQueryStartRsp struct {
 	Target		config.DsKey			// target node identity
 	Eno			int						// result code
 }
 
-//
 // EvDhtQryMgrQueryStopReq
-//
 type MsgDhtQryMgrQueryStopReq struct {
 	Target		config.DsKey			// target node identity
 }
 
-//
 // EvDhtQryMgrQueryStopRsp
-//
 type MsgDhtQryMgrQueryStopRsp struct {
 	Target		config.DsKey			// target node identity
 	Eno			int						// result code
 }
 
-//
 // EvDhtQryMgrQueryResultInd
-//
 type MsgDhtQryMgrQueryResultInd struct {
 	Eno			int						// result code. notice: when timeout, closests reported
 	ForWhat		int						// what's the original query for: find-node; get-value; get-provider; put-value; put provider; ...
@@ -746,27 +647,21 @@ const (
 	EvDhtQryInstProtoMsgInd		= EvDhtQryInstBase + 6
 )
 
-//
 // EvDhtQryInstStopReq
-//
 type MsgDhtQryInstStopReq struct {
 	Target		config.DsKey		// target to be looked up
 	Peer		config.NodeID		// peer to be queried
 	Eno			int					// why stop
 }
 
-//
 // EvDhtQryInstStatusInd
-//
 type MsgDhtQryInstStatusInd struct {
 	Target		config.DsKey		// target node identity
 	Peer		config.NodeID		// peer to be queried
 	Status		int					// status
 }
 
-//
 // EvDhtQryInstResultInd
-//
 type Provider struct {
 	Key			[]byte				// key
 	Nodes		[]*config.Node		// node
@@ -784,17 +679,13 @@ type MsgDhtQryInstResultInd struct {
 	Pcs			[]int				// peer connection status, see dht.conMgrPeerConnStat pls
 }
 
-//
 // EvDhtQryInstStopRsp
-//
 type MsgDhtQryInstStopRsp struct {
 	To			config.Node			// whom is queried by the instance
 	Target		config.DsKey		// target node identity
 }
 
-//
 // EvDhtQryInstProtoMsgInd
-//
 type MsgDhtQryInstProtoMsgInd struct {
 	From		*config.Node		// where data is sent from
 	Msg			interface{}			// dht message pointer
@@ -819,9 +710,7 @@ const (
 	EvDhtRutRefreshReq			= EvDhtRutMgrBase + 9
 )
 
-//
 // EvDhtRutMgrNearestReq
-//
 type MsgDhtRutMgrNearestReq struct {
 	Target		config.DsKey		// could be config.NodeID or [config.DhtKeyLength]byte as of key
 	Max			int					// max items returned could be
@@ -832,9 +721,7 @@ type MsgDhtRutMgrNearestReq struct {
 	Filter		interface{}			// filter function
 }
 
-//
 // EvDhtRutMgrNearestRsp
-//
 type MsgDhtRutMgrNearestRsp struct {
 	Eno			int					// result code
 	ForWhat		int					// what for
@@ -845,9 +732,7 @@ type MsgDhtRutMgrNearestRsp struct {
 	Msg			interface{}			// backup for original request
 }
 
-//
 // EvDhtRutMgrUpdateReq
-//
 type MsgDhtRutMgrUpdateReq struct {
 	Why			int					// why to request to upadte
 	Eno			int					// result code
@@ -855,41 +740,31 @@ type MsgDhtRutMgrUpdateReq struct {
 	Duras		[]time.Duration		// durations/latencies about seen nodes
 }
 
-//
 // EvDhtRutMgrNotificationInd
-//
 type MsgDhtRutMgrNotificationInd struct {
 	Target		config.DsKey		// target peer identity
 	Peers		interface{}			// nearest nodes table
 	Dists		interface{}			// distances of nearest nodes
 }
 
-//
 // EvDhtRutPeerRemovedInd
-//
 type MsgDhtRutPeerRemovedInd struct {
 	Peer		config.NodeID		// target peer identity
 }
 
-//
 // EvDhtRutMgrStopNotifyReq
-//
 type MsgDhtRutMgrStopNofiyReq struct {
 	Task		interface{}			// owner task of the notifee registered
 	Target		config.DsKey		// target peer identity
 }
 
-//
 // EvDhtRutPingInd
-//
 type MsgDhtRutPingInd struct {
 	ConInst		interface{}			// connection instance who sent this meeage
 	Msg			interface{}			// the message pointer
 }
 
-//
 // EvDhtRutPongInd
-//
 type MsgDhtRutPongInd struct {
 	ConInst		interface{}			// connection instance who sent this meeage
 	Msg			interface{}			// the message pointer
@@ -908,42 +783,32 @@ const (
 	EvDhtPrdMgrGetProviderReq	= EvDhtPrdMgrBase + 4
 )
 
-//
 // EvDhtPrdMgrAddProviderReq
-//
 type MsgDhtPrdMgrAddProviderReq struct {
 	Key			[]byte			// key of what is provided
 	Prd			config.Node		// provider node
 }
 
-//
 // EvDhtPrdMgrAddProviderRsp
-//
 type MsgDhtPrdMgrAddProviderRsp struct {
 	Key			[]byte			// key of what is provided
 	Eno			int				// result code
 	Peers		[]*config.Node	// peers list, if target got, it always be the first one
 }
 
-//
 // EvDhtPrdMgrPutProviderReq
-//
 type MsgDhtPrdMgrPutProviderReq struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
 }
 
-//
 // EvDhtPrdMgrPutProviderRsp
-//
 type MsgDhtPrdMgrPutProviderRsp struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
 }
 
-//
 // EvDhtPrdMgrGetProviderReq
-//
 type MsgDhtPrdMgrGetProviderReq struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
@@ -961,9 +826,7 @@ const (
 	EvDhtDsMgrGetValReq			= EvDhtDsMgrBase + 3
 )
 
-//
 // EvDhtDsMgrAddValReq
-//
 const Keep4Ever = time.Duration(-1)
 type MsgDhtDsMgrAddValReq struct {
 	Key			[]byte			// key
@@ -971,17 +834,13 @@ type MsgDhtDsMgrAddValReq struct {
 	KT			time.Duration	// duration to keep this [key, val] pair
 }
 
-//
 // EvDhtDsMgrPutValReq
-//
 type MsgDhtDsMgrPutValReq struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
 }
 
-//
 // EvDhtDsMgrGetValReq
-//
 type MsgDhtDsMgrGetValReq struct {
 	ConInst		interface{}		// connection instance who sent this meeage
 	Msg			interface{}		// the message pointer
@@ -1001,4 +860,75 @@ const (
 type MsgDhtShEventInd struct {
 	Evt		int					// event indication type
 	Msg		interface{}			// event body pointer
+}
+
+
+//
+// NAT manager event
+//
+const NatMgrRefreshTimerId	= 0
+const (
+	EvNatMgrBase				= 2900
+	EvNatRefreshTimer			= EvTimerBase + NatMgrRefreshTimerId
+	EvNatMgrDiscoverReq			= EvNatMgrBase + 1
+	EvNatMgrDiscoverRsp			= EvNatMgrBase + 2
+	EvNatMgrMakeMapReq			= EvNatMgrBase + 3
+	EvNatMgrMakeMapRsp			= EvNatMgrBase + 4
+	EvNatMgrRemoveMapReq		= EvNatMgrBase + 5
+	EvNatMgrGetPublicAddrReq	= EvNatMgrBase + 6
+	EvNatMgrGetPublicAddrRsp	= EvNatMgrBase + 7
+	EvNatMgrPubAddrChangeInd	= EvNatMgrBase + 8
+)
+
+// EvNatMgrDiscoverReq
+type MsgNatMgrDiscoverReq struct {
+	NatType		string			// "pmp", "upnp", "none"
+	GwIp		*net.IP			// gateway ip address when "pmp" specified
+}
+
+// EvNatMgrDiscoverRsp
+type MsgNatMgrDiscoverRsp struct {
+	Result		int				// result
+}
+
+// EvNatMgrMakeMapReq
+type MsgNatMgrMakeMapReq struct {
+	Proto		string			// the prototcol, "tcp" or "udp"
+	FromPort	int				// local port number be mapped
+	ToPort		int				// public port number mapped to
+	DurKeep		time.Duration	// duration for map to be kept
+	DurRefresh	time.Duration	// interval duration to refresh the map
+}
+
+// EvNatMgrMakeMapRsp
+type MsgNatMgrMakeMapRsp struct {
+	Result		int				// result
+	PubIp		net.IP			// public address
+	PubPort		int				// public port number
+}
+
+// EvNatMgrRemoveMapReq
+type MsgNatMgrRemoveMapReq struct {
+	Proto		string			// the prototcol, "tcp" or "udp"
+	FromPort	int				// local port number be mapped
+}
+
+// EvNatMgrGetPublicAddrReq
+type MsgNatMgrGetPublicAddrReq struct {
+	Proto		string			// the prototcol, "tcp" or "udp"
+	FromPort	int				// local port number be mapped
+}
+
+// EvNatMgrGetPublicAddrRsp
+type MsgNatMgrGetPublicAddrRsp struct {
+	PubIp		net.IP			// public address
+	PubPort		int				// public port number
+}
+
+// EvNatMgrPubAddrChangeInd
+type MsgNatMgrPubAddrChangeInd struct {
+	Proto		string			// the prototcol, "tcp" or "udp"
+	FromPort	int				// local port number be mapped
+	PubIp		net.IP			// public address
+	PubPort		int				// public port number
 }
