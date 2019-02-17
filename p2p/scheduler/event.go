@@ -883,7 +883,7 @@ const (
 // EvNatMgrDiscoverReq
 type MsgNatMgrDiscoverReq struct {
 	NatType		string			// "pmp", "upnp", "none"
-	GwIp		*net.IP			// gateway ip address when "pmp" specified
+	GwIp		net.IP			// gateway ip address when "pmp" specified
 }
 
 // EvNatMgrDiscoverRsp
@@ -903,6 +903,7 @@ type MsgNatMgrMakeMapReq struct {
 // EvNatMgrMakeMapRsp
 type MsgNatMgrMakeMapRsp struct {
 	Result		int				// result
+	Status		int				// map status
 	PubIp		net.IP			// public address
 	PubPort		int				// public port number
 }
