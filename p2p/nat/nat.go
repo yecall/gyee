@@ -226,6 +226,9 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 		inst NatMapInstance
 	)
 
+	var ip net.IP
+	var s NatEno
+
 	sender := natMgr.sdl.SchGetSender(msg)
 	mmr, _ := msg.Body.(*sch.MsgNatMgrMakeMapReq)
 	if eno := natMgr.checkMakeMapReq(mmr); eno != NatEnoNone {
@@ -258,8 +261,11 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 		goto _rsp2sender
 
 	}
-	inst.pubIp, inst.status = natMgr.nat.getPublicIpAddr()
+	ip, s = natMgr.nat.getPublicIpAddr()
 	natMgr.instTab[id] = &inst
+	inst.pubIp = append(inst.pubIp[0:], ip...)
+	inst.status = s
+
 	pubIp = append(pubIp[0:], inst.pubIp...)
 	pubPort = inst.pubPort
 	status = inst.status
@@ -278,11 +284,96 @@ _rsp2sender:
 }
 
 func (natMgr *NatManager)removeMapReq(msg *sch.SchMessage) sch.SchErrno {
-	return sch.SchEnoNone
+	eno := NatEnoUnknown
+	rmr, _ := msg.Body.(*sch.MsgNatMgrRemoveMapReq)
+	sender := natMgr.sdl.SchGetSender(msg)
+
+	id := NatMapInstID {
+		proto: rmr.Proto,
+		fromPort: rmr.FromPort,
+	}
+	inst, ok := natMgr.instTab[id]
+	if !ok {
+		eno = NatEnoMismatched
+		goto _rsp2sender
+	}
+
+	if natMgr.cfg.natType != NATT_NONE {
+		if inst.status == NatEnoNone {
+			if eno = natMgr.nat.removeMap(inst.id.proto, inst.id.fromPort, inst.pubPort); eno != NatEnoNone {
+				natLog.Debug("removeMapReq: removeMap failed, error: %s", eno.Error())
+				goto _rsp2sender
+			}
+		}
+		if inst.tidRefresh != sch.SchInvalidTid {
+			if schEno := natMgr.sdl.SchKillTimer(natMgr.ptnMe, inst.tidRefresh); schEno != sch.SchEnoNone {
+				natLog.Debug("removeMapReq: SchKillTimer failed, eno: %d", schEno)
+				eno = NatEnoScheduler
+				goto _rsp2sender
+			}
+		}
+	}
+
+	delete(natMgr.instTab, id)
+	eno = NatEnoNone
+
+_rsp2sender:
+	rsp := sch.MsgNatMgrRemoveMapRsp{
+		Result: eno.Errno(),
+	}
+	schMsg := sch.SchMessage{}
+	natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, sender, sch.EvNatMgrRemoveMapRsp, &rsp)
+	return natMgr.sdl.SchSendMessage(&schMsg)
 }
 
 func (natMgr *NatManager)getPubAddrReq(msg *sch.SchMessage) sch.SchErrno {
-	return sch.SchEnoNone
+	if natMgr.cfg.natType == NATT_NONE {
+		natLog.Debug("getPubAddrReq: type mismatche, current: %s", natMgr.cfg.natType)
+		return sch.SchEnoUserTask
+	}
+
+	var (
+		eno = NatEnoUnknown
+		status = NatEnoUnknown
+		pubIp = net.IPv4zero
+		pubPort = -1
+		id NatMapInstID
+		inst *NatMapInstance
+	)
+	var ip net.IP
+	var s NatEno
+
+	gar, _ := msg.Body.(*sch.MsgNatMgrGetPublicAddrReq)
+	sender := natMgr.sdl.SchGetSender(msg)
+	id = NatMapInstID {
+		proto: gar.Proto,
+		fromPort: gar.FromPort,
+	}
+	_, ok := natMgr.instTab[id]
+	if !ok {
+		eno = NatEnoMismatched
+		goto _rsp2sender
+	}
+
+	inst = natMgr.instTab[id]
+	ip, s = natMgr.nat.getPublicIpAddr()
+	inst.pubIp = append(inst.pubIp[0:], ip...)
+	inst.status = s
+
+	eno = NatEnoNone
+	pubIp = append(pubIp[0:], inst.pubIp...)
+	pubPort = inst.pubPort
+
+_rsp2sender:
+	rsp := sch.MsgNatMgrGetPublicAddrRsp{
+		Result: eno.Errno(),
+		Status: status.Errno(),
+		PubIp: pubIp,
+		PubPort: pubPort,
+	}
+	schMsg := sch.SchMessage{}
+	natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, sender, sch.EvNatMgrGetPublicAddrRsp, &rsp)
+	return natMgr.sdl.SchSendMessage(&schMsg)
 }
 
 func (natMgr *NatManager)getConfig() NatEno {
