@@ -60,6 +60,7 @@ type Core struct {
 	tetrisOutputCh chan tetris.ConsensusOutput
 	storage        persistent.Storage
 	blockChain     *BlockChain
+	blockPool      *BlockPool
 	yvm            yvm.YVM
 	subscriber     *p2p.Subscriber
 
@@ -89,6 +90,10 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
+	core.blockPool, err = NewBlockPool(core)
+	if err != nil {
+		return nil, err
+	}
 
 	return core, nil
 }
@@ -101,6 +106,8 @@ func (c *Core) Start() error {
 		return nil
 	}
 	log.Info("Core Start...")
+
+	c.blockPool.Start()
 
 	//如果开启挖矿
 	if c.config.Chain.Mine {
@@ -137,6 +144,9 @@ func (c *Core) Stop() error {
 
 	// unsubscribe from p2p net
 	c.node.P2pService().UnRegister(c.subscriber)
+
+	// stop block pool and wait
+	c.blockPool.Stop()
 
 	// stop chain also wait for cache flush
 	c.blockChain.Stop()

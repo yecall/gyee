@@ -30,10 +30,20 @@
 package core
 
 import (
+	"errors"
 	"sync"
 
+	"github.com/gogo/protobuf/proto"
+	"github.com/yeeco/gyee/core/pb"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
-	"github.com/yeeco/gyee/utils/logging"
+)
+
+const TooFarBlocks = 120
+
+var (
+	ErrBlockChainID        = errors.New("block chainID mismatch")
+	ErrBlockTooFarForChain = errors.New("block too far for chain head")
 )
 
 type BlockPool struct {
@@ -46,7 +56,7 @@ type BlockPool struct {
 }
 
 func NewBlockPool(core *Core) (*BlockPool, error) {
-	logging.Logger.Info("Create New BlockPool")
+	log.Info("Create New BlockPool")
 	bp := &BlockPool{
 		core:   core,
 		quitCh: make(chan struct{}),
@@ -57,11 +67,10 @@ func NewBlockPool(core *Core) (*BlockPool, error) {
 func (bp *BlockPool) Start() {
 	bp.lock.Lock()
 	defer bp.lock.Unlock()
-	logging.Logger.Info("BlockPool Start...")
+	log.Info("BlockPool Start...")
 
 	bp.subscriber = p2p.NewSubscriber(bp, make(chan p2p.Message), p2p.MessageTypeBlock)
-	p2p := bp.core.node.P2pService()
-	p2p.Register(bp.subscriber)
+	bp.core.node.P2pService().Register(bp.subscriber)
 
 	go bp.loop()
 }
@@ -69,7 +78,7 @@ func (bp *BlockPool) Start() {
 func (bp *BlockPool) Stop() {
 	bp.lock.Lock()
 	defer bp.lock.Unlock()
-	logging.Logger.Info("BlockPool Stop...")
+	log.Info("BlockPool Stop...")
 
 	p2p := bp.core.node.P2pService()
 	p2p.UnRegister(bp.subscriber)
@@ -79,17 +88,88 @@ func (bp *BlockPool) Stop() {
 }
 
 func (bp *BlockPool) loop() {
-	logging.Logger.Info("BlockPool loop...")
+	log.Info("BlockPool loop...")
 	bp.wg.Add(1)
 	defer bp.wg.Done()
 
 	for {
 		select {
 		case <-bp.quitCh:
-			logging.Logger.Info("BlockPool loop end.")
+			log.Info("BlockPool loop end.")
 			return
 		case msg := <-bp.subscriber.MsgChan:
-			logging.Logger.Info("block pool receive ", msg.MsgType, " ", msg.From)
+			log.Info("block pool receive ", msg.MsgType, " ", msg.From)
+			bp.processMsg(msg)
 		}
 	}
+}
+
+func (bp *BlockPool) processMsg(msg p2p.Message) {
+	switch msg.MsgType {
+	case p2p.MessageTypeBlockHeader:
+		var h = new(corepb.SignedBlockHeader)
+		if err := proto.Unmarshal(msg.Data, h); err != nil {
+			bp.markBadPeer(msg)
+			return
+		}
+		// TODO:
+	case p2p.MessageTypeBlock:
+		var b = new(Block)
+		if err := b.setBytes(msg.Data); err != nil {
+			log.Warn("block decode failure", "msg", msg)
+			bp.markBadPeer(msg)
+			return
+		}
+		bp.processBlock(b)
+	default:
+		log.Crit("unhandled msg sent to blockPool", "msg", msg)
+	}
+}
+
+func (bp *BlockPool) processBlock(blk *Block) {
+	if err := bp.core.blockChain.verifyBlock(blk); err != nil {
+		log.Warn("processBlock() verify fails", "err", err)
+		// TODO: mark bad peer?
+		return
+	}
+	if err := bp.core.blockChain.AddBlock(blk); err != nil {
+		log.Warn("processBlock() add fail", "err", err)
+		return
+	}
+}
+
+/*
+check if block header is valid and belongs to chain
+ */
+func (bc *BlockChain) verifyHeader(h *BlockHeader) error {
+	if ChainID(h.ChainID) != bc.chainID {
+		return ErrBlockChainID
+	}
+	currentHeight := bc.CurrentBlockHeight()
+	height := h.Number
+	if height < currentHeight-TooFarBlocks || height > currentHeight+TooFarBlocks {
+		return ErrBlockTooFarForChain
+		// ignore too far block
+	}
+	// TODO: check if header exists
+	return nil
+}
+
+/*
+check if block is valid and belongs to chain
+ */
+func (bc *BlockChain) verifyBlock(b *Block) error {
+	// verify block header
+	if err := bc.verifyHeader(b.header); err != nil {
+		return err
+	}
+	// verify block body matches header
+	if err := b.VerifyBody(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bp *BlockPool) markBadPeer(msg p2p.Message) {
+	// TODO: inform bad peed msg.From to p2p module
 }

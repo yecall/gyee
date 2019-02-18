@@ -36,6 +36,8 @@ import (
 
 var (
 	EmptyRootHash = DeriveHash(Transactions{})
+
+	ErrBlockBodyTxsMismatch = errors.New("block body txs mismatch")
 )
 
 // Block Header of yee chain
@@ -167,6 +169,17 @@ func (b *Block) UpdateHeader() error {
 	return nil
 }
 
+/*
+Verify block body match with hash in header
+ */
+func (b *Block) VerifyBody() error {
+	txHash := DeriveHash(b.transactions)
+	if txHash != b.header.TxsRoot {
+		return ErrBlockBodyTxsMismatch
+	}
+	return nil
+}
+
 func (b *Block) ToBytes() ([]byte, error) {
 	pbSignedHeader, err := b.header.toSignedProto()
 	if err != nil {
@@ -193,7 +206,17 @@ func (b *Block) setBytes(enc []byte) error {
 		return err
 	}
 	b.header = header
+	b.signature = pbBlock.Header
 	b.body = pbBlock.Body
+	b.transactions = make(Transactions, 0, len(b.body.RawTransactions))
+	for _, raw := range b.body.RawTransactions {
+		tx := new(Transaction)
+		if err := tx.Decode(raw); err != nil {
+			return err
+		}
+		tx.raw = raw
+		b.transactions = append(b.transactions, tx)
+	}
 	return nil
 }
 

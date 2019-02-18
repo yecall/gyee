@@ -190,8 +190,8 @@ func (bc *BlockChain) Reset() error {
 	return nil
 }
 
-// add a checked block to block chain
-func (bc *BlockChain) AddBlock(b *Block) error {
+// store a verified block in chain, not marking as last block
+func (bc *BlockChain) storeBlock(b *Block) error {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
@@ -215,6 +215,15 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 
 	// batch writing to storage
 	if err := batch.Write(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// add a checked block to block chain, as last block
+func (bc *BlockChain) AddBlock(b *Block) error {
+	if err := bc.storeBlock(b); err != nil {
 		return err
 	}
 
