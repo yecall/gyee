@@ -21,12 +21,14 @@
 package dht
 
 import (
+	"bytes"
 	"net"
 	"time"
-	"bytes"
-	pb		"github.com/yeeco/gyee/p2p/dht/pb"
-	config	"github.com/yeeco/gyee/p2p/config"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/yeeco/gyee/p2p/config"
+	pb "github.com/yeeco/gyee/p2p/dht/pb"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
 
 
@@ -269,7 +271,7 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 	}
 
 	pbMsg := new(pb.DhtMessage)
-	if err := pbMsg.Unmarshal(dhtPkg.Payload); err != nil {
+	if err := proto.Unmarshal(dhtPkg.Payload, pbMsg); err != nil {
 		protoLog.Debug("GetMessage: Unmarshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
@@ -864,7 +866,7 @@ func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbHs.Id = uint64(time.Now().UnixNano())
 	pbHs.Extra = hs.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetHandshakePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -902,7 +904,7 @@ func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbFn.Id = uint64(fn.Id)
 	pbFn.Extra = fn.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetFindNodePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -944,7 +946,7 @@ func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbNbs.Id = uint64(nbs.Id)
 	pbNbs.Extra = nbs.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetNeighborsPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -990,7 +992,7 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbPv.Id = uint64(pv.Id)
 	pbPv.Extra = pv.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetPutValuePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1029,7 +1031,7 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbGvr.Id = uint64(gvr.Id)
 	pbGvr.Extra = gvr.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetGetValueReqPackage: failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1076,7 +1078,7 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbGvr.Id = uint64(gvr.Id)
 	pbGvr.Extra = gvr.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetGetValueRspPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1122,7 +1124,7 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbPP.Id = uint64(pp.Id)
 	pbPP.Extra = pp.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetPutProviderPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1160,7 +1162,7 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbGpr.Id = uint64(gpr.Id)
 	pbGpr.Extra = gpr.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetGetProviderReqPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1209,7 +1211,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbGpr.Id = uint64(gpr.Id)
 	pbGpr.Extra = gpr.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetGetProviderRspPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1247,7 +1249,7 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbPing.Seq = uint64(ping.Seq)
 	pbPing.Extra = ping.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetPingPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1284,7 +1286,7 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbPong.Seq = uint64(pong.Seq)
 	pbPong.Extra = pong.Extra
 
-	pl, err := pbMsg.Marshal()
+	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
 		protoLog.Debug("GetPongPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1324,7 +1326,7 @@ func (dhtDsRec *DhtDatastoreRecord)EncDsRecord(dsr *DsRecord) DhtErrno {
 		Extra:	dhtDsRec.Extra,
 	}
 
-	val, err :=pbr.Marshal()
+	val, err := proto.Marshal(&pbr)
 	if err != nil {
 		protoLog.Debug("EncDsRecord: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1345,7 +1347,7 @@ func (dhtDsRec *DhtDatastoreRecord)DecDsRecord(dsr *DsRecord) DhtErrno {
 	}
 
 	pbdpr := pb.DhtRecord{}
-	if err := pbdpr.Unmarshal(dsr.Value.([]byte)); err != nil {
+	if err := proto.Unmarshal(dsr.Value.([]byte), &pbdpr); err != nil {
 		protoLog.Debug("DecDsRecord: Unmarshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
@@ -1391,7 +1393,7 @@ func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PsRecord) DhtErrno {
 		pbdpr.Providers = append(pbdpr.Providers, pbprd)
 	}
 
-	val, err := pbdpr.Marshal()
+	val, err := proto.Marshal(pbdpr)
 	if err != nil {
 		protoLog.Debug("EncPsRecord: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
@@ -1414,7 +1416,7 @@ func (dhtPsRec *DhtProviderStoreRecord)DecPsRecord(psr *PsRecord) DhtErrno {
 	}
 
 	pbdpr := pb.DhtProviderRecord{}
-	if err := pbdpr.Unmarshal(psr.Value.([]byte)); err != nil {
+	if err := proto.Unmarshal(psr.Value.([]byte), &pbdpr); err != nil {
 		protoLog.Debug("DecPsRecord: Unmarshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
