@@ -21,14 +21,16 @@
 package peer
 
 import (
-	"io"
-	"time"
-	"net"
 	"fmt"
+	"io"
+	"net"
+	"time"
+
 	ggio "github.com/gogo/protobuf/io"
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/golang/protobuf/proto"
+	"github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 	pb "github.com/yeeco/gyee/p2p/peer/pb"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -224,7 +226,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMg
 
 	pbMsg := new(pb.P2PMessage)
 
-	if err := pbMsg.Unmarshal(pkg.Payload); err != nil {
+	if err := proto.Unmarshal(pkg.Payload, pbMsg); err != nil {
 
 		tcpmsgLog.Debug("getHandshakeInbound:" +
 			"Unmarshal failed, err: %s",
@@ -334,7 +336,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) P
 	*pbMsg.Mid = pb.MessageId_MID_HANDSHAKE
 	pbMsg.Handshake = pbHandshakeMsg
 
-	payload, err1 := pbMsg.Marshal()
+	payload, err1 := proto.Marshal(pbMsg)
 	if err1 != nil {
 
 		tcpmsgLog.Debug("putHandshakeOutbound:" +
@@ -390,7 +392,7 @@ func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMg
 	*pbPing.Mid = MID_PING
 	pbPing.Ping.Extra = append(pbPing.Ping.Extra, ping.Extra...)
 
-	payload, err := pbPing.Marshal()
+	payload, err := proto.Marshal(&pbPing)
 
 	if len(payload) == 0 || err != nil {
 		tcpmsgLog.Debug("ping: empty payload")
@@ -453,7 +455,7 @@ func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong, write bool) PeMg
 	*pbPong.Mid = MID_PONG
 	pbPong.Pong.Extra = append(pbPong.Pong.Extra, pong.Extra...)
 
-	payload, err := pbPong.Marshal()
+	payload, err := proto.Marshal(&pbPong)
 
 	if len(payload) == 0 || err != nil {
 		tcpmsgLog.Debug("pong: empty payload")
@@ -516,7 +518,7 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) 
 	*pbChkk.Mid = MID_CHKK
 	pbChkk.CheckKey.Extra = append(pbChkk.CheckKey.Extra, chkk.Extra...)
 
-	payload, err := pbChkk.Marshal()
+	payload, err := proto.Marshal(&pbChkk)
 
 	if len(payload) == 0 || err != nil {
 		tcpmsgLog.Debug("chkk: empty payload")
@@ -583,7 +585,7 @@ func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey, write bool
 	*pbRptk.ReportKey.Status = pb.KeyStatus(rptk.Status)
 	pbRptk.ReportKey.Extra = append(pbRptk.ReportKey.Extra, rptk.Extra...)
 
-	payload, err := pbRptk.Marshal()
+	payload, err := proto.Marshal(&pbRptk)
 
 	if len(payload) == 0 || err != nil {
 		tcpmsgLog.Debug("rptk: empty payload")
@@ -736,7 +738,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 
 	pbMsg := new(pb.P2PMessage)
 
-	if err := pbMsg.Unmarshal(upkg.Payload); err != nil {
+	if err := proto.Unmarshal(upkg.Payload, pbMsg); err != nil {
 
 		tcpmsgLog.Debug("GetMessage:" +
 			"Unmarshal failed, err: %s",
@@ -803,7 +805,7 @@ func (upkg *P2pPackage)GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 
 	pbMsg := new(pb.ExtMessage)
 
-	if err := pbMsg.Unmarshal(upkg.Payload); err != nil {
+	if err := proto.Unmarshal(upkg.Payload, pbMsg); err != nil {
 
 		tcpmsgLog.Debug("GetExtMessage:" +
 			"Unmarshal failed, err: %s",
