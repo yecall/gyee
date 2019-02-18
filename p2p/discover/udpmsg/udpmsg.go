@@ -21,11 +21,13 @@
 package udpmsg
 
 import (
-	"net"
 	"fmt"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	config	"github.com/yeeco/gyee/p2p/config"
-	pb		"github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
+	"net"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/yeeco/gyee/p2p/config"
+	pb "github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -196,7 +198,7 @@ func (pum *UdpMsg) Decode() UdpMsgErrno {
 
 	pum.Msg = new(pb.UdpMessage)
 
-	if err := (pum.Msg).Unmarshal((*pum.Pbuf)[0:pum.Len]); err != nil {
+	if err := proto.Unmarshal((*pum.Pbuf)[0:pum.Len], pum.Msg); err != nil {
 
 		udpmsgLog.Debug("Decode: " +
 			"Unmarshal failed, err: %s",
@@ -483,7 +485,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 
 	var err error
 
-	if *pum.Pbuf, err = pum.Msg.Marshal(); err != nil {
+	if *pum.Pbuf, err = proto.Marshal(pum.Msg); err != nil {
 
 		udpmsgLog.Debug("Encode: " +
 			"Marshal failed, err: %s",
@@ -591,7 +593,7 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 	var err error
 	var buf []byte
 
-	if buf, err = pbm.Marshal(); err != nil {
+	if buf, err = proto.Marshal(pbm); err != nil {
 
 		udpmsgLog.Debug("EncodePing: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
@@ -660,7 +662,7 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 	var err error
 	var buf []byte
 
-	if buf, err = pbm.Marshal(); err != nil {
+	if buf, err = proto.Marshal(pbm); err != nil {
 
 		udpmsgLog.Debug("EncodePong: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
@@ -750,7 +752,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 	var err error
 	var buf []byte
 
-	if buf, err = pbm.Marshal(); err != nil {
+	if buf, err = proto.Marshal(pbm); err != nil {
 
 		udpmsgLog.Debug("EncodeFindNode: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
@@ -834,7 +836,7 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	var err error
 	var buf []byte
 
-	if buf, err = pbm.Marshal(); err != nil {
+	if buf, err = proto.Marshal(pbm); err != nil {
 
 		udpmsgLog.Debug("EncodeNeighbors: failed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
