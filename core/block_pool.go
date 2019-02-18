@@ -33,7 +33,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"

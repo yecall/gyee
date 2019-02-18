@@ -270,7 +270,7 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, txs Transactions) *Block {
 		transactions: make(Transactions, 0, len(txs)),
 	}
 	// next block number
-	next.header.Number ++
+	next.header.Number++
 
 	// state trie
 	stateTrie, err := state.NewAccountTrie(parent.StateRoot(), bc.stateDB)

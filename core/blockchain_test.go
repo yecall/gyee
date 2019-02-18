@@ -97,7 +97,7 @@ func TestBlockChainGrow(t *testing.T) {
 			tx.to[1] = byte(j)
 			tx.amount = amount
 			tx.nonce = nonce
-			nonce ++
+			nonce++
 
 			txs = append(txs, tx)
 		}
