@@ -210,6 +210,12 @@ type Config struct {
 	DhtQryCfg			Cfg4DhtQryManager		// for dht query manager
 	DhtConCfg			Cfg4DhtConManager		// for dht connection manager
 	DhtFdsCfg			Cfg4DhtFileDatastore	// for dht file data store
+
+	//
+	// NAT part
+	//
+
+	NatCfg				Cfg4NatManager			// for nat manager
 }
 
 // Configuration about neighbor manager on UDP
@@ -333,6 +339,17 @@ type Cfg4DhtFileDatastore struct {
 	Sync				bool		// sync file store flag
 }
 
+// Configuration about nat
+const (
+	NATT_NONE = "none"
+	NATT_PMP = "pmp"
+	NATT_UPNP = "upnp"
+)
+type Cfg4NatManager struct {
+	NatType		string				// "pmp", "upnp", "none"
+	GwIp		net.IP				// gateway ip address when "pmp" specified
+}
+
 // Default version string, formated as "M.m0.m1.m2"
 const DefaultVersion = "0.1.0.0"
 
@@ -434,6 +451,15 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 			PadLength:			2,
 			Sync:				true,
 		},
+
+		//
+		// NAT part
+		//
+
+		NatCfg: Cfg4NatManager {
+			NatType:			NATT_NONE,
+			GwIp:				net.IPv4zero,
+		},
 	}
 
 	if bsUrls != nil {
@@ -502,6 +528,15 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 			ShardFuncName:		sfnNextToLast,
 			PadLength:			2,
 			Sync:				true,
+		},
+
+		//
+		// NAT part
+		//
+
+		NatCfg: Cfg4NatManager {
+			NatType:			NATT_NONE,
+			GwIp:				net.IPv4zero,
 		},
 	}
 
@@ -1050,6 +1085,11 @@ func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
 	config[name].DhtConCfg.Local = &config[name].DhtLocal
 	config[name].DhtConCfg.BootstrapNode = config[name].BootstrapNode
 	return &config[name].DhtConCfg
+}
+
+// Get configuration for nat
+func P2pConfig4NatManager(name string) *Cfg4NatManager {
+	return &config[name].NatCfg
 }
 
 // elliptic.P256

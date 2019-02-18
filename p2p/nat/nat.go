@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 	"bytes"
+	config	"github.com/yeeco/gyee/p2p/config"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 )
@@ -69,15 +70,24 @@ func (ne NatEno)Errno() int {
 // configuration
 //
 const (
-	 NATT_PMP = "pmp"
-	 NATT_UPNP = "upnp"
-	 NATT_NONE = "none"
+	NATT_NONE = config.NATT_NONE
+	NATT_PMP = config.NATT_PMP
+	NATT_UPNP = config.NATT_UPNP
 )
 
 type natConfig struct {
 	natType		string		// "pmp", "upnp", "none"
 	gwIp		net.IP		// gateway ip address when "pmp" specified
 }
+
+//
+// refresh the mapping before it's expired
+//
+const (
+	minKeepDuration = time.Minute * 20
+	minRefreshDelta = time.Minute * 5
+	maxRefreshDelta = time.Minute * 10
+)
 
 //
 // interface for nat
@@ -377,6 +387,9 @@ _rsp2sender:
 }
 
 func (natMgr *NatManager)getConfig() NatEno {
+	cfg := config.P2pConfig4NatManager(natMgr.sdl.SchGetP2pCfgName())
+	natMgr.cfg.natType = fmt.Sprintf("%s", cfg.NatType)
+	natMgr.cfg.gwIp = append(natMgr.cfg.gwIp, cfg.GwIp...)
 	return NatEnoNone
 }
 
@@ -418,8 +431,12 @@ func (natMgr *NatManager)reconfig(dcvReq *sch.MsgNatMgrDiscoverReq) NatEno {
 		return NatEnoParameter
 	}
 	switch dcvReq.NatType {
-	case NATT_NONE, NATT_PMP, NATT_UPNP:
-		break
+	case NATT_NONE, NATT_UPNP:
+	case NATT_PMP:
+		if dcvReq.GwIp == nil {
+			natLog.Debug("reconfig: invalid GwIp for type: %s", NATT_PMP)
+			return NatEnoParameter
+		}
 	default:
 		natLog.Debug("reconfig: invalid type: %s", dcvReq.NatType)
 		return NatEnoParameter
@@ -435,13 +452,59 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 		natLog.Debug("refreshInstance: instance not exist, id: %+v", inst.id)
 		return NatEnoMismatched
 	}
-	return natMgr.nat.makeMap(inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep)
+	eno := natMgr.nat.makeMap(inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep)
+	if eno != NatEnoNone {
+		natLog.Debug("refreshInstance: makeMap failed, inst: %+v", *inst)
+		return eno
+	}
+	return natMgr.startRefreshTimer(inst)
 }
 
 func (natMgr *NatManager)checkMakeMapReq(mmr *sch.MsgNatMgrMakeMapReq) NatEno {
+	if mmr == nil {
+		natLog.Debug("checkMakeMapReq: invalid prameters")
+		return NatEnoParameter
+	}
+	if strings.Compare(strings.ToLower(mmr.Proto), "udp") != 0 &&
+		strings.Compare(strings.ToLower(mmr.Proto), "tcp") != 0 {
+		natLog.Debug("checkMakeMapReq: invalid protocol: %s", mmr.Proto)
+		return NatEnoParameter
+	}
+	if mmr.DurKeep < minKeepDuration {
+		natLog.Debug("checkMakeMapReq: invalid DurKeep: %d, min: %d", mmr.DurKeep, minKeepDuration)
+		return NatEnoParameter
+	}
+	if mmr.DurRefresh != time.Duration(0) {
+		if !(mmr.DurRefresh >= mmr.DurKeep - maxRefreshDelta &&
+			mmr.DurRefresh <= mmr.DurKeep - minRefreshDelta) {
+			natLog.Debug("checkMakeMapReq: invalid [keep, refesh] pair: [%d,%d]", mmr.DurKeep, mmr.DurRefresh)
+			return NatEnoParameter
+		}
+	}
 	return NatEnoNone
 }
 
 func (natMgr *NatManager)startRefreshTimer(inst *NatMapInstance) NatEno {
+	// notice: we start an "Absolute" timer after map made than a "Cycle" timer
+	if inst.tidRefresh != sch.SchInvalidTid {
+		if eno := natMgr.sdl.SchKillTimer(natMgr.ptnMe, inst.tidRefresh); eno != sch.SchEnoNone {
+			natLog.Debug("startRefreshTimer: SchKillTimer failed, tid: %d, eno: %d", inst.tidRefresh, eno)
+			return NatEnoScheduler
+		}
+	}
+	td := sch.TimerDescription {
+		Name:	"natInstRefreshingTimer",
+		Utid:	sch.NatMgrRefreshTimerId,
+		Tmt:	sch.SchTmTypeAbsolute,
+		Dur:	inst.durRefresh,
+		Extra:	inst,
+	}
+	eno, tid := natMgr.sdl.SchSetTimer(natMgr.ptnMe, &td)
+	if eno != sch.SchEnoNone {
+		natLog.Debug("startRefreshTimer: SchSetTimer failed, eno: %d", eno)
+		inst.tidRefresh = sch.SchInvalidTid
+		return NatEnoScheduler
+	}
+	inst.tidRefresh = tid
 	return NatEnoNone
 }
