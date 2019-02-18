@@ -53,8 +53,12 @@ type NatEno int
 const (
 	NatEnoNone = NatEno(iota)
 	NatEnoParameter
+	NatEnoNotFound
 	NatEnoMismatched
 	NatEnoScheduler
+	NatEnoFromPmpLib
+	NatEnoFromUpnpLib
+	NatEnoFromSystem
 	NatEnoUnknown
 )
 
@@ -95,7 +99,7 @@ const (
 type natInterface interface {
 
 	// make map between local address to public address
-	makeMap(proto string, locPort int, pubPort int, durKeep time.Duration) NatEno
+	makeMap(name string, proto string, locPort int, pubPort int, durKeep time.Duration) NatEno
 
 	// remove map make by makeMap
 	removeMap(proto string, locPort int, pubPort int) NatEno
@@ -115,6 +119,10 @@ const (
 type NatMapInstID	struct {
 	proto		string			// the prototcol, "tcp" or "udp"
 	fromPort	int				// local port number be mapped
+}
+
+func (id NatMapInstID)toString() string {
+	return fmt.Sprintf("%s:%d", id.proto, id.fromPort)
 }
 
 type NatMapInstance struct {
@@ -262,7 +270,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 		pubPort: -1,
 	}
 
-	if eno := natMgr.nat.makeMap(inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep); eno != NatEnoNone {
+	if eno := natMgr.nat.makeMap(inst.id.toString(), inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep); eno != NatEnoNone {
 		natLog.Debug("makeMapReq: makeMap failed, error: %s", eno.Error())
 		goto _rsp2sender
 	}
@@ -394,6 +402,18 @@ func (natMgr *NatManager)getConfig() NatEno {
 }
 
 func (natMgr *NatManager)setupNatInterface() NatEno {
+	if natMgr.cfg.natType == NATT_PMP {
+		natMgr.nat = NewPmpInterface(natMgr.cfg.gwIp)
+	} else if natMgr.cfg.natType == NATT_UPNP {
+		// we might be blocked for some seconds to obtain an upnp interface,
+		// see function NewUpnpInterface for more please.
+		natMgr.nat = NewUpnpInterface()
+	} else if natMgr.cfg.natType == NATT_NONE {
+		natMgr.nat = nil
+	} else {
+		natLog.Debug("setupNatInterface: invalid nat type: %s", natMgr.cfg.natType)
+		return NatEnoParameter
+	}
 	return NatEnoNone
 }
 
@@ -452,7 +472,7 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 		natLog.Debug("refreshInstance: instance not exist, id: %+v", inst.id)
 		return NatEnoMismatched
 	}
-	eno := natMgr.nat.makeMap(inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep)
+	eno := natMgr.nat.makeMap(inst.id.toString(), inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep)
 	if eno != NatEnoNone {
 		natLog.Debug("refreshInstance: makeMap failed, inst: %+v", *inst)
 		return eno
@@ -465,8 +485,8 @@ func (natMgr *NatManager)checkMakeMapReq(mmr *sch.MsgNatMgrMakeMapReq) NatEno {
 		natLog.Debug("checkMakeMapReq: invalid prameters")
 		return NatEnoParameter
 	}
-	if strings.Compare(strings.ToLower(mmr.Proto), "udp") != 0 &&
-		strings.Compare(strings.ToLower(mmr.Proto), "tcp") != 0 {
+	if strings.Compare(strings.ToLower(mmr.Proto), NATP_UDP) != 0 &&
+		strings.Compare(strings.ToLower(mmr.Proto), NATP_TCP) != 0 {
 		natLog.Debug("checkMakeMapReq: invalid protocol: %s", mmr.Proto)
 		return NatEnoParameter
 	}
@@ -480,6 +500,8 @@ func (natMgr *NatManager)checkMakeMapReq(mmr *sch.MsgNatMgrMakeMapReq) NatEno {
 			natLog.Debug("checkMakeMapReq: invalid [keep, refesh] pair: [%d,%d]", mmr.DurKeep, mmr.DurRefresh)
 			return NatEnoParameter
 		}
+	} else {
+		mmr.DurRefresh = mmr.DurKeep - minRefreshDelta
 	}
 	return NatEnoNone
 }
