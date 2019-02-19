@@ -117,27 +117,33 @@ func (bc *BlockChain) loadLastBlock() error {
 		log.Warn("getLastBlock() empty, reset chain")
 		return bc.Reset()
 	}
-	lastBlock := bc.GetBlockByHash(lastHash)
-	if lastBlock == nil {
+	b := bc.GetBlockByHash(lastHash)
+	if b == nil {
 		log.Warn("GetBlockByHash() nil, reset chain",
 			"hash", lastHash)
 		return bc.Reset()
 	}
-	trie, err := state.NewAccountTrie(lastBlock.StateRoot(), bc.stateDB)
-	if err != nil {
+	var err error
+	if b.stateTrie, err = state.NewAccountTrie(b.StateRoot(), bc.stateDB); err != nil {
 		log.Warn("lastBlock state trie missing",
-			"number", lastBlock.Number(), "hash", lastBlock.Hash())
-		if err := bc.repair(&lastBlock); err != nil {
+			"number", b.Number(), "hash", b.Hash())
+		if err := bc.repair(&b); err != nil {
 			return err
 		}
 	}
-	lastBlock.stateTrie = trie
+	if b.consensusTrie, err = state.NewConsensusTrie(b.ConsensusRoot(), bc.stateDB); err != nil {
+		log.Warn("lastBlock consensus trie missing",
+			"number", b.Number(), "hash", b.Hash())
+		if err := bc.repair(&b); err != nil {
+			return err
+		}
+	}
 
 	// lastBlock verified
-	bc.lastBlock.Store(lastBlock)
+	bc.lastBlock.Store(b)
 
 	log.Info("Loaded local block",
-		"number", lastBlock.Number(), "Hash", lastBlock.Hash())
+		"number", b.Number(), "Hash", b.Hash())
 
 	return nil
 }

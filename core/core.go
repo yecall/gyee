@@ -181,7 +181,12 @@ func (c *Core) loop() {
 			// TODO: build block
 		case msg := <-c.subscriber.MsgChan:
 			log.Info("core receive ", msg.MsgType, " ", msg.From)
-			// TODO: send to consensus
+			switch msg.MsgType {
+			case p2p.MessageTypeEvent:
+				c.engine.SendEvent(msg.Data)
+			default:
+				log.Crit("wrong msg", "msg", msg)
+			}
 		}
 
 	}

@@ -175,6 +175,10 @@ func (t *Tetris) Output() chan *consensus.Output {
 	return t.OutputCh
 }
 
+func (t *Tetris) SendEvent(event []byte) {
+	t.EventCh <- event
+}
+
 func (t *Tetris) loop() {
 	t.wg.Add(1)
 	defer t.wg.Done()

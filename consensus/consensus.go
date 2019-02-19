@@ -30,8 +30,13 @@ type Output struct {
 
 // Engine defines what a consensus engine provides
 type Engine interface {
+	// lifecycle controls
 	Start() error
 	Stop() error
 
+	// engine output channel
 	Output() chan *Output
+
+	// send event raw bytes to engine
+	SendEvent([]byte)
 }

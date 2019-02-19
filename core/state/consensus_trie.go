@@ -78,7 +78,7 @@ func (ct *consensusTrie) GetValidators() []string {
 		return nil
 	}
 	var result []string
-	if err := rlp.DecodeBytes(enc, result); err != nil {
+	if err := rlp.DecodeBytes(enc, &result); err != nil {
 		ct.setTrieErr(err)
 		return nil
 	}
