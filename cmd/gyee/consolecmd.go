@@ -22,8 +22,8 @@ package main
 
 import (
 	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/cmd/gyee/console"
 	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/gyee/console"
 )
 
 var (

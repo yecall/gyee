@@ -25,9 +25,9 @@ import (
 	"io/ioutil"
 
 	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/cmd/gyee/console"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"
-	"github.com/yeeco/gyee/gyee/console"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/utils/logging"
 )
