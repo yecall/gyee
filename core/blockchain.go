@@ -339,15 +339,9 @@ func (bc *BlockChain) CurrentBlockHeight() uint64 {
 	return bc.LastBlock().Number()
 }
 
-func (bc *BlockChain) GetValidators() map[string]uint {
-	//从state取
-	//测试先取一个固定的
-	return map[string]uint{
-		"aaaa": 1,
-		"bbbb": 2,
-		"cccc": 3,
-		"dddd": 4,
-	}
+func (bc *BlockChain) GetValidators() []string {
+	b := bc.LastBlock()
+	return b.consensusTrie.GetValidators()
 }
 
 //非验证节点，是否需要启txPool?

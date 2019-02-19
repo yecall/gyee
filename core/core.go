@@ -44,7 +44,8 @@ import (
 	"sync"
 
 	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/consensus/tetris"
+	"github.com/yeeco/gyee/consensus"
+	"github.com/yeeco/gyee/consensus/tetris2"
 	"github.com/yeeco/gyee/core/yvm"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/secp256k1"
@@ -56,8 +57,8 @@ import (
 type Core struct {
 	node           INode
 	config         *config.Config
-	tetris         *tetris.Tetris
-	tetrisOutputCh chan tetris.ConsensusOutput
+	engine         consensus.Engine
+	engineOutputCh chan *consensus.Output
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	blockPool      *BlockPool
@@ -114,13 +115,16 @@ func (c *Core) Start() error {
 		members := c.blockChain.GetValidators()
 		blockHeight := c.blockChain.CurrentBlockHeight()
 		mid := c.node.NodeID()
-		tetris, err := tetris.NewTetris(c, members, blockHeight, mid)
+		// TODO: vid?mid?
+		tetris, err := tetris2.NewTetris(c, mid, members, blockHeight)
 		if err != nil {
 			return err
 		}
-		c.tetris = tetris
-		c.tetrisOutputCh = tetris.OutputCh
-		c.tetris.Start()
+		c.engine = tetris
+		c.engineOutputCh = tetris.Output()
+		if err := c.engine.Start(); err != nil {
+			return err
+		}
 
 		c.subscriber = p2p.NewSubscriber(c, make(chan p2p.Message), p2p.MessageTypeEvent)
 		p2p := c.node.P2pService()
@@ -155,7 +159,7 @@ func (c *Core) Stop() error {
 	}
 
 	// stop tetris
-	err := c.tetris.Stop()
+	err := c.engine.Stop()
 
 	// notify loop and wait
 	close(c.quitCh)
@@ -172,9 +176,12 @@ func (c *Core) loop() {
 		case <-c.quitCh:
 			log.Info("Core loop end.")
 			return
-		case <-c.tetrisOutputCh:
+		case output := <-c.engineOutputCh:
+			log.Info("core receive engine output", "output", output)
+			// TODO: build block
 		case msg := <-c.subscriber.MsgChan:
 			log.Info("core receive ", msg.MsgType, " ", msg.From)
+			// TODO: send to consensus
 		}
 
 	}

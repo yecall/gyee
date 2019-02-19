@@ -28,6 +28,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/consensus"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
@@ -59,7 +60,7 @@ type Tetris struct {
 	TxsCh         chan common.Hash
 
 	//Output Channel
-	OutputCh       chan *ConsensusOutput
+	OutputCh       chan *consensus.Output
 	SendEventCh    chan []byte
 	RequestEventCh chan common.Hash
 
@@ -105,7 +106,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		ParentEventCh: make(chan []byte, 10),
 		TxsCh:         make(chan common.Hash, 2000),
 
-		OutputCh:       make(chan *ConsensusOutput, 10),
+		OutputCh:       make(chan *consensus.Output, 10),
 		SendEventCh:    make(chan []byte, 10),
 		RequestEventCh: make(chan common.Hash, 10),
 
@@ -168,6 +169,10 @@ func (t *Tetris) Stop() error {
 	close(t.quitCh)
 	t.wg.Wait()
 	return nil
+}
+
+func (t *Tetris) Output() chan *consensus.Output {
+	return t.OutputCh
 }
 
 func (t *Tetris) loop() {
@@ -893,7 +898,7 @@ func (t *Tetris) consensusComputing() {
 		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
 	}
 
-	o := &ConsensusOutput{H: t.h + 1, Output: css, Tx: txc}
+	o := &consensus.Output{H: t.h + 1, Output: css, Txs: txc}
 	t.OutputCh <- o
 	t.h++
 

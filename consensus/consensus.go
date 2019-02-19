@@ -1,4 +1,4 @@
-// Copyright (C) 2018 gyee authors
+// Copyright (C) 2019 gyee authors
 //
 // This file is part of the gyee library.
 //
@@ -15,14 +15,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
 
-package tetris2
+package consensus
 
 import (
-	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/common"
 )
 
-type ICore interface {
-	GetSigner() crypto.Signer
-	GetPrivateKeyOfDefaultAccount() ([]byte, error)
-	AddressFromPublicKey(publicKey []byte) ([]byte, error)
+// output of consensus to generate a block at height H, with txs Txs
+type Output struct {
+	Txs    []common.Hash
+	H      uint64
+	Output string
+}
+
+// Engine defines what a consensus engine provides
+type Engine interface {
+	Start() error
+	Stop() error
+
+	Output() chan *Output
 }
