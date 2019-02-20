@@ -59,6 +59,7 @@ const (
 	NatEnoFromPmpLib
 	NatEnoFromUpnpLib
 	NatEnoFromSystem
+	NatEnoNoNat
 	NatEnoUnknown
 )
 
@@ -126,6 +127,7 @@ func (id NatMapInstID)toString() string {
 }
 
 type NatMapInstance struct {
+	owner		interface{}		// owner task pointer
 	id			NatMapInstID	// map item identity
 	toPort		int				// target port number requested
 	durKeep		time.Duration	// duration for map to be kept
@@ -145,6 +147,8 @@ type NatManager struct {
 	sdl			*sch.Scheduler						// pointer to scheduler
 	name		string								// name
 	ptnMe		interface{}							// myself task node pointer
+	ptnDhtMgr	interface{}							// pointer to table manager
+	ptnTabMgr	interface{}							// pointer to dht manager
 	tep			sch.SchUserTaskEp					// entry
 	cfg			natConfig							// configuration
 	nat			natInterface						// nil or pointer to pmpCtrlBlock or upnpCtrlBlock
@@ -191,6 +195,12 @@ func (natMgr *NatManager)natMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 	natMgr.ptnMe = ptn
 	natMgr.sdl = sch.SchGetScheduler(ptn)
+	if _, natMgr.ptnTabMgr = natMgr.sdl.SchGetUserTaskNode(sch.TabMgrName); natMgr.ptnTabMgr == nil {
+		natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.TabMgrName)
+	}
+	if _, natMgr.ptnDhtMgr = natMgr.sdl.SchGetUserTaskNode(sch.DhtMgrName); natMgr.ptnDhtMgr == nil {
+		natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.DhtMgrName)
+	}
 	if eno := natMgr.getConfig(); eno != NatEnoNone {
 		natLog.Debug("poweron: getConfig failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
@@ -198,6 +208,15 @@ func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 	if eno := natMgr.setupNatInterface(); eno != NatEnoNone {
 		natLog.Debug("poweron: setupNatInterface failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
+	}
+	schMsg := sch.SchMessage{}
+	if natMgr.ptnTabMgr != nil {
+		natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, natMgr.ptnTabMgr, sch.EvNatMgrReadyInd, nil)
+		natMgr.sdl.SchSendMessage(&schMsg)
+	}
+	if natMgr.ptnDhtMgr != nil {
+		natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, natMgr.ptnDhtMgr, sch.EvNatMgrReadyInd, nil)
+		natMgr.sdl.SchSendMessage(&schMsg)
 	}
 	return sch.SchEnoNone
 }
@@ -238,6 +257,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	var (
 		eno = NatEnoNone
 		status = NatEnoUnknown
+		proto = ""
 		pubIp = net.IPv4zero
 		pubPort = -1
 		id NatMapInstID
@@ -249,6 +269,14 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 
 	sender := natMgr.sdl.SchGetSender(msg)
 	mmr, _ := msg.Body.(*sch.MsgNatMgrMakeMapReq)
+
+	if natMgr.cfg.natType == NATT_NONE {
+		status = NatEnoNoNat
+		proto = fmt.Sprintf("%s", mmr.Proto)
+		pubPort = mmr.FromPort
+		goto _rsp2sender
+	}
+
 	if eno := natMgr.checkMakeMapReq(mmr); eno != NatEnoNone {
 		natLog.Debug("makeMapReq: checkMakeMapReq failed, error: %s", eno.Error())
 		goto _rsp2sender
@@ -260,6 +288,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	}
 
 	inst = NatMapInstance {
+		owner: natMgr.sdl.SchGetSender(msg),
 		id: id,
 		toPort: mmr.ToPort,
 		durKeep: mmr.DurKeep,
@@ -284,15 +313,17 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	inst.pubIp = append(inst.pubIp[0:], ip...)
 	inst.status = s
 
+	proto = fmt.Sprintf("%s", inst.id.proto)
 	pubIp = append(pubIp[0:], inst.pubIp...)
 	pubPort = inst.pubPort
 	status = inst.status
 
 _rsp2sender:
 
-	rsp := sch.MsgNatMgrMakeMapRsp{
+	rsp := sch.MsgNatMgrMakeMapRsp {
 		Result: eno.Errno(),
 		Status: status.Errno(),
+		Proto: proto,
 		PubIp: pubIp,
 		PubPort: pubPort,
 	}
@@ -477,6 +508,27 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 		natLog.Debug("refreshInstance: makeMap failed, inst: %+v", *inst)
 		return eno
 	}
+
+	// when failed to get public address, we do not send indication, so nat client will
+	// keep the old public address version and go on.
+	if curIp, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
+		natLog.Debug("refreshInstance: getPublicIpAddr failed, error: %s", eno.Error())
+	} else {
+		if bytes.Compare(inst.pubIp, curIp) != 0 {
+			inst.pubIp = append(inst.pubIp[0:], curIp...)
+			ind := sch.MsgNatMgrPubAddrChangeInd{
+				Result: NatEnoNone.Errno(),
+				Proto: inst.id.proto,
+				FromPort: inst.id.fromPort,
+				PubIp: inst.pubIp,
+				PubPort: inst.pubPort,
+			}
+			schMsg := sch.SchMessage{}
+			natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, inst.owner, sch.EvNatMgrPubAddrUpdateInd, &ind)
+			natMgr.sdl.SchSendMessage(&schMsg)
+		}
+	}
+
 	return natMgr.startRefreshTimer(inst)
 }
 
@@ -529,4 +581,12 @@ func (natMgr *NatManager)startRefreshTimer(inst *NatMapInstance) NatEno {
 	}
 	inst.tidRefresh = tid
 	return NatEnoNone
+}
+
+func NatResultOk(eno int) bool {
+	return eno == NatEnoNone.Errno()
+}
+
+func NatNone(status int) bool {
+	return status == NatEnoNoNat.Errno()
 }

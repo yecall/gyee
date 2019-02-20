@@ -30,11 +30,14 @@ import (
 	"sync"
 	"bytes"
 	"errors"
+	"net"
+	"strings"
 	"crypto/sha256"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	nat		"github.com/yeeco/gyee/p2p/nat"
 )
 
 
@@ -90,6 +93,14 @@ type Hash [HashLength]byte
 //
 const (
 	ndbVersion = 1
+)
+
+//
+// Some contants about NAT
+//
+const (
+	natMapKeepTime = time.Minute * 20
+	natMapRefreshTime = natMapKeepTime - time.Minute * 5
 )
 
 //
@@ -233,6 +244,7 @@ type TableManager struct {
 	ptnMe			interface{}			// pointer to task node of myself
 	ptnNgbMgr		interface{}			// pointer to neighbor manager task node
 	ptnDcvMgr		interface{}			// pointer to discover manager task node
+	ptnNatMgr		interface{}			// pointer to nat manager task node
 	shaLocal		Hash				// hash of local node identity
 	buckets			[nBuckets]*bucket	// buckets
 	queryIcb		[]*instCtrlBlock	// active query instance table
@@ -265,6 +277,18 @@ type TableManager struct {
 	networkType		int								// network type
 	snid			SubNetworkID					// sub network identity
 	SubNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
+
+	//
+	// public address from nat manager
+	//
+
+	natUdpResult	bool				// result about nap mapping for udp
+	pubUdpIp		net.IP				// public ip from nat to be announced for udp
+	pubUdpPort		int					// public port form nat to be announced for udp
+
+	natTcpResult	bool				// result about nap mapping for tcp
+	pubTcpIp		net.IP				// should be same as pubUdpIp
+	pubTcpPort		int					// public port form nat to be announced for tcp
 }
 
 func NewTabMgr() *TableManager {
@@ -321,6 +345,15 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 
 	case sch.EvNblQueriedInd:
 		eno = tabMgr.tabMgrQueriedInd(msg.Body.(*um.FindNode))
+
+	case sch.EvNatMgrReadyInd:
+		eno = tabMgr.tabMgrNatReadyInd()
+
+	case sch.EvNatMgrMakeMapRsp:
+		eno = tabMgr.tabMgrNatMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
+
+	case sch.EvNatMgrPubAddrUpdateInd:
+		eno = tabMgr.tabMgrNatPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrChangeInd))
 
 	default:
 		tabLog.Debug("TabMgrProc: invalid message: %d", msg.Id)
@@ -421,14 +454,14 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 		return TabMgrEnoInternal
 	}
 
-	// refresh all possible sub networks in the list. since we had put all
-	// into the list in any cases, we need just to loop the list, see codes
-	// and comments above please.
+	return TabMgrEnoNone
+}
 
-	for _, mgr := range tabMgr.SubNetMgrList {
-		mgr.startSubnetRefresh()
+func (tabMgr *TableManager)stopSubnetRefresh() TabMgrErrno {
+	if tabMgr.arfTid != sch.SchInvalidTid {
+		tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, tabMgr.arfTid)
+		tabMgr.arfTid = sch.SchInvalidTid
 	}
-
 	return TabMgrEnoNone
 }
 
@@ -470,6 +503,12 @@ func newTabMgrWithoutLock() *TableManager {
 		networkType:	p2pTypeDynamic,
 		snid:			AnySubNet,
 		SubNetMgrList:	map[SubNetworkID]*TableManager{},
+		natUdpResult:	false,
+		pubUdpIp:		make([]byte, 0),
+		pubUdpPort:		0,
+		natTcpResult:	false,
+		pubTcpIp:		make([]byte, 0),
+		pubTcpPort:		0,
 	}
 
 	tabMgr.tep = tabMgr.tabMgrProc
@@ -901,6 +940,122 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 	return TabMgrEnoNone
 }
 
+func (tabMgr *TableManager)tabMgrNatReadyInd() TabMgrErrno {
+	schMsg := sch.SchMessage{}
+	req := sch.MsgNatMgrMakeMapReq {
+		Proto: "udp",
+		FromPort: int(tabMgr.cfg.local.UDP),
+		ToPort: int(tabMgr.cfg.local.UDP),
+		DurKeep: natMapKeepTime,
+		DurRefresh: natMapRefreshTime,
+	}
+	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
+	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+		return TabMgrEnoScheduler
+	}
+	req.Proto = "tcp"
+	req.FromPort = int(tabMgr.cfg.local.TCP)
+	req.ToPort = int(tabMgr.cfg.local.TCP)
+	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
+	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+		return TabMgrEnoScheduler
+	}
+	return TabMgrEnoNone
+}
+
+func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) TabMgrErrno {
+	if !nat.NatResultOk(msg.Result) {
+		tabLog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
+	}
+	if strings.ToLower(msg.Proto) == "udp" {
+		tabMgr.natUdpResult = nat.NatResultOk(msg.Result)
+		if tabMgr.natUdpResult {
+			if nat.NatNone(msg.Status) {
+				tabMgr.pubUdpIp = tabMgr.cfg.local.IP
+				tabMgr.pubUdpPort = int(tabMgr.cfg.local.UDP)
+			} else {
+				tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
+				tabMgr.pubUdpPort = msg.PubPort
+			}
+		} else {
+			tabMgr.pubUdpIp = make([]byte, 0)
+			tabMgr.pubUdpPort = 0
+		}
+	} else if strings.ToLower(msg.Proto) == "tcp" {
+		tabMgr.natTcpResult = nat.NatResultOk(msg.Result)
+		if tabMgr.natTcpResult {
+			if nat.NatNone(msg.Status) {
+				tabMgr.pubTcpIp = tabMgr.cfg.local.IP
+				tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
+			} else {
+				tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
+				tabMgr.pubTcpPort = msg.PubPort
+			}
+		} else {
+			tabMgr.pubTcpIp = make([]byte, 0)
+			tabMgr.pubTcpPort = 0
+		}
+	} else {
+		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", msg.Proto)
+		return TabMgrEnoParameter
+	}
+
+	// refresh all possible sub networks in the list. since we had put all
+	// into the list in any cases, we need just to loop the list, see codes
+	// and comments above please.
+
+	if tabMgr.natUdpResult {
+		for _, mgr := range tabMgr.SubNetMgrList {
+			mgr.startSubnetRefresh()
+		}
+	}
+
+	return TabMgrEnoNone
+}
+
+func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrChangeInd) TabMgrErrno {
+	// see function nat.refreshInstance, the indication would be received hyst when nat manager
+	// refreshed ok, here the msg.Result must be good.
+	old := tabMgr.natUdpResult
+	if strings.ToLower(msg.Proto) == "udp" {
+		tabMgr.natUdpResult = nat.NatResultOk(msg.Result)
+		if tabMgr.natUdpResult {
+			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
+			tabMgr.pubUdpPort = msg.PubPort
+		} else {
+			tabMgr.pubUdpIp = make([]byte, 0)
+			tabMgr.pubUdpPort = 0
+		}
+	} else if strings.ToLower(msg.Proto) == "tcp" {
+		tabMgr.natTcpResult = nat.NatResultOk(msg.Result)
+		if tabMgr.natTcpResult {
+			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
+			tabMgr.pubTcpPort = msg.PubPort
+		} else {
+			tabMgr.pubTcpIp = make([]byte, 0)
+			tabMgr.pubTcpPort = 0
+		}
+	} else {
+		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", msg.Proto)
+		return TabMgrEnoParameter
+	}
+
+	// check to start or stop auto-refreshing when updated
+	if tabMgr.natUdpResult && !old {
+		for _, mgr := range tabMgr.SubNetMgrList {
+			mgr.startSubnetRefresh()
+		}
+	} else if !tabMgr.natUdpResult && old {
+		for _, mgr := range tabMgr.SubNetMgrList {
+			mgr.stopSubnetRefresh()
+		}
+	}
+
+	return TabMgrEnoNone
+}
+
 // Static task to keep the node database clean
 const NdbcName = "ndbCleaner"
 
@@ -1128,7 +1283,12 @@ func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno 
 		return TabMgrEnoScheduler
 	}
 
-	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil {
+	if eno, tabMgr.ptnNatMgr = tabMgr.sdl.SchGetUserTaskNode(sch.NatMgrName); eno != sch.SchEnoNone {
+		tabLog.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
+		return TabMgrEnoScheduler
+	}
+
+	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil || tabMgr.ptnNatMgr == nil {
 		tabLog.Debug("tabRelatedTaskPrepare: invaid task node pointer")
 		return TabMgrEnoInternal
 	}

@@ -1895,6 +1895,7 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	// send poweron event for those taskes registed in table "tpo" passed in, notice
 	// that, if one task had set the SchCreatedGo flag, it then should not be present
 	// in this "tpo" table, see above pls.
+	//
 
 	for _, name := range tpo {
 

@@ -206,6 +206,15 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtConInstStatusInd:
 		eno = dhtMgr.conInstStatusInd(msg.Body.(*sch.MsgDhtConInstStatusInd))
 
+	case sch.EvNatMgrReadyInd:
+		eno = dhtMgr.natMgrReadyInd()
+
+	case sch.EvNatMgrMakeMapRsp:
+		eno = dhtMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
+
+	case sch.EvNatMgrPubAddrUpdateInd:
+		eno = dhtMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrChangeInd))
+
 	default:
 		eno = sch.SchEnoParameter
 		dhtLog.Debug("dhtMgrProc: invalid event, id: %d", msg.Id)
@@ -557,6 +566,27 @@ func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchEr
 		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtConInstStatusInd, msg)
 		dhtLog.Debug("conInstStatusInd: callback return: %d", rc)
 	}
+	return sch.SchEnoNone
+}
+
+//
+// NAT manager ready indication handler
+//
+func (dhtMgr *DhtMgr)natMgrReadyInd() sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// NAT map response handler
+//
+func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+//
+// NAT public address update indication handler
+//
+func (dhtMgr *DhtMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrChangeInd) sch.SchErrno {
 	return sch.SchEnoNone
 }
 

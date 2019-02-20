@@ -878,7 +878,8 @@ const (
 	EvNatMgrRemoveMapRsp		= EvNatMgrBase + 6
 	EvNatMgrGetPublicAddrReq	= EvNatMgrBase + 7
 	EvNatMgrGetPublicAddrRsp	= EvNatMgrBase + 8
-	EvNatMgrPubAddrChangeInd	= EvNatMgrBase + 9
+	EvNatMgrPubAddrUpdateInd	= EvNatMgrBase + 9
+	EvNatMgrReadyInd			= EvNatMgrBase + 10
 )
 
 // EvNatMgrDiscoverReq
@@ -905,6 +906,7 @@ type MsgNatMgrMakeMapReq struct {
 type MsgNatMgrMakeMapRsp struct {
 	Result		int				// result
 	Status		int				// map status
+	Proto		string			// protocol
 	PubIp		net.IP			// public address
 	PubPort		int				// public port number
 }
@@ -934,10 +936,19 @@ type MsgNatMgrGetPublicAddrRsp struct {
 	PubPort		int				// public port number
 }
 
-// EvNatMgrPubAddrChangeInd
+// EvNatMgrPubAddrUpdateInd
 type MsgNatMgrPubAddrChangeInd struct {
+	Result		int				// result
 	Proto		string			// the prototcol, "tcp" or "udp"
 	FromPort	int				// local port number be mapped
 	PubIp		net.IP			// public address
 	PubPort		int				// public port number
+}
+
+// EvNatMgrPubAddrUpdateInd
+type MsgNatMgrPubAddrUpdateInd struct {
+	Proto		string			// the prototcol, "tcp" or "udp"
+	fromPort	int				// local port number be mapped
+	pubIp		net.IP			// public address
+	pubPort		int				// public port
 }
