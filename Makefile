@@ -2,24 +2,35 @@
 THIS_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
 SRC_ROOT := $(patsubst %/,%,$(dir ${THIS_MAKEFILE}))
 
-OUTPUT := ${SRC_ROOT}/build
+OUTPUT := ./build
 OUT_BIN := ${OUTPUT}/bin
 
 GIT_COMMIT := $(shell git rev-parse HEAD)
 
 GO_LD_FLAGS=-ldflags "-X github.com/yeeco/gyee/version.GitCommit=${GIT_COMMIT}"
 
-.PHONY: all clean env bootnode gyee
-
-gyee: env
-	@mkdir -p '${OUT_BIN}'
-	go build -o '${OUT_BIN}/gyee' ${GO_LD_FLAGS} '${SRC_ROOT}/cmd/gyee'
-	@echo "Done building gyee"
-
+.PHONY: all
 all: bootnode gyee
 	@echo "Done building all"
 
-bootnode: env
+#
+# CMD targets
+#
+
+.PHONY: bootnode
+bootnode: ${OUT_BIN}/bootnode
+
+.PHONY: gyee
+gyee: ${OUT_BIN}/gyee
+
+${OUT_BIN}/%: env
+	@mkdir -p '${OUT_BIN}'
+	go build -o $@ ${GO_LD_FLAGS} ./cmd/$(@F)
+	@echo "Done building cmd $(@F)"
+
+#
+# Misc
+#
 
 .PHONY: protobufgen
 protobufgen: env
@@ -29,6 +40,7 @@ protobufgen: env
 	$(MAKE) -C p2p/peer/pb clean all
 	$(MAKE) -C rpc/pb clean all
 
+.PHONY: clean env
 clean: env
 	@rm -fr "${OUTPUT}"
 	@echo "Done cleaning ${OUTPUT}"
