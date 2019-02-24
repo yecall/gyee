@@ -89,6 +89,10 @@ func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		eno = lsnMgr.lsnMgrStart()
 	case sch.EvPeLsnStopReq:
 		eno = lsnMgr.lsnMgrStop()
+	case sch.EvPeLsnRestart:
+		if eno = lsnMgr.lsnMgrStop(); eno == sch.SchEnoNone {
+			eno = lsnMgr.lsnMgrStart()
+		}
 	default:
 		lsnLog.Debug("LsnMgrProc: invalid message: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -261,6 +265,11 @@ acceptLoop:
 			default:
 		}
 
+		// notice: here the listener might have been closed, or would be closed
+		// while accepting, see function lsnMgrStop for more. in these cases, we
+		// expect an error fired from underlying network library, so we can jump
+		// out the loop, to done the accepter.
+
 		listener := accepter.listener
 		if listener == nil {
 			lsnLog.Debug("PeerAcceptProc: break the loop for nil listener")
@@ -293,9 +302,9 @@ acceptLoop:
 		accepter.sdl.SchSendMessage(&msg)
 	}
 
-	doneFor := sch.SchEnoNone
+	doneFor := sch.SchEnoKilled
 	if !stop {
-		doneFor = sch.SchEnoUnknown
+		doneFor = sch.SchEnoOS
 	}
 	return accepter.sdl.SchTaskDone(ptn, doneFor)
 }

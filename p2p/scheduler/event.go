@@ -300,6 +300,7 @@ const (
 	EvPeLsnConnAcceptedInd	= EvPeerLsnBase + 1
 	EvPeLsnStartReq			= EvPeerLsnBase + 2
 	EvPeLsnStopReq			= EvPeerLsnBase + 3
+	EvPeLsnRestart			= EvPeerLsnBase
 )
 
 // Peer connection establishment event
@@ -907,6 +908,7 @@ type MsgNatMgrMakeMapRsp struct {
 	Result		int				// result
 	Status		int				// map status
 	Proto		string			// protocol
+	FromPort	int				// local port number be mapped
 	PubIp		net.IP			// public address
 	PubPort		int				// public port number
 }
@@ -920,6 +922,8 @@ type MsgNatMgrRemoveMapReq struct {
 // EvNatMgrRemoveMapRsp
 type MsgNatMgrRemoveMapRsp struct {
 	Result		int				// result
+	Proto		string			// the prototcol, "tcp" or "udp"
+	FromPort	int				// local port number be mapped
 }
 
 // EvNatMgrGetPublicAddrReq
@@ -932,13 +936,6 @@ type MsgNatMgrGetPublicAddrReq struct {
 type MsgNatMgrGetPublicAddrRsp struct {
 	Result		int				// result
 	Status		int				// map status
-	PubIp		net.IP			// public address
-	PubPort		int				// public port number
-}
-
-// EvNatMgrPubAddrUpdateInd
-type MsgNatMgrPubAddrChangeInd struct {
-	Result		int				// result
 	Proto		string			// the prototcol, "tcp" or "udp"
 	FromPort	int				// local port number be mapped
 	PubIp		net.IP			// public address
@@ -947,8 +944,10 @@ type MsgNatMgrPubAddrChangeInd struct {
 
 // EvNatMgrPubAddrUpdateInd
 type MsgNatMgrPubAddrUpdateInd struct {
+	Status		int				// map status
 	Proto		string			// the prototcol, "tcp" or "udp"
-	fromPort	int				// local port number be mapped
-	pubIp		net.IP			// public address
-	pubPort		int				// public port
+	FromPort	int				// local port number be mapped
+	PubIp		net.IP			// public address
+	PubPort		int				// public port number
 }
+

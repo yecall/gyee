@@ -207,13 +207,13 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = dhtMgr.conInstStatusInd(msg.Body.(*sch.MsgDhtConInstStatusInd))
 
 	case sch.EvNatMgrReadyInd:
-		eno = dhtMgr.natMgrReadyInd()
+		eno = dhtMgr.natMgrReadyInd(msg)
 
 	case sch.EvNatMgrMakeMapRsp:
-		eno = dhtMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
+		eno = dhtMgr.natMakeMapRsp(msg)
 
 	case sch.EvNatMgrPubAddrUpdateInd:
-		eno = dhtMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrChangeInd))
+		eno = dhtMgr.natPubAddrUpdateInd(msg)
 
 	default:
 		eno = sch.SchEnoParameter
@@ -572,22 +572,25 @@ func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchEr
 //
 // NAT manager ready indication handler
 //
-func (dhtMgr *DhtMgr)natMgrReadyInd() sch.SchErrno {
-	return sch.SchEnoNone
+func (dhtMgr *DhtMgr)natMgrReadyInd(msg *sch.SchMessage) sch.SchErrno {
+	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
+	return dhtMgr.sdl.SchSendMessage(msg)
 }
 
 //
 // NAT map response handler
 //
-func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
-	return sch.SchEnoNone
+func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
+	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
+	return dhtMgr.sdl.SchSendMessage(msg)
 }
 
 //
 // NAT public address update indication handler
 //
-func (dhtMgr *DhtMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrChangeInd) sch.SchErrno {
-	return sch.SchEnoNone
+func (dhtMgr *DhtMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
+	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
+	return dhtMgr.sdl.SchSendMessage(msg)
 }
 
 //

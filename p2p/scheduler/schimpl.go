@@ -1137,6 +1137,11 @@ func (sdl *scheduler)schStartTask(name string) SchErrno {
 	// start it.
 	//
 
+	if sdl.powerOff == true {
+		schLog.Debug("schStartTask: in power off stage")
+		return SchEnoPowerOff
+	}
+
 	eno, ptn := sdl.schGetTaskNodeByName(name)
 
 	if eno != SchEnoNone || ptn == nil {
@@ -1175,6 +1180,11 @@ func (sdl *scheduler)schStartTask(name string) SchErrno {
 // Start task by task node pointer
 //
 func (sdl *scheduler)schStartTaskEx(ptn *schTaskNode) SchErrno {
+
+	if sdl.powerOff == true {
+		schLog.Debug("schStartTaskEx: in power off stage")
+		return SchEnoPowerOff
+	}
 
 	if ptn == nil {
 		schLog.Debug("schStartTaskEx: invalid pointer to task node")
@@ -1438,24 +1448,49 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	target.lock.Lock()
 	defer target.lock.Unlock()
 
-	if target.mailbox.que == nil {
-		schLog.Debug("schSendMsg: mailbox of target is empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
-		// we have a BUG currently not be solved, when come here, it's most possible that the target
-		// task had been killed from the scheduler.
-		//panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
-		return SchEnoInternal
+	msg2MailBox := func(msg *schMessage) SchErrno {
+		if target.mailbox.que == nil {
+			schLog.Debug("schSendMsg: mailbox of target is empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
+			// we have a BUG currently not be solved, when come here, it's most possible that the target
+			// task had been killed from the scheduler.
+			//panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
+			return SchEnoInternal
+		}
+
+		if len(*target.mailbox.que)+mbReserved >= cap(*target.mailbox.que) {
+			schLog.Debug("schSendMsg: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
+			panic(fmt.Sprintf("system overload, task: %s", target.name))
+		}
+
+		target.evTotal += 1
+		target.evHistory[target.evhIndex] = *msg
+		target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
+		*target.mailbox.que <- *msg
+
+		return SchEnoNone
 	}
 
-	if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
-		schLog.Debug("schSendMsg: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
-		panic(fmt.Sprintf("system overload, task: %s", target.name))
+	if target.isStatic {
+		if !target.isPoweron {
+			if msg.Id != EvSchPoweron {
+				target.delayMessages = append(target.delayMessages, msg)
+				return SchEnoNone
+			} else {
+				if eno := msg2MailBox(msg); eno != SchEnoNone {
+					return eno
+				}
+				target.isPoweron = true
+				target.delayMessages = nil
+				for idx := 0; idx < len(target.delayMessages); idx++ {
+					if eno := msg2MailBox(target.delayMessages[idx]); eno != SchEnoNone {
+						return eno
+					}
+				}
+			}
+		}
+	} else if eno := msg2MailBox(msg); eno != SchEnoNone {
+		return eno
 	}
-
-	target.evTotal += 1
-	target.evHistory[target.evhIndex] = *msg
-	target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
-
-	*target.mailbox.que<-*msg
 
 	return SchEnoNone
 }
@@ -1797,28 +1832,29 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	schLog.Debug("schSchedulerStart:")
 	schLog.Debug("schSchedulerStart:")
 
-	var po = schMessage {
-		sender:	&rawSchTsk,
-		recver: nil,
-		Id:		EvSchPoweron,
-		Body:	nil,
-	}
-
-	var ptn interface{} = nil
-
-	var tkd  = schTaskDescription {
-		MbSize:	schMaxMbSize,
-		// watch dog is not implemented, ignored.
-		Wd:		&SchWatchDog {HaveDog: false},
-		Flag:	SchCreatedGo,
-	}
-
-	var name2PtnMap = make(map[string] interface{})
-
 	if len(tsd) <= 0 {
 		schLog.Debug("schSchedulerStart: static task table is empty")
 		return SchEnoParameter, nil
 	}
+
+	var (
+		po = schMessage {
+			sender:	&rawSchTsk,
+			recver: nil,
+			Id:		EvSchPoweron,
+			Body:	nil,
+		}
+
+		ptn interface{} = nil
+
+		tkd  = schTaskDescription {
+			MbSize:	schMaxMbSize,
+			Wd:		&SchWatchDog {HaveDog: false}, // watch dog is not implemented, ignored
+			Flag:	SchCreatedGo,
+		}
+
+		name2PtnMap = make(map[string] interface{})
+	)
 
 	//
 	// loop the static table
@@ -1854,11 +1890,9 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 		//
 
 		if eno, ptn = sdl.schCreateTask(&tkd); eno != SchEnoNone {
-
 			schLog.Debug("schSchedulerStart: " +
 				"schCreateTask failed, task: %s",
 				tkd.Name)
-
 			return SchEnoParameter, nil
 		}
 
@@ -1876,19 +1910,21 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 		//
 
 		if tsd[loop].Flag == SchCreatedGo {
-
 			po.recver = ptn.(*schTaskNode)
-
 			if eno = sdl.schSendMsg(&po); eno != SchEnoNone {
-
 				schLog.Debug("schSchedulerStart: "+
 					"schSendMsg failed, event: EvSchPoweron, eno: %d, task: %s",
 					eno,
 					tkd.Name)
-
 				return eno, nil
 			}
+			ptn.(*schTaskNode).task.isPoweron = true
+			ptn.(*schTaskNode).task.delayMessages = nil
+		} else {
+			ptn.(*schTaskNode).task.isPoweron = false
+			ptn.(*schTaskNode).task.delayMessages = make([]*schMessage, 0)
 		}
+		ptn.(*schTaskNode).task.isStatic = true
 	}
 
 	//
@@ -1898,40 +1934,31 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	//
 
 	for _, name := range tpo {
-
 		schLog.Debug("schSchedulerStart: send poweron to task: %s", name)
-
 		eno, tsk := sdl.schGetTaskNodeByName(name)
-
 		if eno != SchEnoNone {
-
 			schLog.Debug("schSchedulerStart: " +
 				"schGetTaskNodeByName failed, eno: %d, name: %s",
 				eno,
 				name)
-
 			continue
 		}
 
 		if tsk == nil {
-
 			schLog.Debug("schSchedulerStart: " +
 				"nil task node pointer, eno: %d, name: %s",
 				eno,
 				name)
-
 			continue
 		}
 
 		po.recver = tsk
 
 		if eno = sdl.schSendMsg(&po); eno != SchEnoNone {
-
 			schLog.Debug("schSchedulerStart: "+
 				"schSendMsg failed, event: EvSchPoweron, eno: %d, task: %s",
 				eno,
 				name)
-
 			return eno, nil
 		}
 	}

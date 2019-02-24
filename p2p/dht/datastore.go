@@ -585,7 +585,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	}
 
 	//
-	// check provier manager
+	// check provider manager
 	//
 
 	prdMgr, ok := dsMgr.sdl.SchGetTaskObject(PrdMgrName).(*PrdMgr)

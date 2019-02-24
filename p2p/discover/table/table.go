@@ -353,7 +353,7 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 		eno = tabMgr.tabMgrNatMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
 
 	case sch.EvNatMgrPubAddrUpdateInd:
-		eno = tabMgr.tabMgrNatPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrChangeInd))
+		eno = tabMgr.tabMgrNatPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
 
 	default:
 		tabLog.Debug("TabMgrProc: invalid message: %d", msg.Id)
@@ -966,61 +966,59 @@ func (tabMgr *TableManager)tabMgrNatReadyInd() TabMgrErrno {
 }
 
 func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) TabMgrErrno {
-	if !nat.NatResultOk(msg.Result) {
+	if !nat.NatIsResultOk(msg.Result) {
 		tabLog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
-	if strings.ToLower(msg.Proto) == "udp" {
-		tabMgr.natUdpResult = nat.NatResultOk(msg.Result)
-		if tabMgr.natUdpResult {
-			if nat.NatNone(msg.Status) {
-				tabMgr.pubUdpIp = tabMgr.cfg.local.IP
-				tabMgr.pubUdpPort = int(tabMgr.cfg.local.UDP)
-			} else {
-				tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
-				tabMgr.pubUdpPort = msg.PubPort
-			}
+	proto := strings.ToLower(msg.Proto)
+	if proto == "udp" {
+		tabMgr.natUdpResult = nat.NatIsResultOk(msg.Result)
+		if tabMgr.natUdpResult && nat.NatIsStatusOk(msg.Status) {
+			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
+			tabMgr.pubUdpPort = msg.PubPort
 		} else {
 			tabMgr.pubUdpIp = make([]byte, 0)
 			tabMgr.pubUdpPort = 0
 		}
-	} else if strings.ToLower(msg.Proto) == "tcp" {
-		tabMgr.natTcpResult = nat.NatResultOk(msg.Result)
-		if tabMgr.natTcpResult {
-			if nat.NatNone(msg.Status) {
-				tabMgr.pubTcpIp = tabMgr.cfg.local.IP
-				tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
-			} else {
-				tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
-				tabMgr.pubTcpPort = msg.PubPort
-			}
+	} else if proto == "tcp" {
+		tabMgr.natTcpResult = nat.NatIsResultOk(msg.Result)
+		if tabMgr.natTcpResult && nat.NatIsStatusOk(msg.Status) {
+			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
+			tabMgr.pubTcpPort = msg.PubPort
 		} else {
 			tabMgr.pubTcpIp = make([]byte, 0)
 			tabMgr.pubTcpPort = 0
 		}
 	} else {
-		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", msg.Proto)
+		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
 	// refresh all possible sub networks in the list. since we had put all
 	// into the list in any cases, we need just to loop the list, see codes
-	// and comments above please.
+	// and comments above please. notice that, we do not take the old natUdpResult
+	// into account here.
 
 	if tabMgr.natUdpResult {
-		for _, mgr := range tabMgr.SubNetMgrList {
-			mgr.startSubnetRefresh()
+		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
+			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			return eno
+		} else if proto == "udp" {
+			for _, mgr := range tabMgr.SubNetMgrList {
+				mgr.startSubnetRefresh()
+			}
 		}
 	}
 
 	return TabMgrEnoNone
 }
 
-func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrChangeInd) TabMgrErrno {
-	// see function nat.refreshInstance, the indication would be received hyst when nat manager
-	// refreshed ok, here the msg.Result must be good.
+func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) TabMgrErrno {
+	// see function nat.refreshInstance, the indication would be received after nat manager
+	// refreshed itself ok, here the msg.Result must be good.
 	old := tabMgr.natUdpResult
-	if strings.ToLower(msg.Proto) == "udp" {
-		tabMgr.natUdpResult = nat.NatResultOk(msg.Result)
+	proto := strings.ToLower(msg.Proto)
+	if proto == "udp" {
+		tabMgr.natUdpResult = nat.NatIsStatusOk(msg.Status)
 		if tabMgr.natUdpResult {
 			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
 			tabMgr.pubUdpPort = msg.PubPort
@@ -1028,8 +1026,8 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrCh
 			tabMgr.pubUdpIp = make([]byte, 0)
 			tabMgr.pubUdpPort = 0
 		}
-	} else if strings.ToLower(msg.Proto) == "tcp" {
-		tabMgr.natTcpResult = nat.NatResultOk(msg.Result)
+	} else if proto == "tcp" {
+		tabMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if tabMgr.natTcpResult {
 			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
 			tabMgr.pubTcpPort = msg.PubPort
@@ -1038,16 +1036,21 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrCh
 			tabMgr.pubTcpPort = 0
 		}
 	} else {
-		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", msg.Proto)
+		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
 	// check to start or stop auto-refreshing when updated
-	if tabMgr.natUdpResult && !old {
-		for _, mgr := range tabMgr.SubNetMgrList {
-			mgr.startSubnetRefresh()
+	if tabMgr.natUdpResult {
+		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
+			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			return eno
+		} else if proto == "udp" {
+			for _, mgr := range tabMgr.SubNetMgrList {
+				mgr.startSubnetRefresh()
+			}
 		}
-	} else if !tabMgr.natUdpResult && old {
+	} else if old {
 		for _, mgr := range tabMgr.SubNetMgrList {
 			mgr.stopSubnetRefresh()
 		}
@@ -2465,4 +2468,39 @@ func (tabMgr *TableManager)switch2RootInst() *TableManager {
 		}
 	}
 	return mgr
+}
+
+func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
+	// notice: in current design of p2p, same (ip, port) is applied for
+	// udp and tcp, so tabMgr.pubUdpIp and tabMgr.pubTcpIp must be the
+	// same.
+	switch proto {
+	case "udp":
+		if bytes.Compare(tabMgr.cfg.local.IP, tabMgr.pubUdpIp) == 0 &&
+			int(tabMgr.cfg.local.UDP) == tabMgr.pubUdpPort {
+			return TabMgrEnoParameter
+		}
+		tabMgr.cfg.local.IP = append(tabMgr.cfg.local.IP, tabMgr.pubUdpIp...)
+		tabMgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
+		for _, mgr := range tabMgr.SubNetMgrList {
+			mgr.cfg.local.IP = append(mgr.cfg.local.IP, tabMgr.pubUdpIp...)
+			mgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
+		}
+		return TabMgrEnoNone
+	case "tcp":
+		if bytes.Compare(tabMgr.cfg.local.IP, tabMgr.pubTcpIp) == 0 &&
+			int(tabMgr.cfg.local.TCP) == tabMgr.pubTcpPort {
+			return TabMgrEnoParameter
+		}
+		tabMgr.cfg.local.IP = append(tabMgr.cfg.local.IP, tabMgr.pubUdpIp...)
+		tabMgr.cfg.local.TCP = uint16(tabMgr.pubTcpPort & 0xffff)
+		for _, mgr := range tabMgr.SubNetMgrList {
+			mgr.cfg.local.IP = append(mgr.cfg.local.IP, tabMgr.pubUdpIp...)
+			mgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
+		}
+		return TabMgrEnoNone
+	default:
+		tabLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
+	}
+	return TabMgrEnoParameter
 }

@@ -22,11 +22,14 @@ package dht
 
 import (
 	"fmt"
+	"net"
 	"time"
 	"bytes"
+	"strings"
 	"container/list"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	config	"github.com/yeeco/gyee/p2p/config"
+	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -59,6 +62,8 @@ const (
 	qryMgrQryMaxWidth = 64				// not the true "width", the max number of peers queryied
 	qryMgrQryMaxDepth = 8				// the max depth for a query
 	qryInstExpired = time.Second * 16	// duration to get expired for a query instance
+	natMapKeepTime = time.Minute * 20	// NAT map keep time
+	natMapRefreshTime = natMapKeepTime - time.Minute * 5 // NAT map refresh time
 )
 
 //
@@ -136,41 +141,45 @@ const (
 // Query instance control block
 //
 type qryInstCtrlBlock struct {
-	sdl			*sch.Scheduler					// pointer to scheduler
-	seq			int								// sequence number
-	qryReq		*sch.MsgDhtQryMgrQueryStartReq	// original query request message
-	name		string							// instance name
-	ptnInst		interface{}						// pointer to query instance task node
-	ptnConMgr	interface{}						// pointer to connection manager task node
-	ptnQryMgr	interface{}						// pointer to query manager task node
-	ptnRutMgr	interface{}						// pointer to rute manager task node
-	status		int								// instance status
-	local		*config.Node					// pointer to local node specification
-	target		config.DsKey					// target is looking up
-	to			config.Node						// to whom the query message sent
-	dir			int								// connection direction
-	qTid		int								// query timer identity
-	begTime		time.Time						// query begin time
-	endTime		time.Time						// query end time
-	conBegTime	time.Time						// time to start connection
-	conEndTime	time.Time						// time connection established
-	depth		int								// the current depth of the query instance
+	sdl				*sch.Scheduler					// pointer to scheduler
+	seq				int								// sequence number
+	qryReq			*sch.MsgDhtQryMgrQueryStartReq	// original query request message
+	name			string							// instance name
+	ptnInst			interface{}						// pointer to query instance task node
+	ptnConMgr		interface{}						// pointer to connection manager task node
+	ptnQryMgr		interface{}						// pointer to query manager task node
+	ptnRutMgr		interface{}						// pointer to rute manager task node
+	status			int								// instance status
+	local			*config.Node					// pointer to local node specification
+	target			config.DsKey					// target is looking up
+	to				config.Node						// to whom the query message sent
+	dir				int								// connection direction
+	qTid			int								// query timer identity
+	begTime			time.Time						// query begin time
+	endTime			time.Time						// query end time
+	conBegTime		time.Time						// time to start connection
+	conEndTime		time.Time						// time connection established
+	depth			int								// the current depth of the query instance
 }
 
 //
 // Query manager
 //
 type QryMgr struct {
-	sdl			*sch.Scheduler					// pointer to scheduler
-	name		string							// query manager name
-	tep			sch.SchUserTaskEp				// task entry
-	ptnMe		interface{}						// pointer to task node of myself
-	ptnRutMgr	interface{}						// pointer to task node of route manager
-	ptnDhtMgr	interface{}						// pointer to task node of dht manager
-	instSeq		int								// query instance sequence number
-	qcbTab		map[config.DsKey]*qryCtrlBlock	// query control blocks
-	qmCfg		qryMgrCfg						// query manager configuration
-	qcbSeq		int								// query control block sequence number
+	sdl				*sch.Scheduler					// pointer to scheduler
+	name			string							// query manager name
+	tep				sch.SchUserTaskEp				// task entry
+	ptnMe			interface{}						// pointer to task node of myself
+	ptnRutMgr		interface{}						// pointer to task node of route manager
+	ptnDhtMgr		interface{}						// pointer to task node of dht manager
+	ptnNatMgr		interface{}						// pointer to task naode of nat manager
+	instSeq			int								// query instance sequence number
+	qcbTab			map[config.DsKey]*qryCtrlBlock	// query control blocks
+	qmCfg			qryMgrCfg						// query manager configuration
+	qcbSeq			int								// query control block sequence number
+	natTcpResult	bool							// result about nap mapping for tcp
+	pubTcpIp		net.IP							// should be same as pubUdpIp
+	pubTcpPort		int								// public port form nat to be announced for tcp
 }
 
 //
@@ -248,6 +257,15 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtQryInstStopRsp:
 		eno = qryMgr.instStopRsp(msg.Body.(*sch.MsgDhtQryInstStopRsp))
 
+	case sch.EvNatMgrReadyInd:
+		eno = qryMgr.natMgrReadyInd()
+
+	case sch.EvNatMgrMakeMapRsp:
+		eno = qryMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
+
+	case sch.EvNatMgrPubAddrUpdateInd:
+		eno = qryMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
+
 	default:
 		qryLog.Debug("qryMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -280,6 +298,12 @@ func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
 	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetUserTaskNode(RutMgrName);
 	eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", RutMgrName)
+		return eno
+	}
+
+	if eno, qryMgr.ptnNatMgr = qryMgr.sdl.SchGetUserTaskNode(nat.NatMgrName);
+	eno != sch.SchEnoNone {
+		qryLog.Debug("poweron: get task failed, task: %s", nat.NatMgrName)
 		return eno
 	}
 
@@ -1049,6 +1073,77 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
+func (qryMgr *QryMgr)natMgrReadyInd() sch.SchErrno {
+	schMsg := sch.SchMessage{}
+	req := sch.MsgNatMgrMakeMapReq {
+		Proto: "tcp",
+		FromPort: int(qryMgr.qmCfg.local.TCP),
+		ToPort: int(qryMgr.qmCfg.local.TCP),
+		DurKeep: natMapKeepTime,
+		DurRefresh: natMapRefreshTime,
+	}
+	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
+	if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+	return sch.SchEnoNone
+}
+
+func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
+	if !nat.NatIsResultOk(msg.Result) {
+		qryLog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
+	}
+	proto := strings.ToLower(msg.Proto)
+	if proto == "tcp" {
+		qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
+		if qryMgr.natTcpResult {
+			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], msg.PubIp...)
+			qryMgr.pubTcpPort = msg.PubPort
+		} else {
+			qryMgr.pubTcpIp = make([]byte, 0)
+			qryMgr.pubTcpPort = 0
+		}
+		if qryMgr.natTcpResult {
+			if eno := qryMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
+				qryLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				return eno
+			}
+		}
+		return sch.SchEnoNone
+	}
+
+	qryLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	return sch.SchEnoParameter
+}
+
+func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch.SchErrno {
+	if !nat.NatIsStatusOk(msg.Status) {
+		qryLog.Debug("natPubAddrUpdateInd: fail reported, msg: %+v", *msg)
+	}
+	proto := strings.ToLower(msg.Proto)
+	if proto == "tcp" {
+		qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
+		if qryMgr.natTcpResult {
+			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], msg.PubIp...)
+			qryMgr.pubTcpPort = msg.PubPort
+		} else {
+			qryMgr.pubTcpIp = make([]byte, 0)
+			qryMgr.pubTcpPort = 0
+		}
+		if qryMgr.natTcpResult {
+			if eno := qryMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
+				qryLog.Debug("natPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+				return eno
+			}
+		}
+		return sch.SchEnoNone
+	}
+
+	qryLog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", msg.Proto)
+	return sch.SchEnoParameter
+}
+
 //
 // Get query manager configuration
 //
@@ -1498,4 +1593,10 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 	qryMgr.sdl.SchSendMessage(&msg)
 
 	return DhtEnoNone
+}
+
+func (qryMgr *QryMgr)switch2NatAddr(proto string) sch.SchErrno {
+	qryMgr.qmCfg.local.IP = qryMgr.pubTcpIp
+	qryMgr.qmCfg.local.TCP = uint16(qryMgr.pubTcpPort & 0xffff)
+	return sch.SchEnoNone
 }

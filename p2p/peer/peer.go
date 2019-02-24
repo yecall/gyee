@@ -500,7 +500,8 @@ func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
 	peerLog.Debug("peMgrStartReq: task: %s", peMgr.name)
 	var schMsg = sch.SchMessage{}
 
-	// start peer listener if necessary
+	// start peer listener if necessary. notice: nat mapping for peer listener manager
+	// is established by table manager, here start the listener at once.
 	if peMgr.cfg.noAccept == false {
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
 		peMgr.sdl.SchSendMessage(&schMsg)

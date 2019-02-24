@@ -102,26 +102,29 @@ const schTimerNodePoolSize	= 2048						// timer node pool size, must be (2^n)
 //
 // Task struct
 //
-const schMaxTaskTimer	= SchMaxTaskTimer		// max timers can be held by one user task
-const schInvalidTid		= SchInvalidTid			// invalid timer identity
-const evHistorySize		= 64					// round buffer size fo event history
+const schMaxTaskTimer	= SchMaxTaskTimer			// max timers can be held by one user task
+const schInvalidTid		= SchInvalidTid				// invalid timer identity
+const evHistorySize		= 64						// round buffer size fo event history
 type schTask struct {
-	lock		sync.Mutex						// lock to protect task control block
-	sdl			*scheduler						// pointer to scheduler
-	name		string							// task name
-	utep		schUserTaskProc					// user task entry point
-	mailbox		schMailBox						// mail box
-	done		chan SchErrno					// done with errno
-	stopped		chan bool						// stopped signal
-	tmTab		[schMaxTaskTimer]*schTmcbNode	// timer node table
-	tmIdxTab	map[*schTmcbNode] int			// map time node pointer to its' index in tmTab
-	dog			schWatchDog						// wathch dog
-	dieCb		func(interface{}) SchErrno		// callbacked when going to die
-	goStatus	int								// in going or suspended
-	evHistory	[evHistorySize]schMessage		// event history
-	evhIndex	int								// event history index
-	evTotal		int64							// total event number
-	userData	interface{}						// data area pointer of user task
+	lock			sync.Mutex						// lock to protect task control block
+	sdl				*scheduler						// pointer to scheduler
+	name			string							// task name
+	utep			schUserTaskProc					// user task entry point
+	mailbox			schMailBox						// mail box
+	done			chan SchErrno					// done with errno
+	stopped			chan bool						// stopped signal
+	tmTab			[schMaxTaskTimer]*schTmcbNode	// timer node table
+	tmIdxTab		map[*schTmcbNode] int			// map time node pointer to its' index in tmTab
+	dog				schWatchDog						// wathch dog
+	dieCb			func(interface{}) SchErrno		// callbacked when going to die
+	goStatus		int								// in going or suspended
+	evHistory		[evHistorySize]schMessage		// event history
+	evhIndex		int								// event history index
+	evTotal			int64							// total event number
+	userData		interface{}						// data area pointer of user task
+	isStatic		bool							// is static task
+	isPoweron		bool							// if EvSchPoweron sent to task
+	delayMessages	[]*schMessage					// messages before EvSchPoweron
 }
 
 //

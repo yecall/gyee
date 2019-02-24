@@ -1272,6 +1272,11 @@ func (conMgr *ConMgr)instTxTimeoutInd(msg *sch.MsgDhtConInstStatusInd) sch.SchEr
 // deal with connection instance evicted
 //
 func (conMgr *ConMgr)onInstEvicted(key interface{}, value interface{}) {
+	// notice: here we can send EvDhtLsnMgrPauseReq event to listener manager so
+	// later connections from outside would not be accepted, since at this moment,
+	// max connection threshold had been reached. this is not implemented, for it
+	// needs EvDhtLsnMgrResumeReq to be sent when number of connection is under
+	// the threshold later.
 	k, _ := key.(*instLruKey)
 	ci, _ := value.(instLruValue)
 	if k == nil || ci == nil {

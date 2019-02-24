@@ -31,6 +31,7 @@ import (
 	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
 	peer	"github.com/yeeco/gyee/p2p/peer"
 	dht		"github.com/yeeco/gyee/p2p/dht"
+	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -71,6 +72,8 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 	// Following are static tasks for ycp2p module internal. Notice that fields of struct
 	// sch.TaskStaticDescription like MbSize, Wd, Flag will be set to default values internal
 	// scheduler, please see function schimplSchedulerStart for details pls.
+	// notice: since in gyee project the chain and dht are combined together, just one nat
+	// manager needed.
 	//
 
 	if what == config.P2P_TYPE_CHAIN {
@@ -83,20 +86,21 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: sch.PeerMgrName,		Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.NatMgrName,		Tep: nat.NewNatMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: sch.ShMgrName,		Tep: NewShellMgr(),			MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
 	} else if what == config.P2P_TYPE_DHT {
 
 		return []sch.TaskStaticDescription{
-			{Name: dht.DhtMgrName,		Tep: dht.NewDhtMgr(),	MbSize: -1,	DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.DsMgrName,		Tep: dht.NewDsMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.LsnMgrName,		Tep: dht.NewLsnMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.PrdMgrName,		Tep: dht.NewPrdMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.QryMgrName,		Tep: dht.NewQryMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.RutMgrName,		Tep: dht.NewRutMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.ConMgrName,		Tep: dht.NewConMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: sch.DhtShMgrName,	Tep: NewDhtShellMgr(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DsMgrName,		Tep: dht.NewDsMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.LsnMgrName,		Tep: dht.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.PrdMgrName,		Tep: dht.NewPrdMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.QryMgrName,		Tep: dht.NewQryMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.RutMgrName,		Tep: dht.NewRutMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.ConMgrName,		Tep: dht.NewConMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.ShMgrName,		Tep: nat.NewNatMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.DhtShMgrName,	Tep: NewDhtShellMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 	}
 
@@ -111,6 +115,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 // to modify this table if necessary.
 //
 var taskStaticPoweronOrder4Chain = []string {
+	nat.NatMgrName,
 	dcv.DcvMgrName,
 	tab.NdbcName,
 	ngb.LsnMgrName,
@@ -127,6 +132,7 @@ var taskStaticPoweronOrder4Chain = []string {
 // to modify this table if necessary.
 //
 var taskStaticPoweroffOrder4Chain = []string {
+	nat.NatMgrName,
 	sch.ShMgrName,
 	dcv.DcvMgrName,
 	tab.NdbcName,

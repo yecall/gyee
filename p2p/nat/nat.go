@@ -60,6 +60,7 @@ const (
 	NatEnoFromUpnpLib
 	NatEnoFromSystem
 	NatEnoNoNat
+	NatEnoNullNat
 	NatEnoUnknown
 )
 
@@ -258,6 +259,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 		eno = NatEnoNone
 		status = NatEnoUnknown
 		proto = ""
+		fromPort = -1
 		pubIp = net.IPv4zero
 		pubPort = -1
 		id NatMapInstID
@@ -273,6 +275,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	if natMgr.cfg.natType == NATT_NONE {
 		status = NatEnoNoNat
 		proto = fmt.Sprintf("%s", mmr.Proto)
+		fromPort = mmr.FromPort
 		pubPort = mmr.FromPort
 		goto _rsp2sender
 	}
@@ -314,6 +317,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	inst.status = s
 
 	proto = fmt.Sprintf("%s", inst.id.proto)
+	fromPort = mmr.FromPort
 	pubIp = append(pubIp[0:], inst.pubIp...)
 	pubPort = inst.pubPort
 	status = inst.status
@@ -324,6 +328,7 @@ _rsp2sender:
 		Result: eno.Errno(),
 		Status: status.Errno(),
 		Proto: proto,
+		FromPort: fromPort,
 		PubIp: pubIp,
 		PubPort: pubPort,
 	}
@@ -404,14 +409,17 @@ func (natMgr *NatManager)getPubAddrReq(msg *sch.SchMessage) sch.SchErrno {
 		goto _rsp2sender
 	}
 
-	inst = natMgr.instTab[id]
-	ip, s = natMgr.nat.getPublicIpAddr()
-	inst.pubIp = append(inst.pubIp[0:], ip...)
-	inst.status = s
-
-	eno = NatEnoNone
-	pubIp = append(pubIp[0:], inst.pubIp...)
-	pubPort = inst.pubPort
+	if natMgr.nat == nil {
+		status = NatEnoNullNat
+	} else {
+		inst = natMgr.instTab[id]
+		ip, s = natMgr.nat.getPublicIpAddr()
+		inst.pubIp = append(inst.pubIp[0:], ip...)
+		inst.status = s
+		eno = NatEnoNone
+		pubIp = append(pubIp[0:], inst.pubIp...)
+		pubPort = inst.pubPort
+	}
 
 _rsp2sender:
 	rsp := sch.MsgNatMgrGetPublicAddrRsp{
@@ -516,8 +524,8 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 	} else {
 		if bytes.Compare(inst.pubIp, curIp) != 0 {
 			inst.pubIp = append(inst.pubIp[0:], curIp...)
-			ind := sch.MsgNatMgrPubAddrChangeInd{
-				Result: NatEnoNone.Errno(),
+			ind := sch.MsgNatMgrPubAddrUpdateInd{
+				Status: NatEnoNone.Errno(),
 				Proto: inst.id.proto,
 				FromPort: inst.id.fromPort,
 				PubIp: inst.pubIp,
@@ -583,10 +591,10 @@ func (natMgr *NatManager)startRefreshTimer(inst *NatMapInstance) NatEno {
 	return NatEnoNone
 }
 
-func NatResultOk(eno int) bool {
+func NatIsResultOk(eno int) bool {
 	return eno == NatEnoNone.Errno()
 }
 
-func NatNone(status int) bool {
+func NatIsStatusOk(status int) bool {
 	return status == NatEnoNoNat.Errno()
 }
