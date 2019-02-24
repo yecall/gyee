@@ -75,6 +75,8 @@ type P2pConfig struct {
 	EvKeepTime        int      `toml:"ev_keep_time"`
 	DedupTime         int      `toml:"dedup_time"`
 	BootstrapTime     int      `toml:"bootstrap_time"`
+	NatType           string   `toml:"nat_type"`
+	GatewayIp         string   `toml:"gateway_ip"`
 }
 
 //Listen addr, modules, access right

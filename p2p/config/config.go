@@ -73,6 +73,7 @@ const (
 	PcfgEnoDatabase
 	PcfgEnoIpAddr
 	PcfgEnoNodeId
+	PcfgEnoNat
 	PcfgEnoUnknown
 )
 
@@ -153,6 +154,13 @@ type Protocol struct {
 const (
 	P2pNetworkTypeDynamic	= 0				// neighbor discovering needed
 	P2pNetworkTypeStatic	= 1				// no discovering
+)
+
+// Nat type
+const (
+	NATT_NONE	= "none"
+	NATT_PMP	= "pmp"
+	NATT_UPNP	= "upnp"
 )
 
 // Application type
@@ -609,7 +617,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	cfgLog.Debug("P2pSetConfig: [ip, udp, tcp]=[%s, %d, %d]",
 		cfg.Local.IP.String(), cfg.Local.UDP, cfg.Local.TCP)
 
-	name = strings.Trim(name, " ")
+	name = strings.TrimSpace(name)
 	if len(name) == 0 {
 		if len(cfg.CfgName) == 0 {
 			cfgLog.Debug("P2pSetConfig: empty configuration name")
@@ -1156,4 +1164,26 @@ func FromECDSA(priK *ecdsa.PrivateKey) []byte {
 	return priK.D.Bytes()
 }
 
+// Setup nat configuration
+func P2pIsValidNatType(natt string) bool {
+	natt = strings.ToLower(natt)
+	return natt == NATT_NONE || natt == NATT_PMP || natt == NATT_UPNP
+}
 
+func P2pSetupNatType(cfg *Config, natType string, gwIp string) P2pCfgErrno {
+	if P2pIsValidNatType(natType) != true {
+		cfgLog.Debug("P2pSetupNat: invalid nat type: %s", natType)
+		return PcfgEnoNat
+	}
+	natt := strings.TrimSpace(natType)
+	if natt == strings.ToLower(NATT_PMP) {
+		gwIp = strings.TrimSpace(gwIp)
+		if len(gwIp) == 0 {
+			cfgLog.Debug("")
+			return PcfgEnoNat
+		}
+		cfg.NatCfg.GwIp = net.ParseIP(gwIp)
+	}
+	cfg.NatCfg.NatType = natt
+	return PcfgEnoNone
+}

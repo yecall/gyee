@@ -142,6 +142,8 @@ type YeShellConfig struct {
 	EvKeepTime			time.Duration							// duration for events kept by dht
 	DedupTime			time.Duration							// duration for deduplication cleanup timer
 	BootstrapTime		time.Duration							// duration for bootstrap blind connection
+	NatType				string									// nat type, "none"/"pmp"/"upnp"
+	GatewayIp			string									// gateway ip when nat type is "pmp"
 	localSnid			[]config.SubNetworkID					// local sub network identities
 	localNode			map[config.SubNetworkID]config.Node		// local sub nodes
 	dhtBootstrapNodes	[]*config.Node							// dht bootstarp nodes
@@ -153,6 +155,8 @@ const (
 	DftEvKeepTime		= time.Minute * 1
 	DftDedupTime		= time.Second * 60
 	DftBootstrapTime	= time.Second * 4
+	DftNatType			= "none"
+	DftGatewayIp		= "0.0.0.0"
 )
 
 // Default yee shell configuration for convenience
@@ -178,6 +182,8 @@ var DefaultYeShellConfig = YeShellConfig{
 	EvKeepTime:			DftEvKeepTime,
 	DedupTime:			DftDedupTime,
 	BootstrapTime:		DftBootstrapTime,
+	NatType:			DftNatType,
+	GatewayIp:			DftGatewayIp,
 	localSnid:			make([]config.SubNetworkID, 0),
 	localNode:			make(map[config.SubNetworkID]config.Node, 0),
 	dhtBootstrapNodes:	make([]*config.Node, 0),
@@ -220,30 +226,28 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 
 	p2plog.Debug("YeShellConfigToP2pCfg: LocalNodeIp: %s, LocalUdpPort: %d, LocalTcpPort: %d",
 		yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort)
-
 	if config.P2pSetLocalIpAddr(chainCfg, yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort) != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalIpAddr failed")
 		return nil
 	}
-
 	if config.P2pSetupLocalNodeId(chainCfg) != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetupLocalNodeId failed")
 		return nil
 	}
-
 	if err := SetupSubNetwork(chainCfg, yesCfg.SubNetMaskBits, yesCfg.Validator); err != nil {
 		yesLog.Debug("YeShellConfigToP2pCfg: SetupSubNetwork failed")
 		return nil
 	}
-
 	thisCfg.localSnid = append(thisCfg.localSnid, chainCfg.SubNetIdList...)
 	for _, snid := range thisCfg.localSnid {
 		thisCfg.localNode[snid] = chainCfg.SubNetNodeList[snid]
 	}
 
+	p2plog.Debug("YeShellConfigToP2pCfg: NatType: %s, GatewayIp: %s", yesCfg.NatType, yesCfg.GatewayIp)
+	config.P2pSetupNatType(chainCfg, yesCfg.NatType, yesCfg.GatewayIp)
+
 	p2plog.Debug("YeShellConfigToP2pCfg: LocalDhtIp: %s, LocalDhtPort: %d",
 		yesCfg.LocalDhtIp, yesCfg.LocalDhtPort)
-
 	if config.P2pSetLocalDhtIpAddr(chainCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.PcfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
 		return nil
@@ -907,7 +911,7 @@ func (yeShMgr *YeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 				yesLog.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
 				yeShMgr.dhtBsChan<-true
 
-				// when coming here, we should havd add the connected bootstarp node to our
+				// when coming here, we should have added the connected bootstarp node to our
 				// dht route table, but it's the only node there, we need to start a bootstrap
 				// procedure to fill our route now.
 				time.Sleep(time.Second)

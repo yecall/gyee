@@ -84,6 +84,10 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	//											周期性的从BootstrapNodes中随机挑选节点进行连接，
 	//											连接成功之后，该时钟停止。
 	//
+	// NatType				string				nat类型，目前支持三种："none", "pmp", "upnp"
+	//
+	// GatewayIp			string				当nat类型配置为"pmp"的时候相应的网关IP地址
+	//
 	// 注：如前所述，本函数应由应用根据具体情况（cfgFromFie的结构设计）实现并调用，但这不是必须的，应用
 	// 可以用任何方法构造合理的YeShellConfig结构，然后调用NewOsnService得到服务实例。
 	//
