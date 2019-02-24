@@ -156,13 +156,6 @@ const (
 	P2pNetworkTypeStatic	= 1				// no discovering
 )
 
-// Nat type
-const (
-	NATT_NONE	= "none"
-	NATT_PMP	= "pmp"
-	NATT_UPNP	= "upnp"
-)
-
 // Application type
 type P2pAppType int
 const (
