@@ -488,6 +488,7 @@ func testCase2(tc *testCase) {
 		yeShMgr.Start()
 		time.Sleep(time.Second * 60)
 		yeShMgr.Stop()
+		log.Debug("\n\n\n")
 	}
 }
 

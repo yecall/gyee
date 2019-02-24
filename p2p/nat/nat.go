@@ -26,6 +26,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	"sync"
 )
 
 
@@ -37,7 +38,7 @@ type natMgrLogger struct {
 }
 
 var natLog = natMgrLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log natMgrLogger)Debug(fmt string, args ... interface{}) {
@@ -100,6 +101,9 @@ const (
 //
 // interface for nat
 //
+
+var natLock sync.Mutex
+
 type natInterface interface {
 
 	// make map between local address to public address
@@ -129,6 +133,9 @@ func (id NatMapInstID)toString() string {
 	return fmt.Sprintf("%s:%d", id.proto, id.fromPort)
 }
 
+//
+// map instance
+//
 type NatMapInstance struct {
 	owner		interface{}		// owner task pointer
 	id			NatMapInstID	// map item identity
@@ -196,6 +203,9 @@ func (natMgr *NatManager)natMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 }
 
 func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
+	natLock.Lock()
+	defer natLock.Unlock()
+
 	natMgr.ptnMe = ptn
 	natMgr.sdl = sch.SchGetScheduler(ptn)
 
@@ -222,10 +232,14 @@ func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
+	ind := sch.MsgNatMgrReadyInd {
+		NatType: natMgr.cfg.natType,
+	}
+
 	if natMgr.ptnTabMgr != nil {
 		msg2Tab := sch.SchMessage{}
 		if natMgr.ptnTabMgr != nil {
-			natMgr.sdl.SchMakeMessage(&msg2Tab, natMgr.ptnMe, natMgr.ptnTabMgr, sch.EvNatMgrReadyInd, nil)
+			natMgr.sdl.SchMakeMessage(&msg2Tab, natMgr.ptnMe, natMgr.ptnTabMgr, sch.EvNatMgrReadyInd, &ind)
 			natMgr.sdl.SchSendMessage(&msg2Tab)
 		}
 	}
@@ -233,7 +247,7 @@ func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 	if natMgr.ptnDhtMgr != nil {
 		msg2Dht := sch.SchMessage{}
 		if natMgr.ptnDhtMgr != nil {
-			natMgr.sdl.SchMakeMessage(&msg2Dht, natMgr.ptnMe, natMgr.ptnDhtMgr, sch.EvNatMgrReadyInd, nil)
+			natMgr.sdl.SchMakeMessage(&msg2Dht, natMgr.ptnMe, natMgr.ptnDhtMgr, sch.EvNatMgrReadyInd, &ind)
 			natMgr.sdl.SchSendMessage(&msg2Dht)
 		}
 	}
@@ -248,6 +262,9 @@ func (natMgr *NatManager)poweroff(msg *sch.SchMessage) sch.SchErrno {
 }
 
 func (natMgr *NatManager)discoverReq(msg *sch.SchMessage) sch.SchErrno {
+	natLock.Lock()
+	defer natLock.Unlock()
+
 	// notice: "ANY" type is not supported by reconfiguration, so it's not
 	// supported by EvNatMgrDiscoverReq.
 	var eno = NatEnoNone
@@ -267,6 +284,9 @@ func (natMgr *NatManager)discoverReq(msg *sch.SchMessage) sch.SchErrno {
 }
 
 func (natMgr *NatManager)refreshTimerHandler(msg *sch.SchMessage) sch.SchErrno {
+	natLock.Lock()
+	defer natLock.Unlock()
+
 	inst, _ := msg.Body.(*NatMapInstance)
 	if eno := natMgr.refreshInstance(inst); eno != NatEnoNone {
 		natLog.Debug("refreshTimerHandler: refreshInstance failed, error: %s", eno.Error())
@@ -276,6 +296,9 @@ func (natMgr *NatManager)refreshTimerHandler(msg *sch.SchMessage) sch.SchErrno {
 }
 
 func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
+	natLock.Lock()
+	defer natLock.Unlock()
+
 	var (
 		eno = NatEnoNone
 		status = NatEnoUnknown
@@ -318,7 +341,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	}
 
 	inst = NatMapInstance {
-		owner: natMgr.sdl.SchGetSender(msg),
+		owner: sender,
 		id: id,
 		toPort: mmr.ToPort,
 		durKeep: mmr.DurKeep,
@@ -326,7 +349,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 		tidRefresh: sch.SchInvalidTid,
 		status: NatEnoUnknown,
 		pubIp: net.IPv4zero,
-		pubPort: -1,
+		pubPort: mmr.ToPort,
 	}
 
 	if eno := natMgr.nat.makeMap(inst.id.toString(), inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep); eno != NatEnoNone {
@@ -340,12 +363,12 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	}
 	ip, s = natMgr.nat.getPublicIpAddr()
 	natMgr.instTab[id] = &inst
-	inst.pubIp = append(inst.pubIp[0:], ip...)
+	inst.pubIp = ip
 	inst.status = s
 
 	proto = fmt.Sprintf("%s", inst.id.proto)
 	fromPort = mmr.FromPort
-	pubIp = append(pubIp[0:], inst.pubIp...)
+	pubIp = inst.pubIp
 	pubPort = inst.pubPort
 	status = inst.status
 
@@ -365,6 +388,9 @@ _rsp2sender:
 }
 
 func (natMgr *NatManager)removeMapReq(msg *sch.SchMessage) sch.SchErrno {
+	natLock.Lock()
+	defer natLock.Unlock()
+
 	eno := NatEnoUnknown
 	rmr, _ := msg.Body.(*sch.MsgNatMgrRemoveMapReq)
 	sender := natMgr.sdl.SchGetSender(msg)
@@ -408,6 +434,9 @@ _rsp2sender:
 }
 
 func (natMgr *NatManager)getPubAddrReq(msg *sch.SchMessage) sch.SchErrno {
+	natLock.Lock()
+	defer natLock.Unlock()
+
 	if natMgr.cfg.natType == NATT_NONE {
 		natLog.Debug("getPubAddrReq: type mismatche, current: %s", natMgr.cfg.natType)
 		return sch.SchEnoUserTask

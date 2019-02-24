@@ -258,7 +258,7 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = qryMgr.instStopRsp(msg.Body.(*sch.MsgDhtQryInstStopRsp))
 
 	case sch.EvNatMgrReadyInd:
-		eno = qryMgr.natMgrReadyInd(msg.Body.(*sch.sch.MsgNatMgrReadyInd))
+		eno = qryMgr.natMgrReadyInd(msg.Body.(*sch.MsgNatMgrReadyInd))
 
 	case sch.EvNatMgrMakeMapRsp:
 		eno = qryMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
@@ -1105,6 +1105,8 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 		if qryMgr.natTcpResult {
 			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], msg.PubIp...)
 			qryMgr.pubTcpPort = msg.PubPort
+			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+				qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort)
 		} else {
 			qryMgr.pubTcpIp = make([]byte, 0)
 			qryMgr.pubTcpPort = 0
@@ -1130,7 +1132,7 @@ func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if qryMgr.natTcpResult {
-			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], msg.PubIp...)
+			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], msg.PubIp.To4()...)
 			qryMgr.pubTcpPort = msg.PubPort
 		} else {
 			qryMgr.pubTcpIp = make([]byte, 0)

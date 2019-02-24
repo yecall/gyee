@@ -270,13 +270,13 @@ type TableManager struct {
 	// as dynamic but no specific sub network identities provided, a table
 	// manager with identity as AnySubNet would be allocated. There is always
 	// one base table manager act as a task for dispatching messages to real
-	// sub network table managers in SubNetMgrList, and sending messages for
+	// sub network table managers in subNetMgrList, and sending messages for
 	// them when necessary.
 	//
 
 	networkType		int								// network type
 	snid			SubNetworkID					// sub network identity
-	SubNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
+	subNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
 
 	//
 	// public address from nat manager
@@ -433,7 +433,7 @@ func (tabMgr *TableManager)tabMgrPoweron(ptn interface{}) TabMgrErrno {
 			b.nodes = make([]*bucketEntry, 0, bucketSize)
 		}
 
-		tabMgr.SubNetMgrList[tabMgr.snid] = tabMgr
+		tabMgr.subNetMgrList[tabMgr.snid] = tabMgr
 
 	} else if len(tabMgr.cfg.subNetIdList) > 0 {
 
@@ -502,7 +502,7 @@ func newTabMgrWithoutLock() *TableManager {
 		arfTid:			sch.SchInvalidTid,
 		networkType:	p2pTypeDynamic,
 		snid:			AnySubNet,
-		SubNetMgrList:	map[SubNetworkID]*TableManager{},
+		subNetMgrList:	map[SubNetworkID]*TableManager{},
 		natUdpResult:	false,
 		pubUdpIp:		make([]byte, 0),
 		pubUdpPort:		0,
@@ -527,7 +527,7 @@ func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
 	mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
 	mgr.dlkTab			= make([]int, 256)
 	mgr.tabSetupLocalHashId()
-	tabMgr.SubNetMgrList[snid] = mgr
+	tabMgr.subNetMgrList[snid] = mgr
 
 	for loop := 0; loop < cap(mgr.buckets); loop++ {
 		b := new(bucket)
@@ -540,7 +540,7 @@ func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
 func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 	for _, snid := range tabMgr.cfg.subNetIdList {
 		mgr := tabMgr.mgr4Subnet(snid)
-		tabMgr.SubNetMgrList[snid] = mgr
+		tabMgr.subNetMgrList[snid] = mgr
 	}
 	return TabMgrEnoNone
 }
@@ -569,13 +569,13 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 	addList := msg.SnidAdd
 
 	for _, del := range delList {
-		if mgr, ok := tabMgr.SubNetMgrList[del]; ok {
+		if mgr, ok := tabMgr.subNetMgrList[del]; ok {
 			if mgr.arfTid != sch.SchInvalidTid {
 				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, mgr.arfTid)
 				mgr.arfTid = sch.SchInvalidTid
 			}
 			delete(tabMgr.cfg.subNetNodeList, del)
-			delete(tabMgr.SubNetMgrList, del)
+			delete(tabMgr.subNetMgrList, del)
 			tabLog.Debug("shellReconfigReq: subnet deleted: %x", del)
 		}
 		for idx, snid := range tabMgr.cfg.subNetIdList {
@@ -599,7 +599,7 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 	tabMgr.sdl.SchGetP2pConfig().SnidMaskBits = msg.MaskBits
 
 	for _, add := range addList {
-		if _, ok := tabMgr.SubNetMgrList[add.SubNetId]; ok {
+		if _, ok := tabMgr.subNetMgrList[add.SubNetId]; ok {
 			tabLog.Debug("shellReconfigReq: duplicated for adding")
 			continue
 		}
@@ -609,12 +609,12 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 	}
 
 	for _, add := range addList {
-		if _, ok := tabMgr.SubNetMgrList[add.SubNetId]; ok {
+		if _, ok := tabMgr.subNetMgrList[add.SubNetId]; ok {
 			tabLog.Debug("shellReconfigReq: duplicated for adding")
 			continue
 		}
 		mgr := tabMgr.mgr4Subnet(add.SubNetId)
-		tabMgr.SubNetMgrList[add.SubNetId] = mgr
+		tabMgr.subNetMgrList[add.SubNetId] = mgr
 		tabLog.Debug("shellReconfigReq: subnet manager added: %x", add.SubNetId)
 
 		if eno := mgr.startSubnetRefresh(); eno != TabMgrEnoNone {
@@ -628,7 +628,7 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 }
 
 func (tabMgr *TableManager)tabMgrRefreshTimerHandler(snid *SubNetworkID)TabMgrErrno {
-	if mgr, ok := tabMgr.SubNetMgrList[*snid]; ok {
+	if mgr, ok := tabMgr.subNetMgrList[*snid]; ok {
 		return mgr.tabRefresh(snid, nil)
 	}
 	tabLog.Debug("tabMgrRefreshTimerHandler: invalid subnet: %x", snid)
@@ -636,7 +636,7 @@ func (tabMgr *TableManager)tabMgrRefreshTimerHandler(snid *SubNetworkID)TabMgrEr
 }
 
 func (tabMgr *TableManager)tabMgrPingpongTimerHandler(inst *instCtrlBlock) TabMgrErrno {
-	mgr, ok := tabMgr.SubNetMgrList[inst.snid]
+	mgr, ok := tabMgr.subNetMgrList[inst.snid]
 	if !ok {
 		tabLog.Debug("tabMgrPingpongTimerHandler: invalid subnet: %x", inst.snid)
 		return TabMgrEnoParameter
@@ -661,7 +661,7 @@ func (tabMgr *TableManager)tabMgrPingpongTimerHandler(inst *instCtrlBlock) TabMg
 }
 
 func (tabMgr *TableManager)tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabMgrErrno {
-	mgr, ok := tabMgr.SubNetMgrList[inst.snid]
+	mgr, ok := tabMgr.subNetMgrList[inst.snid]
 	if !ok {
 		tabLog.Debug("tabMgrFindNodeTimerHandler: invalid subnet: %x", inst.snid)
 		return TabMgrEnoNotFound
@@ -698,7 +698,7 @@ func (tabMgr *TableManager)tabMgrRefreshReq(msg *sch.MsgTabRefreshReq)TabMgrErrn
 
 func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno {
 	snid := msg.FindNode.SubNetId
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
 		tabLog.Debug("tabMgrFindNodeRsp: invalid subnet: %x", snid)
 		return TabMgrEnoNotFound
@@ -773,7 +773,7 @@ func (tabMgr *TableManager)tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp)TabMgrErrno
 
 func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	snid := msg.Ping.SubNetId
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
 		tabLog.Debug("tabMgrFindNodeRsp: invalid subnet: %x", snid)
 		return TabMgrEnoNotFound
@@ -854,7 +854,7 @@ func (tabMgr *TableManager)tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 
 func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 	snid := ping.SubNetId
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
 		tabLog.Debug("tabMgrPingedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
@@ -883,7 +883,7 @@ func (tabMgr *TableManager)tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 
 func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 	snid := pong.SubNetId
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
 		tabLog.Debug("tabMgrPongedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
@@ -912,7 +912,7 @@ func (tabMgr *TableManager)tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 
 func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 	snid := findNode.SubNetId
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
 		tabLog.Debug("tabMgrQueriedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
@@ -985,6 +985,8 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 		if tabMgr.natUdpResult && nat.NatIsStatusOk(msg.Status) {
 			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
 			tabMgr.pubUdpPort = msg.PubPort
+			p2plog.Debug("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
+				tabMgr.pubUdpIp.String(), tabMgr.pubUdpPort)
 		} else {
 			tabMgr.pubUdpIp = make([]byte, 0)
 			tabMgr.pubUdpPort = 0
@@ -994,6 +996,8 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 		if tabMgr.natTcpResult && nat.NatIsStatusOk(msg.Status) {
 			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
 			tabMgr.pubTcpPort = msg.PubPort
+			p2plog.Debug("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
+				tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort)
 		} else {
 			tabMgr.pubTcpIp = make([]byte, 0)
 			tabMgr.pubTcpPort = 0
@@ -1013,7 +1017,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
-			for _, mgr := range tabMgr.SubNetMgrList {
+			for _, mgr := range tabMgr.subNetMgrList {
 				mgr.startSubnetRefresh()
 			}
 		}
@@ -1056,12 +1060,12 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
-			for _, mgr := range tabMgr.SubNetMgrList {
+			for _, mgr := range tabMgr.subNetMgrList {
 				mgr.startSubnetRefresh()
 			}
 		}
 	} else if old {
-		for _, mgr := range tabMgr.SubNetMgrList {
+		for _, mgr := range tabMgr.subNetMgrList {
 			mgr.stopSubnetRefresh()
 		}
 	}
@@ -1325,11 +1329,11 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	// If we are in refreshing, return at once. When the pending table for query
 	// is empty, this flag is set to false;
 	// If the "tid"(target identity) passed in is nil, we build a random one;
-	if _, ok := tabMgr.SubNetMgrList[*snid]; !ok {
+	if _, ok := tabMgr.subNetMgrList[*snid]; !ok {
 		tabLog.Debug("tabRefresh: none of manager for subnet: %x", *snid)
 		return TabMgrEnoNotFound
 	}
-	mgr := tabMgr.SubNetMgrList[*snid]
+	mgr := tabMgr.subNetMgrList[*snid]
 
 	mgr.refreshing = len(mgr.queryIcb) >= TabInstQueringMax
 	if mgr.refreshing == true {
@@ -2337,7 +2341,7 @@ func (tabMgr *TableManager)tabShouldBoundDbNode(id NodeID) bool {
 }
 
 func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
 		if tabLog.debug__ {
 			tabLog.Debug("TabBucketAddNode: none of manager instance for subnet: %x", snid)
@@ -2350,7 +2354,7 @@ func (tabMgr *TableManager)TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQ
 }
 
 func (tabMgr *TableManager)TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgrErrno {
-	mgr, ok := tabMgr.SubNetMgrList[snid]
+	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
 		if tabLog.debug__ {
 			tabLog.Debug("TabUpdateNode: none of manager instance for subnet: %x", snid)
@@ -2409,20 +2413,20 @@ func (tabMgr *TableManager)TabGetInstBySubNetId(snid *SubNetworkID) *TableManage
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
 	if *snid != AnySubNet {
-		mgr := tabMgr.SubNetMgrList[*snid]
+		mgr := tabMgr.subNetMgrList[*snid]
 		if mgr == nil && tabMgr.cfg.bootstrapNode {
-			mgr = tabMgr.SubNetMgrList[AnySubNet]
+			mgr = tabMgr.subNetMgrList[AnySubNet]
 		}
 		return mgr
 	}
-	return tabMgr.SubNetMgrList[AnySubNet]
+	return tabMgr.subNetMgrList[AnySubNet]
 }
 
 func (tabMgr *TableManager)TabGetInstAll() *map[SubNetworkID]*TableManager {
 	// should be called with the "root" manager
 	tabMgr.lock.Lock()
 	defer tabMgr.lock.Unlock()
-	return &tabMgr.SubNetMgrList
+	return &tabMgr.subNetMgrList
 }
 
 func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, error) {
@@ -2473,8 +2477,8 @@ func (tabMgr *TableManager)switch2RootInst() *TableManager {
 	if tabMgr.cfg.bootstrapNode {
 		if tabMgr.snid == config.AnySubNet {
 			mgr = tabMgr
-		} else if tabMgr.snid == config.ZeroSubNet && len(tabMgr.SubNetMgrList) == 1 {
-			mgr = tabMgr.SubNetMgrList[config.AnySubNet]
+		} else if tabMgr.snid == config.ZeroSubNet && len(tabMgr.subNetMgrList) == 1 {
+			mgr = tabMgr.subNetMgrList[config.AnySubNet]
 		}
 	}
 	return mgr
@@ -2492,7 +2496,7 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 		}
 		tabMgr.cfg.local.IP = append(tabMgr.cfg.local.IP, tabMgr.pubUdpIp...)
 		tabMgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
-		for _, mgr := range tabMgr.SubNetMgrList {
+		for _, mgr := range tabMgr.subNetMgrList {
 			mgr.cfg.local.IP = append(mgr.cfg.local.IP, tabMgr.pubUdpIp...)
 			mgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
 		}
@@ -2504,7 +2508,7 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 		}
 		tabMgr.cfg.local.IP = append(tabMgr.cfg.local.IP, tabMgr.pubUdpIp...)
 		tabMgr.cfg.local.TCP = uint16(tabMgr.pubTcpPort & 0xffff)
-		for _, mgr := range tabMgr.SubNetMgrList {
+		for _, mgr := range tabMgr.subNetMgrList {
 			mgr.cfg.local.IP = append(mgr.cfg.local.IP, tabMgr.pubUdpIp...)
 			mgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
 		}
