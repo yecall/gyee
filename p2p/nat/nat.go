@@ -54,6 +54,7 @@ const (
 	NatEnoNone = NatEno(iota)
 	NatEnoParameter
 	NatEnoNotFound
+	NatEnoDuplicated
 	NatEnoMismatched
 	NatEnoScheduler
 	NatEnoFromPmpLib
@@ -79,6 +80,7 @@ const (
 	NATT_NONE = config.NATT_NONE
 	NATT_PMP = config.NATT_PMP
 	NATT_UPNP = config.NATT_UPNP
+	NATT_ANY = config.NATT_ANY
 )
 
 type natConfig struct {
@@ -157,12 +159,12 @@ type NatManager struct {
 }
 
 func NewNatMgr() *NatManager {
-	var lsnMgr = NatManager {
+	var natMgr = NatManager {
 		name: NatMgrName,
 		instTab: make(map[NatMapInstID]*NatMapInstance, 0),
 	}
-	lsnMgr.tep = lsnMgr.natMgrProc
-	return &lsnMgr
+	natMgr.tep = natMgr.natMgrProc
+	return &natMgr
 }
 
 func (natMgr *NatManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
@@ -196,29 +198,46 @@ func (natMgr *NatManager)natMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 	natMgr.ptnMe = ptn
 	natMgr.sdl = sch.SchGetScheduler(ptn)
-	if _, natMgr.ptnTabMgr = natMgr.sdl.SchGetUserTaskNode(sch.TabMgrName); natMgr.ptnTabMgr == nil {
-		natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.TabMgrName)
+
+	appt := natMgr.sdl.SchGetAppType()
+	if appt == int(config.P2P_TYPE_CHAIN) {
+		if _, natMgr.ptnTabMgr = natMgr.sdl.SchGetUserTaskNode(sch.TabMgrName); natMgr.ptnTabMgr == nil {
+			natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.TabMgrName)
+		}
+	} else if appt == int(config.P2P_TYPE_DHT) {
+		if _, natMgr.ptnDhtMgr = natMgr.sdl.SchGetUserTaskNode(sch.DhtMgrName); natMgr.ptnDhtMgr == nil {
+			natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.DhtMgrName)
+		}
+	} else {
+		natLog.Debug("poweron: unknown application type: %d", appt)
 	}
-	if _, natMgr.ptnDhtMgr = natMgr.sdl.SchGetUserTaskNode(sch.DhtMgrName); natMgr.ptnDhtMgr == nil {
-		natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.DhtMgrName)
-	}
+
 	if eno := natMgr.getConfig(); eno != NatEnoNone {
 		natLog.Debug("poweron: getConfig failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
 	}
+
 	if eno := natMgr.setupNatInterface(); eno != NatEnoNone {
 		natLog.Debug("poweron: setupNatInterface failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
 	}
-	schMsg := sch.SchMessage{}
+
 	if natMgr.ptnTabMgr != nil {
-		natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, natMgr.ptnTabMgr, sch.EvNatMgrReadyInd, nil)
-		natMgr.sdl.SchSendMessage(&schMsg)
+		msg2Tab := sch.SchMessage{}
+		if natMgr.ptnTabMgr != nil {
+			natMgr.sdl.SchMakeMessage(&msg2Tab, natMgr.ptnMe, natMgr.ptnTabMgr, sch.EvNatMgrReadyInd, nil)
+			natMgr.sdl.SchSendMessage(&msg2Tab)
+		}
 	}
+
 	if natMgr.ptnDhtMgr != nil {
-		natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, natMgr.ptnDhtMgr, sch.EvNatMgrReadyInd, nil)
-		natMgr.sdl.SchSendMessage(&schMsg)
+		msg2Dht := sch.SchMessage{}
+		if natMgr.ptnDhtMgr != nil {
+			natMgr.sdl.SchMakeMessage(&msg2Dht, natMgr.ptnMe, natMgr.ptnDhtMgr, sch.EvNatMgrReadyInd, nil)
+			natMgr.sdl.SchSendMessage(&msg2Dht)
+		}
 	}
+
 	return sch.SchEnoNone
 }
 
@@ -229,6 +248,8 @@ func (natMgr *NatManager)poweroff(msg *sch.SchMessage) sch.SchErrno {
 }
 
 func (natMgr *NatManager)discoverReq(msg *sch.SchMessage) sch.SchErrno {
+	// notice: "ANY" type is not supported by reconfiguration, so it's not
+	// supported by EvNatMgrDiscoverReq.
 	var eno = NatEnoNone
 	sender := natMgr.sdl.SchGetSender(msg)
 	dcvReq, _ := msg.Body.(*sch.MsgNatMgrDiscoverReq)
@@ -280,7 +301,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 		goto _rsp2sender
 	}
 
-	if eno := natMgr.checkMakeMapReq(mmr); eno != NatEnoNone {
+	if eno = natMgr.checkMakeMapReq(mmr); eno != NatEnoNone {
 		natLog.Debug("makeMapReq: checkMakeMapReq failed, error: %s", eno.Error())
 		goto _rsp2sender
 	}
@@ -288,6 +309,12 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	id = NatMapInstID {
 		proto: mmr.Proto,
 		fromPort: mmr.FromPort,
+	}
+
+	if _, ok := natMgr.instTab[id]; ok {
+		natLog.Debug("makeMapReq: duplicated, id: %+v", id)
+		eno = NatEnoDuplicated
+		goto _rsp2sender
 	}
 
 	inst = NatMapInstance {
@@ -441,18 +468,52 @@ func (natMgr *NatManager)getConfig() NatEno {
 }
 
 func (natMgr *NatManager)setupNatInterface() NatEno {
-	if natMgr.cfg.natType == NATT_PMP {
+	if natMgr.cfg.natType == NATT_NONE {
+		natMgr.nat = nil
+	} else if natMgr.cfg.natType == NATT_PMP {
 		natMgr.nat = NewPmpInterface(natMgr.cfg.gwIp)
 	} else if natMgr.cfg.natType == NATT_UPNP {
-		// we might be blocked for some seconds to obtain an upnp interface,
-		// see function NewUpnpInterface for more please.
 		natMgr.nat = NewUpnpInterface()
-	} else if natMgr.cfg.natType == NATT_NONE {
-		natMgr.nat = nil
+	} else if natMgr.cfg.natType == NATT_ANY {
+		if natMgr.cfg.gwIp != nil && !natMgr.cfg.gwIp.Equal(net.IPv4zero) {
+			if natMgr.nat = NewPmpInterface(natMgr.cfg.gwIp); natMgr.nat != nil {
+				if _, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
+					natMgr.nat = nil
+				} else {
+					natMgr.cfg.natType = NATT_PMP
+				}
+			}
+		} else {
+			if gws, eno := guessPossibleGateways(); eno == NatEnoNone {
+				for _, gwIp := range(gws) {
+					if natMgr.nat = NewPmpInterface(gwIp); natMgr.nat != nil {
+						if _, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
+							natMgr.nat = nil
+						} else {
+							natMgr.cfg.natType = NATT_PMP
+							natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], gwIp...)
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if natMgr.nat == nil {
+			if natMgr.nat = NewUpnpInterface(); natMgr.nat != nil {
+				natMgr.cfg.natType = NATT_UPNP
+			}
+		}
 	} else {
 		natLog.Debug("setupNatInterface: invalid nat type: %s", natMgr.cfg.natType)
 		return NatEnoParameter
 	}
+
+	if natMgr.cfg.natType != NATT_NONE && natMgr.nat == nil {
+		natLog.Debug("setupNatInterface: null nat, natType: %s", natMgr.cfg.natType)
+		return NatEnoNullNat
+	}
+
 	return NatEnoNone
 }
 
@@ -462,6 +523,7 @@ func (natMgr *NatManager)stop()  {
 			natLog.Debug("stopInstance: failed, id: %+v", inst.id)
 		}
 	}
+	natMgr.nat = nil
 }
 
 func (natMgr *NatManager)deleteInstance(inst *NatMapInstance) NatEno {
@@ -485,6 +547,7 @@ func (natMgr *NatManager)deleteInstance(inst *NatMapInstance) NatEno {
 }
 
 func (natMgr *NatManager)reconfig(dcvReq *sch.MsgNatMgrDiscoverReq) NatEno {
+	// notice: "ANY" type is not supported by reconfiguration
 	if dcvReq == nil {
 		natLog.Debug("reconfig: invalid parameters")
 		return NatEnoParameter
@@ -502,7 +565,9 @@ func (natMgr *NatManager)reconfig(dcvReq *sch.MsgNatMgrDiscoverReq) NatEno {
 	}
 	natMgr.stop()
 	natMgr.cfg.natType = dcvReq.NatType
-	natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], dcvReq.GwIp...)
+	if dcvReq.NatType == NATT_PMP {
+		natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], dcvReq.GwIp...)
+	}
 	return natMgr.setupNatInterface()
 }
 
@@ -596,5 +661,5 @@ func NatIsResultOk(eno int) bool {
 }
 
 func NatIsStatusOk(status int) bool {
-	return status == NatEnoNoNat.Errno()
+	return status == NatEnoNone.Errno()
 }

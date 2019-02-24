@@ -77,6 +77,8 @@ func (upnp *upnpCtrlBlock)makeMap(name string, proto string, locPort int, pubPor
 	}
 	proto = strings.ToUpper(proto)
 	seconds := uint32(durKeep/time.Second)
+	// we had filtered out the duplicated case in function makeMapReq,
+	// but would someone else(other application)... try removing...
 	upnp.removeMap(proto, locPort, pubPort)
 	err := upnp.client.AddPortMapping("", uint16(pubPort), proto, uint16(locPort), ip.String(), true, name, seconds)
 	if err != nil {

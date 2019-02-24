@@ -1466,7 +1466,6 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 		target.evHistory[target.evhIndex] = *msg
 		target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
 		*target.mailbox.que <- *msg
-
 		return SchEnoNone
 	}
 
@@ -1480,19 +1479,22 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 					return eno
 				}
 				target.isPoweron = true
-				target.delayMessages = nil
 				for idx := 0; idx < len(target.delayMessages); idx++ {
 					if eno := msg2MailBox(target.delayMessages[idx]); eno != SchEnoNone {
 						return eno
 					}
 				}
+				target.delayMessages = nil
+				return SchEnoNone
 			}
+		} else {
+			return msg2MailBox(msg)
 		}
-	} else if eno := msg2MailBox(msg); eno != SchEnoNone {
-		return eno
+	} else {
+		return msg2MailBox(msg)
 	}
 
-	return SchEnoNone
+	panic("schSendMsg: would never come here!!!")
 }
 
 //
@@ -1860,8 +1862,10 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	// loop the static table
 	//
 
-	for loop, desc := range tsd {
+	//for loop, desc := range tsd {
+	for loop := 0; loop < len(tsd); loop++ {
 
+		desc := tsd[loop]
 		schLog.Debug("schSchedulerStart: " +
 			"start a static task, idx: %d, name: %s",
 			loop,
@@ -1869,8 +1873,8 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 
 		//
 		// setup task description. notice here the "Flag" always set to SchCreatedGo,
-		// so task routine always goes when schCreateTask called, and later we
-		// would not send poweron to an user task if it's flag (tsd[loop].Flag) is not
+		// so task routine always goes when schCreateTask called, and later we would
+		// not send poweron to an user task if it's flag (tsd[loop].Flag) is not
 		// SchCreatedGo(SchCreatedSuspend), see bellow pls.
 		//
 
@@ -1903,10 +1907,19 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 		name2PtnMap[tkd.Name] = ptn
 
 		//
+		// all tasks created from register table are static, and those created by calling
+		// function SchCreateTask would be dynamic tasks.
+		//
+
+		ptn.(*schTaskNode).task.isStatic = true
+
+		//
 		// send poweron event to task created aboved if it is required to be shceduled
 		// at once; if the flag is SchCreatedSuspend, NO poweron sending, for this task
 		// routine is not sleeping on the mailbox, BUT those who had set SchCreatedGo
-		// do sleeping on their mailboxes.
+		// do sleeping on their mailboxes. and please notice that: those tasks who had
+		// been sent poweron signal to, must not try to interact with those tasks still
+		// not be created.
 		//
 
 		if tsd[loop].Flag == SchCreatedGo {
@@ -1918,13 +1931,7 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 					tkd.Name)
 				return eno, nil
 			}
-			ptn.(*schTaskNode).task.isPoweron = true
-			ptn.(*schTaskNode).task.delayMessages = nil
-		} else {
-			ptn.(*schTaskNode).task.isPoweron = false
-			ptn.(*schTaskNode).task.delayMessages = make([]*schMessage, 0)
 		}
-		ptn.(*schTaskNode).task.isStatic = true
 	}
 
 	//
@@ -1933,7 +1940,10 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	// in this "tpo" table, see above pls.
 	//
 
-	for _, name := range tpo {
+	//for _, name := range tpo {
+	for loop := 0; loop < len(tpo); loop++ {
+
+		name := tpo[loop]
 		schLog.Debug("schSchedulerStart: send poweron to task: %s", name)
 		eno, tsk := sdl.schGetTaskNodeByName(name)
 		if eno != SchEnoNone {

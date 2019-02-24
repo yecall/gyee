@@ -345,6 +345,7 @@ const (
 	NATT_NONE = "none"
 	NATT_PMP = "pmp"
 	NATT_UPNP = "upnp"
+	NATT_ANY = "any"
 )
 type Cfg4NatManager struct {
 	NatType		string				// "pmp", "upnp", "none"
@@ -458,7 +459,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		//
 
 		NatCfg: Cfg4NatManager {
-			NatType:			NATT_NONE,
+			NatType:			NATT_ANY,
 			GwIp:				net.IPv4zero,
 		},
 	}

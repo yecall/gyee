@@ -25,6 +25,10 @@ import (
 )
 
 
+const (
+	clientTimout = time.Second * 8
+)
+
 type pmpCtrlBlock struct {
 	gateWay	net.IP				// gateway ip address
 	client	*natpmp.Client		// client to interactive with the gateway
@@ -37,7 +41,7 @@ func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
 	}
 	cb := pmpCtrlBlock{
 		gateWay: gw,
-		client: natpmp.NewClient(gw),
+		client: natpmp.NewClientWithTimeout(gw, clientTimout),
 	}
 	return &cb
 }
@@ -68,4 +72,60 @@ func (pmp *pmpCtrlBlock)getPublicIpAddr() (net.IP, NatEno) {
 		return nil, NatEnoFromPmpLib
 	}
 	return rsp.ExternalIPAddress[:], NatEnoNone
+}
+
+/*
+ * kinds of private ip address are listed as bellow. when nat type "pmp" is configured
+ * but no gateway ip is set, we had to guess the gatway ip as: b1.b2.b3.1 or b1.b2.1.1
+ * see bellow please.
+ *
+ *	type	IP								CIDR
+ * ==========================================================
+ * 	A		10.0.0.0~10.255.255.255			10.0.0.0/8
+ * 	B		172.16.0.0~172.31.255.255		172.16.0.0/12
+ * 	C		192.168.0.0~192.168.255.255		192.168.0.0/16
+ */
+
+var _, privateCidrA, _ = net.ParseCIDR("10.0.0.0/8")
+var _, privateCidrB, _ = net.ParseCIDR("172.16.0.0/12")
+var _, privateCidrC, _ = net.ParseCIDR("192.168.0.0/16")
+
+func guessPossibleGateways() (gws []net.IP, eno NatEno) {
+	dedup := make(map[string]bool, 0)
+	itfList, err := net.Interfaces()
+	if err != nil {
+		return nil, NatEnoFromSystem
+	}
+	for _, itf := range itfList {
+		addrList, err := itf.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrList {
+			switch t := addr.(type) {
+			case *net.IPNet:
+				if privateCidrA.Contains(t.IP) {
+					ip := t.IP.Mask(t.Mask).To4()
+					if ip != nil {
+						ip[3] = ip[3] | 0x01
+						if _, dup := dedup[ip.String()]; !dup {
+							gws = append(gws, ip)
+							dedup[ip.String()] = true
+						}
+					}
+				} else if privateCidrB.Contains(t.IP) || privateCidrC.Contains(t.IP) {
+					ip := t.IP.Mask(t.Mask).To4()
+					if ip != nil {
+						ip[2] = ip[2] | 0x01
+						ip[3] = ip[3] | 0x01
+						if _, dup := dedup[ip.String()]; !dup {
+							gws = append(gws, ip)
+							dedup[ip.String()] = true
+						}
+					}
+				}
+			}
+		}
+	}
+	return gws, NatEnoNone
 }

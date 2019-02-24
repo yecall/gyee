@@ -229,7 +229,8 @@ func (sdl *Scheduler)SchSendMessageByName(dstTask string, srcTask string, msg *S
 }
 
 func (sdl *Scheduler)SchSendMessage(msg *SchMessage) SchErrno {
-	return sdl.schSendMsg((*schMessage)(msg))
+	_msg := *msg
+	return sdl.schSendMsg((*schMessage)(&_msg))
 }
 
 // Set sender of message
@@ -256,6 +257,9 @@ func (sdl *Scheduler)SchGetRecver(msg *SchMessage) interface{} {
 
 // Make scheduling message
 func (sdl *Scheduler)SchMakeMessage(msg *SchMessage, s, r interface{}, id int, body interface{}) SchErrno {
+	// notice: the "body" is a reference to message body, so one should not try
+	// to access the body again after this function called, or the body will be
+	// modified(corrupted).
 	if msg == nil || s == nil || r == nil {
 		return SchEnoParameter
 	}

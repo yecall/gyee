@@ -942,22 +942,23 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 
 func (tabMgr *TableManager)tabMgrNatReadyInd() TabMgrErrno {
 	schMsg := sch.SchMessage{}
-	req := sch.MsgNatMgrMakeMapReq {
+	reqUdp := sch.MsgNatMgrMakeMapReq {
 		Proto: "udp",
 		FromPort: int(tabMgr.cfg.local.UDP),
 		ToPort: int(tabMgr.cfg.local.UDP),
 		DurKeep: natMapKeepTime,
 		DurRefresh: natMapRefreshTime,
 	}
-	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
+	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
 	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 		tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 		return TabMgrEnoScheduler
 	}
-	req.Proto = "tcp"
-	req.FromPort = int(tabMgr.cfg.local.TCP)
-	req.ToPort = int(tabMgr.cfg.local.TCP)
-	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
+	reqTcp := reqUdp
+	reqTcp.Proto = "tcp"
+	reqTcp.FromPort = int(tabMgr.cfg.local.TCP)
+	reqTcp.ToPort = int(tabMgr.cfg.local.TCP)
+	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
 	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 		tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 		return TabMgrEnoScheduler
@@ -966,6 +967,8 @@ func (tabMgr *TableManager)tabMgrNatReadyInd() TabMgrErrno {
 }
 
 func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) TabMgrErrno {
+	// notice: the external public ip reported in msg.pubUdpIp and msg.pubTcpIp must be
+	// same, tabMgr.pubTcpIp is copied twice with same value.
 	if !nat.NatIsResultOk(msg.Result) {
 		tabLog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
