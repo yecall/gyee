@@ -883,9 +883,14 @@ const (
 	EvNatMgrReadyInd			= EvNatMgrBase + 10
 )
 
+//EvNatMgrReadyInd
+type MsgNatMgrReadyInd struct {
+	NatType		string			// type: "pmp", "upnp", "none"
+}
+
 // EvNatMgrDiscoverReq
 type MsgNatMgrDiscoverReq struct {
-	NatType		string			// "pmp", "upnp", "none"
+	NatType		string			// type: "pmp", "upnp", "none", "any"
 	GwIp		net.IP			// gateway ip address when "pmp" specified
 }
 

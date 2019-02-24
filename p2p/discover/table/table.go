@@ -347,7 +347,7 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 		eno = tabMgr.tabMgrQueriedInd(msg.Body.(*um.FindNode))
 
 	case sch.EvNatMgrReadyInd:
-		eno = tabMgr.tabMgrNatReadyInd()
+		eno = tabMgr.tabMgrNatReadyInd(msg.Body.(*sch.MsgNatMgrReadyInd))
 
 	case sch.EvNatMgrMakeMapRsp:
 		eno = tabMgr.tabMgrNatMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
@@ -940,28 +940,35 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 	return TabMgrEnoNone
 }
 
-func (tabMgr *TableManager)tabMgrNatReadyInd() TabMgrErrno {
-	schMsg := sch.SchMessage{}
-	reqUdp := sch.MsgNatMgrMakeMapReq {
-		Proto: "udp",
-		FromPort: int(tabMgr.cfg.local.UDP),
-		ToPort: int(tabMgr.cfg.local.UDP),
-		DurKeep: natMapKeepTime,
-		DurRefresh: natMapRefreshTime,
-	}
-	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
-	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
-		return TabMgrEnoScheduler
-	}
-	reqTcp := reqUdp
-	reqTcp.Proto = "tcp"
-	reqTcp.FromPort = int(tabMgr.cfg.local.TCP)
-	reqTcp.ToPort = int(tabMgr.cfg.local.TCP)
-	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
-	if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
-		return TabMgrEnoScheduler
+func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrErrno {
+	if msg.NatType == config.NATT_NONE {
+		tabMgr.pubTcpIp = tabMgr.cfg.local.IP
+		tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
+		tabMgr.pubUdpIp = tabMgr.cfg.local.IP
+		tabMgr.pubUdpPort = int(tabMgr.cfg.local.UDP)
+	} else {
+		schMsg := sch.SchMessage{}
+		reqUdp := sch.MsgNatMgrMakeMapReq{
+			Proto:      "udp",
+			FromPort:   int(tabMgr.cfg.local.UDP),
+			ToPort:     int(tabMgr.cfg.local.UDP),
+			DurKeep:    natMapKeepTime,
+			DurRefresh: natMapRefreshTime,
+		}
+		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
+		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			return TabMgrEnoScheduler
+		}
+		reqTcp := reqUdp
+		reqTcp.Proto = "tcp"
+		reqTcp.FromPort = int(tabMgr.cfg.local.TCP)
+		reqTcp.ToPort = int(tabMgr.cfg.local.TCP)
+		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
+		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			return TabMgrEnoScheduler
+		}
 	}
 	return TabMgrEnoNone
 }

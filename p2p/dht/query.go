@@ -258,7 +258,7 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = qryMgr.instStopRsp(msg.Body.(*sch.MsgDhtQryInstStopRsp))
 
 	case sch.EvNatMgrReadyInd:
-		eno = qryMgr.natMgrReadyInd()
+		eno = qryMgr.natMgrReadyInd(msg.Body.(*sch.sch.MsgNatMgrReadyInd))
 
 	case sch.EvNatMgrMakeMapRsp:
 		eno = qryMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
@@ -1073,19 +1073,24 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-func (qryMgr *QryMgr)natMgrReadyInd() sch.SchErrno {
-	schMsg := sch.SchMessage{}
-	req := sch.MsgNatMgrMakeMapReq {
-		Proto: "tcp",
-		FromPort: int(qryMgr.qmCfg.local.TCP),
-		ToPort: int(qryMgr.qmCfg.local.TCP),
-		DurKeep: natMapKeepTime,
-		DurRefresh: natMapRefreshTime,
-	}
-	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
-	if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
-		return sch.SchEnoUserTask
+func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
+	if msg.NatType == config.NATT_NONE {
+		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
+		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
+	} else {
+		schMsg := sch.SchMessage{}
+		req := sch.MsgNatMgrMakeMapReq{
+			Proto:      "tcp",
+			FromPort:   int(qryMgr.qmCfg.local.TCP),
+			ToPort:     int(qryMgr.qmCfg.local.TCP),
+			DurKeep:    natMapKeepTime,
+			DurRefresh: natMapRefreshTime,
+		}
+		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
+		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+			return sch.SchEnoUserTask
+		}
 	}
 	return sch.SchEnoNone
 }
