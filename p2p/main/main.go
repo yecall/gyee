@@ -488,7 +488,7 @@ func testCase2(tc *testCase) {
 		yeShMgr.Start()
 		time.Sleep(time.Second * 60)
 		yeShMgr.Stop()
-		log.Debug("\n\n\n")
+		log.Debug("\n\n\n testCase2: loop: %d", loop)
 	}
 }
 
@@ -548,6 +548,7 @@ func testCase5(tc *testCase) {
 		yeShMgr.Start()
 		time.Sleep(time.Second * 60)
 		yeShMgr.Stop()
+		log.Debug("\n\n\n testCase5: loop: %d", loop)
 	}
 }
 
@@ -562,6 +563,7 @@ func testCase6(tc *testCase) {
 		yeShMgr.Start()
 		time.Sleep(time.Second * 120)
 		yeShMgr.Stop()
+		log.Debug("\n\n\n testCase6: loop: %d", loop)
 	}
 }
 
@@ -847,9 +849,3 @@ func testCase15(tc *testCase) {
 	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
 }
 
-//
-// testCase16
-//
-func testCase16(tc *testCase) {
-
-}
