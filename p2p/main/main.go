@@ -138,6 +138,11 @@ var testCaseTable = []testCase{
 		description:	"reconfiguration: little-white => validator with defferent mask bits",
 		entry:			testCase15,
 	},
+	{
+		name:			"testCase16",
+		description:	"reconfiguration: nat",
+		entry:			testCase16,
+	},
 }
 
 //
@@ -849,3 +854,39 @@ func testCase15(tc *testCase) {
 	waitInterruptWithCallback(osnSrv, nil, yeChainStop)
 }
 
+//
+// testCase16
+//
+func testCase16(tc *testCase) {
+	yesCfg := yep2p.DefaultYeShellConfig
+	yesCfg.Validator = true
+	yesCfg.BootstrapNode = false
+	yesCfg.SubNetMaskBits = 4
+
+	//yesCfg.NatType = config.NATT_NONE
+	//yesCfg.NatType = config.NATT_PMP
+	yesCfg.NatType = config.NATT_UPNP
+	//yesCfg.NatType = config.NATT_ANY
+
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+
+	node := yeShMgr.GetLocalNode()
+	setMessageFrom(node)
+
+	yeShMgr.Register(&subEv)
+	yeShMgr.Register(&subTx)
+	yeShMgr.Register(&subBh)
+
+	go subFunc(subEv, "ev")
+	go subFunc(subTx, "tx")
+	go subFunc(subBh, "bh")
+
+	if true {
+		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
+	} else {
+		time.Sleep(time.Second * 10)
+		yeChainProc(yeShMgr, ev, tx, bh, bk)
+		yeChainStop(yeShMgr, subEv, subTx, subBh)
+	}
+}

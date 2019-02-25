@@ -155,7 +155,7 @@ const (
 	DftEvKeepTime		= time.Minute * 1
 	DftDedupTime		= time.Second * 60
 	DftBootstrapTime	= time.Second * 4
-	DftNatType			= config.NATT_UPNP
+	DftNatType			= config.NATT_NONE
 	DftGatewayIp		= "0.0.0.0"
 )
 
