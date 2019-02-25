@@ -152,6 +152,18 @@ func putBlockNum2Hash(putter persistent.Putter, num uint64, hash common.Hash) {
 	}
 }
 
+func hasTransaction(getter persistent.Getter, hash common.Hash) bool {
+	has, err := getter.Has(keyTx(hash))
+	if err != nil {
+		log.Crit("hasTransaction() failed", "hash", hash, "err", err)
+	}
+	return has
+}
+
+func putTransaction(putter persistent.Putter, hash common.Hash, tx *corepb.Transaction) {
+	putProtoMsg(putter, keyTx(hash), tx)
+}
+
 func getProtoMsg(getter persistent.Getter, key []byte, message proto.Message) error {
 	enc, err := getter.Get(key)
 	if err != nil {
@@ -199,4 +211,8 @@ func keyBlockNum2Hash(num uint64) []byte {
 	buf := append([]byte(KeyPrefixBlockNum2Hash), make([]byte, 8)...)
 	binary.BigEndian.PutUint64(buf[len(buf)-8:], num)
 	return buf
+}
+
+func keyTx(hash common.Hash) []byte {
+	return append([]byte(KeyPrefixTx), hash[:]...)
 }

@@ -54,9 +54,6 @@ type BlockChain struct {
 
 	lastBlock atomic.Value
 
-	//blockPool *BlockPool
-	//txPool    *TransactionPool
-
 	chainmu sync.RWMutex
 
 	stopped int32          // state

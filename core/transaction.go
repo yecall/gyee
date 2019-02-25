@@ -156,18 +156,11 @@ func (txs Transactions) GetEncoded(index int) []byte { return txs[index].raw }
 
 func (txs Transactions) Write(putter persistent.Putter) error {
 	for _, tx := range txs {
-		key := append([]byte(KeyPrefixTx), tx.Hash()[:]...)
 		pb, err := tx.ToProto()
 		if err != nil {
 			return err
 		}
-		value, err := proto.Marshal(pb)
-		if err != nil {
-			return err
-		}
-		if err = putter.Put(key, value); err != nil {
-			return err
-		}
+		putTransaction(putter, *tx.Hash(), pb)
 	}
 	return nil
 }

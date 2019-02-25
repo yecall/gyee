@@ -179,6 +179,10 @@ func (t *Tetris) SendEvent(event []byte) {
 	t.EventCh <- event
 }
 
+func (t *Tetris) SendTx(hash common.Hash) {
+	t.TxsCh <- hash
+}
+
 func (t *Tetris) loop() {
 	t.wg.Add(1)
 	defer t.wg.Done()

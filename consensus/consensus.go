@@ -39,4 +39,7 @@ type Engine interface {
 
 	// send event raw bytes to engine
 	SendEvent([]byte)
+
+	// send tx hash to engine
+	SendTx(common.Hash)
 }

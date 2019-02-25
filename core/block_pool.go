@@ -80,8 +80,7 @@ func (bp *BlockPool) Stop() {
 	defer bp.lock.Unlock()
 	log.Info("BlockPool Stop...")
 
-	p2p := bp.core.node.P2pService()
-	p2p.UnRegister(bp.subscriber)
+	bp.core.node.P2pService().UnRegister(bp.subscriber)
 
 	close(bp.quitCh)
 	bp.wg.Wait()
@@ -110,7 +109,7 @@ func (bp *BlockPool) processMsg(msg p2p.Message) {
 		var h = new(corepb.SignedBlockHeader)
 		if err := proto.Unmarshal(msg.Data, h); err != nil {
 			bp.markBadPeer(msg)
-			return
+			break
 		}
 		// TODO:
 	case p2p.MessageTypeBlock:
@@ -118,7 +117,7 @@ func (bp *BlockPool) processMsg(msg p2p.Message) {
 		if err := b.setBytes(msg.Data); err != nil {
 			log.Warn("block decode failure", "msg", msg)
 			bp.markBadPeer(msg)
-			return
+			break
 		}
 		bp.processBlock(b)
 	default:

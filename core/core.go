@@ -62,6 +62,7 @@ type Core struct {
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	blockPool      *BlockPool
+	txPool         *TransactionPool
 	yvm            yvm.YVM
 	subscriber     *p2p.Subscriber
 
@@ -95,6 +96,10 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
+	core.txPool, err = NewTransactionPool(core)
+	if err != nil {
+		return nil, err
+	}
 
 	return core, nil
 }
@@ -109,6 +114,7 @@ func (c *Core) Start() error {
 	log.Info("Core Start...")
 
 	c.blockPool.Start()
+	c.txPool.Start()
 
 	//如果开启挖矿
 	if c.config.Chain.Mine {
@@ -148,6 +154,9 @@ func (c *Core) Stop() error {
 
 	// unsubscribe from p2p net
 	c.node.P2pService().UnRegister(c.subscriber)
+
+	// stop tx pool and wait
+	c.txPool.Stop()
 
 	// stop block pool and wait
 	c.blockPool.Stop()

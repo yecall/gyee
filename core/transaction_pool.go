@@ -29,15 +29,30 @@
 package core
 
 import (
+	"errors"
 	"sync"
 
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
 	"github.com/yeeco/gyee/utils/logging"
+)
+
+const TooFarTx = 128
+
+var (
+	ErrTxChainID = errors.New("transaction chainID mismatch")
 )
 
 type TransactionPool struct {
 	core       *Core
 	subscriber *p2p.Subscriber
+
+	// requesting tx hash pool
+	reqPool map[common.Hash]struct{}
+
+	// pending tx pool
+	pendingPool map[common.Hash]*Transaction
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -47,8 +62,10 @@ type TransactionPool struct {
 func NewTransactionPool(core *Core) (*TransactionPool, error) {
 	logging.Logger.Info("Create New TransactionPool")
 	bp := &TransactionPool{
-		core:   core,
-		quitCh: make(chan struct{}),
+		core:        core,
+		reqPool:     make(map[common.Hash]struct{}),
+		pendingPool: make(map[common.Hash]*Transaction),
+		quitCh:      make(chan struct{}),
 	}
 	return bp, nil
 }
@@ -59,8 +76,7 @@ func (tp *TransactionPool) Start() {
 	logging.Logger.Info("TransactionPool Start...")
 
 	tp.subscriber = p2p.NewSubscriber(tp, make(chan p2p.Message), p2p.MessageTypeTx)
-	p2p := tp.core.node.P2pService()
-	p2p.Register(tp.subscriber)
+	tp.core.node.P2pService().Register(tp.subscriber)
 
 	go tp.loop()
 }
@@ -70,8 +86,7 @@ func (tp *TransactionPool) Stop() {
 	defer tp.lock.Unlock()
 	logging.Logger.Info("TransactionPool Stop...")
 
-	p2p := tp.core.node.P2pService()
-	p2p.UnRegister(tp.subscriber)
+	tp.core.node.P2pService().UnRegister(tp.subscriber)
 
 	close(tp.quitCh)
 	tp.wg.Wait()
@@ -89,10 +104,93 @@ func (tp *TransactionPool) loop() {
 			return
 		case msg := <-tp.subscriber.MsgChan:
 			logging.Logger.Info("tx pool receive ", msg.MsgType, " ", msg.From)
+			tp.processMsg(msg)
 		}
 	}
 }
 
+func (tp *TransactionPool) processMsg(msg p2p.Message) {
+	switch msg.MsgType {
+	case p2p.MessageTypeTx:
+		var tx = new(Transaction)
+		if err := tx.Decode(msg.Data); err != nil {
+			tp.markBadPeer(msg)
+			break
+		}
+		tp.processTx(tx)
+	default:
+		log.Crit("unhandled msg sent to txPool", "msg", msg)
+	}
+}
+
+func (tp *TransactionPool) processTx(tx *Transaction) {
+	// validate tx integrity
+	if err := tp.core.blockChain.verifyTx(tx); err != nil || tx.from == nil {
+		log.Warn("processTx() verify fails", "err", err, "tx", tx)
+		// TODO: mark bad peer?
+		return
+	}
+
+	// search in-mem request, if we are requesting for this tx
+	if _, ok := tp.reqPool[*tx.hash]; ok {
+		delete(tp.reqPool, *tx.hash)
+		tp.pendingPool[*tx.hash] = tx
+
+		// TODO: check if block can be sealed
+		return
+	}
+
+	// search chain, if tx has been sealed
+	// this may not be sufficient, legacy tx may be dropped from storage
+	// in such cases a nonce check would cover
+	if hasTransaction(tp.core.storage, *tx.Hash()) {
+		// TODO: mark bad peer?
+		return
+	}
+
+	// basic check tx
+	//  nonce not too far
+	account := tp.core.blockChain.LastBlock().stateTrie.GetAccount(*tx.from, false)
+	if account == nil {
+		log.Warn("ignore tx for non-exist account", "tx", tx)
+		// TODO: mark bad peer?
+		return
+	}
+	currNonce := account.Nonce()
+	if (currNonce > tx.nonce) || (currNonce+TooFarTx < tx.nonce) {
+		log.Warn("tx nonce too far", "nonce", currNonce, "tx", tx)
+		// TODO: mark bad peer?
+		return
+	}
+
+	// put tx to DHT
+	// TODO:
+
+	// send tx to consensus
+	tp.core.engine.SendTx(*tx.Hash())
+}
+
 func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
-	tp.core.node.P2pService().BroadcastMessage(p2p.Message{MsgType: p2p.MessageTypeTx, From: "node1"})
+	msg := p2p.Message{
+		MsgType: p2p.MessageTypeTx,
+		From:    "node1",
+	}
+	err := tp.core.node.P2pService().BroadcastMessage(msg)
+	if err != nil {
+		log.Error("TxBroadcast", "err", err)
+	}
+}
+
+/*
+check if tx is valid and belongs to chain
+ */
+func (bc *BlockChain) verifyTx(tx *Transaction) error {
+	if ChainID(tx.chainID) != bc.chainID {
+		return ErrTxChainID
+	}
+	return nil
+}
+
+func (tp *TransactionPool) markBadPeer(msg p2p.Message) {
+	// TODO: inform bad peed msg.From to p2p module
 }
