@@ -268,7 +268,7 @@ acceptLoop:
 		// notice: here the listener might have been closed, or would be closed
 		// while accepting, see function lsnMgrStop for more. in these cases, we
 		// expect an error fired from underlying network library, so we can jump
-		// out the loop, to done the accepter.
+		// out of the loop to done the accepter.
 
 		listener := accepter.listener
 		if listener == nil {

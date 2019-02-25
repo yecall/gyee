@@ -38,6 +38,7 @@ import (
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	nat		"github.com/yeeco/gyee/p2p/nat"
+	"runtime"
 )
 
 
@@ -1223,22 +1224,15 @@ func (tabMgr *TableManager)tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	tabMgr.networkType = cfg.NetworkType
 
 	if tabMgr.networkType == config.P2pNetworkTypeStatic {
-
 		tabMgr.snid = config.ZeroSubNet
-
 	} else if tabMgr.networkType == config.P2pNetworkTypeDynamic {
 
 		if len(tabCfg.subNetIdList) == 0 {
-
 			tabMgr.snid = AnySubNet
-
 		} else {
-
 			tabMgr.snid = config.ZeroSubNet
 		}
-
 	} else {
-
 		tabLog.Debug("tabGetConfig: invalid network type: %d", tabMgr.networkType)
 		return TabMgrEnoConfig
 	}
@@ -1253,6 +1247,12 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 	}
 
 	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.name, tabMgr.cfg.nodeDb)
+	if runtime.GOOS == "windows" {
+		p2plog.Debug("tabMgr: nodeDb will be created at: %s", strings.Replace(dbPath, "/", "\\", -1))
+	} else {
+		p2plog.Debug("tabMgr: nodeDb will be created at: %s", dbPath)
+	}
+
 	if tabMgr.cfg.noHistory {
 		if _, err := os.Stat(dbPath); err == nil {
 			os.RemoveAll(dbPath)
@@ -1266,7 +1266,6 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 	}
 
 	tabMgr.nodeDb = db
-
 	return TabMgrEnoNone
 }
 

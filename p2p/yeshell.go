@@ -366,9 +366,11 @@ func (yeShMgr *YeShellManager)Start() error {
 
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	if thisCfg.BootstrapNode == false {
-		yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
-		yeShMgr.dhtBsChan = make(chan bool, 1)
-		go yeShMgr.dhtBootstrapProc()
+		if dht.DhtReady() {
+			yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
+			yeShMgr.dhtBsChan = make(chan bool, 1)
+			go yeShMgr.dhtBootstrapProc()
+		}
 	}
 
 	go yeShMgr.chainRxProc()

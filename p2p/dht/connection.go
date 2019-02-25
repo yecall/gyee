@@ -23,13 +23,16 @@ package dht
 import (
 	"fmt"
 	"time"
+	"net"
 	"io"
 	"sync"
+	"strings"
 	"container/list"
 	lru		"github.com/hashicorp/golang-lru"
 	ggio	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
@@ -105,13 +108,15 @@ type ConMgr struct {
 	ciSeq			int64							// connection instance sequence number
 	txQueTab		map[conInstIdentity]*list.List	// outbound data pending queue
 	ibInstTemp		map[string]*ConInst				// temp map for inbound instances
+	natTcpResult	bool							// nat make map result
+	pubTcpIp		net.IP							// public ip address
+	pubTcpPort		int								// public port
 }
 
 //
 // Create route manager
 //
 func NewConMgr() *ConMgr {
-
 	conMgr := ConMgr{
 		name:		ConMgrName,
 		ciTab:		make(map[conInstIdentity]*ConInst, 0),
@@ -119,9 +124,8 @@ func NewConMgr() *ConMgr {
 		txQueTab:	make(map[conInstIdentity]*list.List, 0),
 		ibInstTemp: make(map[string]*ConInst, 0),
 	}
-
 	conMgr.tep = conMgr.conMgrProc
-
+	chConMgrReady = make(chan bool, 1)
 	return &conMgr
 }
 
@@ -175,6 +179,15 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvDhtRutPeerRemovedInd:
 		eno = conMgr.rutPeerRemoveInd(msg.Body.(*sch.MsgDhtRutPeerRemovedInd))
 
+	case sch.EvNatMgrReadyInd:
+		eno = conMgr.natReadyInd(msg.Body.(*sch.MsgNatMgrReadyInd))
+
+	case sch.EvNatMgrMakeMapRsp:
+		eno = conMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
+
+	case sch.EvNatMgrPubAddrUpdateInd:
+		eno = conMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
+
 	default:
 		connLog.Debug("conMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -227,6 +240,7 @@ func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 	connLog.Debug("poweroff: task will be done ...")
 
 	po := sch.SchMessage{}
+	close(chConMgrReady)
 
 	for _, ci := range conMgr.ciTab {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
@@ -249,7 +263,7 @@ func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	//
-	// at this moment, we do not know any peer information, since it just only the
+	// at this moment, we do not know any peer information, since it's just only the
 	// inbound connection accepted. we can check the peer only after the handshake
 	// procedure is completed.
 	//
@@ -1013,6 +1027,74 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 }
 
 //
+// NAT ready indication handler
+//
+func (conMgr *ConMgr)natReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
+	if msg.NatType == config.NATT_NONE {
+		conMgr.pubTcpIp = conMgr.cfg.local.IP
+		conMgr.pubTcpPort = int(conMgr.cfg.local.TCP)
+		chConMgrReady<-true
+	}
+	return sch.SchEnoNone
+}
+
+//
+// NAT make map response handler
+//
+func (conMgr *ConMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
+	if !nat.NatIsResultOk(msg.Result) {
+		connLog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
+	}
+	proto := strings.ToLower(msg.Proto)
+	if proto == "tcp" {
+		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
+		if conMgr.natTcpResult {
+			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+				msg.PubIp.String(), msg.PubPort)
+			conMgr.pubTcpIp = append(conMgr.pubTcpIp[0:], msg.PubIp...)
+			conMgr.pubTcpPort = msg.PubPort
+			if eno := conMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
+				connLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				return eno
+			}
+			chConMgrReady<-true
+		} else {
+			conMgr.pubTcpIp = make([]byte, 0)
+			conMgr.pubTcpPort = 0
+		}
+		return sch.SchEnoNone
+	}
+	connLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	return sch.SchEnoParameter
+}
+
+//
+// Public address update indication handler
+//
+func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch.SchErrno {
+	proto := strings.ToLower(msg.Proto)
+	if proto == "tcp" {
+		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
+		if conMgr.natTcpResult {
+			p2plog.Debug("natPubAddrUpdateInd: public dht addr: %s:%d",
+				msg.PubIp.String(), msg.PubPort)
+			conMgr.pubTcpIp = append(conMgr.pubTcpIp[0:], msg.PubIp...)
+			conMgr.pubTcpPort = msg.PubPort
+			if eno := conMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
+				connLog.Debug("natPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+				return eno
+			}
+		} else {
+			conMgr.pubTcpIp = make([]byte, 0)
+			conMgr.pubTcpPort = 0
+		}
+		return sch.SchEnoNone
+	}
+	connLog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
+	return sch.SchEnoParameter
+}
+
+//
 // Get configuration for connection mananger
 //
 func (conMgr *ConMgr)getConfig() DhtErrno {
@@ -1291,4 +1373,29 @@ func (conMgr *ConMgr)onInstEvicted(key interface{}, value interface{}) {
 	msg := sch.SchMessage{}
 	conMgr.sdl.SchMakeMessage(&msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConMgrCloseReq, &req)
 	conMgr.sdl.SchSendMessage(&msg)
+}
+
+//
+// Switch to public address
+//
+func (conMgr *ConMgr)switch2NatAddr(proto string) sch.SchErrno {
+	if proto == nat.NATP_TCP {
+		conMgr.cfg.local.IP = conMgr.pubTcpIp
+		conMgr.cfg.local.TCP = uint16(conMgr.pubTcpPort & 0xffff)
+		return sch.SchEnoNone
+	}
+	connLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
+	return sch.SchEnoParameter
+}
+
+//
+// Signal connection manager ready
+//
+var chConMgrReady chan bool
+func ConMgrReady() bool {
+	r, ok := <-chConMgrReady
+	if !ok {
+		return false
+	}
+	return r
 }

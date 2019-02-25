@@ -574,7 +574,11 @@ func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchEr
 //
 func (dhtMgr *DhtMgr)natMgrReadyInd(msg *sch.SchMessage) sch.SchErrno {
 	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
-	return dhtMgr.sdl.SchSendMessage(msg)
+	msg2 := *msg
+	dhtMgr.sdl.SchSetRecver(&msg2, dhtMgr.ptnConMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
+	dhtMgr.sdl.SchSendMessage(&msg2)
+	return sch.SchEnoNone
 }
 
 //
@@ -590,7 +594,11 @@ func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 //
 func (dhtMgr *DhtMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
-	return dhtMgr.sdl.SchSendMessage(msg)
+	msg2 := *msg
+	dhtMgr.sdl.SchSetRecver(&msg2, dhtMgr.ptnConMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
+	dhtMgr.sdl.SchSendMessage(&msg2)
+	return sch.SchEnoNone
 }
 
 //
@@ -685,4 +693,11 @@ func (dhtMgr *DhtMgr)DhtCommand(cmd int, msg interface{}) sch.SchErrno {
 	schMsg := sch.SchMessage{}
 	dhtMgr.sdl.SchMakeMessage(&schMsg, &sch.RawSchTask, dhtMgr.ptnMe, cmd, msg)
 	return dhtMgr.sdl.SchSendMessage(&schMsg)
+}
+
+//
+// dht ready
+//
+func DhtReady() bool {
+	return ConMgrReady()
 }

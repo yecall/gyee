@@ -592,7 +592,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		for idx, n := range req.Seens {
 			pcs := conInstStatus2PCS(CisHandshaked)
 			doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
-			rutMgr.showRoute("handshake-update")
+			rutMgr.showRoute("rutMgrUpdate4Handshake.DhtEnoNone")
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
@@ -628,7 +628,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			}
 
 			rutMgr.rutMgrRmvNotify(bn)
-			rutMgr.showRoute("handshake.outbound-failed-delete")
+			rutMgr.showRoute("rutMgrUpdate4Handshake.!DhtEnoNone")
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout.GetEno() {
@@ -659,7 +659,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			}
 
 			rutMgr.rutMgrRmvNotify(bn)
-			rutMgr.showRoute("query-timeout-delete")
+			rutMgr.showRoute("rutMgrUpdate4Query.DhtEnoTimeout")
 		}
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone.GetEno() {
@@ -690,7 +690,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 				rt := &rutMgr.rutTab
 				pcs := conInstStatus2PCS(CisNull)
 				doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
-				rutMgr.showRoute("handshake-update")
+				rutMgr.showRoute("rutMgrUpdate4Query.DhtEnoNone")
 			}
 		}
 
@@ -728,23 +728,17 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 // Stop notify request handler
 //
 func (rutMgr *RutMgr)stopNotifyReq(req *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErrno {
-
 	var nfi = rutMgrNotifeeId {
 		task:	req.Task,
 		target:	req.Target,
 	}
-
 	if _, exist := rutMgr.ntfTab[nfi]; exist == false {
-
 		rutLog.Debug("stopNotifyReq: " +
 			"notifee not found, task: %p, target: %x",
 			nfi.task, nfi.target)
-
 		return sch.SchEnoUserTask
 	}
-
 	delete(rutMgr.ntfTab, nfi)
-
 	return sch.SchEnoNone
 }
 
@@ -752,14 +746,12 @@ func (rutMgr *RutMgr)stopNotifyReq(req *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErr
 // Get route manager configuration
 //
 func (rutMgr *RutMgr)rutMgrGetRouteConfig() DhtErrno {
-
 	cfgName := rutMgr.sdl.SchGetP2pCfgName()
 	rutCfg := config.P2pConfig4DhtRouteManager(cfgName)
 	rutMgr.bootstrapNode = rutCfg.BootstrapNode
 	rutMgr.localNodeId = rutCfg.NodeId
 	rutMgr.bpCfg.randomQryNum = rutCfg.RandomQryNum
 	rutMgr.bpCfg.period = rutCfg.Period
-
 	return DhtEnoNone
 }
 
@@ -781,13 +773,15 @@ func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 		Extra:	nil,
 	}
 
+	// one cae start bootstarp procedure at once and then start a timer, but this
+	// is not necessary since the yeShellManager would carry out a blind-connect
+	// when the application starting up, see it please.
+
 	if eno, tid := rutMgr.sdl.SchSetTimer(rutMgr.ptnMe, &td);
 	eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-
 		rutLog.Debug("rutMgrStartBspTimer: " +
 			"SchSetTimer failed, eno: %d, tid: %d",
 			eno, tid)
-
 		return DhtEnoScheduler
 	}
 
@@ -798,16 +792,13 @@ func (rutMgr *RutMgr)rutMgrStartBspTimer() DhtErrno {
 // Stop bootstrap timer
 //
 func (rutMgr *RutMgr)rutMgrStopBspTimer() DhtErrno {
-
 	var dhtEno = DhtEnoNone
-
 	if rutMgr.bpTid != sch.SchInvalidTid {
 		if eno := rutMgr.sdl.SchKillTimer(rutMgr.ptnMe, rutMgr.bpTid); eno != sch.SchEnoNone {
 			dhtEno = DhtEnoScheduler
 		}
 	}
 	rutMgr.bpTid = sch.SchInvalidTid
-
 	return dhtEno
 }
 

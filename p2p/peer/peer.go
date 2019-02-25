@@ -25,16 +25,17 @@ import (
 	"time"
 	"fmt"
 	"math/rand"
-	"reflect"
-	ggio 	"github.com/gogo/protobuf/io"
-	"github.com/yeeco/gyee/p2p/config"
-	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	tab		"github.com/yeeco/gyee/p2p/discover/table"
-	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"crypto/ecdsa"
 	"sync"
 	"bytes"
+	"reflect"
+	"crypto/ecdsa"
+	ggio 	"github.com/gogo/protobuf/io"
+	config	"github.com/yeeco/gyee/p2p/config"
+	sch		"github.com/yeeco/gyee/p2p/scheduler"
+	tab		"github.com/yeeco/gyee/p2p/discover/table"
+	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
+	nat		"github.com/yeeco/gyee/p2p/nat"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 //
@@ -320,6 +321,12 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	case sch.EvPeTxDataReq:
 		eno = peMgr.peMgrDataReq(msg.Body)
+
+	case sch.EvNatMgrReadyInd:
+		eno = peMgr.natMgrReadyInd(msg.Body.(*sch.MsgNatMgrReadyInd))
+
+	case sch.EvNatMgrMakeMapRsp:
+		eno = peMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
 
 	default:
 		peerLog.Debug("PeerMgrProc: invalid message: %d", msg.Id)
@@ -662,7 +669,7 @@ func (peMgr *PeerManager)peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErrn
 func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	var eno = sch.SchEnoNone
 	var ptnInst interface{} = nil
-	var ibInd = msg.(*msgConnAcceptedInd)
+	var ibInd, _ = msg.(*msgConnAcceptedInd)
 	var peInst = new(PeerInstance)
 
 	*peInst				= peerInstDefault
@@ -730,6 +737,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 	if peMgr.cfg.noDial || peMgr.cfg.bootstrapNode {
+		peerLog.Debug("PeerManager: no outbound for noDial or boostrapNode: %t, %t")
 		return PeMgrEnoNone
 	}
 
@@ -741,6 +749,7 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 	if snid == nil {
 
 		if eno := peMgr.peMgrStaticSubNetOutbound(); eno != PeMgrEnoNone {
+			peerLog.Debug("peMgrOutboundReq: peMgrStaticSubNetOutbound failed, eno: %d", eno)
 			return eno
 		}
 
@@ -749,6 +758,7 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 			for _, id := range peMgr.cfg.subNetIdList {
 
 				if eno := peMgr.peMgrDynamicSubNetOutbound(&id); eno != PeMgrEnoNone {
+					peerLog.Debug("peMgrOutboundReq: peMgrDynamicSubNetOutbound failed, eno: %d", eno)
 					return eno
 				}
 			}
@@ -1341,6 +1351,24 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	// drive ourselves to startup outbound
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &ind.snid)
 	peMgr.sdl.SchSendMessage(&schMsg)
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) PeMgrErrno {
+	// nothing to do
+	peerLog.Debug("natMgrReadyInd: NatType: %s", msg.NatType)
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno {
+	// switch to the public address, if the nat is configured as "none", the old
+	// address is kept.
+	if nat.NatIsResultOk(msg.Result) && nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
+		for _, n := range peMgr.cfg.subNetNodeList {
+			n.IP = msg.PubIp
+			n.TCP = uint16(msg.PubPort & 0xffff)
+		}
+	}
 	return PeMgrEnoNone
 }
 
