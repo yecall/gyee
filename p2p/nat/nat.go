@@ -21,12 +21,13 @@ import (
 	"time"
 	"net"
 	"fmt"
+	"sync"
 	"strings"
 	"bytes"
+	"reflect"
 	config	"github.com/yeeco/gyee/p2p/config"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	"sync"
 )
 
 
@@ -171,6 +172,7 @@ func NewNatMgr() *NatManager {
 		instTab: make(map[NatMapInstID]*NatMapInstance, 0),
 	}
 	natMgr.tep = natMgr.natMgrProc
+	natMgr.nat = nil
 	return &natMgr
 }
 
@@ -506,29 +508,33 @@ func (natMgr *NatManager)setupNatInterface() NatEno {
 	} else if natMgr.cfg.natType == NATT_ANY {
 		if natMgr.cfg.gwIp != nil && !natMgr.cfg.gwIp.Equal(net.IPv4zero) {
 			if natMgr.nat = NewPmpInterface(natMgr.cfg.gwIp); natMgr.nat != nil {
-				if _, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
-					natMgr.nat = nil
-				} else {
-					natMgr.cfg.natType = NATT_PMP
+				if !reflect.ValueOf(natMgr.nat).IsNil() {
+					if _, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
+						natMgr.nat = nil
+					} else {
+						natMgr.cfg.natType = NATT_PMP
+					}
 				}
 			}
 		} else {
 			if gws, eno := guessPossibleGateways(); eno == NatEnoNone {
 				for _, gwIp := range(gws) {
 					if natMgr.nat = NewPmpInterface(gwIp); natMgr.nat != nil {
-						if _, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
-							natMgr.nat = nil
-						} else {
-							natMgr.cfg.natType = NATT_PMP
-							natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], gwIp...)
-							break
+						if !reflect.ValueOf(natMgr.nat).IsNil() {
+							if _, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
+								natMgr.nat = nil
+							} else {
+								natMgr.cfg.natType = NATT_PMP
+								natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], gwIp...)
+								break
+							}
 						}
 					}
 				}
 			}
 		}
 
-		if natMgr.nat == nil {
+		if natMgr.nat == nil || reflect.ValueOf(natMgr.nat).IsNil() {
 			if natMgr.nat = NewUpnpInterface(); natMgr.nat != nil {
 				natMgr.cfg.natType = NATT_UPNP
 			}
@@ -538,7 +544,7 @@ func (natMgr *NatManager)setupNatInterface() NatEno {
 		return NatEnoParameter
 	}
 
-	if natMgr.cfg.natType != NATT_NONE && natMgr.nat == nil {
+	if natMgr.cfg.natType != NATT_NONE && reflect.ValueOf(natMgr.nat).IsNil() {
 		natLog.Debug("setupNatInterface: null nat, natType: %s", natMgr.cfg.natType)
 		return NatEnoNullNat
 	}

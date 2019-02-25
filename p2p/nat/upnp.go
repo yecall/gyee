@@ -65,6 +65,7 @@ func NewUpnpInterface() *upnpCtrlBlock {
 	cb := queryUpnp()
 	if cb == nil {
 		natLog.Debug("NewUpnpInterface: queryUpnp failed")
+		return (*upnpCtrlBlock )(nil)
 	}
 	return cb
 }
