@@ -1,24 +1,21 @@
-/*
- *  Copyright (C) 2017 gyee authors
- *
- *  This file is part of the gyee library.
- *
- *  The gyee library is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  The gyee library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+// Copyright (C) 2017 gyee authors
+//
+// This file is part of the gyee library.
+//
+// The gyee library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The gyee library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
 
-package core
+package address
 
 /*
 The account address calculation formula is as follows:
@@ -78,7 +75,7 @@ var (
 )
 
 type Address struct {
-	address []byte
+	Raw []byte
 }
 
 func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {
@@ -94,17 +91,17 @@ func NewContractAddressFromData() (*Address, error) {
 
 // Bytes returns address bytes
 func (a *Address) Bytes() []byte {
-	return a.address
+	return a.Raw
 }
 
 // String returns address string
 func (a *Address) String() string {
-	return hex.EncodeToString(a.address)
+	return hex.EncodeToString(a.Raw)
 }
 
 func (a *Address) CommonAddress() *common.Address {
 	ret := new(common.Address)
-	ret.SetBytes(a.address[AddressContentIndex:AddressChecksumIndex])
+	ret.SetBytes(a.Raw[AddressContentIndex:AddressChecksumIndex])
 	return ret
 }
 
@@ -136,7 +133,7 @@ func AddressParseFromBytes(b []byte) (*Address, error) {
 		return nil, ErrInvalidAddressChecksum
 	}
 
-	return &Address{address: b}, nil
+	return &Address{Raw: b}, nil
 }
 
 func newAddressFromPublicKey(t AddressType, pubkey []byte) (*Address, error) {
@@ -149,7 +146,7 @@ func newAddressFromPublicKey(t AddressType, pubkey []byte) (*Address, error) {
 	cs := checkSum(buffer[:AddressChecksumIndex])
 	copy(buffer[AddressChecksumIndex:], cs)
 	return &Address{
-		address: buffer,
+		Raw: buffer,
 	}, nil
 }
 

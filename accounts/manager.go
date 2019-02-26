@@ -22,17 +22,17 @@ package accounts
 
 import (
 	"errors"
-	"path/filepath"
-
 	"fmt"
+	"path/filepath"
+	"time"
+
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/crypto/keystore"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/utils/logging"
-	"time"
 )
 
 /*
@@ -85,10 +85,10 @@ func NewAccountManager(config *config.Config) (*AccountManager, error) {
 	return am, nil
 }
 
-func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, error) {
+func (am *AccountManager) CreateNewAccount(passphrase []byte) (*address.Address, error) {
 	var key keystore.Key
 	key = secp256k1.GenerateKey() //TODO：这个写成crpto模块的interface
-	address, err := core.NewAddressFromPublicKey(key.PublicKey())
+	address, err := address.NewAddressFromPublicKey(key.PublicKey())
 	if err != nil {
 		logging.Logger.Panic("failed create account:", err)
 	}
@@ -99,11 +99,11 @@ func (am *AccountManager) CreateNewAccount(passphrase []byte) (*core.Address, er
 	return address, nil
 }
 
-func (am *AccountManager) Accounts() []*core.Address {
+func (am *AccountManager) Accounts() []*address.Address {
 	list := am.ks.List()
-	addrs := make([]*core.Address, len(list))
+	addrs := make([]*address.Address, len(list))
 	for i, item := range list {
-		addr, err := core.AddressParse(item)
+		addr, err := address.AddressParse(item)
 		if err != nil {
 			logging.Logger.Error("address parse:", err)
 		}
@@ -112,26 +112,26 @@ func (am *AccountManager) Accounts() []*core.Address {
 	return addrs
 }
 
-func (am *AccountManager) ResetPassword(address *core.Address, oldPass []byte, newPass []byte) error {
+func (am *AccountManager) ResetPassword(address *address.Address, oldPass []byte, newPass []byte) error {
 	return nil
 }
 
-func (am *AccountManager) Import(keyContent []byte, passphrase []byte) (*core.Address, error) {
+func (am *AccountManager) Import(keyContent []byte, passphrase []byte) (*address.Address, error) {
 	return nil, nil
 }
 
 //TODO：实现这几个func
 //TODO：需要搞定keystore的问题
 
-func (am *AccountManager) Unlock(address *core.Address, passphrase []byte, duration time.Duration) error {
+func (am *AccountManager) Unlock(address *address.Address, passphrase []byte, duration time.Duration) error {
 	return am.ks.Unlock(address.String(), passphrase, duration)
 }
 
-func (am *AccountManager) Lock(address *core.Address) error {
+func (am *AccountManager) Lock(address *address.Address) error {
 	return am.ks.Lock(address.String())
 }
 
-func (am *AccountManager) SignHash(address *core.Address, hash common.Hash) ([]byte, error) {
+func (am *AccountManager) SignHash(address *address.Address, hash common.Hash) ([]byte, error) {
 	key, err := am.ks.GetUnlocked(address.String())
 	if err != nil {
 		logging.Logger.WithFields(logrus.Fields{

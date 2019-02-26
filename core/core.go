@@ -43,6 +43,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus"
 	"github.com/yeeco/gyee/consensus/tetris2"
@@ -213,10 +214,10 @@ func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) { //从node的acc
 }
 
 func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {
-	ad, err := NewAddressFromPublicKey(publicKey)
+	ad, err := address.NewAddressFromPublicKey(publicKey)
 	if err != nil {
 		log.Warn("New address from public key error", err)
 		return nil, err
 	}
-	return ad.address, nil
+	return ad.Raw, nil
 }
