@@ -192,6 +192,7 @@ type Config struct {
 	NoAccept			bool					// do not accept incoming dial flag
 	BootstrapNode		bool					// bootstrap node flag
 	Local				Node					// local node struct
+	CheckAddress		bool					// check the neighbor reported address with the source ip
 	ProtoNum			uint32					// local protocol number
 	Protocols			[]Protocol				// local protocol table
 	SnidMaskBits		int						// mask bits for subnet identity
@@ -236,6 +237,7 @@ type Cfg4UdpNgbListener struct {
 	UDP				uint16			// udp port numbers
 	TCP				uint16			// tcp port numbers
 	ID				NodeID			// the node's public key
+	CheckAddr		bool			// check reported address against the source ip
 }
 
 // Configuration about peer listener on TCP
@@ -415,6 +417,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		NoAccept:				false,
 		BootstrapNode:			false,
 		Local:					DefaultLocalNode,
+		CheckAddress:			false,
 		ProtoNum:				1,
 		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
 		SnidMaskBits:			0,
@@ -984,10 +987,11 @@ func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
 // Get configuration of neighbor discovering listener
 func P2pConfig4UdpNgbListener(name string) *Cfg4UdpNgbListener {
 	return &Cfg4UdpNgbListener {
-		IP:		config[name].Local.IP,
-		UDP:	config[name].Local.UDP,
-		TCP:	config[name].Local.TCP,
-		ID:		config[name].Local.ID,
+		IP:			config[name].Local.IP,
+		UDP:		config[name].Local.UDP,
+		TCP:		config[name].Local.TCP,
+		ID:			config[name].Local.ID,
+		CheckAddr:	config[name].CheckAddress,
 	}
 }
 

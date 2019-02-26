@@ -56,10 +56,11 @@ func (log lsnMgrLogger)Debug(fmt string, args ... interface{}) {
 const LsnMgrName = sch.NgbLsnName
 
 type listenerConfig struct {
-	IP	net.IP			// IP
-	UDP	uint16			// UDP port number
-	TCP	uint16			// TCP port number
-	ID	config.NodeID	// node identity: the public key
+	IP			net.IP			// IP
+	UDP			uint16			// UDP port number
+	TCP			uint16			// TCP port number
+	ID			config.NodeID	// node identity: the public key
+	CheckAddr	bool			// check the address reported against the source address
 }
 
 type ListenerManager struct {
@@ -127,6 +128,7 @@ func (lsnMgr *ListenerManager) setupConfig() sch.SchErrno {
 	lsnMgr.cfg.UDP	= ptCfg.UDP
 	lsnMgr.cfg.TCP	= ptCfg.TCP
 	lsnMgr.cfg.ID	= ptCfg.ID
+	lsnMgr.cfg.CheckAddr = ptCfg.CheckAddr
 	return sch.SchEnoNone
 }
 
@@ -242,6 +244,7 @@ func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 	udpReader.lsnMgr = lsnMgr
 	udpReader.sdl = lsnMgr.sdl
 	udpReader.conn = lsnMgr.conn
+	udpReader.chkAddr = lsnMgr.cfg.CheckAddr
 	eno, ptnLoop = lsnMgr.sdl.SchCreateTask(&udpReader.desc)
 	if eno != sch.SchEnoNone {
 		lsnLog.Debug("procStart: SchCreateTask failed, eno: %d, ptn: %p", eno, ptnLoop)
@@ -290,6 +293,7 @@ type UdpReaderTask struct {
 	ptnNgbMgr	interface{}				// pointer to neighbor manager task
 	desc		sch.SchTaskDescription	// description
 	udpMsg		*umsg.UdpMsg			// decode/encode wrapper
+	chkAddr		bool					// check sender ip with that reported
 }
 
 type UdpMsgInd struct {
@@ -391,8 +395,8 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 		msgType:udpReader.udpMsg.GetDecodedMsgType(),
 		msgBody:udpReader.udpMsg.GetDecodedMsg(),
 	}
-	if udpReader.udpMsg.CheckUdpMsgFromPeer(from) != true {
-		lsnLog.Debug("msgHandler: CheckUdpMsgFromPeer failed")
+	if eno = udpReader.udpMsg.CheckUdpMsgFromPeer(from, udpReader.chkAddr); eno != umsg.UdpMsgEnoNone {
+		lsnLog.Debug("msgHandler: CheckUdpMsgFromPeer failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 	udpReader.udpMsg.DebugPeerMessage()

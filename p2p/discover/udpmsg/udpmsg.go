@@ -158,6 +158,7 @@ const (
 
 type UdpMsgErrno int
 
+
 //
 // Create UdpMsg object
 //
@@ -443,12 +444,16 @@ func (pum *UdpMsg) GetNeighbors() interface{} {
 //
 // Check decoded message with endpoint where the message from
 //
-func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr) bool {
+func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgErrno {
 
 	//
 	// We just check the ip address simply now, more might be needed.
 	// Also notice that, only IPV4 supported currently.
 	//
+
+	if !chkAddr {
+		return UdpMsgEnoNone
+	}
 
 	var ipv4 = net.IPv4zero
 
@@ -469,11 +474,16 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr) bool {
 		ipv4 = net.IP(pum.Msg.Neighbors.From.IP).To4()
 
 	} else {
-
-		return false
+		udpmsgLog.Debug("CheckUdpMsgFromPeer: invalid message type: %d", *pum.Msg.MsgType)
+		return UdpMsgEnoMessage
 	}
 
-	return ipv4.Equal(from.IP.To4())
+	if !ipv4.Equal(from.IP.To4()) {
+		udpmsgLog.Debug("CheckUdpMsgFromPeer: address mitched, source: %s, reported: %s", from.IP.String(), ipv4.String())
+		return UdpMsgEnoMessage
+	}
+
+	return UdpMsgEnoNone
 }
 
 //
