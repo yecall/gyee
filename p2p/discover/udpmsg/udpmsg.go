@@ -915,7 +915,7 @@ func (ping *Ping)String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
-		strPing := "Ping: "
+		strPing := "Ping:\n"
 		From := "From: " + ping.From.Srting() + "\n"
 		To := "To: " + ping.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
@@ -935,7 +935,7 @@ func (pong *Pong)String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
-		strPing := "Pong: "
+		strPing := "Pong:\n"
 		From := "From: " + pong.From.Srting() + "\n"
 		To := "To: " + pong.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
@@ -955,7 +955,7 @@ func (findnode *FindNode)String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
-		strPing := "FindNode: "
+		strPing := "FindNode:\n"
 		From := "From: " + findnode.From.Srting() + "\n"
 		To := "To: " + findnode.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
@@ -977,7 +977,7 @@ func (neighbors *Neighbors)String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
-		strPing := "Neighbors: "
+		strPing := "Neighbors:\n"
 		From := "From: " + neighbors.From.Srting() + "\n"
 		To := "To: " + neighbors.To.Srting() + "\n"
 		FromSubNetId := "FromSubNetId: "
