@@ -42,7 +42,7 @@ type chainShellLogger struct {
 }
 
 var chainLog = chainShellLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log chainShellLogger)Debug(fmt string, args ... interface{}) {
@@ -311,7 +311,6 @@ func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErr
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
 	panic("peerCloseInd: should never be called!!!")
-	//return sch.SchEnoInternal
 }
 
 func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {

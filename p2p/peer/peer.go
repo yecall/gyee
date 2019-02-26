@@ -36,6 +36,7 @@ import (
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"unsafe"
 )
 
 //
@@ -220,8 +221,10 @@ type PeerManager struct {
 
 	reCfg			PeerReconfig								// sub network reconfiguration
 	reCfgTid		int											// reconfiguration timer
-	natResult		bool										// nat status
 	inStartup		bool										// if had been requestd to startup
+	natResult		bool										// nat status
+	pubTcpIp		net.IP										// public tcp ip
+	pubTcpPort		int											// public tcp port
 }
 
 func NewPeerMgr() *PeerManager {
@@ -564,6 +567,12 @@ func (peMgr *PeerManager)ocrTimestampCleanup() {
 }
 
 func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
+	if (!peMgr.inStartup || !peMgr.natResult) {
+		peerLog.Debug("peMgrDcvFindNodeRsp: not ready, inStartup: %t, natResult: %t",
+			peMgr.inStartup, peMgr.natResult)
+		return PeMgrEnoNone
+	}
+
 	var rsp, _ = msg.(*sch.MsgDcvFindNodeRsp)
 	if rsp == nil {
 		peerLog.Debug("peMgrDcvFindNodeRsp: invalid message")
@@ -1367,6 +1376,8 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 
 func (peMgr *PeerManager)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) PeMgrErrno {
 	if peMgr.natResult = msg.NatType == nat.NATT_NONE; peMgr.natResult {
+		peMgr.pubTcpIp = peMgr.cfg.ip
+		peMgr.pubTcpPort = int(peMgr.cfg.port)
 		if peMgr.inStartup {
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
@@ -1381,11 +1392,14 @@ func (peMgr *PeerManager)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno 
 	// switch to the public address, if the nat is configured as "none", the old
 	// address is kept. MORE might be needed.
 	if nat.NatIsResultOk(msg.Result) && nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
-		for _, n := range peMgr.cfg.subNetNodeList {
+		peMgr.natResult = true
+		peMgr.pubTcpIp = msg.PubIp
+		peMgr.pubTcpPort = msg.PubPort
+		for k, n := range peMgr.cfg.subNetNodeList {
 			n.IP = msg.PubIp
 			n.TCP = uint16(msg.PubPort & 0xffff)
+			peMgr.cfg.subNetNodeList[k] = n
 		}
-		peMgr.natResult = true
 		if peMgr.inStartup {
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
@@ -1402,17 +1416,23 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 	natMapLost := func() {}
 
 	if nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
+		old := peMgr.natResult
+		peMgr.natResult = true
+		peMgr.pubTcpIp = msg.PubIp
+		peMgr.pubTcpPort = msg.PubPort
 		for _, n := range peMgr.cfg.subNetNodeList {
 			n.IP = msg.PubIp
 			n.TCP = uint16(msg.PubPort & 0xffff)
 		}
-		if !peMgr.natResult {
-			peMgr.natResult = true
+		if !old {
 			natMapRecovered()
 		}
 	} else if msg.Proto == nat.NATP_TCP {
-		if peMgr.natResult {
-			peMgr.natResult = false
+		old := peMgr.natResult
+		peMgr.natResult = false
+		peMgr.pubTcpIp = net.IPv4zero
+		peMgr.pubTcpPort = 0
+		if old {
 			natMapLost()
 		}
 	}
