@@ -41,7 +41,7 @@ func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
 	}
 	cb := pmpCtrlBlock{
 		gateWay: gw,
-		client: natpmp.NewClientWithTimeout(gw, clientTimout),
+		client: natpmp.NewClient(gw),
 	}
 	return &cb
 }
