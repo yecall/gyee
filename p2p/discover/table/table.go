@@ -147,25 +147,25 @@ type NodeID = config.NodeID
 type NodeIdEx [config.NodeIDBytes+config.SubNetIdBytes]byte
 
 type Node struct {
-	config.Node			// our Node type
-	sha			Hash	// hash from node identity
+	config.Node					// our Node type
+	sha				Hash		// hash from node identity
 }
 
 type bucketEntry struct {
-	addTime		time.Time	// time when node added
-	lastQuery	time.Time	// time when node latest queryed
-	lastPing	time.Time	// time when node latest pinged
-	lastPong	time.Time	// time when node pong latest received
-	failCount	int			// fail to response find node request counter
-	config.Node				// node
-	sha			Hash		// hash of id
+	addTime			time.Time	// time when node added
+	lastQuery		time.Time	// time when node latest queryed
+	lastPing		time.Time	// time when node latest pinged
+	lastPong		time.Time	// time when node pong latest received
+	failCount		int			// fail to response find node request counter
+	config.Node					// node
+	sha				Hash		// hash of id
 }
 
 //
 // bucket type
 //
 type bucket struct {
-	nodes []*bucketEntry	// node table for a bucket
+	nodes 	[]*bucketEntry		// node table for a bucket
 }
 
 //
@@ -246,6 +246,7 @@ type TableManager struct {
 	ptnNgbMgr		interface{}			// pointer to neighbor manager task node
 	ptnDcvMgr		interface{}			// pointer to discover manager task node
 	ptnNatMgr		interface{}			// pointer to nat manager task node
+	ptnPeerMgr		interface{}			// pointer to peer manager task node
 	shaLocal		Hash				// hash of local node identity
 	buckets			[nBuckets]*bucket	// buckets
 	queryIcb		[]*instCtrlBlock	// active query instance table
@@ -971,6 +972,9 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 			return TabMgrEnoScheduler
 		}
 	}
+	schMsg := sch.SchMessage{}
+	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrReadyInd, msg)
+	tabMgr.sdl.SchSendMessage(&schMsg)
 	return TabMgrEnoNone
 }
 
@@ -1003,6 +1007,9 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 			tabMgr.pubTcpIp = make([]byte, 0)
 			tabMgr.pubTcpPort = 0
 		}
+		schMsg := sch.SchMessage{}
+		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrMakeMapRsp, msg)
+		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
 		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
@@ -1050,6 +1057,9 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 			tabMgr.pubTcpIp = make([]byte, 0)
 			tabMgr.pubTcpPort = 0
 		}
+		schMsg := sch.SchMessage{}
+		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrPubAddrUpdateInd, msg)
+		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
 		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
@@ -1304,7 +1314,13 @@ func (tabMgr *TableManager)tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno 
 		return TabMgrEnoScheduler
 	}
 
-	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil || tabMgr.ptnNatMgr == nil {
+	if eno, tabMgr.ptnPeerMgr = tabMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName); eno != sch.SchEnoNone {
+		tabLog.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.PeerMgrName)
+		return TabMgrEnoScheduler
+	}
+
+	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil ||
+		tabMgr.ptnNatMgr == nil || tabMgr.ptnPeerMgr == nil {
 		tabLog.Debug("tabRelatedTaskPrepare: invaid task node pointer")
 		return TabMgrEnoInternal
 	}

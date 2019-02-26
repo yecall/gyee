@@ -220,6 +220,8 @@ type PeerManager struct {
 
 	reCfg			PeerReconfig								// sub network reconfiguration
 	reCfgTid		int											// reconfiguration timer
+	natResult		bool										// nat status
+	inStartup		bool										// if had been requestd to startup
 }
 
 func NewPeerMgr() *PeerManager {
@@ -327,6 +329,9 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	case sch.EvNatMgrMakeMapRsp:
 		eno = peMgr.natMakeMapRsp(msg.Body.(*sch.MsgNatMgrMakeMapRsp))
+
+	case sch.EvNatMgrPubAddrUpdateInd:
+		eno = peMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
 
 	default:
 		peerLog.Debug("PeerMgrProc: invalid message: %d", msg.Id)
@@ -504,6 +509,12 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
+	peMgr.inStartup = true
+	if !peMgr.natResult {
+		peerLog.Debug("peMgrStartReq: still not mapped by nat")
+		return PeMgrEnoNone
+	}
+
 	peerLog.Debug("peMgrStartReq: task: %s", peMgr.name)
 	var schMsg = sch.SchMessage{}
 
@@ -1355,18 +1366,54 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) PeMgrErrno {
-	// nothing to do
-	peerLog.Debug("natMgrReadyInd: NatType: %s", msg.NatType)
+	if peMgr.natResult = msg.NatType == nat.NATT_NONE; peMgr.natResult {
+		if peMgr.inStartup {
+			schMsg := sch.SchMessage{}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
+			peMgr.sdl.SchSendMessage(&schMsg)
+		}
+	}
+
 	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno {
 	// switch to the public address, if the nat is configured as "none", the old
-	// address is kept.
+	// address is kept. MORE might be needed.
 	if nat.NatIsResultOk(msg.Result) && nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
 		for _, n := range peMgr.cfg.subNetNodeList {
 			n.IP = msg.PubIp
 			n.TCP = uint16(msg.PubPort & 0xffff)
+		}
+		peMgr.natResult = true
+		if peMgr.inStartup {
+			schMsg := sch.SchMessage{}
+			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
+			peMgr.sdl.SchSendMessage(&schMsg)
+		}
+	}
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) PeMgrErrno {
+	// SIMPLY switch the ip address and set result, MORE needed to implement the
+	// following "recover" and "lost" functions.
+	natMapRecovered := func() {}
+	natMapLost := func() {}
+
+	if nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
+		for _, n := range peMgr.cfg.subNetNodeList {
+			n.IP = msg.PubIp
+			n.TCP = uint16(msg.PubPort & 0xffff)
+		}
+		if !peMgr.natResult {
+			peMgr.natResult = true
+			natMapRecovered()
+		}
+	} else if msg.Proto == nat.NATP_TCP {
+		if peMgr.natResult {
+			peMgr.natResult = false
+			natMapLost()
 		}
 	}
 	return PeMgrEnoNone
