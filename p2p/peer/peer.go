@@ -36,7 +36,6 @@ import (
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
 	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"unsafe"
 )
 
 //
