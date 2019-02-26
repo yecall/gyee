@@ -38,7 +38,7 @@ type udpmsgLogger struct {
 }
 
 var udpmsgLog = udpmsgLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log udpmsgLogger)Debug(fmt string, args ... interface{}) {
@@ -924,7 +924,7 @@ func (ping *Ping)String() string {
 		}
 		FromSubNetId += "\n"
 		SubNetId := "SubNetId: " + fmt.Sprintf("%x", ping.SubNetId) + "\n"
-		Id := "Id: " + fmt.Sprintf("%d", ping.Id)
+		Id := "Id: " + fmt.Sprintf("%d", ping.Id) + "\n"
 		Expiration := "Expiration: " + fmt.Sprintf("%d", ping.Expiration) + "\n"
 		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
 		return strPing
@@ -944,7 +944,7 @@ func (pong *Pong)String() string {
 		}
 		FromSubNetId += "\n"
 		SubNetId := "SubNetId: " + fmt.Sprintf("%x", pong.SubNetId) + "\n"
-		Id := "Id: " + fmt.Sprintf("%d", pong.Id)
+		Id := "Id: " + fmt.Sprintf("%d", pong.Id) + "\n"
 		Expiration := "Expiration: " + fmt.Sprintf("%d", pong.Expiration) + "\n"
 		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
 		return strPing
@@ -966,7 +966,7 @@ func (findnode *FindNode)String() string {
 		MaskBits := "MaskBits: " + fmt.Sprintf("%d", findnode.MaskBits) + "\n"
 		SubNetId := "SubNetId: " + fmt.Sprintf("%x", findnode.SubNetId) + "\n"
 		Target := "Target: " + fmt.Sprintf("%x", findnode.Target) + "\n"
-		Id := "Id: " + fmt.Sprintf("%d", findnode.Id)
+		Id := "Id: " + fmt.Sprintf("%d", findnode.Id) + "\n"
 		Expiration := "Expiration: " + fmt.Sprintf("%d", findnode.Expiration) + "\n"
 		strPing += From + To + FromSubNetId + MaskBits + SubNetId + Target + Id + Expiration
 		return strPing
@@ -990,7 +990,7 @@ func (neighbors *Neighbors)String() string {
 		for idx := 0; idx < len(neighbors.Nodes); idx++ {
 			Nodes += neighbors.Nodes[idx].Srting() + "\n"
 		}
-		Id := "Id: " + fmt.Sprintf("%d", neighbors.Id)
+		Id := "Id: " + fmt.Sprintf("%d", neighbors.Id) + "\n"
 		Expiration := "Expiration: " + fmt.Sprintf("%d", neighbors.Expiration) + "\n"
 		strPing += From + To + FromSubNetId + SubNetId + Nodes + Id + Expiration
 		return strPing

@@ -27,6 +27,7 @@ import (
 )
 
 
+
 // see following packages under github.com/huin/goupnp for details:
 // internetgateway1.WANIPConnection1, internetgateway1.WANPPPConnection1,
 // internetgateway2.WANIPConnection1, internetgateway2.WANIPConnection2, internetgateway2.WANPPPConnection1
@@ -46,6 +47,8 @@ const (
 	srvType23 = internetgateway2.URN_WANPPPConnection_1
 	srvType23Str = "internetgateway2.URN_WANPPPConnection_1"
 )
+
+const upnpClientTimout = 3 * time.Second
 
 type upnpClient interface {
 	GetExternalIPAddress() (string, error)
@@ -148,7 +151,7 @@ func devType1Matcher(dev *goupnp.RootDevice, sc goupnp.ServiceClient) *upnpCtrlB
 			devType: devType1Str,
 			srvType: srvType11Str,
 			device: dev,
-			client: &internetgateway1.WANPPPConnection1{ServiceClient: sc},
+			client: &internetgateway1.WANIPConnection1{ServiceClient: sc},
 		}
 	case srvType12:
 		return &upnpCtrlBlock {
@@ -202,43 +205,40 @@ func queryUpnp() *upnpCtrlBlock {
 	return nil
 }
 
-func query(out chan<-*upnpCtrlBlock, target string, matcher matcherT) {
-	const soapRequestTimeout = 3 * time.Second
+func query(found chan<- *upnpCtrlBlock, target string, matcher matcherT) {
 	devs, err := goupnp.DiscoverDevices(target)
 	if err != nil {
-		out <- nil
+		found <- nil
 		return
 	}
-	found := false
-	for i := 0; i < len(devs) && !found; i++ {
+	getone := false
+	for i := 0; i < len(devs) && !getone; i++ {
 		if devs[i].Root == nil {
 			continue
 		}
 		devs[i].Root.Device.VisitServices(func(service *goupnp.Service) {
-			if found {
+			if getone {
 				return
 			}
-			// check for a matching IGD service
 			sc := goupnp.ServiceClient{
 				SOAPClient: service.NewSOAPClient(),
 				RootDevice: devs[i].Root,
 				Location:   devs[i].Location,
 				Service:    service,
 			}
-			sc.SOAPClient.HTTPClient.Timeout = soapRequestTimeout
+			sc.SOAPClient.HTTPClient.Timeout = upnpClientTimout
 			upnp := matcher(devs[i].Root, sc)
 			if upnp == nil {
 				return
 			}
-			// check whether port mapping is enabled
 			if _, nat, err := upnp.client.GetNATRSIPStatus(); err != nil || !nat {
 				return
 			}
-			out <- upnp
-			found = true
+			found <- upnp
+			getone = true
 		})
 	}
-	if !found {
-		out <- nil
+	if !getone {
+		found <- nil
 	}
 }

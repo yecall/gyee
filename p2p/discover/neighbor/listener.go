@@ -42,7 +42,7 @@ type lsnMgrLogger struct {
 }
 
 var lsnLog = lsnMgrLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log lsnMgrLogger)Debug(fmt string, args ... interface{}) {
@@ -406,6 +406,8 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 }
 
 func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
+	lsnMgr.lock.Lock()
+	defer lsnMgr.lock.Unlock()
 	if lsnMgr.conn == nil {
 		lsnLog.Debug("sendUdpMsg: invalid UDP connection")
 		return sch.SchEnoInternal

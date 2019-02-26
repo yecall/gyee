@@ -26,7 +26,7 @@ import (
 
 
 const (
-	clientTimout = time.Second * 8
+	pmpClientTimout = time.Second * 8
 )
 
 type pmpCtrlBlock struct {
@@ -42,6 +42,7 @@ func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
 	cb := pmpCtrlBlock{
 		gateWay: gw,
 		client: natpmp.NewClient(gw),
+		//client: natpmp.NewClientWithTimeout(gw, pmpClientTimout),
 	}
 	if cb.client == nil {
 		return (*pmpCtrlBlock)(nil)

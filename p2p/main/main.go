@@ -38,6 +38,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	log		"github.com/yeeco/gyee/p2p/logger"
 	yep2p	"github.com/yeeco/gyee/p2p"
+	"reflect"
 )
 
 //
@@ -874,6 +875,27 @@ func testCase15(tc *testCase) {
 // testCase16
 //
 func testCase16(tc *testCase) {
+	var v1 []byte
+	var v2  = []byte{1, 2, 3}
+	v1 = v2
+	v1 = append(v1, "123"...)
+
+	var v3 string
+	var v4 = "yyil"
+	v3 = v4
+	v3 += "123"
+
+	var v5 *byte
+	v5 = &v2[0]
+	fmt.Printf("%s", reflect.ValueOf(v5).Type().String())
+
+	v6 := reflect.ValueOf(v5)
+	v7 := reflect.ValueOf(v2).UnsafeAddr()
+	v7 += 1
+
+
+
+
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.Validator = true
 	yesCfg.BootstrapNode = false

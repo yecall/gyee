@@ -1406,7 +1406,6 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	}
 
 	mgr.refreshing = true
-
 	return TabMgrEnoNone
 }
 
@@ -2493,10 +2492,10 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 			int(tabMgr.cfg.local.UDP) == tabMgr.pubUdpPort {
 			return TabMgrEnoParameter
 		}
-		tabMgr.cfg.local.IP = append(tabMgr.cfg.local.IP, tabMgr.pubUdpIp...)
+		tabMgr.cfg.local.IP = tabMgr.pubUdpIp
 		tabMgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
 		for _, mgr := range tabMgr.subNetMgrList {
-			mgr.cfg.local.IP = append(mgr.cfg.local.IP, tabMgr.pubUdpIp...)
+			mgr.cfg.local.IP = tabMgr.pubUdpIp
 			mgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
 		}
 		return TabMgrEnoNone
@@ -2505,10 +2504,10 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 			int(tabMgr.cfg.local.TCP) == tabMgr.pubTcpPort {
 			return TabMgrEnoParameter
 		}
-		tabMgr.cfg.local.IP = append(tabMgr.cfg.local.IP, tabMgr.pubUdpIp...)
+		tabMgr.cfg.local.IP = tabMgr.pubUdpIp
 		tabMgr.cfg.local.TCP = uint16(tabMgr.pubTcpPort & 0xffff)
 		for _, mgr := range tabMgr.subNetMgrList {
-			mgr.cfg.local.IP = append(mgr.cfg.local.IP, tabMgr.pubUdpIp...)
+			mgr.cfg.local.IP = mgr.cfg.local.IP
 			mgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
 		}
 		return TabMgrEnoNone
