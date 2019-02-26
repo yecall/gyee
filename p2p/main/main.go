@@ -143,6 +143,11 @@ var testCaseTable = []testCase{
 		description:	"reconfiguration: nat",
 		entry:			testCase16,
 	},
+	{
+		name:			"testCase17",
+		description:	"reconfiguration: traffic with nat",
+		entry:			testCase17,
+	},
 }
 
 //
@@ -445,6 +450,7 @@ func testCase0(tc *testCase) {
 	yesCfg.SubNetMaskBits = 0
 	yesCfg.LocalNodeIp = "192.168.1.109"
 	yesCfg.LocalDhtIp = "192.168.1.109"
+	yesCfg.NatType = config.NATT_NONE
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
 	waitInterrupt()
@@ -858,6 +864,26 @@ func testCase15(tc *testCase) {
 // testCase16
 //
 func testCase16(tc *testCase) {
+	yesCfg := yep2p.DefaultYeShellConfig
+	yesCfg.Validator = true
+	yesCfg.BootstrapNode = false
+	yesCfg.SubNetMaskBits = 4
+
+	//yesCfg.NatType = config.NATT_NONE
+	//yesCfg.NatType = config.NATT_PMP
+	yesCfg.NatType = config.NATT_UPNP
+	//yesCfg.NatType = config.NATT_ANY
+
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+	waitInterrupt()
+	yeShMgr.Stop()
+}
+
+//
+// testCase17
+//
+func testCase17(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.Validator = true
 	yesCfg.BootstrapNode = false
