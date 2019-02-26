@@ -32,13 +32,13 @@ import (
 	"errors"
 	"net"
 	"strings"
+	"runtime"
 	"crypto/sha256"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	config	"github.com/yeeco/gyee/p2p/config"
 	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	nat		"github.com/yeeco/gyee/p2p/nat"
-	"runtime"
+	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
 
 
