@@ -204,6 +204,16 @@ func waitInterrupt() {
 	<-sigc
 }
 
+func waitInterrupt2Stop(mgr interface{}) {
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc, os.Interrupt)
+	defer signal.Stop(sigc)
+	<-sigc
+	if yesMgr, ok := mgr.(*yep2p.YeShellManager); ok {
+		yesMgr.Stop()
+	}
+}
+
 func waitInterruptWithCallback(srv yep2p.Service, workp appWorkProc, stopp appStopProc) {
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt)
@@ -871,13 +881,13 @@ func testCase16(tc *testCase) {
 
 	//yesCfg.NatType = config.NATT_NONE
 	//yesCfg.NatType = config.NATT_PMP
+	//yesCfg.GatewayIp = "192.168.1.1"
 	yesCfg.NatType = config.NATT_UPNP
 	//yesCfg.NatType = config.NATT_ANY
 
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
-	waitInterrupt()
-	yeShMgr.Stop()
+	waitInterrupt2Stop(yeShMgr)
 }
 
 //

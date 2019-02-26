@@ -37,11 +37,14 @@ type pmpCtrlBlock struct {
 func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
 	if gw == nil {
 		natLog.Debug("NewPmpInterface: nil gateway ip address")
-		return nil
+		return (*pmpCtrlBlock)(nil)
 	}
 	cb := pmpCtrlBlock{
 		gateWay: gw,
-		client: natpmp.NewClient(gw),
+		client: natpmp.NewClientWithTimeout(gw, clientTimout),
+	}
+	if cb.client == nil {
+		return (*pmpCtrlBlock)(nil)
 	}
 	return &cb
 }
