@@ -153,7 +153,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var targetCase = "testCase16"
+var targetCase = "testCase17"
 
 //
 // switch for playing go-monitors, related commands:
@@ -392,8 +392,8 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 
 		//time.Sleep(time.Millisecond * 20)
 		//time.Sleep(time.Millisecond * 50)
-		//time.Sleep(time.Millisecond * 100)
-		time.Sleep(time.Millisecond * 1000)
+		time.Sleep(time.Millisecond * 100)
+		//time.Sleep(time.Millisecond * 1000)
 	}
 }
 
