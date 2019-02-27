@@ -1441,6 +1441,10 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 		tabLog.Debug("tabClosest: invalid size: %d, min: 1, max: %d", size, maxBonding)
 		return nil
 	}
+	if forWhat != Closest4Queried && forWhat != Closest4Querying {
+		tabLog.Debug("tabClosest: don't know what it's for: %d", forWhat);
+		return nil
+	}
 
 	ht := TabNodeId2Hash(target)
 	dt := tabMgr.tabLog2Dist(tabMgr.shaLocal, *ht)
@@ -1449,7 +1453,8 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 	// we are looking for nodes for queries from peers. in this case, if the local node is
 	// bootstrap node and configured as "AnySubNet", we had to determine the target subnet
 	// identity by mask bits and the target node identity, since the subnet identity is not
-	// backup in the bucket.
+	// backup in the bucket. and please notice that: if it is for "Closest4Querying", then
+	// when come the tabMgr instance must matched the target subnet identity.
 
 	dedup := make(map[string]bool, 0)
 	targetSnid := config.SubNetworkID{}
@@ -1473,11 +1478,14 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 				// different subnets, and the max number of nodes is limited by the parameter
 				// "size" passed into this function.
 
-				ipnport := fmt.Sprintf("%s:%d", ne.IP.String(), ne.UDP)
-				if _, dup := dedup[ipnport]; dup {
-					continue
+				ipnport := ""
+				if forWhat == Closest4Querying {
+					ipnport = fmt.Sprintf("%s:%d", ne.IP.String(), ne.UDP)
+					if _, dup := dedup[ipnport]; dup {
+						continue
+					}
+					dedup[ipnport] = true
 				}
-				dedup[ipnport] = true
 
 				// if we are fetching nodes to which we would query, we need to check the time
 				// we had queried them last time to escape the case that query too frequency.
