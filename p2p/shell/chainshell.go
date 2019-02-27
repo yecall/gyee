@@ -73,7 +73,6 @@ type shellPeerInst struct {
 	hsInfo		*peer.Handshake					// handshake info about peer
 	pi			*peer.PeerInstance				// peer instance pointer
 	status		int								// active peer instance status
-	txLock		sync.Mutex						// tx lock to sync deduplicaton messages sending and instance closing
 }
 
 const (
@@ -230,11 +229,15 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 		pi: pi,
 		status: pisActive,
 	}
+
+	shMgr.peerLock.Lock()
 	if _, dup := shMgr.peerActived[peerId]; dup {
 		chainLog.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
+		shMgr.peerLock.Unlock()
 		return sch.SchEnoUserTask
 	}
 	shMgr.peerActived[peerId] = &peerInst
+	shMgr.peerLock.Unlock()
 
 	chainLog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
 		peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
@@ -290,6 +293,9 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 }
 
 func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErrno {
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+
 	peerId := shellPeerID {
 		snid: cfm.Snid,
 		nodeId: cfm.PeerId,
@@ -316,6 +322,9 @@ func (shMgr *ShellManager)peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchErr
 }
 
 func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+
 	peerId := shellPeerID {
 		snid: ind.Snid,
 		nodeId: ind.PeerId,
@@ -429,9 +438,7 @@ func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadc
 		chainLog.Debug("send2Peer: bcr2Package failed")
 		return sch.SchEnoUserTask
 	} else {
-		peer.txLock.Lock()
 		peer.txChan<-pkg
-		peer.txLock.Unlock()
 		return sch.SchEnoNone
 	}
 }
@@ -535,20 +542,19 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		nodeId:	rxPkg.PeerInfo.NodeId,
 	}
 
-	shMgr.peerLock.lock()
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
 		chainLog.Debug("checkKeyFromPeer: active peer not found, spid: %+v", spid)
-		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
 	if pai.status != pisActive {
 		chainLog.Debug("checkKeyFromPeer: peer not active, spid: %+v", spid)
-		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
-	shMgr.peerLock.Unlock()
 
 	shMgr.deDupKeyLock.Lock()
 	status := int32(peer.KS_NOTEXIST)
@@ -593,23 +599,20 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 	}
 
 	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
 		chainLog.Debug("reportKeyFromPeer: active peer not found, spid: %+v", spid)
-		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
 	if pai.status != pisActive {
 		chainLog.Debug("reportKeyFromPeer: peer not active, spid: %+v", spid)
-		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
-	shMgr.peerLock.Unlock()
 
 	shMgr.deDupLock.Lock()
-	defer shMgr.deDupLock.Unlock()
-
 	ddk := deDupKey{}
 	copy(ddk.key[0:], rxPkg.Key)
 	ddk.peer = spid
@@ -617,11 +620,13 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 
 	if !ok {
 		chainLog.Debug("reportKeyFromPeer: not found, ddk: %+v", ddk)
+		shMgr.deDupLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
 	shMgr.tmDedup.KillTimer(ddv.timer)
 	delete(shMgr.deDupMap, ddk)
+	shMgr.deDupLock.Unlock()
 
 	if msg.Rptk.Status == int32(peer.KS_NOTEXIST) {
 		return shMgr.send2Peer(pai, ddv.bcReq)
@@ -677,10 +682,7 @@ func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, key *config.DsKey, 
 		return errors.New("reportKey2Peer: ReportKey failed")
 	}
 
-	pai.txLock.Lock()
 	pai.txChan<-upkg
-	pai.txLock.Unlock()
-
 	return nil
 }
 
