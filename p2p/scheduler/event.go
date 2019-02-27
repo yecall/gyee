@@ -335,6 +335,16 @@ const (
 )
 
 // EvPeCloseReq
+const (
+	PEC_FOR_NONE			= "None"
+	PEC_FOR_COMMAND			= "Command"
+	PEC_FOR_SETDEADLINE		= "SetDeadline failed"
+	PEC_FOR_PINGPONG		= "PeMgrEnoPingpongTh"
+	PEC_FOR_RXERROR			= "RecvPackage"
+	PEC_FOR_TXERROR			= "SendPackage"
+	PEC_FOR_RECONFIG		= "Reconfig"
+	PEC_FOR_RECONFIG_REQ	= "ReconfigReq"
+)
 type MsgPeCloseReq struct {
 	Ptn		interface{}				// pointer to peer task instance node
 	Snid	config.SubNetworkID		// sub network identity

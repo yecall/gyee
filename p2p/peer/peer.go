@@ -1266,6 +1266,11 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	var snid = req.Snid
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
 
+	if why, ok := req.Why.(string); ok {
+		p2plog.Debug("peMgrCloseReq: why: %s, snid: %x, dir: %d, ip: %s, port: %d",
+			why, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
+	}
+
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {
 		peerLog.Debug("peMgrCloseReq: worker not found")
@@ -1658,6 +1663,7 @@ func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
 		if !ok {
 			continue
 		}
+		why := sch.PEC_FOR_RECONFIG
 		msg := sch.SchMessage{}
 		for _, peerInst := range wks {
 			req := sch.MsgPeCloseReq {
@@ -1665,7 +1671,7 @@ func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
 				Snid:	peerInst.snid,
 				Node:	peerInst.node,
 				Dir:	peerInst.dir,
-				Why:	msg,
+				Why:	why,
 			}
 			peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
 			peMgr.sdl.SchSendMessage(&msg)
@@ -1747,12 +1753,13 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 			if count++; count >= wkNum / 2 {
 				break
 			}
+			why := sch.PEC_FOR_RECONFIG_REQ
 			req := sch.MsgPeCloseReq {
 				Ptn:	peerInst.ptnMe,
 				Snid:	peerInst.snid,
 				Node:	peerInst.node,
 				Dir:	peerInst.dir,
-				Why:	msg,
+				Why:	why,
 			}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
 			if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
@@ -1999,6 +2006,8 @@ type PeerInstance struct {
 	rxEno			PeMgrErrno					// rx errno
 	txEno			PeMgrErrno					// tx errno
 	ppEno			PeMgrErrno					// pingpong errno
+	rxDiscard		int64						// number of rx messages discarded
+	rxOkCnt			int64						// number of rx messages accepted
 }
 
 var peerInstDefault = PeerInstance {
@@ -2314,6 +2323,7 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 
 	if err := pi.conn.SetDeadline(time.Time{}); err != nil {
 		peerLog.Debug("piEstablishedInd: SetDeadline failed, error: %s", err.Error())
+		why := sch.PEC_FOR_SETDEADLINE
 		msg := sch.SchMessage{}
 		req := sch.MsgPeCloseReq{
 			Ptn: pi.ptnMe,
@@ -2322,6 +2332,7 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 				ID: pi.node.ID,
 			},
 			Dir: pi.dir,
+			Why: why,
 		}
 		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 		pi.sdl.SchSendMessage(&msg)
@@ -2342,7 +2353,8 @@ func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
 	msg := sch.SchMessage{}
 	if pi.ppCnt++; pi.ppCnt > PeInstMaxPingpongCnt {
 		pi.ppEno = PeMgrEnoPingpongTh
-
+		why := sch.PEC_FOR_PINGPONG
+		/* get a simple "why"
 		i := P2pIndConnStatusPara {
 			Ptn:		pi.ptnMe,
 			PeerInfo:	&Handshake {
@@ -2354,19 +2366,17 @@ func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
 			Status		:	PeMgrEnoPingpongTh,
 			Flag		:	false,
 			Description	:	"piPingpongTimerHandler: threshold reached",
-		}
-
+		}*/
 		req := sch.MsgPeCloseReq {
 			Ptn: pi.ptnMe,
 			Snid: pi.snid,
 			Node: pi.node,
 			Dir: pi.dir,
-			Why: &i,
+			Why: why,
 		}
 
 		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 		pi.sdl.SchSendMessage(&msg)
-
 		return pi.ppEno
 	}
 
@@ -2550,6 +2560,7 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	idExOut := PeerIdEx{Id: *id, Dir: PeInstDirOutbound}
 	idExIn := PeerIdEx{Id: *id, Dir: PeInstDirInbound}
 	idExList := []PeerIdEx{idExOut, idExIn}
+	why := sch.PEC_FOR_COMMAND
 	for _, idEx := range idExList {
 		var req = sch.MsgPeCloseReq{
 			Ptn: nil,
@@ -2558,6 +2569,7 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 				ID: *id,
 			},
 			Dir: idEx.Dir,
+			Why: why,
 		}
 		var schMsg= sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
@@ -2591,30 +2603,28 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		// might had fired pi.txDone and been blocked by pi.txExit. panic is called
 		// for such a overload system, see scheduler please.
 
-		pi.txFailedCnt += 1
 		pi.txEno = eno
-
+		why := sch.PEC_FOR_TXERROR
+		/* get a simple "why"
 		hs := Handshake{
 			Snid:      pi.snid,
 			NodeId:    pi.node.ID,
 			ProtoNum:  pi.protoNum,
 			Protocols: pi.protocols,
 		}
-
 		i := P2pIndConnStatusPara{
 			Ptn:         pi.ptnMe,
 			PeerInfo:    &hs,
 			Status:      int(eno),
 			Flag:        false,
 			Description: "piTx: SendPackage failed",
-		}
-
+		}*/
 		req := sch.MsgPeCloseReq{
 			Ptn:  pi.ptnMe,
 			Snid: pi.snid,
 			Node: pi.node,
 			Dir:  pi.dir,
-			Why:  &i,
+			Why:  why,
 		}
 
 		msg := sch.SchMessage{}
@@ -2672,6 +2682,7 @@ _txLoop:
 
 				} else {
 
+					pi.txFailedCnt += 1
 					ask4Close(eno)
 				}
 			}
@@ -2701,12 +2712,13 @@ _txLoop:
 
 			} else {
 
+				pi.txFailedCnt += 1
 				ask4Close(eno)
 			}
 		}
 
-		if pi.txSeq & 0x0f == 0 {
-			peerLog.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. snid: %x, dir: %d, peer: %x",
+		if pi.txSeq & 0xff == 0 {
+			p2plog.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. snid: %x, dir: %d, peer: %x",
 				pi.txSeq, pi.txOkCnt, pi.txFailedCnt, pi.snid, pi.dir, pi.node.ID)
 		}
 	}
@@ -2764,29 +2776,28 @@ _rxLoop:
 			// we would get an error;
 
 			peerLog.Debug("piRx: error, snid: %x, ip: %s", pi.snid, pi.node.IP.String())
-
+			why := sch.PEC_FOR_RXERROR
 			pi.rxEno = eno
+			/* get a simple "why"
 			hs := Handshake {
 				Snid:		pi.snid,
 				NodeId:		pi.node.ID,
 				ProtoNum:	pi.protoNum,
 				Protocols:	pi.protocols,
 			}
-
-			i := P2pIndConnStatusPara{
+			why := P2pIndConnStatusPara{
 				Ptn:		pi.ptnMe,
 				PeerInfo:	&hs,
 				Status:		int(eno),
 				Flag:		false,
 				Description:"piRx: RecvPackage failed",
-			}
-
+			}*/
 			req := sch.MsgPeCloseReq {
 				Ptn: pi.ptnMe,
 				Snid: pi.snid,
 				Node: pi.node,
 				Dir: pi.dir,
-				Why: &i,
+				Why: why,
 			}
 
 			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
@@ -2820,6 +2831,11 @@ _rxLoop:
 				peerLog.Debug("piRx: rx queue full, snid: %x, dir: %d, pi: %s, peer: %x",
 					pi.snid, pi.dir, pi.name, pi.node.ID)
 
+				if pi.rxDiscard += 1; pi.rxDiscard & 0x1f == 0 {
+					p2plog.Debug("piRx: snid: %x, dir: %d, pi: %s, rxDiscard: %d",
+						pi.snid, pi.dir, pi.name, pi.rxDiscard)
+				}
+
 			} else {
 
 				peerInfo := PeerInfo{}
@@ -2843,6 +2859,11 @@ _rxLoop:
 				pkgCb.Payload = append(pkgCb.Payload, upkg.Payload...)
 
 				pi.rxChan <- &pkgCb
+
+				if pi.rxOkCnt += 1; pi.rxOkCnt & 0xff == 0 {
+					p2plog.Debug("piRx: rxOkCnt: %d, snid: %x, dir: %d, pi: %s",
+						pi.rxOkCnt, pi.snid, pi.dir, pi.name)
+				}
 			}
 
 		} else {

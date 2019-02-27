@@ -1445,7 +1445,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 			target.discardMessages += 1
 
 			if target.discardMessages & (0x1f) == 0 {
-				schLog.Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
+				p2plog./*schLog*/Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
 					sdl.p2pCfg.CfgName, target.name, target.discardMessages)
 			}
 

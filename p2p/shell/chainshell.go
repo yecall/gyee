@@ -68,11 +68,12 @@ type shellPeerID struct {
 
 type shellPeerInst struct {
 	shellPeerID									// shell peer identity
-	txChan		chan *peer.P2pPackage			// tx channel of peer instance
-	rxChan		chan *peer.P2pPackageRx			// rx channel of peer instance
-	hsInfo		*peer.Handshake					// handshake info about peer
-	pi			*peer.PeerInstance				// peer instance pointer
-	status		int								// active peer instance status
+	txChan			chan *peer.P2pPackage		// tx channel of peer instance
+	rxChan			chan *peer.P2pPackageRx		// rx channel of peer instance
+	hsInfo			*peer.Handshake				// handshake info about peer
+	pi				*peer.PeerInstance			// peer instance pointer
+	status			int							// active peer instance status
+	discrdMessages	int64						// number of messages discarded
 }
 
 const (
@@ -427,18 +428,21 @@ func (shMgr *ShellManager)bcr2Package(req *sch.MsgShellBroadcastReq) *peer.P2pPa
 	return pkg
 }
 
-func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
-	if len(peer.txChan) >= cap(peer.txChan) {
+func (shMgr *ShellManager)send2Peer(spi *shellPeerInst, req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	if len(spi.txChan) >= cap(spi.txChan) {
 		chainLog.Debug("send2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
-			peer.snid, peer.dir, peer.nodeId)
+			spi.snid, spi.dir, spi.nodeId)
+		if spi.discrdMessages += 1; spi.discrdMessages & 0x1f == 0 {
+			chainLog.Debug("send2Peer：sind: %x, dir: %d, discardMessages: %d",
+				spi.snid, spi.dir, spi.discrdMessages)
+		}
 		return sch.SchEnoResource
 	}
-
 	if pkg := shMgr.bcr2Package(req); pkg == nil {
 		chainLog.Debug("send2Peer: bcr2Package failed")
 		return sch.SchEnoUserTask
 	} else {
-		peer.txChan<-pkg
+		spi.txChan<-pkg
 		return sch.SchEnoNone
 	}
 }
@@ -654,35 +658,47 @@ func (shMgr *ShellManager)deDupTimerCb(el *list.Element, data interface{}) inter
 	return errors.New(fmt.Sprintf("deDupTimerCb: not found, ddk: %+v", *ddk))
 }
 
-func (shMgr *ShellManager)checkKey2Peer(pai *shellPeerInst, ddk *deDupKey) error {
-
+func (shMgr *ShellManager)checkKey2Peer(spi *shellPeerInst, ddk *deDupKey) error {
+	if len(spi.txChan) >= cap(spi.txChan) {
+		chainLog.Debug("checkKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
+			spi.snid, spi.dir, spi.nodeId)
+		if spi.discrdMessages += 1; spi.discrdMessages & 0x1f == 0 {
+			chainLog.Debug("checkKey2Peer：sind: %x, dir: %d, discrdMessages: %d",
+				spi.snid, spi.dir, spi.discrdMessages)
+		}
+		return sch.SchEnoResource
+	}
 	chkk := peer.CheckKey{}
 	chkk.Key = append(chkk.Key, ddk.key[0:]...)
 	upkg := new(peer.P2pPackage)
-
-	if eno := upkg.CheckKey(pai.pi, &chkk, false); eno != peer.PeMgrEnoNone {
+	if eno := upkg.CheckKey(spi.pi, &chkk, false); eno != peer.PeMgrEnoNone {
 		chainLog.Debug("checkKey2Peer: CheckKey failed, eno: %d", eno)
 		return errors.New("checkKey2Peer: ReportKey failed")
 	}
-
-	pai.txChan<-upkg
-
+	spi.txChan<-upkg
 	return nil
 }
 
-func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, key *config.DsKey, status int32) error {
+func (shMgr *ShellManager)reportKey2Peer(spi *shellPeerInst, key *config.DsKey, status int32) error {
 
+	if len(spi.txChan) >= cap(spi.txChan) {
+		chainLog.Debug("reportKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
+			spi.hsInfo.Snid, spi.hsInfo.Dir, spi.hsInfo.NodeId)
+		if spi.discrdMessages += 1; spi.discrdMessages & 0x1f == 0 {
+			chainLog.Debug("reportKey2Peer：sind: %x, dir: %d, discardMessages: %d",
+				spi.snid, spi.dir, spi.discrdMessages)
+		}
+		return sch.SchEnoResource
+	}
 	rptk := peer.ReportKey{}
 	rptk.Key = append(rptk.Key, key[0:]...)
 	rptk.Status = status
 	upkg := new(peer.P2pPackage)
-
-	if eno := upkg.ReportKey(pai.pi, &rptk, false); eno != peer.PeMgrEnoNone {
+	if eno := upkg.ReportKey(spi.pi, &rptk, false); eno != peer.PeMgrEnoNone {
 		chainLog.Debug("reportKey2Peer: ReportKey failed, eno: %d", eno)
 		return errors.New("reportKey2Peer: ReportKey failed")
 	}
-
-	pai.txChan<-upkg
+	spi.txChan<-upkg
 	return nil
 }
 

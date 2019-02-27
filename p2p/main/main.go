@@ -390,9 +390,9 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 			log.Debug("yeChainProc: cnt: %d, loop BroadcastMessageOsn", cnt)
 		}
 
-		//time.Sleep(time.Millisecond * 20)
+		time.Sleep(time.Millisecond * 20)
 		//time.Sleep(time.Millisecond * 50)
-		time.Sleep(time.Millisecond * 100)
+		//time.Sleep(time.Millisecond * 100)
 		//time.Sleep(time.Millisecond * 1000)
 	}
 }
@@ -897,7 +897,7 @@ func testCase17(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.Validator = true
 	yesCfg.BootstrapNode = false
-	yesCfg.SubNetMaskBits = 4
+	yesCfg.SubNetMaskBits = 0
 
 	//yesCfg.NatType = config.NATT_NONE
 	//yesCfg.NatType = config.NATT_PMP
