@@ -113,7 +113,7 @@ const (
 	bucketSize			= 32					// max nodes can be held for one bucket
 	nBuckets			= HashBits + 1			// total number of buckets
 	maxBonding			= 16					// max concurrency bondings
-	maxFindnodeFailures	= 5						// max FindNode failures to remove a node
+	maxFindnodeFailures	= 3						// max FindNode failures to remove a node
 
 	//
 	// Since a bootstrap node would not dial outside, one could set a small value for the
@@ -124,20 +124,12 @@ const (
 	autoBsnRefreshCycle	= autoRefreshCycle / 60	// one minute
 
 	findNodeMinInterval	= 4 * time.Second		// min interval for two queries to same node
-	findNodeExpiration	= 21 * time.Second		// should be (NgbProtoFindNodeResponseTimeout + delta)
-	pingpongExpiration	= 21 * time.Second		// should be (NgbProtoPingResponseTimeout + delta)
-	seedMaxCount          = 32					// wanted number of seeds
-	seedMaxAge          = 5 * 24 * time.Hour	// max age can seeds be
+	findNodeExpiration	= 8 * time.Second		// should be (NgbProtoFindNodeResponseTimeout + delta)
+	pingpongExpiration	= 8 * time.Second		// should be (NgbProtoPingResponseTimeout + delta)
+	seedMaxCount		= 32					// wanted number of seeds
+	seedMaxAge          = 1 * 24 * time.Hour	// max age can seeds be
 	nodeReboundDuration	= 1 * time.Minute		// duration for a node to be rebound
 	nodeAutoCleanCycle	= time.Hour				// Time period for running the expiration task.
-
-	//
-	// See constant nodeDBNodeExpiration defined in file nodedb.go for details.
-	// The following constant is an alias for that and is not used currently.
-	//
-
-	nodeExpiration		= 24 * time.Hour		// Time after which an unseen node should be dropped.
-
 )
 
 //
@@ -1151,7 +1143,7 @@ func (ndbc *NodeDbCleaner)ndbcPoweron(ptn interface{}) TabMgrErrno {
 	ndbc.tabMgr = ndbc.sdl.SchGetTaskObject(TabMgrName).(*TableManager)
 	var tmd  = sch.TimerDescription {
 		Name:	NdbcName + "_autoclean",
-		Utid:	0,
+		Utid:	sch.NdbCleanerTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	nodeAutoCleanCycle,
 		Extra:	nil,
@@ -1453,12 +1445,18 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 	ht := TabNodeId2Hash(target)
 	dt := tabMgr.tabLog2Dist(tabMgr.shaLocal, *ht)
 
-	// get target subnet identity, see bellow pls
+	// get target subnet identity, see bellow pls. this is only for Closest4Queried means
+	// we are looking for nodes for queries from peers. in this case, if the local node is
+	// bootstrap node and configured as "AnySubNet", we had to determine the target subnet
+	// identity by mask bits and the target node identity, since the subnet identity is not
+	// backup in the bucket.
+
+	dedup := make(map[string]bool, 0)
 	targetSnid := config.SubNetworkID{}
 	if forWhat == Closest4Queried &&
 		tabMgr.cfg.bootstrapNode &&
 		tabMgr.snid == config.AnySubNet {
-		var err error
+		err := error(nil)
 		targetSnid, err = GetSubnetIdentity(target, mbs)
 		if err != nil {
 			tabLog.Debug("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
@@ -1470,6 +1468,16 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 		count = len(closest)
 		if bk != nil {
 			for _, ne := range bk.nodes {
+
+				// we had to deduplicate, since "validator" might have smae address for its'
+				// different subnets, and the max number of nodes is limited by the parameter
+				// "size" passed into this function.
+
+				ipnport := fmt.Sprintf("%s:%d", ne.IP.String(), ne.UDP)
+				if _, dup := dedup[ipnport]; dup {
+					continue
+				}
+				dedup[ipnport] = true
 
 				// if we are fetching nodes to which we would query, we need to check the time
 				// we had queried them last time to escape the case that query too frequency.
