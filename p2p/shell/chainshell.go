@@ -531,18 +531,20 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		nodeId:	rxPkg.PeerInfo.NodeId,
 	}
 
+	shMgr.deDupKeyLock.Lock()
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
 		chainLog.Debug("checkKeyFromPeer: active peer not found, spid: %+v", spid)
+		shMgr.deDupKeyLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
 	if pai.status != pisActive {
 		chainLog.Debug("checkKeyFromPeer: peer not active, spid: %+v", spid)
+		shMgr.deDupKeyLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
-	shMgr.deDupKeyLock.Lock()
 	status := int32(peer.KS_NOTEXIST)
 	if _, dup := shMgr.deDupKeyMap[key]; dup {
 		status = int32(peer.KS_EXIST)
@@ -584,6 +586,9 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 		nodeId: rxPkg.PeerInfo.NodeId,
 	}
 
+	shMgr.deDupLock.Lock()
+	defer shMgr.deDupLock.Unlock()
+
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
 		chainLog.Debug("reportKeyFromPeer: active peer not found, spid: %+v", spid)
@@ -595,15 +600,11 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 		return sch.SchEnoNotFound
 	}
 
-	shMgr.deDupLock.Lock()
-	defer shMgr.deDupLock.Unlock()
-
 	ddk := deDupKey{}
-
 	copy(ddk.key[0:], rxPkg.Key)
 	ddk.peer = spid
-
 	ddv, ok := shMgr.deDupMap[ddk]
+
 	if !ok {
 		chainLog.Debug("reportKeyFromPeer: not found, ddk: %+v", ddk)
 		return sch.SchEnoNotFound
