@@ -2032,11 +2032,11 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, la
 	// node must be pinged can it be added into a bucket, if pong does not received
 	// while adding, we set it a very old one.
 	if n == nil || lastQuery == nil || lastPing == nil {
-		p2plog./*tabLog*/Debug("tabBucketAddNode: invalid parameters")
+		p2plog./*tabLog*/Debug("tabBucketAddNode: snid: %x, invalid parameters", tabMgr.snid)
 		return TabMgrEnoParameter
 	}
 
-	p2plog./*tabLog*/Debug("tabBucketAddNode: snid: %d, ip: %s, port: %d", n.IP.String(), n.UDP)
+	p2plog./*tabLog*/Debug("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
 
 	if lastPong == nil {
 		var veryOld = time.Time{}
