@@ -23,7 +23,6 @@ package accounts
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -71,10 +70,9 @@ type AccountManager struct {
 }
 
 func NewAccountManager(config *config.Config) (*AccountManager, error) {
-	am := &AccountManager{}
-	//TODO: 用config里的keydir来拼
-	keydir := filepath.Join(config.NodeDir, "keystore")
-	am.ks = keystore.NewKeystore(keydir)
+	am := &AccountManager{
+		ks: keystore.NewKeystoreWithConfig(config),
+	}
 	//accounts := Accounts{}
 	//accounts.Accounts = make(map[string]*Account)
 	//err := accounts.LoadFromFile()

@@ -33,6 +33,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common/address"
+	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/crypto/keystore/cipher"
 	"github.com/yeeco/gyee/crypto/util"
 	"github.com/yeeco/gyee/utils/logging"
@@ -63,6 +64,11 @@ type Keystore struct {
 	unlocked  map[string]*unlocked
 
 	mu sync.RWMutex
+}
+
+func NewKeystoreWithConfig(config *config.Config) *Keystore {
+	//TODO: 用config里的keydir来拼
+	return NewKeystore(filepath.Join(config.NodeDir, "keystore"))
 }
 
 func NewKeystore(dirPath string) *Keystore {

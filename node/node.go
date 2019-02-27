@@ -176,12 +176,7 @@ func (n *Node) WaitForShutdown() {
 }
 
 func (n *Node) lockDataDir() error {
-	instDir := filepath.Join(n.config.NodeDir, n.config.Name)
-	if err := os.MkdirAll(instDir, 0700); err != nil {
-		return err
-	}
-
-	filelock := flock.New(filepath.Join(instDir, "LOCK"))
+	filelock := flock.New(filepath.Join(n.config.NodeDir, "LOCK"))
 	locked, err := filelock.TryLock()
 	if err != nil {
 		return err

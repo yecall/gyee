@@ -49,6 +49,7 @@ import (
 	"github.com/yeeco/gyee/consensus/tetris2"
 	"github.com/yeeco/gyee/core/yvm"
 	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/crypto/keystore"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
@@ -66,6 +67,9 @@ type Core struct {
 	txPool         *TransactionPool
 	yvm            yvm.YVM
 	subscriber     *p2p.Subscriber
+
+	// miner
+	keystore *keystore.Keystore
 
 	lock    sync.RWMutex
 	running bool
@@ -100,6 +104,9 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 	core.txPool, err = NewTransactionPool(core)
 	if err != nil {
 		return nil, err
+	}
+	if conf.Chain.Mine {
+		core.keystore = keystore.NewKeystoreWithConfig(conf)
 	}
 
 	return core, nil
@@ -206,7 +213,8 @@ func (c *Core) loop() {
 
 //ICORE
 func (c *Core) GetSigner() crypto.Signer {
-	return secp256k1.NewSecp256k1Signer()
+	signer := secp256k1.NewSecp256k1Signer()
+	return signer
 }
 
 func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) { //从node的accountManager取
