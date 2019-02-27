@@ -623,7 +623,7 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 		natLog.Debug("refreshInstance: getPublicIpAddr failed, error: %s", eno.Error())
 	} else {
 		if bytes.Compare(inst.pubIp, curIp) != 0 {
-			inst.pubIp = append(inst.pubIp[0:], curIp...)
+			inst.pubIp = curIp
 			ind := sch.MsgNatMgrPubAddrUpdateInd{
 				Status: NatEnoNone.Errno(),
 				Proto: inst.id.proto,
