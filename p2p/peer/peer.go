@@ -2725,7 +2725,7 @@ _txLoop:
 			}
 		}
 
-		if pi.txSeq & 0xff == 0 {
+		if pi.txSeq & 0x3ff == 0 {
 			p2plog.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. snid: %x, dir: %d, peer: %x",
 				pi.txSeq, pi.txOkCnt, pi.txFailedCnt, pi.snid, pi.dir, pi.node.ID)
 		}
@@ -2868,14 +2868,12 @@ _rxLoop:
 
 				pi.rxChan <- &pkgCb
 
-				if pi.rxOkCnt += 1; pi.rxOkCnt & 0xff == 0 {
+				if pi.rxOkCnt += 1; pi.rxOkCnt & 0x3ff == 0 {
 					p2plog.Debug("piRx: rxOkCnt: %d, snid: %x, dir: %d, pi: %s",
 						pi.rxOkCnt, pi.snid, pi.dir, pi.name)
 				}
 			}
-
 		} else {
-
 			peerLog.Debug("piRx: package discarded for unknown pid: pi: %s, %d", pi.name, upkg.Pid)
 		}
 	}
