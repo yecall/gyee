@@ -43,6 +43,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -228,10 +229,11 @@ func (c *Core) loadCoinbaseKey() error {
 	if contains, _ := c.keystore.Contains(coinbase); !contains {
 		return errors.New("coinbase not found in keystore")
 	}
-	pwd, err := ioutil.ReadFile(conf.Chain.PwdFile)
+	pwdContent, err := ioutil.ReadFile(conf.Chain.PwdFile)
 	if err != nil {
 		return err
 	}
+	pwd := []byte(strings.Split(string(pwdContent), "\n")[0])
 	if err := c.keystore.Unlock(coinbase, pwd, time.Minute); err != nil {
 		return err
 	}

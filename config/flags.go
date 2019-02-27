@@ -120,6 +120,8 @@ var (
 		ChainKeyDirFlag,
 		ChainGenesisFlag,
 		ChainMineFlag,
+		ChainCoinbaseFlag,
+		ChainPwdFileFlag,
 	}
 
 	ChainIDFlag = cli.IntFlag{
