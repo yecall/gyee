@@ -38,7 +38,7 @@ type udpmsgLogger struct {
 }
 
 var udpmsgLog = udpmsgLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log udpmsgLogger)Debug(fmt string, args ... interface{}) {
@@ -57,7 +57,7 @@ const (
 	UdpMsgTypeAny
 )
 
-type UdpMsgType int
+type UdpMsgType = int
 type SubNetworkID = config.SubNetworkID
 
 type (
@@ -543,6 +543,8 @@ func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 	}
 
 	pum.Eno = eno
+	pum.typ = t
+	pum.pum = msg
 
 	return eno
 }
@@ -997,19 +999,36 @@ func (neighbors *Neighbors)String() string {
 	}
 }
 
-func (pum *UdpMsg)DebugPeerMessage() {
+func (pum *UdpMsg)DebugMessageFromPeer() {
 	if udpmsgLog.debug__ {
 		switch pum.typ {
 		case UdpMsgTypePing:
-			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*Ping).String())
+			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
 		case UdpMsgTypePong:
-			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*Pong).String())
+			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
 		case UdpMsgTypeFindNode:
-			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*FindNode).String())
+			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
 		case UdpMsgTypeNeighbors:
-			udpmsgLog.Debug("DebugPeerMessage: %s", pum.pum.(*Neighbors).String())
+			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
 		default:
-			udpmsgLog.Debug("DebugPeerMessage: invalid message type: %d", pum.typ)
+			udpmsgLog.Debug("DebugMessageFromPeer: invalid message type: %d", pum.typ)
+		}
+	}
+}
+
+func (pum *UdpMsg)DebugMessageToPeer() {
+	if udpmsgLog.debug__ {
+		switch pum.typ {
+		case UdpMsgTypePing:
+			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
+		case UdpMsgTypePong:
+			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
+		case UdpMsgTypeFindNode:
+			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
+		case UdpMsgTypeNeighbors:
+			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
+		default:
+			udpmsgLog.Debug("DebugMessageToPeer: invalid message type: %d", pum.typ)
 		}
 	}
 }

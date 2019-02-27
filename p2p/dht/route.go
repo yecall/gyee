@@ -509,7 +509,7 @@ func (rutMgr *RutMgr)nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNear
 			if idx != len(nearest) - 1 {
 				nearest = append(nearest[0:idx], nearest[idx+1:]...)
 			} else if idx > 0{
-				nearest = nearest[0:idx-1]
+				nearest = nearest[0:idx]
 			} else {
 				nearest = nil
 			}

@@ -897,7 +897,7 @@ func testCase17(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.Validator = true
 	yesCfg.BootstrapNode = false
-	yesCfg.SubNetMaskBits = 1
+	yesCfg.SubNetMaskBits = 4
 
 	//yesCfg.NatType = config.NATT_NONE
 	//yesCfg.NatType = config.NATT_PMP

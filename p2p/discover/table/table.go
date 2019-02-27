@@ -1456,7 +1456,6 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 	// backup in the bucket. and please notice that: if it is for "Closest4Querying", then
 	// when come the tabMgr instance must matched the target subnet identity.
 
-	dedup := make(map[string]bool, 0)
 	targetSnid := config.SubNetworkID{}
 	if forWhat == Closest4Queried &&
 		tabMgr.cfg.bootstrapNode &&
@@ -1473,19 +1472,6 @@ func (tabMgr *TableManager)tabClosest(forWhat int, target NodeID, mbs int, size 
 		count = len(closest)
 		if bk != nil {
 			for _, ne := range bk.nodes {
-
-				// we had to deduplicate, since "validator" might have smae address for its'
-				// different subnets, and the max number of nodes is limited by the parameter
-				// "size" passed into this function.
-
-				ipnport := ""
-				if forWhat == Closest4Querying {
-					ipnport = fmt.Sprintf("%s:%d", ne.IP.String(), ne.UDP)
-					if _, dup := dedup[ipnport]; dup {
-						continue
-					}
-					dedup[ipnport] = true
-				}
 
 				// if we are fetching nodes to which we would query, we need to check the time
 				// we had queried them last time to escape the case that query too frequency.
@@ -1940,12 +1926,17 @@ func (tabMgr *TableManager)tabBucketFindNode(id NodeID) (int, int, TabMgrErrno) 
 func (tabMgr *TableManager)tabBucketRemoveNode(id NodeID) TabMgrErrno {
 	bidx, nidx, eno := tabMgr.tabBucketFindNode(id)
 	if eno != TabMgrEnoNone {
-		tabLog.Debug("tabBucketRemoveNode: not found, node: %s",
-			config.P2pNodeId2HexString(config.NodeID(id)))
+		p2plog./*tabLog*/Debug("tabBucketRemoveNode: not found, snid: %d, node: %x", tabMgr.snid, id)
 		return eno
 	}
 	nodes := tabMgr.buckets[bidx].nodes
-	nodes = append(nodes[0:nidx], nodes[nidx+1:] ...)
+	p2plog./*tabLog*/Debug("tabBucketRemoveNode: removed, sid: %d, ip: %s, port: node: %x",
+		tabMgr.snid, nodes[nidx].IP.String(), nodes[nidx].UDP, id)
+	if nidx != len(nodes) - 1 {
+		nodes = append(nodes[0:nidx], nodes[nidx+1:] ...)
+	} else {
+		nodes = nodes[0:nidx]
+	}
 	tabMgr.buckets[bidx].nodes = nodes
 	return TabMgrEnoNone
 }
@@ -2041,9 +2032,11 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, la
 	// node must be pinged can it be added into a bucket, if pong does not received
 	// while adding, we set it a very old one.
 	if n == nil || lastQuery == nil || lastPing == nil {
-		tabLog.Debug("tabBucketAddNode: invalid parameters")
+		p2plog./*tabLog*/Debug("tabBucketAddNode: invalid parameters")
 		return TabMgrEnoParameter
 	}
+
+	p2plog./*tabLog*/Debug("tabBucketAddNode: snid: %d, ip: %s, port: %d", n.IP.String(), n.UDP)
 
 	if lastPong == nil {
 		var veryOld = time.Time{}
@@ -2135,7 +2128,11 @@ func (tabMgr *TableManager)tabDeleteActiveQueryInst(inst *instCtrlBlock) TabMgrE
 				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
 				inst.tid = sch.SchInvalidTid
 			}
-			tabMgr.queryIcb = append(tabMgr.queryIcb[0:idx], tabMgr.queryIcb[idx+1:]...)
+			if idx != len(tabMgr.queryIcb) {
+				tabMgr.queryIcb = append(tabMgr.queryIcb[0:idx], tabMgr.queryIcb[idx+1:]...)
+			} else {
+				tabMgr.queryIcb = tabMgr.queryIcb[0:idx]
+			}
 			return TabMgrEnoNone
 		}
 	}
@@ -2189,7 +2186,11 @@ func (tabMgr *TableManager)tabDeleteActiveBoundInst(inst *instCtrlBlock) TabMgrE
 				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
 				inst.tid = sch.SchInvalidTid
 			}
-			tabMgr.boundIcb = append(tabMgr.boundIcb[0:idx], tabMgr.boundIcb[idx+1:]...)
+			if idx != len(tabMgr.boundIcb) {
+				tabMgr.boundIcb = append(tabMgr.boundIcb[0:idx], tabMgr.boundIcb[idx+1:]...)
+			} else {
+				tabMgr.boundIcb = tabMgr.boundIcb[0:idx]
+			}
 			return TabMgrEnoNone
 		}
 	}

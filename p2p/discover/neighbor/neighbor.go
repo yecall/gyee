@@ -168,7 +168,7 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 	dst.IP = append(dst.IP, fn.To.IP...)
 	dst.Port = int(fn.To.UDP)
 
-	ngbLog.Debug("NgbProtoFindNodeReq: sending to ip: %s, udp: %d", dst.IP.String(), dst.Port)
+	pum.DebugMessageToPeer()
 
 	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
 		ngbLog.Debug("NgbProtoFindNodeReq: failed to send, ip: %s, udp: %d", dst.IP.String(), dst.Port)
@@ -202,6 +202,8 @@ func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbPro
 	dst := net.UDPAddr{}
 	dst.IP = append(dst.IP, ping.To.IP...)
 	dst.Port = int(ping.To.UDP)
+
+	pum.DebugMessageToPeer()
 	sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst)
 
 	var tmd  = sch.TimerDescription {
@@ -436,7 +438,11 @@ func (ngbMgr *NeighborManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) Ngb
 	for _, d := range del {
 		for idx, id := range ngbMgr.cfg.SubNetIdList {
 			if id == d {
-				ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList[0:idx], ngbMgr.cfg.SubNetIdList[idx+1:]...)
+				if idx != len(ngbMgr.cfg.SubNetIdList) {
+					ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList[0:idx], ngbMgr.cfg.SubNetIdList[idx+1:]...)
+				} else {
+					ngbMgr.cfg.SubNetIdList = ngbMgr.cfg.SubNetIdList[0:idx]
+				}
 				break
 			}
 		}
@@ -516,6 +522,9 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 		ngbLog.Debug("PingHandler: GetRawMessage failed")
 		return NgbMgrEnoEncode
 	}
+
+	pum.DebugMessageToPeer()
+
 	if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
 		ngbLog.Debug("PingHandler: sendUdpMsg failed")
 		return NgbMgrEnoUdp
@@ -676,6 +685,8 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		ngbLog.Debug("FindNodeHandler: GetRawMessage failed")
 		return NgbMgrEnoEncode
 	}
+
+	pum.DebugMessageToPeer()
 
 	if eno := sendUdpMsg(ngbMgr.sdl, ngbMgr.ptnLsn, ngbMgr.ptnMe, buf, &toAddr); eno != sch.SchEnoNone {
 		ngbLog.Debug("FindNodeHandler: sendUdpMsg failed")
