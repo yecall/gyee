@@ -521,7 +521,6 @@ func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
 	mgr.boundPending	= make([]*Node, 0, TabInstBPendingMax)
 	mgr.dlkTab			= make([]int, 256)
 	mgr.tabSetupLocalHashId()
-	tabMgr.subNetMgrList[snid] = mgr
 
 	for loop := 0; loop < cap(mgr.buckets); loop++ {
 		b := new(bucket)
@@ -1857,7 +1856,6 @@ func (tabMgr *TableManager)tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 		TCP:	node.TCP,
 		NodeId:	node.ID,
 	}
-
 	return tabMgr.TabBucketAddNode(snid, &umn, &time.Time{}, &now, &now)
 }
 
@@ -1926,11 +1924,11 @@ func (tabMgr *TableManager)tabBucketFindNode(id NodeID) (int, int, TabMgrErrno) 
 func (tabMgr *TableManager)tabBucketRemoveNode(id NodeID) TabMgrErrno {
 	bidx, nidx, eno := tabMgr.tabBucketFindNode(id)
 	if eno != TabMgrEnoNone {
-		p2plog./*tabLog*/Debug("tabBucketRemoveNode: not found, snid: %d, node: %x", tabMgr.snid, id)
+		tabLog.Debug("tabBucketRemoveNode: not found, snid: %d, node: %x", tabMgr.snid, id)
 		return eno
 	}
 	nodes := tabMgr.buckets[bidx].nodes
-	p2plog./*tabLog*/Debug("tabBucketRemoveNode: removed, sid: %d, ip: %s, port: node: %x",
+	tabLog.Debug("tabBucketRemoveNode: removed, sid: %d, ip: %s, port: %d, node: %x",
 		tabMgr.snid, nodes[nidx].IP.String(), nodes[nidx].UDP, id)
 	if nidx != len(nodes) - 1 {
 		nodes = append(nodes[0:nidx], nodes[nidx+1:] ...)
@@ -2032,11 +2030,11 @@ func (tabMgr *TableManager)tabBucketAddNode(n *um.Node, lastQuery *time.Time, la
 	// node must be pinged can it be added into a bucket, if pong does not received
 	// while adding, we set it a very old one.
 	if n == nil || lastQuery == nil || lastPing == nil {
-		p2plog./*tabLog*/Debug("tabBucketAddNode: snid: %x, invalid parameters", tabMgr.snid)
+		tabLog.Debug("tabBucketAddNode: snid: %x, invalid parameters", tabMgr.snid)
 		return TabMgrEnoParameter
 	}
 
-	p2plog./*tabLog*/Debug("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
+	tabLog.Debug("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
 
 	if lastPong == nil {
 		var veryOld = time.Time{}
