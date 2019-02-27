@@ -88,12 +88,13 @@ type RpcConfig struct {
 
 //Genesis, ChainID, Keydir, Coinbase, gas...
 type ChainConfig struct {
-	ChainID uint32 `toml:"chain_id"`
-	DataDir string `toml:"data_dir"`
-	KeyDir  string `toml:"key_dir"`
-	Genesis string `toml:"genesis"`
-	Mine    bool   `toml:"mine"`
-	Address string `toml:"address"`
+	ChainID  uint32 `toml:"chain_id"`
+	DataDir  string `toml:"data_dir"`
+	KeyDir   string `toml:"key_dir"`
+	Genesis  string `toml:"genesis"`
+	Mine     bool   `toml:"mine"`
+	Coinbase string `toml:"coinbase"`
+	PwdFile  string `toml:"pwdfile"`
 }
 
 //cpu, mem, disk profile,

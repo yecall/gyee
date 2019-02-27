@@ -40,8 +40,11 @@ package core
 
 */
 import (
+	"errors"
+	"io/ioutil"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
@@ -70,6 +73,7 @@ type Core struct {
 
 	// miner
 	keystore *keystore.Keystore
+	minerKey []byte
 
 	lock    sync.RWMutex
 	running bool
@@ -106,7 +110,9 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 		return nil, err
 	}
 	if conf.Chain.Mine {
-		core.keystore = keystore.NewKeystoreWithConfig(conf)
+		if err := core.loadCoinbaseKey(); err != nil {
+			return nil, err
+		}
 	}
 
 	return core, nil
@@ -209,11 +215,40 @@ func (c *Core) loop() {
 	}
 }
 
+func (c *Core) loadCoinbaseKey() error {
+	conf := c.config
+	coinbase := conf.Chain.Coinbase
+	if len(coinbase) == 0 {
+		return errors.New("coinbase not provided")
+	}
+	if len(conf.Chain.PwdFile) == 0 {
+		return errors.New("coinbase keystore password file not provided")
+	}
+	c.keystore = keystore.NewKeystoreWithConfig(conf)
+	if contains, _ := c.keystore.Contains(coinbase); !contains {
+		return errors.New("coinbase not found in keystore")
+	}
+	pwd, err := ioutil.ReadFile(conf.Chain.PwdFile)
+	if err != nil {
+		return err
+	}
+	if err := c.keystore.Unlock(coinbase, pwd, time.Minute); err != nil {
+		return err
+	}
+	key, err := c.keystore.GetKey(coinbase, pwd)
+	if err != nil {
+		return err
+	}
+	c.minerKey = key
+	return nil
+}
+
 // implements of interface
 
 //ICORE
 func (c *Core) GetSigner() crypto.Signer {
 	signer := secp256k1.NewSecp256k1Signer()
+	_ = signer.InitSigner(c.minerKey)
 	return signer
 }
 
