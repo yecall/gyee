@@ -433,7 +433,7 @@ func (shMgr *ShellManager)send2Peer(spi *shellPeerInst, req *sch.MsgShellBroadca
 		chainLog.Debug("send2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.snid, spi.dir, spi.nodeId)
 		if spi.txDiscrd += 1; spi.txDiscrd & 0x1f == 0 {
-			chainLog.Debug("send2Peer：sind: %x, dir: %d, discardMessages: %d",
+			chainLog.Debug("send2Peer：sind: %x, dir: %d, txDiscrd: %d",
 				spi.snid, spi.dir, spi.txDiscrd)
 		}
 		return sch.SchEnoResource

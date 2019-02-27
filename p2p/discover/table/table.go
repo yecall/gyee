@@ -498,10 +498,10 @@ func newTabMgrWithoutLock() *TableManager {
 		snid:			AnySubNet,
 		subNetMgrList:	map[SubNetworkID]*TableManager{},
 		natUdpResult:	false,
-		pubUdpIp:		make([]byte, 0),
+		pubUdpIp:		net.IPv4zero,
 		pubUdpPort:		0,
 		natTcpResult:	false,
-		pubTcpIp:		make([]byte, 0),
+		pubTcpIp:		net.IPv4zero,
 		pubTcpPort:		0,
 	}
 
@@ -934,6 +934,7 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 }
 
 func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrErrno {
+	p2plog.Debug("tabMgrNatReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		tabMgr.pubTcpIp = tabMgr.cfg.local.IP
 		tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
@@ -950,7 +951,7 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 		}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			p2plog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 			return TabMgrEnoScheduler
 		}
 		reqTcp := reqUdp
@@ -959,7 +960,7 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 		reqTcp.ToPort = int(tabMgr.cfg.local.TCP)
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			p2plog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 			return TabMgrEnoScheduler
 		}
 	}
@@ -973,7 +974,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 	// notice: the external public ip reported in msg.pubUdpIp and msg.pubTcpIp must be
 	// same, tabMgr.pubTcpIp is copied twice with same value.
 	if !nat.NatIsResultOk(msg.Result) {
-		tabLog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
+		p2plog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
 	proto := strings.ToLower(msg.Proto)
 	if proto == "udp" {
@@ -984,7 +985,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 			p2plog.Debug("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
 				tabMgr.pubUdpIp.String(), tabMgr.pubUdpPort)
 		} else {
-			tabMgr.pubUdpIp = make([]byte, 0)
+			tabMgr.pubUdpIp = net.IPv4zero
 			tabMgr.pubUdpPort = 0
 		}
 	} else if proto == "tcp" {
@@ -995,14 +996,14 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 			p2plog.Debug("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
 				tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort)
 		} else {
-			tabMgr.pubTcpIp = make([]byte, 0)
+			tabMgr.pubTcpIp = net.IPv4zero
 			tabMgr.pubTcpPort = 0
 		}
 		schMsg := sch.SchMessage{}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrMakeMapRsp, msg)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
-		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
+		p2plog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
@@ -1013,7 +1014,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 
 	if tabMgr.natUdpResult {
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			p2plog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
@@ -1028,6 +1029,12 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) TabMgrErrno {
 	// see function nat.refreshInstance, the indication would be received after nat manager
 	// refreshed itself ok, here the msg.Result must be good.
+	if !nat.NatIsStatusOk(msg.Status) {
+		p2plog.Debug("tabMgrNatPubAddrUpdateInd: fail reported, msg: %+v", *msg)
+	}
+	p2plog.Debug("tabMgrNatPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+		msg.Proto, tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
+
 	old := tabMgr.natUdpResult
 	proto := strings.ToLower(msg.Proto)
 	if proto == "udp" {
@@ -1036,7 +1043,7 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
 			tabMgr.pubUdpPort = msg.PubPort
 		} else {
-			tabMgr.pubUdpIp = make([]byte, 0)
+			tabMgr.pubUdpIp = net.IPv4zero
 			tabMgr.pubUdpPort = 0
 		}
 	} else if proto == "tcp" {
@@ -1045,21 +1052,21 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
 			tabMgr.pubTcpPort = msg.PubPort
 		} else {
-			tabMgr.pubTcpIp = make([]byte, 0)
+			tabMgr.pubTcpIp = net.IPv4zero
 			tabMgr.pubTcpPort = 0
 		}
 		schMsg := sch.SchMessage{}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrPubAddrUpdateInd, msg)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
-		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
+		p2plog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
 	// check to start or stop auto-refreshing when updated
 	if tabMgr.natUdpResult {
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			p2plog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {

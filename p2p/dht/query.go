@@ -200,6 +200,8 @@ func NewQryMgr() *QryMgr {
 		qcbTab:		map[config.DsKey]*qryCtrlBlock{},
 		qmCfg:		qmCfg,
 		qcbSeq:		0,
+		pubTcpIp:	net.IPv4zero,
+		pubTcpPort:	0,
 	}
 
 	qryMgr.tep = qryMgr.qryMgrProc
@@ -1079,6 +1081,7 @@ func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
 }
 
 func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
+	p2plog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
 		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
@@ -1093,7 +1096,7 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
 		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+			p2plog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -1103,7 +1106,7 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
-		qryLog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
+		p2plog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
 	}
 	proto := strings.ToLower(mmr.Proto)
 	if proto == "tcp" {
@@ -1111,14 +1114,14 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		if qryMgr.natTcpResult {
 			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
 				mmr.PubIp.String(), mmr.PubPort)
-			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], mmr.PubIp...)
+			qryMgr.pubTcpIp = mmr.PubIp
 			qryMgr.pubTcpPort = mmr.PubPort
 			if eno := qryMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
-				qryLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				p2plog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return eno
 			}
 		} else {
-			qryMgr.pubTcpIp = make([]byte, 0)
+			qryMgr.pubTcpIp = net.IPv4zero
 			qryMgr.pubTcpPort = 0
 		}
 		_, ptrConMgr := qryMgr.sdl.SchGetUserTaskNode(ConMgrName)
@@ -1126,34 +1129,37 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		return qryMgr.sdl.SchSendMessage(msg)
 	}
 
-	qryLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	p2plog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
 func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch.SchErrno {
 	if !nat.NatIsStatusOk(msg.Status) {
-		qryLog.Debug("natPubAddrUpdateInd: fail reported, msg: %+v", *msg)
+		p2plog.Debug("natPubAddrUpdateInd: fail reported, msg: %+v", *msg)
 	}
+	p2plog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+		msg.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
+
 	proto := strings.ToLower(msg.Proto)
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if qryMgr.natTcpResult {
-			qryMgr.pubTcpIp = append(qryMgr.pubTcpIp[0:], msg.PubIp.To4()...)
+			qryMgr.pubTcpIp = msg.PubIp
 			qryMgr.pubTcpPort = msg.PubPort
 		} else {
-			qryMgr.pubTcpIp = make([]byte, 0)
+			qryMgr.pubTcpIp = net.IPv4zero
 			qryMgr.pubTcpPort = 0
 		}
 		if qryMgr.natTcpResult {
 			if eno := qryMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
-				qryLog.Debug("natPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+				p2plog.Debug("natPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 				return eno
 			}
 		}
 		return sch.SchEnoNone
 	}
 
-	qryLog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", msg.Proto)
+	p2plog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", msg.Proto)
 	return sch.SchEnoParameter
 }
 

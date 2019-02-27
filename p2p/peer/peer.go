@@ -1960,7 +1960,7 @@ const PeInstDirOutbound		= 1					// outbound connection
 const PeInstMailboxSize 	= 512				// mailbox size
 const PeInstMaxP2packages	= 512				// max p2p packages pending to be sent
 const PeInstMaxPings		= 8					// max pings pending to be sent
-const PeInstMaxPingpongCnt	= 8					// max pingpong counter value
+const PeInstMaxPingpongCnt	= 4					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second * 16	// pingpong period
 
 type PeerInstance struct {
