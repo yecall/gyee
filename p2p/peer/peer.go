@@ -127,8 +127,8 @@ const (
 	minDuration4OutboundConnectReq = time.Second * 2	// min duration to try oubound connect for a specific
 														// sub-network and peer
 
-	conflictAccessDelayLower = 1000						// conflict delay lower bounder in time.Millisecond
-	conflictAccessDelayUpper = 5000						// conflict delay upper bounder in time.Millisecond
+	conflictAccessDelayLower = 500						// conflict delay lower bounder in time.Millisecond
+	conflictAccessDelayUpper = 2000						// conflict delay upper bounder in time.Millisecond
 
 	reconfigDelay = time.Second * 4						// reconfiguration delay time duration
 )

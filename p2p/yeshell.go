@@ -1163,11 +1163,13 @@ func (yeShMgr *YeShellManager)broadcastBkOsn(msg *Message, exclude *config.NodeI
 		Val: msg.Data,
 		KeepTime: dht.DsMgrDurInf,
 	}
+
 	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 		yesLog.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
 		return eno
 	}
+
 	return nil
 }
 

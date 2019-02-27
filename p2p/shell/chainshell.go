@@ -73,7 +73,7 @@ type shellPeerInst struct {
 	hsInfo			*peer.Handshake				// handshake info about peer
 	pi				*peer.PeerInstance			// peer instance pointer
 	status			int							// active peer instance status
-	discrdMessages	int64						// number of messages discarded
+	txDiscrd		int64						// number of messages discarded
 }
 
 const (
@@ -432,9 +432,9 @@ func (shMgr *ShellManager)send2Peer(spi *shellPeerInst, req *sch.MsgShellBroadca
 	if len(spi.txChan) >= cap(spi.txChan) {
 		chainLog.Debug("send2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.snid, spi.dir, spi.nodeId)
-		if spi.discrdMessages += 1; spi.discrdMessages & 0x1f == 0 {
+		if spi.txDiscrd += 1; spi.txDiscrd & 0x1f == 0 {
 			chainLog.Debug("send2Peer：sind: %x, dir: %d, discardMessages: %d",
-				spi.snid, spi.dir, spi.discrdMessages)
+				spi.snid, spi.dir, spi.txDiscrd)
 		}
 		return sch.SchEnoResource
 	}
@@ -662,9 +662,9 @@ func (shMgr *ShellManager)checkKey2Peer(spi *shellPeerInst, ddk *deDupKey) error
 	if len(spi.txChan) >= cap(spi.txChan) {
 		chainLog.Debug("checkKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.snid, spi.dir, spi.nodeId)
-		if spi.discrdMessages += 1; spi.discrdMessages & 0x1f == 0 {
-			chainLog.Debug("checkKey2Peer：sind: %x, dir: %d, discrdMessages: %d",
-				spi.snid, spi.dir, spi.discrdMessages)
+		if spi.txDiscrd += 1; spi.txDiscrd & 0x1f == 0 {
+			chainLog.Debug("checkKey2Peer：sind: %x, dir: %d, txDiscrd: %d",
+				spi.snid, spi.dir, spi.txDiscrd)
 		}
 		return sch.SchEnoResource
 	}
@@ -684,9 +684,9 @@ func (shMgr *ShellManager)reportKey2Peer(spi *shellPeerInst, key *config.DsKey, 
 	if len(spi.txChan) >= cap(spi.txChan) {
 		chainLog.Debug("reportKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.hsInfo.Snid, spi.hsInfo.Dir, spi.hsInfo.NodeId)
-		if spi.discrdMessages += 1; spi.discrdMessages & 0x1f == 0 {
+		if spi.txDiscrd += 1; spi.txDiscrd & 0x1f == 0 {
 			chainLog.Debug("reportKey2Peer：sind: %x, dir: %d, discardMessages: %d",
-				spi.snid, spi.dir, spi.discrdMessages)
+				spi.snid, spi.dir, spi.txDiscrd)
 		}
 		return sch.SchEnoResource
 	}
