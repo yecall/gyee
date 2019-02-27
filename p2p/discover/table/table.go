@@ -972,10 +972,15 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 
 func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) TabMgrErrno {
 	// notice: the external public ip reported in msg.pubUdpIp and msg.pubTcpIp must be
-	// same, tabMgr.pubTcpIp is copied twice with same value.
+	// same, tabMgr.pubTcpIp is copied twice with same value. a "status" is introduced
+	// for future to deal with the case: the "result" is ok, but need to wait nat to do
+	// more work for mapping.
 	if !nat.NatIsResultOk(msg.Result) {
 		p2plog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
+	p2plog.Debug("tabMgrNatMakeMapRsp: proto: %s, ip:port = %s:%d",
+		msg.Proto, msg.PubIp.String(), msg.PubPort)
+
 	proto := strings.ToLower(msg.Proto)
 	if proto == "udp" {
 		tabMgr.natUdpResult = nat.NatIsResultOk(msg.Result)
@@ -1014,7 +1019,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 
 	if tabMgr.natUdpResult {
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			p2plog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			p2plog.Debug("tabMgrNatMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
@@ -2528,7 +2533,7 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 	case "udp":
 		if bytes.Compare(tabMgr.cfg.local.IP, tabMgr.pubUdpIp) == 0 &&
 			int(tabMgr.cfg.local.UDP) == tabMgr.pubUdpPort {
-			return TabMgrEnoParameter
+			return TabMgrEnoNone
 		}
 		tabMgr.cfg.local.IP = tabMgr.pubUdpIp
 		tabMgr.cfg.local.UDP = uint16(tabMgr.pubUdpPort & 0xffff)
@@ -2540,7 +2545,7 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 	case "tcp":
 		if bytes.Compare(tabMgr.cfg.local.IP, tabMgr.pubTcpIp) == 0 &&
 			int(tabMgr.cfg.local.TCP) == tabMgr.pubTcpPort {
-			return TabMgrEnoParameter
+			return TabMgrEnoNone
 		}
 		tabMgr.cfg.local.IP = tabMgr.pubUdpIp
 		tabMgr.cfg.local.TCP = uint16(tabMgr.pubTcpPort & 0xffff)

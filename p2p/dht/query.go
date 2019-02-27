@@ -1104,10 +1104,14 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 }
 
 func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
+	// see comments in function tabMgrNatMakeMapRsp for more please.
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
 		p2plog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
 	}
+	p2plog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
+		mmr.Proto, mmr.PubIp.String(), mmr.PubPort)
+
 	proto := strings.ToLower(mmr.Proto)
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(mmr.Status)
@@ -1134,6 +1138,7 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 }
 
 func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch.SchErrno {
+	// see comments in function tabMgrNatPubAddrUpdateInd for more please.
 	if !nat.NatIsStatusOk(msg.Status) {
 		p2plog.Debug("natPubAddrUpdateInd: fail reported, msg: %+v", *msg)
 	}

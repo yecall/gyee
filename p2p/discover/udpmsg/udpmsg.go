@@ -38,7 +38,7 @@ type udpmsgLogger struct {
 }
 
 var udpmsgLog = udpmsgLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log udpmsgLogger)Debug(fmt string, args ... interface{}) {
