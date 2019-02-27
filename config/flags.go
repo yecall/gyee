@@ -147,6 +147,16 @@ var (
 		Usage: "mine",
 	}
 
+	ChainCoinbaseFlag = cli.StringFlag{
+		Name:  "coinbase",
+		Usage: "coinbase address for node",
+	}
+
+	ChainPwdFileFlag = cli.StringFlag{
+		Name:  "pwdfile",
+		Usage: "pwdfile for coinbase keystore",
+	}
+
 	//MetricsConfig Flags
 	MetricsFlags = []cli.Flag{
 		MetricsEnableFlag,
@@ -250,6 +260,14 @@ func getChainConfig(ctx *cli.Context, cfg *Config) {
 
 	if ctx.GlobalIsSet(FlagName(ChainMineFlag.Name)) {
 		cfg.Chain.Mine = ctx.GlobalBool(FlagName(ChainMineFlag.Name))
+	}
+
+	if ctx.GlobalIsSet(FlagName(ChainCoinbaseFlag.Name)) {
+		cfg.Chain.Coinbase = ctx.GlobalString(FlagName(ChainCoinbaseFlag.Name))
+	}
+
+	if ctx.GlobalIsSet(FlagName(ChainPwdFileFlag.Name)) {
+		cfg.Chain.PwdFile = ctx.GlobalString(FlagName(ChainPwdFileFlag.Name))
 	}
 }
 
