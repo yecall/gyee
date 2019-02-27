@@ -110,6 +110,7 @@ type ShellManager struct {
 	localSnid		[]config.SubNetworkID					// local sub network identities
 	localNode		map[config.SubNetworkID]config.Node		// local sub nodes
 	peerActived		map[shellPeerID]*shellPeerInst			// active peers
+	peerLock		sync.Mutex								// lock sync accessing to field "peerActived"
 	rxChan			chan *peer.P2pPackageRx					// total rx channel, for rx packages from all instances
 	deDup			bool									// deduplication flag
 	tmDedup			*dht.TimerManager						// deduplication timer manager
@@ -534,20 +535,22 @@ func (shMgr *ShellManager)checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrn
 		nodeId:	rxPkg.PeerInfo.NodeId,
 	}
 
-	shMgr.deDupKeyLock.Lock()
+	shMgr.peerLock.lock()
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
 		chainLog.Debug("checkKeyFromPeer: active peer not found, spid: %+v", spid)
-		shMgr.deDupKeyLock.Unlock()
+		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
 	if pai.status != pisActive {
 		chainLog.Debug("checkKeyFromPeer: peer not active, spid: %+v", spid)
-		shMgr.deDupKeyLock.Unlock()
+		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
+	shMgr.peerLock.Unlock()
 
+	shMgr.deDupKeyLock.Lock()
 	status := int32(peer.KS_NOTEXIST)
 	if _, dup := shMgr.deDupKeyMap[key]; dup {
 		status = int32(peer.KS_EXIST)
@@ -589,19 +592,23 @@ func (shMgr *ShellManager)reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 		nodeId: rxPkg.PeerInfo.NodeId,
 	}
 
-	shMgr.deDupLock.Lock()
-	defer shMgr.deDupLock.Unlock()
-
+	shMgr.peerLock.Lock()
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
 		chainLog.Debug("reportKeyFromPeer: active peer not found, spid: %+v", spid)
+		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
 
 	if pai.status != pisActive {
 		chainLog.Debug("reportKeyFromPeer: peer not active, spid: %+v", spid)
+		shMgr.peerLock.Unlock()
 		return sch.SchEnoNotFound
 	}
+	shMgr.peerLock.Unlock()
+
+	shMgr.deDupLock.Lock()
+	defer shMgr.deDupLock.Unlock()
 
 	ddk := deDupKey{}
 	copy(ddk.key[0:], rxPkg.Key)
