@@ -353,8 +353,6 @@ taskDone:
 		panic(fmt.Sprintf("schCommonTasks: " +
 			"schTaskBusyDeque failed, eno: %d, task: %s",
 			eno, ptn.task.name))
-
-		return eno
 	}
 
 	//
@@ -369,8 +367,6 @@ taskDone:
 		panic(fmt.Sprintf("schCommonTasks: " +
 			"schStopTaskEx failed, eno: %d, task: %s",
 			eno, ptn.task.name))
-
-		return eno
 	}
 
 	//
@@ -385,8 +381,6 @@ taskDone:
 		panic(fmt.Sprintf("schCommonTask: " +
 			"schRetTaskNode failed, eno: %d, task: %s",
 			eno, ptn.task.name))
-
-		return  eno
 	}
 
 	return SchEnoNone
@@ -639,10 +633,7 @@ absTimerLoop:
 	task.lock.Unlock()
 
 	if eno := sdl.schRetTimerNode(ptm); eno != SchEnoNone {
-
 		panic(fmt.Sprintf("schTimerCommonTask: schRetTimerNode failed, eno: %d", eno))
-
-		return eno
 	}
 
 	return SchEnoNone
@@ -1264,7 +1255,6 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 
 	if ptn == nil {
 		panic("schStopTaskEx: invalid task node pointer")
-		return SchEnoInternal
 	}
 
 	//
@@ -1296,12 +1286,9 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 		sdl.p2pCfg.CfgName, ptn.task.name)
 
 	if eno = sdl.schKillTaskTimers(&ptn.task); eno != SchEnoNone {
-
 		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schKillTaskTimers faild, eno: %d， task: %s",
 			eno, ptn.task.name))
-
-		return eno
 	}
 
 	//
@@ -1312,12 +1299,9 @@ func (sdl *scheduler)schStopTaskEx(ptn *schTaskNode) SchErrno {
 		sdl.p2pCfg.CfgName, ptn.task.name)
 
 	if eno = sdl.schTcbClean(&ptn.task); eno != SchEnoNone {
-
 		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schTcbClean faild, eno: %d, task: %s",
 			eno, ptn.task.name))
-
-		return eno
 	}
 
 	schLog.Debug("schStopTaskEx: all ok, sdl: %s, task: %s",
@@ -1450,47 +1434,63 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	msg2MailBox := func(msg *schMessage) SchErrno {
 		if target.mailbox.que == nil {
+			// target had been killed
 			schLog.Debug("schSendMsg: mailbox of target is empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
-			// we have a BUG currently not be solved, when come here, it's most possible that the target
-			// task had been killed from the scheduler.
-			//panic(fmt.Sprintf("try to send message to task without a mailbox, target: %s", target.name))
 			return SchEnoInternal
 		}
 
-		if len(*target.mailbox.que)+mbReserved >= cap(*target.mailbox.que) {
+		if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
+
 			schLog.Debug("schSendMsg: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
-			panic(fmt.Sprintf("system overload, task: %s", target.name))
+			target.discardMessages += 1
+
+			if target.discardMessages & (0x1f) == 0 {
+				schLog.Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
+					sdl.p2pCfg.CfgName, target.name, target.discardMessages)
+			}
+
+		} else {
+
+			*target.mailbox.que <- *msg
 		}
 
 		target.evTotal += 1
 		target.evHistory[target.evhIndex] = *msg
 		target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
-		*target.mailbox.que <- *msg
+
 		return SchEnoNone
 	}
 
 	if target.isStatic {
 		if !target.isPoweron {
+
 			if msg.Id != EvSchPoweron {
+
 				target.delayMessages = append(target.delayMessages, msg)
 				return SchEnoNone
+
 			} else {
+
 				if eno := msg2MailBox(msg); eno != SchEnoNone {
 					return eno
 				}
+
 				target.isPoweron = true
 				for idx := 0; idx < len(target.delayMessages); idx++ {
 					if eno := msg2MailBox(target.delayMessages[idx]); eno != SchEnoNone {
 						return eno
 					}
 				}
+
 				target.delayMessages = nil
 				return SchEnoNone
 			}
 		} else {
+
 			return msg2MailBox(msg)
 		}
 	} else {
+
 		return msg2MailBox(msg)
 	}
 

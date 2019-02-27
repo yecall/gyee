@@ -125,6 +125,7 @@ type schTask struct {
 	isStatic		bool							// is static task
 	isPoweron		bool							// if EvSchPoweron sent to task
 	delayMessages	[]*schMessage					// messages before EvSchPoweron
+	discardMessages	int64							// messages discarded
 }
 
 //

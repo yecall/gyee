@@ -1758,7 +1758,6 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 			if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 				peerLog.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
 				panic("shellReconfigReq: SchSendMessage failed")
-				return PeMgrEnoScheduler
 			}
 		}
 
@@ -1779,7 +1778,6 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	if eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
 		peerLog.Debug("shellReconfigReq: SchSetTimer failed, eno: %d", eno)
 		panic("shellReconfigReq: SchSendMessage failed")
-		return PeMgrEnoScheduler
 	} else {
 		peMgr.reCfgTid = tid
 	}
@@ -1795,7 +1793,6 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 	if eno := peMgr.peMgrRecfg2DcvMgr(); eno != PeMgrEnoNone {
 		peerLog.Debug("shellReconfigReq: peMgrRecfg2DcvMgr failed, eno: %d", eno)
 		panic("shellReconfigReq: SchSendMessage failed")
-		return eno
 	}
 
 	// tell shell manager to update subnet info
