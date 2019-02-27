@@ -73,6 +73,7 @@ type shellPeerInst struct {
 	hsInfo		*peer.Handshake					// handshake info about peer
 	pi			*peer.PeerInstance				// peer instance pointer
 	status		int								// active peer instance status
+	txLock		sync.Mutex						// tx lock to sync deduplicaton messages sending and instance closing
 }
 
 const (
@@ -427,7 +428,9 @@ func (shMgr *ShellManager)send2Peer(peer *shellPeerInst, req *sch.MsgShellBroadc
 		chainLog.Debug("send2Peer: bcr2Package failed")
 		return sch.SchEnoUserTask
 	} else {
+		peer.txLock.Lock()
 		peer.txChan<-pkg
+		peer.txLock.Unlock()
 		return sch.SchEnoNone
 	}
 }
@@ -667,7 +670,9 @@ func (shMgr *ShellManager)reportKey2Peer(pai *shellPeerInst, key *config.DsKey, 
 		return errors.New("reportKey2Peer: ReportKey failed")
 	}
 
+	pai.txLock.Lock()
 	pai.txChan<-upkg
+	pai.txLock.Unlock()
 
 	return nil
 }
