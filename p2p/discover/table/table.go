@@ -980,7 +980,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 	if proto == "udp" {
 		tabMgr.natUdpResult = nat.NatIsResultOk(msg.Result)
 		if tabMgr.natUdpResult && nat.NatIsStatusOk(msg.Status) {
-			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
+			tabMgr.pubUdpIp = msg.PubIp
 			tabMgr.pubUdpPort = msg.PubPort
 			p2plog.Debug("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
 				tabMgr.pubUdpIp.String(), tabMgr.pubUdpPort)
@@ -991,7 +991,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 	} else if proto == "tcp" {
 		tabMgr.natTcpResult = nat.NatIsResultOk(msg.Result)
 		if tabMgr.natTcpResult && nat.NatIsStatusOk(msg.Status) {
-			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
+			tabMgr.pubTcpIp = msg.PubIp
 			tabMgr.pubTcpPort = msg.PubPort
 			p2plog.Debug("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
 				tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort)
@@ -1040,7 +1040,7 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 	if proto == "udp" {
 		tabMgr.natUdpResult = nat.NatIsStatusOk(msg.Status)
 		if tabMgr.natUdpResult {
-			tabMgr.pubUdpIp = append(tabMgr.pubUdpIp[0:], msg.PubIp...)
+			tabMgr.pubUdpIp = msg.PubIp
 			tabMgr.pubUdpPort = msg.PubPort
 		} else {
 			tabMgr.pubUdpIp = net.IPv4zero
@@ -1049,7 +1049,7 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 	} else if proto == "tcp" {
 		tabMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if tabMgr.natTcpResult {
-			tabMgr.pubTcpIp = append(tabMgr.pubTcpIp[0:], msg.PubIp...)
+			tabMgr.pubTcpIp = msg.PubIp
 			tabMgr.pubTcpPort = msg.PubPort
 		} else {
 			tabMgr.pubTcpIp = net.IPv4zero
