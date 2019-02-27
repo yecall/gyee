@@ -26,8 +26,8 @@ import (
 
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/cmd/gyee/console"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/utils/logging"
 )
@@ -100,10 +100,10 @@ func accountResetPassword(ctx *cli.Context) error {
 		logging.Logger.Fatal("No accounts specified")
 	}
 
-	address := ctx.Args().First()
-	addr, err := core.AddressParse(address)
+	addrStr := ctx.Args().First()
+	addr, err := address.AddressParse(addrStr)
 	if err != nil {
-		logging.Logger.Fatalf("address %s parse failed:%s", address, err)
+		logging.Logger.Fatalf("address %s parse failed:%s", addrStr, err)
 	}
 	oldPass := getPassPhrase("Please input current passphrase", false)
 	newPass := getPassPhrase("Please input new passphrase", true)
@@ -111,7 +111,7 @@ func accountResetPassword(ctx *cli.Context) error {
 	node := makeNode(ctx)
 	err = node.AccountManager().ResetPassword(addr, []byte(oldPass), []byte(newPass))
 	if err != nil {
-		logging.Logger.Fatalf("reset password failed:%s,%s", address, err)
+		logging.Logger.Fatalf("reset password failed:%s,%s", addrStr, err)
 	}
 
 	fmt.Printf("Password resetted for address:%s\n", addr.String())

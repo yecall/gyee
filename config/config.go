@@ -93,6 +93,7 @@ type ChainConfig struct {
 	KeyDir  string `toml:"key_dir"`
 	Genesis string `toml:"genesis"`
 	Mine    bool   `toml:"mine"`
+	Address string `toml:"address"`
 }
 
 //cpu, mem, disk profile,

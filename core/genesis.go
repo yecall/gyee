@@ -26,6 +26,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/persistent"
 	"github.com/yeeco/gyee/res"
@@ -81,7 +82,7 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 		return nil, err
 	}
 	for _, dist := range g.InitYeeDist {
-		addr, err := AddressParse(dist.Address)
+		addr, err := address.AddressParse(dist.Address)
 		if err != nil {
 			return nil, err
 		}

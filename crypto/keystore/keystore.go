@@ -32,7 +32,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/common/address"
+	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/crypto/keystore/cipher"
 	"github.com/yeeco/gyee/crypto/util"
 	"github.com/yeeco/gyee/utils/logging"
@@ -63,6 +64,11 @@ type Keystore struct {
 	unlocked  map[string]*unlocked
 
 	mu sync.RWMutex
+}
+
+func NewKeystoreWithConfig(config *config.Config) *Keystore {
+	//TODO: 用config里的keydir来拼
+	return NewKeystore(filepath.Join(config.NodeDir, "keystore"))
 }
 
 func NewKeystore(dirPath string) *Keystore {
@@ -284,7 +290,7 @@ func (ks *Keystore) loadKeyFiles() {
 			}).Warn("Not correct key file content")
 			continue
 		} else {
-			_, err := core.AddressParse(keyJSON.Address)
+			_, err := address.AddressParse(keyJSON.Address)
 			if err != nil {
 				logging.Logger.WithFields(logrus.Fields{
 					"address": keyJSON.Address,
