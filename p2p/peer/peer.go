@@ -952,28 +952,23 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 func (peMgr *PeerManager)peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 	var rsp = msg.(*msgConnOutRsp)
 	if rsp.result != PeMgrEnoNone {
-
 		if _, lived := peMgr.peers[rsp.ptn]; lived {
-
-			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, PeInstDirOutbound); eno != PeMgrEnoNone {
+			if eno := peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, PeInstDirOutbound, PKI_FOR_BOUNDOUT_FAILED);
+				eno != PeMgrEnoNone {
 				peerLog.Debug("peMgrConnOutRsp: peMgrKillInst failed, eno: %d", eno)
 				return eno
 			}
-
 			// drive ourselves to startup outbound
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &rsp.snid)
 			peMgr.sdl.SchSendMessage(&schMsg)
 		}
-
 		return PeMgrEnoNone
 	}
-
 	// request the instance to handshake
 	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeHandshakeReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
-
 	return PeMgrEnoNone
 }
 
@@ -1003,7 +998,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if _, ok := peMgr.reCfg.delList[rsp.snid]; ok {
 		peerLog.Debug("peMgrHandshakeRsp: kill instance for reconfiguration, snid: %x", rsp.snid)
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_RECONFIG)
 		return PeMgrEnoRecofig
 	}
 
@@ -1015,7 +1010,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peerLog.Debug("peMgrHandshakeRsp: failed, result: %d", rsp.result)
 
 		peMgr.updateStaticStatus(rsp.snid, idEx, peerKilling)
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_HANDSHAKE_FAILED)
 
 		if inst.dir == PeInstDirOutbound {
 			schMsg := sch.SchMessage{}
@@ -1064,7 +1059,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			snid, peMgr.wrkNum[snid])
 
 		peMgr.updateStaticStatus(snid, idEx, peerKilling)
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, rsp.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, rsp.dir, PKI_FOR_HANDSHAKE_FAILED)
 		return PeMgrEnoResource
 	}
 
@@ -1074,7 +1069,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peerLog.Debug("peMgrHandshakeRsp: duplicate inbound worker, snid: %x, peer-ip: %s",
 			snid, rsp.peNode.IP.String())
 
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_TOOMUCH_DUPLICATED)
 		return PeMgrEnoDuplicated
 	}
 
@@ -1084,7 +1079,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peerLog.Debug("peMgrHandshakeRsp: duplicate outbound worker, snid: %x, peer-ip: %s",
 			snid, rsp.peNode.IP.String())
 
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_TOOMUCH_WORKERS)
 		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
@@ -1105,7 +1100,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peerLog.Debug("peMgrHandshakeRsp: too much inbound workers, snid: %x, ibpNum: %d",
 					snid, peMgr.ibpNum[snid])
 
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_TOOMUCH_INBOUNDS)
 				return PeMgrEnoResource
 			}
 
@@ -1119,7 +1114,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peerLog.Debug("peMgrHandshakeRsp: inbound conflicts to outbound, snid: %x, peer-ip: %s",
 					snid, rsp.peNode.IP.String())
 
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_TOOMUCH_DUPLICATED)
 				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
 
 				return PeMgrEnoDuplicated
@@ -1143,7 +1138,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peerLog.Debug("peMgrHandshakeRsp: too much outbound workers, snid: %x, obpNum: %d",
 					snid, peMgr.obpNum[snid])
 
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_TOOMUCH_OUTBOUNDS)
 				return PeMgrEnoResource
 			}
 
@@ -1157,7 +1152,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				peerLog.Debug("peMgrHandshakeRsp: outbound conflicts to inbound, snid: %x, peer-ip: %s",
 					snid, rsp.peNode.IP.String())
 
-				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+				peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_TOOMUCH_DUPLICATED)
 				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
 				schMsg := sch.SchMessage{}
 				peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
@@ -1182,7 +1177,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		peerLog.Debug("peMgrHandshakeRsp: instance deal with EvPeEstablishedInd failed, snid: %x, eno: %d, peer-ip: %s",
 			snid, eno, rsp.peNode.IP.String())
 
-		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir)
+		peMgr.peMgrKillInst(rsp.ptn, rsp.peNode, inst.dir, PKI_FOR_WITHOUT_INST_CFM)
 		return PeMgrErrno(eno)
 	}
 
@@ -1309,7 +1304,7 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 	var schMsg = sch.SchMessage{}
 	var cfm = msg.(*MsgCloseCfm)
 
-	if eno := peMgr.peMgrKillInst(cfm.ptn, cfm.peNode, cfm.dir); eno != PeMgrEnoNone {
+	if eno := peMgr.peMgrKillInst(cfm.ptn, cfm.peNode, cfm.dir, PKI_FOR_CLOSE_CFM); eno != PeMgrEnoNone {
 		return PeMgrEnoScheduler
 	}
 
@@ -1348,7 +1343,7 @@ func (peMgr *PeerManager)peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	schMsg := sch.SchMessage{}
 	ind := msg.(*MsgCloseInd)
 
-	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir); eno != PeMgrEnoNone {
+	if eno := peMgr.peMgrKillInst(ind.ptn, ind.peNode, ind.dir, PKI_FOR_CLOSE_IND); eno != PeMgrEnoNone {
 		return PeMgrEnoScheduler
 	}
 
@@ -1546,14 +1541,27 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	return PeMgrEnoNone
 }
 
-func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int) PeMgrErrno {
+const (
+	PKI_FOR_NONE			= "None"
+	PKI_FOR_CLOSE_CFM		= "peMgrConnCloseCfm"
+	PKI_FOR_CLOSE_IND		= "peMgrConnCloseInd"
+	PKI_FOR_BOUNDOUT_FAILED	= "peMgrConnOutRsp"
+	PKI_FOR_RECONFIG		= "reConfig"
+	PKI_FOR_HANDSHAKE_FAILED	= "hsFailed"
+	PKI_FOR_TOOMUCH_WORKERS		= "maxWorks"
+	PKI_FOR_TOOMUCH_OUTBOUNDS	= "maxOutbounds"
+	PKI_FOR_TOOMUCH_INBOUNDS	= "maxInbounds"
+	PKI_FOR_TOOMUCH_DUPLICATED	= "maxInbounds"
+	PKI_FOR_WITHOUT_INST_CFM	= "noInstCfm"
+)
+func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir int, why interface{}) PeMgrErrno {
 
-	peerLog.Debug("peMgrKillInst: task: %s", peMgr.sdl.SchGetTaskName(ptn))
+	why = why.(string)
+	peerLog.Debug("peMgrKillInst: task: %s, why: %s", peMgr.sdl.SchGetTaskName(ptn), why)
 
 	var peInst = peMgr.peers[ptn]
 	if peInst == nil {
-		peerLog.Debug("peMgrKillInst: instance not found, node: %s",
-			config.P2pNodeId2HexString(node.ID))
+		peerLog.Debug("peMgrKillInst: instance not found, node: %x", node.ID)
 		return PeMgrEnoNotfound
 	}
 
