@@ -912,7 +912,7 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 			}
 
 			//
-			// close responsed channel if needed
+			// close "responsed" channel if needed
 			//
 
 			if txPkg.responsed != nil {

@@ -282,38 +282,31 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 // Poweron handler
 //
 func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
-
 	var eno sch.SchErrno
-
 	qryMgr.ptnMe = ptn
 	if qryMgr.sdl = sch.SchGetScheduler(ptn); qryMgr.sdl == nil {
 		qryLog.Debug("poweron: nil scheduler")
 		return sch.SchEnoInternal
 	}
-
 	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetUserTaskNode(DhtMgrName);
 	eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", DhtMgrName)
 		return eno
 	}
-
 	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetUserTaskNode(RutMgrName);
 	eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", RutMgrName)
 		return eno
 	}
-
 	if eno, qryMgr.ptnNatMgr = qryMgr.sdl.SchGetUserTaskNode(nat.NatMgrName);
 	eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", nat.NatMgrName)
 		return eno
 	}
-
 	if dhtEno := qryMgr.qryMgrGetConfig(); dhtEno != DhtEnoNone {
 		qryLog.Debug("poweron: qryMgrGetConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
@@ -321,18 +314,14 @@ func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (qryMgr *QryMgr)poweroff(ptn interface{}) sch.SchErrno {
-
 	qryLog.Debug("poweroff: task will be done ...")
-
 	po := sch.SchMessage{}
-
 	for _, qcb := range qryMgr.qcbTab {
 		for _, qry := range qcb.qryActived {
 			qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, qry.ptnInst, sch.EvSchPoweroff, nil)
 			qryMgr.sdl.SchSendMessage(&po)
 		}
 	}
-
 	return qryMgr.sdl.SchTaskDone(qryMgr.ptnMe, sch.SchEnoKilled)
 }
 

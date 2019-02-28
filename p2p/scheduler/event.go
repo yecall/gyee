@@ -45,8 +45,7 @@ const (
 	EvSchNull		= 0
 	EvSchPoweron	= EvSchNull + 1
 	EvSchPoweroff	= EvSchNull + 2
-	EvSchException	= EvSchNull + 3
-	EvSchDone		= EvSchNull + 4
+	EvSchDone		= EvSchNull + 3
 )
 
 //
@@ -346,7 +345,7 @@ const (
 	PEC_FOR_RECONFIG_REQ	= "ReconfigReq"
 )
 type MsgPeCloseReq struct {
-	Ptn		interface{}				// pointer to peer task instance node
+	Ptn		interface{}				// pointer to peer instance task if not nil
 	Snid	config.SubNetworkID		// sub network identity
 	Node	config.Node				// peer node
 	Dir		int						// direction
@@ -891,6 +890,7 @@ const (
 	EvNatMgrGetPublicAddrRsp	= EvNatMgrBase + 8
 	EvNatMgrPubAddrUpdateInd	= EvNatMgrBase + 9
 	EvNatMgrReadyInd			= EvNatMgrBase + 10
+	EvNatPubAddrSwitchInd		= EvNatMgrBase + 11
 )
 
 //EvNatMgrReadyInd
@@ -966,3 +966,10 @@ type MsgNatMgrPubAddrUpdateInd struct {
 	PubPort		int				// public port number
 }
 
+// EvNatPubAddrSwitchInd
+type MsgNatPubAddrSwitchInd struct {
+	Proto		string			// the prototcol, "tcp" or "udp"
+	FromPort	int				// local port number be mapped
+	PubIp		net.IP			// public address
+	PubPort		int				// public port number
+}

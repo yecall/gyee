@@ -89,6 +89,15 @@ type PeerIdExx struct {
 	Dir				int								// direction
 }
 
+func (ide PeerIdExx)toString() string {
+	return fmt.Sprintf("%x:%x:%s:%d:%d",
+		ide.Snid,
+		ide.Node.ID,
+		ide.Node.IP.String(),
+		ide.Node.TCP,
+		ide.Dir)
+}
+
 type PeerReconfig struct {
 	delList			map[config.SubNetworkID]interface{}	// sub networks to be deleted
 	addList			map[config.SubNetworkID]interface{}	// sub networks to be added
@@ -135,10 +144,10 @@ const (
 
 // peer status
 const (
-	peerIdle			= iota						// idle
-	peerConnectOutInited							// connecting out inited
-	peerActivated									// had been activated
-	peerKilling										// in killing
+	peerIdle			= iota			// idle
+	peerConnectOutInited				// connecting out inited
+	peerActivated						// had been activated
+	peerKilling							// in killing
 )
 
 // peer manager configuration
@@ -171,59 +180,69 @@ type peMgrConfig struct {
 	ibpNumTotal			int									// total number of concurrency inbound peers
 }
 
+// start/stop/addr-switching... related
+const (
+	peMgrInNull		= 0
+	peMgrInStartup	= 1
+	peMgrInStoping	= 2
+	peMgrInStopped	= 3
+	pwMgrPubAddrOutofSwitching	= 0
+	peMgrPubAddrInSwitching		= 1
+	peMgrPubAddrDelaySwitching	= 2
+)
+
+const (
+	PEMGR_STOP4NAT	= "pubAddrSwitch"
+)
+
+type pasBackupItem struct {
+	snid	config.SubNetworkID		// sub network identity
+	node	config.Node				// peer "node" information
+}
+
 // peer manager
 type PeerManager struct {
-	sdl				*sch.Scheduler					// pointer to scheduler
-	name			string							// name
-	inited			chan PeMgrErrno					// result of initialization
-	isInited		bool							// is manager initialized ok
-	tep				sch.SchUserTaskEp				// entry
-	cfg				peMgrConfig						// configuration
-	tidFindNode		map[SubNetworkID]int			// find node timer identity
-	ptnMe			interface{}						// pointer to myself(peer manager task node)
-	ptnTab			interface{}						// pointer to table task node
-	ptnLsn			interface{}						// pointer to peer listener manager task node
-	ptnAcp			interface{}						// pointer to peer acceptor manager task node
-	ptnDcv			interface{}						// pointer to discover task node
-	ptnShell		interface{}						// pointer to shell task node
-
-	//
-	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// here we backup the pointer of table manger to access it, this is dangerous
-	// for the procedure of "poweroff", we take this into account in the "poweroff"
-	// order of these two tasks, see var taskStaticPoweroffOrder4Chain please. We
-	// should solve this issue later, the "accepter" pointer is the same case.
-	//
-
-	tabMgr			*tab.TableManager							// pointer to table manager
-
-	ibInstSeq		int											// inbound instance sequence number
-	obInstSeq		int											// outbound instance sequence number
-	lock			sync.Mutex									// for peer instance to access peer manager
-	peers			map[interface{}]*PeerInstance				// map peer instance's task node pointer to instance pointer
-	nodes			map[SubNetworkID]map[PeerIdEx]*PeerInstance	// map peer node identity to instance pointer
-	workers			map[SubNetworkID]map[PeerIdEx]*PeerInstance	// map peer node identity to pointer of instance in work
-	wrkNum			map[SubNetworkID]int						// worker peer number
-	ibpNum			map[SubNetworkID]int						// active inbound peer number
-	obpNum			map[SubNetworkID]int						// active outbound peer number
-	ibpTotalNum		int											// total active inbound peer number
-	randoms			map[SubNetworkID][]*config.Node				// random nodes found by discover
-	indChan			chan interface{}							// indication signal
-	indCb			P2pIndCallback								// indication callback
-	indCbUserData	interface{}									// user data pointer for callback
-	staticsStatus	map[PeerIdEx]int							// status about static nodes
-
-	ocrTid			int											// OCR(outbound connect request) timestamp cleanup timer
-	tmLastOCR		map[SubNetworkID]map[PeerId]time.Time		// time of last outbound connect request for sub-netowerk
-																// and peer-identity
-	tmLastFNR		map[SubNetworkID]time.Time					// time of last find node request sent for sub network
-
-	reCfg			PeerReconfig								// sub network reconfiguration
-	reCfgTid		int											// reconfiguration timer
-	inStartup		bool										// if had been requestd to startup
-	natResult		bool										// nat status
-	pubTcpIp		net.IP										// public tcp ip
-	pubTcpPort		int											// public tcp port
+	sdl					*sch.Scheduler						// pointer to scheduler
+	name				string								// name
+	inited				chan PeMgrErrno						// result of initialization
+	isInited			bool								// is manager initialized ok
+	tep					sch.SchUserTaskEp					// entry
+	cfg					peMgrConfig							// configuration
+	tidFindNode			map[SubNetworkID]int				// find node timer identity
+	ptnMe				interface{}							// pointer to myself(peer manager task node)
+	ptnTab				interface{}							// pointer to table task node
+	ptnLsn				interface{}							// pointer to peer listener manager task node
+	ptnAcp				interface{}							// pointer to peer acceptor manager task node
+	ptnDcv				interface{}							// pointer to discover task node
+	ptnShell			interface{}							// pointer to shell task node
+	tabMgr				*tab.TableManager							// pointer to table manager
+	ibInstSeq			int											// inbound instance sequence number
+	obInstSeq			int											// outbound instance sequence number
+	lock				sync.Mutex									// for peer instance to access peer manager
+	peers				map[interface{}]*PeerInstance				// map peer instance's task node pointer to instance pointer
+	nodes				map[SubNetworkID]map[PeerIdEx]*PeerInstance	// map peer node identity to instance pointer
+	workers				map[SubNetworkID]map[PeerIdEx]*PeerInstance	// map peer node identity to pointer of instance in work
+	wrkNum				map[SubNetworkID]int						// worker peer number
+	ibpNum				map[SubNetworkID]int						// active inbound peer number
+	obpNum				map[SubNetworkID]int						// active outbound peer number
+	ibpTotalNum			int											// total active inbound peer number
+	randoms				map[SubNetworkID][]*config.Node				// random nodes found by discover
+	indChan				chan interface{}							// indication signal
+	indCb				P2pIndCallback								// indication callback
+	indCbUserData		interface{}									// user data pointer for callback
+	staticsStatus		map[PeerIdEx]int							// status about static nodes
+	caTids				map[string]int								// conflict access timer identity
+	ocrTid				int											// OCR(outbound connect request) timestamp cleanup timer
+	tmLastOCR			map[SubNetworkID]map[PeerId]time.Time		// time of last outbound connect request for sub-netowerk
+	tmLastFNR			map[SubNetworkID]time.Time					// time of last find node request sent for sub network
+	reCfg				PeerReconfig								// sub network reconfiguration
+	reCfgTid			int											// reconfiguration timer
+	inStartup			int											// if had been requestd to startup
+	natResult			bool										// nat status
+	pubTcpIp			net.IP										// public tcp ip
+	pubTcpPort			int											// public tcp port
+	pasStatus			int											// public addr switching status
+	pasBackup			[]pasBackupItem								// backup list for nat public address switching
 }
 
 func NewPeerMgr() *PeerManager {
@@ -242,6 +261,7 @@ func NewPeerMgr() *PeerManager {
 		indChan:     	make(chan interface{}, maxIndicationQueueSize),
 		randoms:     	map[SubNetworkID][]*config.Node{},
 		staticsStatus:	map[PeerIdEx]int{},
+		caTids:			make(map[string]int, 0),
 		ocrTid:			sch.SchInvalidTid,
 		tmLastOCR:		make(map[SubNetworkID]map[PeerId]time.Time, 0),
 		tmLastFNR:		make(map[SubNetworkID]time.Time, 0),
@@ -262,14 +282,6 @@ func (peMgr *PeerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage
 func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
-
-	if !peMgr.isInited {
-		if msg.Id != sch.EvSchPoweron {
-			peerLog.Debug("peerMgrProc: not be initialized, message discarded, "+
-				"name: %s, msg.Id: %d", peMgr.name, msg.Id)
-			return PeMgrEnoMismatched
-		}
-	}
 
 	var schEno = sch.SchEnoNone
 	var eno PeMgrErrno = PeMgrEnoNone
@@ -480,7 +492,7 @@ func (peMgr *PeerManager)PeMgrInited() PeMgrErrno {
 }
 
 func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
-	peerLog.Debug("PeMgrStart: EvPeMgrStartReq will be sent, target: %s", peMgr.sdl.SchGetTaskName(peMgr.ptnMe))
+	peerLog.Debug("PeMgrStart: EvPeMgrStartReq will be sent, target: %s", sch.PeerMgrName)
 	msg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
 	peMgr.sdl.SchSendMessage(&msg)
@@ -488,7 +500,7 @@ func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
-	peerLog.Debug("peMgrPoweroff: task will be done, name: %s", peMgr.sdl.SchGetTaskName(ptn))
+	peerLog.Debug("peMgrPoweroff: task will be done, name: %s", sch.PeerMgrName)
 
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
@@ -511,43 +523,13 @@ func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrStartReq(_ interface{}) PeMgrErrno {
-	peMgr.inStartup = true
+	peMgr.inStartup = peMgrInStartup
 	if !peMgr.natResult {
 		peerLog.Debug("peMgrStartReq: still not mapped by nat")
 		return PeMgrEnoNone
 	}
-
 	peerLog.Debug("peMgrStartReq: task: %s", peMgr.name)
-	var schMsg = sch.SchMessage{}
-
-	// start peer listener if necessary. notice: nat mapping for peer listener manager
-	// is established by table manager, here start the listener at once.
-	if peMgr.cfg.noAccept == false {
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
-		peMgr.sdl.SchSendMessage(&schMsg)
-	}
-
-	// setup outbound timestamp cleaner timer
-	var tdOcr = sch.TimerDescription {
-		Name:	"_pocrTimer",
-		Utid:	sch.PeMinOcrCleanupTimerId,
-		Tmt:	sch.SchTmTypePeriod,
-		Dur:	minDuration4OutboundConnectReq,
-		Extra:	nil,
-	}
-
-	var eno sch.SchErrno
-	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
-	if eno != sch.SchEnoNone || peMgr.ocrTid == sch.SchInvalidTid {
-		peerLog.Debug("peMgrStartReq: SchSetTimer failed, eno: %d", eno)
-		return PeMgrEnoScheduler
-	}
-
-	// drive ourselves to startup outbound
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
-	peMgr.sdl.SchSendMessage(&schMsg)
-
-	return PeMgrEnoNone
+	return peMgr.start()
 }
 
 func (peMgr *PeerManager)ocrTimestampCleanup() {
@@ -566,7 +548,7 @@ func (peMgr *PeerManager)ocrTimestampCleanup() {
 }
 
 func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
-	if (!peMgr.inStartup || !peMgr.natResult) {
+	if (peMgr.inStartup != peMgrInStartup || !peMgr.natResult) {
 		peerLog.Debug("peMgrDcvFindNodeRsp: not ready, inStartup: %t, natResult: %t",
 			peMgr.inStartup, peMgr.natResult)
 		return PeMgrEnoNone
@@ -1278,6 +1260,8 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	}
 
 	if ptnSender := peMgr.sdl.SchGetSender(msg); ptnSender != peMgr.ptnShell {
+		// req.Ptn is nil, means the sender is peMgr.ptnShell, so need not to
+		// send EvShellPeerAskToCloseInd to it again.
 		if req.Ptn != nil {
 			ind := sch.MsgShellPeerAskToCloseInd {
 				Snid: snid,
@@ -1301,20 +1285,19 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 }
 
 func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
+	// cleanup
 	var schMsg = sch.SchMessage{}
 	var cfm = msg.(*MsgCloseCfm)
-
 	if eno := peMgr.peMgrKillInst(cfm.ptn, cfm.peNode, cfm.dir, PKI_FOR_CLOSE_CFM); eno != PeMgrEnoNone {
+		peerLog.Debug("peMgrConnCloseCfm: peMgrKillInst, failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
-
 	i := P2pIndPeerClosedPara {
 		P2pInst:	peMgr.sdl,
 		Snid:		cfm.snid,
 		PeerId:		cfm.peNode.ID,
 		Dir:		cfm.dir,
 	}
-
 	if peMgr.ptnShell != nil {
 		ind2Sh := sch.MsgShellPeerCloseCfm{
 			Result: int(cfm.result),
@@ -1328,9 +1311,20 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		peMgr.peMgrIndEnque(&i)
 	}
 
-	// drive ourselves to startup outbound
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
-	peMgr.sdl.SchSendMessage(&schMsg)
+	// more
+	if peMgr.inStartup == peMgrInStartup {
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
+		peMgr.sdl.SchSendMessage(&schMsg)
+	} else if peMgr.inStartup == peMgrInStoping {
+		if len(peMgr.peers) == 0 || len(peMgr.nodes) == 0 || len(peMgr.workers) == 0 {
+			peMgr.inStartup = peMgrInStopped
+			if peMgr.pasStatus == peMgrPubAddrInSwitching {
+				peMgr.pubAddrSwitch()
+			}
+		}
+	} else {
+		peerLog.Debug("peMgrConnCloseCfm")
+	}
 
 	return PeMgrEnoNone
 }
@@ -1377,7 +1371,7 @@ func (peMgr *PeerManager)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) PeMgrErrno {
 	if peMgr.natResult = msg.NatType == nat.NATT_NONE; peMgr.natResult {
 		peMgr.pubTcpIp = peMgr.cfg.ip
 		peMgr.pubTcpPort = int(peMgr.cfg.port)
-		if peMgr.inStartup {
+		if peMgr.inStartup == peMgrInStartup {
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
 			peMgr.sdl.SchSendMessage(&schMsg)
@@ -1399,7 +1393,7 @@ func (peMgr *PeerManager)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno 
 			n.TCP = uint16(msg.PubPort & 0xffff)
 			peMgr.cfg.subNetNodeList[k] = n
 		}
-		if peMgr.inStartup {
+		if peMgr.inStartup == peMgrInStartup {
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
 			peMgr.sdl.SchSendMessage(&schMsg)
@@ -1409,21 +1403,34 @@ func (peMgr *PeerManager)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno 
 }
 
 func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) PeMgrErrno {
-	// SIMPLY switch the ip address and set result, MORE needed to implement the
-	// following "recover" and "lost" functions.
-	natMapRecovered := func() {}
-	natMapLost := func() {}
+	oldNatResult := peMgr.natResult
+	oldIp := peMgr.pubTcpIp
+	oldTcp := peMgr.pubTcpPort
+
+	natMapRecovered := func() {
+		if !peMgr.pubTcpIp.Equal(oldIp) || peMgr.pubTcpPort != oldTcp {
+			if peMgr.pasStatus == pwMgrPubAddrOutofSwitching {
+				if peMgr.reCfgTid != sch.SchInvalidTid {
+					peMgr.pasStatus = peMgrPubAddrDelaySwitching
+				} else {
+					peMgr.pasStatus = peMgrPubAddrInSwitching
+					peMgr.pubAddrSwitchPrepare()
+					peMgr.stop(PEMGR_STOP4NAT)
+				}
+			}
+		} else if peMgr.inStartup == peMgrInStartup {
+			peMgr.PeMgrStart()
+		}
+	}
+
+	natMapLost := func() {
+		if oldNatResult {
+			peMgr.stop(PEMGR_STOP4NAT)
+		}
+	}
 
 	if nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
-		old := peMgr.natResult
-		peMgr.natResult = true
-		peMgr.pubTcpIp = msg.PubIp
-		peMgr.pubTcpPort = msg.PubPort
-		for _, n := range peMgr.cfg.subNetNodeList {
-			n.IP = msg.PubIp
-			n.TCP = uint16(msg.PubPort & 0xffff)
-		}
-		if !old {
+		if !peMgr.natResult {
 			natMapRecovered()
 		}
 	} else if msg.Proto == nat.NATP_TCP {
@@ -1436,6 +1443,174 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 		}
 	}
 	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)start() PeMgrErrno {
+	var schMsg = sch.SchMessage{}
+	if peMgr.cfg.noAccept == false {
+		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
+		peMgr.sdl.SchSendMessage(&schMsg)
+	}
+
+	var tdOcr = sch.TimerDescription {
+		Name:	"_pocrTimer",
+		Utid:	sch.PeMinOcrCleanupTimerId,
+		Tmt:	sch.SchTmTypePeriod,
+		Dur:	minDuration4OutboundConnectReq,
+		Extra:	nil,
+	}
+	var eno sch.SchErrno
+	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
+	if eno != sch.SchEnoNone || peMgr.ocrTid == sch.SchInvalidTid {
+		peerLog.Debug("start: SchSetTimer failed, eno: %d", eno)
+		return PeMgrEnoScheduler
+	}
+
+	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
+	peMgr.sdl.SchSendMessage(&schMsg)
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
+	if peMgr.reCfgTid != sch.SchInvalidTid {
+		peerLog.Debug("stop: faied, in reconfiguring")
+		return PeMgrEnoRecofig
+	}
+
+	for _, tid := range peMgr.caTids {
+		if tid != sch.SchInvalidTid {
+			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
+		}
+	}
+	peMgr.caTids = make(map[string]int, 0)
+
+	if peMgr.cfg.noAccept == false {
+		msg := sch.SchMessage{}
+		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
+		peMgr.sdl.SchSendMessage(&msg)
+	}
+
+	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
+	if peMgr.ocrTid != sch.SchInvalidTid {
+		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.ocrTid)
+		peMgr.ocrTid = sch.SchInvalidTid
+	}
+
+	for _, tid := range peMgr.tidFindNode {
+		if tid != sch.SchInvalidTid {
+			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
+		}
+	}
+	peMgr.tidFindNode = make(map[SubNetworkID]int, 0)
+
+	// try to close all peer instances: need to check the state of the instance to
+	// take action.
+	for ptn, pi := range peMgr.peers {
+		node := pi.node
+		snid := pi.snid
+		dir := pi.dir
+		idex := PeerIdEx{
+			Id:  pi.node.ID,
+			Dir: dir,
+		}
+		if piOfSubnet, ok := peMgr.nodes[snid]; ok && piOfSubnet != nil {
+			if _, ok := piOfSubnet[idex]; ok {
+				if pi.state >= peInstStateHandshook {
+					// let shell manager know
+					ind := sch.MsgShellPeerAskToCloseInd{
+						Snid:   snid,
+						PeerId: idex.Id,
+						Dir:    idex.Dir,
+						Why:    why,
+					}
+					msg := sch.SchMessage{}
+					peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
+					peMgr.sdl.SchSendMessage(&msg)
+					continue
+				}
+			}
+		}
+		// kill directly
+		req := sch.MsgPeCloseReq {
+			Ptn: ptn,
+			Snid: snid,
+			Node: node,
+			Dir: dir,
+			Why: why,
+		}
+		msg := sch.SchMessage{}
+		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
+		peMgr.sdl.SchSendMessage(&msg)
+	}
+
+	peMgr.inStartup = peMgrInStoping
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)msgFilter(msg *sch.SchMessage) PeMgrErrno {
+	eno := PeMgrErrno(PeMgrEnoNone)
+	if peMgr.inStartup == peMgrInNull {
+		switch msg.Id {
+		case sch.EvSchPoweron:
+		case sch.EvSchPoweroff:
+		default:
+			peerLog.Debug("msgFilter: filtered out for peMgrInNull, msg.Id: %d", msg.Id)
+			eno = PeMgrEnoMismatched
+		}
+	} else if peMgr.inStartup != peMgrInStartup {
+		switch msg.Id {
+		case sch.EvSchPoweroff:
+		case sch.EvPeCloseReq:
+		case sch.EvPeCloseCfm:
+		case sch.EvPeCloseInd:
+		default:
+			peerLog.Debug("msgFilter: filtered out for inStartup: %d, msg.Id: %d", peMgr.inStartup, msg.Id)
+			eno = PeMgrEnoMismatched
+		}
+	}
+	return eno
+}
+
+func (peMgr *PeerManager)pubAddrSwitchPrepare() PeMgrErrno {
+	peMgr.pasBackup = make([]pasBackupItem, 0)
+	for _, piOfSubnet := range peMgr.workers {
+		if piOfSubnet != nil && len(piOfSubnet) > 0 {
+			for _, pi := range(piOfSubnet) {
+				item := pasBackupItem {
+					snid: pi.snid,
+					node: pi.node,
+				}
+				peMgr.pasBackup = append(peMgr.pasBackup, item)
+			}
+		}
+	}
+	return PeMgrEnoNone
+}
+
+func (peMgr *PeerManager)pubAddrSwitch() PeMgrErrno {
+	peMgr.inStartup = peMgrInStartup
+	peMgr.pasStatus = pwMgrPubAddrOutofSwitching
+	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
+	for _, item := range peMgr.pasBackup {
+		snid := item.snid
+		if _, ok := peMgr.randoms[snid]; !ok {
+			peMgr.randoms[snid] = make([]*config.Node, 0)
+		}
+		peMgr.randoms[snid] = append(peMgr.randoms[snid], &item.node)
+	}
+	peMgr.cfg.ip = peMgr.pubTcpIp
+	peMgr.cfg.port = uint16(peMgr.pubTcpPort)
+	peMgr.cfg.udp = uint16(peMgr.pubTcpPort)
+	for k, old := range peMgr.cfg.subNetNodeList {
+		n := config.Node {
+			ID: old.ID,
+			IP: peMgr.pubTcpIp,
+			TCP: uint16(peMgr.pubTcpPort),
+			UDP: uint16(peMgr.pubTcpPort),
+		}
+		peMgr.cfg.subNetNodeList[k] = n
+	}
+	return peMgr.start()
 }
 
 func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
@@ -1643,16 +1818,19 @@ func (peMgr *PeerManager)peMgrConflictAccessProtect(snid config.SubNetworkID, pe
 
 	peerLog.Debug("peMgrConflictAccessProtect: set timer, utid: %d, dur: %d, idexx: %+v", td.Utid, td.Dur, idexx)
 
-	if eno, _ := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
+	eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td)
+	if eno != sch.SchEnoNone {
 		peerLog.Debug("peMgrConflictAccessProtect: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
-
+	idexx.toString()
+	peMgr.caTids[idexx.toString()] = tid
 	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 	idexx := msg.(*PeerIdExx)
+	delete(peMgr.caTids, (*idexx).toString())
 	schMsg := sch.SchMessage{}
 	r := sch.MsgDcvFindNodeRsp{
 		Snid:	idexx.Snid,
@@ -1686,6 +1864,14 @@ func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
 		}
 	}
 	peMgr.reCfg.delList = make(map[config.SubNetworkID]interface{}, 0)
+
+	// carry out public address switching if necessary
+	if peMgr.pasStatus == peMgrPubAddrDelaySwitching {
+		peMgr.pasStatus = peMgrPubAddrInSwitching
+		peMgr.pubAddrSwitchPrepare()
+		return peMgr.stop(PEMGR_STOP4NAT)
+	}
+
 	return PeMgrEnoNone
 }
 
@@ -1964,14 +2150,8 @@ const PeInstMaxPingpongCnt	= 4					// max pingpong counter value
 const PeInstPingpongCycle	= time.Second * 16	// pingpong period
 
 type PeerInstance struct {
-	sdl			*sch.Scheduler				// pointer to scheduler
-
-	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// We backup the pointer to peer manager here to access it while an instance
-	// is running, this might bring us those problems in "SYNC" between instances
-	// and the peer manager.
+	sdl				*sch.Scheduler				// pointer to scheduler
 	peMgr			*PeerManager				// pointer to peer manager
-
 	name			string						// name
 	tep				sch.SchUserTaskEp			// entry
 	ptnMe			interface{}					// the instance task node pointer

@@ -70,6 +70,7 @@ const (
 	TabMgrEnoDatabase
 	TabMgrEnoNotFound
 	TabMgrEnoDuplicated
+	TabMgrEnoMismatched
 	TabMgrEnoInternal
 	TabMgrEnoFindNodeFailed
 	TabMgrEnoPingpongFailed
@@ -234,6 +235,7 @@ type TableManager struct {
 	name			string				// name
 	tep				sch.SchUserTaskEp	// entry
 	cfg				tabConfig			// configuration
+	root			*TableManager		// root manager pointer
 	ptnMe			interface{}			// pointer to task node of myself
 	ptnNgbMgr		interface{}			// pointer to neighbor manager task node
 	ptnDcvMgr		interface{}			// pointer to discover manager task node
@@ -251,9 +253,8 @@ type TableManager struct {
 	arfTid			int					// auto refresh timer identity
 
 	//
-	// Notice: currently Ethereum's database interface is introduced, and
-	// we had make some modifications on it, see file nodedb.go for details
-	// please.
+	// Notice: currently Ethereum's database interface is introduced
+	//see file nodedb.go for details please.
 	//
 
 	nodeDb			*nodeDB				// node database object pointer
@@ -533,6 +534,7 @@ func (tabMgr *TableManager)mgr4Subnet(snid config.SubNetworkID) *TableManager {
 func (tabMgr *TableManager)setupSubNetTabMgr() TabMgrErrno {
 	for _, snid := range tabMgr.cfg.subNetIdList {
 		mgr := tabMgr.mgr4Subnet(snid)
+		mgr.root = tabMgr
 		tabMgr.subNetMgrList[snid] = mgr
 	}
 	return TabMgrEnoNone
@@ -542,11 +544,12 @@ func (tabMgr *TableManager)tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 
 	tabLog.Debug("tabMgrPoweroff: task will be done, name: %s", tabMgr.sdl.SchGetTaskName(ptn))
 
+	// close nodeDb and done the task: timers would be killed by scheduler when task done,
+	// and one could also chose to kill them himself before done the task.
 	if tabMgr.nodeDb != nil {
 		tabMgr.nodeDb.close()
 		tabMgr.nodeDb = nil
 	}
-
 	if tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
@@ -622,6 +625,11 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 
 func (tabMgr *TableManager)tabMgrRefreshTimerHandler(snid *SubNetworkID)TabMgrErrno {
 	if mgr, ok := tabMgr.subNetMgrList[*snid]; ok {
+		if mgr.arfTid == sch.SchInvalidTid && !mgr.root.natUdpResult {
+			tabLog.Debug("tabMgrRefreshTimerHandler: arfTid: %d, natUdpResult: %t",
+				mgr.arfTid, mgr.root.natUdpResult)
+			return TabMgrEnoMismatched
+		}
 		return mgr.tabRefresh(snid, nil)
 	}
 	tabLog.Debug("tabMgrRefreshTimerHandler: invalid subnet: %x", snid)
@@ -686,6 +694,10 @@ func (tabMgr *TableManager)tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabMg
 }
 
 func (tabMgr *TableManager)tabMgrRefreshReq(msg *sch.MsgTabRefreshReq)TabMgrErrno {
+	if !tabMgr.natUdpResult {
+		tabLog.Debug("tabMgrRefreshReq: nat mapping not established")
+		return TabMgrEnoUdp
+	}
 	return tabMgr.tabRefresh(&msg.Snid, nil)
 }
 
@@ -971,10 +983,13 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 }
 
 func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) TabMgrErrno {
-	// notice: the external public ip reported in msg.pubUdpIp and msg.pubTcpIp must be
+	// notice0: the external public ip reported in msg.pubUdpIp and msg.pubTcpIp must be
 	// same, tabMgr.pubTcpIp is copied twice with same value. a "status" is introduced
 	// for future to deal with the case: the "result" is ok, but need to wait nat to do
 	// more work for mapping.
+	// notice1: this is happened while the p2p is powering on, just updating the public
+	// address is needed, for rebuilding about address switching, see function
+	// tabMgrNatPubAddrUpdateInd for details please.
 	if !nat.NatIsResultOk(msg.Result) {
 		p2plog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
@@ -1041,6 +1056,8 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 		msg.Proto, tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
 
 	old := tabMgr.natUdpResult
+	oldUdpIp := tabMgr.pubUdpIp
+	oldUdpPort := tabMgr.pubUdpPort
 	proto := strings.ToLower(msg.Proto)
 	if proto == "udp" {
 		tabMgr.natUdpResult = nat.NatIsStatusOk(msg.Status)
@@ -1070,10 +1087,17 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 
 	// check to start or stop auto-refreshing when updated
 	if tabMgr.natUdpResult {
+		if !tabMgr.pubUdpIp.Equal(oldUdpIp) || oldUdpPort != tabMgr.pubUdpPort {
+			if eno := tabMgr.pubAddrSwitchPrepare(); eno != TabMgrEnoNone {
+				p2plog.Debug("tabMgrNatPubAddrUpdateInd: pubAddrSwitchPrepare failed, eno: %d", eno)
+				return eno
+			}
+		}
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
 			p2plog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
-		} else if proto == "udp" {
+		}
+		if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
 				mgr.startSubnetRefresh()
 			}
@@ -2558,4 +2582,45 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 		tabLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
 	}
 	return TabMgrEnoParameter
+}
+
+func (tabMgr *TableManager)pubAddrSwitchPrepare() TabMgrErrno {
+	for snid, mgr := range tabMgr.subNetMgrList {
+		if eno := mgr.subnetPubAddrSwitchPrepare(); eno != TabMgrEnoNone {
+			tabLog.Debug("pubAddrSwitchPrepare: failed, subnet: %x", snid)
+			return eno
+		}
+	}
+	ind := sch.MsgNatPubAddrSwitchInd {
+		Proto: nat.NATP_UDP,
+		FromPort: tabMgr.pubUdpPort,
+		PubIp: tabMgr.pubUdpIp,
+		PubPort: tabMgr.pubUdpPort,
+	}
+	msg := sch.SchMessage{}
+	tabMgr.sdl.SchMakeMessage(&msg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNatPubAddrSwitchInd, &ind)
+	tabMgr.sdl.SchSendMessage(&msg)
+	return TabMgrEnoNone
+}
+
+func (tabMgr *TableManager)subnetPubAddrSwitchPrepare() TabMgrErrno {
+	if tabMgr.arfTid != sch.SchInvalidTid {
+		tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, tabMgr.arfTid)
+		tabMgr.arfTid = sch.SchInvalidTid
+	}
+	tabMgr.queryPending = make([]*queryPendingEntry, 0)
+	tabMgr.boundPending = make([]*Node, 0)
+	for _, icb := range tabMgr.queryIcb {
+		if eno := tabMgr.tabDeleteActiveQueryInst(icb); eno != TabMgrEnoNone {
+			tabLog.Debug("subnetPubAddrSwitchPrepare: tabDeleteActiveQueryInst failed, eno: %d", eno)
+			return eno
+		}
+	}
+	for _, icb := range tabMgr.boundIcb {
+		if eno := tabMgr.tabDeleteActiveBoundInst(icb); eno != TabMgrEnoNone {
+			tabLog.Debug("subnetPubAddrSwitchPrepare: tabDeleteActiveBoundInst failed, eno: %d", eno)
+			return eno
+		}
+	}
+	return TabMgrEnoNone
 }

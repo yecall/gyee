@@ -1089,7 +1089,7 @@ func (sdl *scheduler)schCreateTask(taskDesc *schTaskDescription) (SchErrno, inte
 	}
 
 	//
-	// start task to work according the flag, if the flag is invalid, we suspend
+	// start task to work according to the flag, if the flag is invalid, we suspend
 	// the user task and inform caller with SchEnoSuspended returned.
 	//
 
@@ -1215,18 +1215,11 @@ func (sdl *scheduler)schStopTask(name string) SchErrno {
 	// caller itself, or will get a deadlock.
 	//
 
-	//
-	// get task node pointer by name
-	//
-
 	eno, ptn := sdl.schGetTaskNodeByName(name)
-
 	if eno != SchEnoNone || ptn == nil {
-
 		schLog.Debug("schStopTask: " +
 			"schGetTaskNodeByName failed, name: %s, eno: %d, ptn: %X",
 			name, eno, ptn)
-
 		return eno
 	}
 
@@ -1235,7 +1228,6 @@ func (sdl *scheduler)schStopTask(name string) SchErrno {
 	//
 
 	ptn.task.done<-SchEnoKilled
-
 	<-ptn.task.stopped
 
 	return SchEnoNone
@@ -1849,9 +1841,10 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 
 		ptn interface{} = nil
 
+		// watch dog is not implemented, ignored
 		tkd  = schTaskDescription {
 			MbSize:	schMaxMbSize,
-			Wd:		&SchWatchDog {HaveDog: false}, // watch dog is not implemented, ignored
+			Wd:		&SchWatchDog {HaveDog: false},
 			Flag:	SchCreatedGo,
 		}
 
@@ -1862,7 +1855,6 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	// loop the static table
 	//
 
-	//for loop, desc := range tsd {
 	for loop := 0; loop < len(tsd); loop++ {
 
 		desc := tsd[loop]
@@ -1940,7 +1932,6 @@ func (sdl *scheduler)schSchedulerStart(tsd []TaskStaticDescription, tpo []string
 	// in this "tpo" table, see above pls.
 	//
 
-	//for _, name := range tpo {
 	for loop := 0; loop < len(tpo); loop++ {
 
 		name := tpo[loop]

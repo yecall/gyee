@@ -72,23 +72,15 @@ const (
 
 // The control block of neighbor task instance
 type neighborInst struct {
-	sdl		*sch.Scheduler		// pointer to scheduler
-
-	//
-	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// we backup the neighbor manager pointer here to access it, this might cause
-	// issues when "poweroff" procedure is carried out.
-	//
-
-	ngbMgr	*NeighborManager	// pointer to neighbor manager
-
-	ptn		interface{}			// task node pointer
-	name	string				// task instance name
-	tep		sch.SchUserTaskEp	// entry
-	msgType	um.UdpMsgType		// message type to inited this instance
-	msgBody	interface{}			// message body
-	tidFN	int					// FindNode timer identity
-	tidPP	int					// Pingpong timer identity
+	sdl			*sch.Scheduler		// pointer to scheduler
+	ngbMgr		*NeighborManager	// pointer to neighbor manager
+	ptn			interface{}			// task node pointer
+	name		string				// task instance name
+	tep			sch.SchUserTaskEp	// entry
+	msgType		um.UdpMsgType		// message type to inited this instance
+	msgBody		interface{}			// message body
+	tidFN		int					// FindNode timer identity
+	tidPP		int					// Pingpong timer identity
 }
 
 // Protocol handler errno
@@ -99,8 +91,6 @@ const (
 										// those NgbMgrEnoxxx.
 
 	NgbProtoEnoScheduler				// scheduler
-	NgbProtoEnoOs						// operating system
-	NgbProtoEnoEncode					// encoding/decoding
 	NgbProtoEnoTimeout					// timeout
 	NgbProtoEnoUdp						// udp
 )
@@ -372,6 +362,8 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 		eno = ngbMgr.PingpongReq(msg.Body.(*um.Ping))
 	case sch.EvNblCleanMapReq:
 		eno = ngbMgr.CleanMapReq(msg.Body.(string))
+	case sch.EvNatPubAddrSwitchInd:
+		eno = ngbMgr.natPubAddrSwitchInd(msg.Body.(*sch.MsgNatPubAddrSwitchInd))
 	default:
 		ngbLog.Debug("NgbMgrProc:  invalid message id: %d", msg.Id)
 		eno = NgbMgrEnoParameter
@@ -995,3 +987,20 @@ func (ngbMgr *NeighborManager)getSubNodeId(snid config.SubNetworkID) *config.Nod
 	return nil
 }
 
+func (ngbMgr *NeighborManager)natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchInd) NgbMgrErrno {
+	ngbMgr.lock.Lock()
+	defer ngbMgr.lock.Unlock()
+	powerOff := sch.SchMessage {
+		Id:		sch.EvSchPoweroff,
+		Body:	nil,
+	}
+	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
+	for _, ngbInst := range ngbMgr.ngbMap {
+		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
+		ngbMgr.sdl.SchSendMessage(&powerOff)
+	}
+	ngbMgr.cfg.IP = msg.PubIp
+	ngbMgr.cfg.UDP = uint16(msg.PubPort)
+	ngbMgr.cfg.TCP = uint16(msg.PubPort)
+	return NgbMgrEnoNone
+}
