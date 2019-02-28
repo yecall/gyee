@@ -60,6 +60,12 @@ import (
 	"github.com/yeeco/gyee/persistent"
 )
 
+var (
+	ErrNoCoinbase          = errors.New("coinbase not provided")
+	ErrNoCoinbasePwdFile   = errors.New("coinbase keystore password file not provided")
+	ErrCoinbaseKeyNotFound = errors.New("coinbase not found in keystore")
+)
+
 type Core struct {
 	node           INode
 	config         *config.Config
@@ -220,14 +226,14 @@ func (c *Core) loadCoinbaseKey() error {
 	conf := c.config
 	coinbase := conf.Chain.Coinbase
 	if len(coinbase) == 0 {
-		return errors.New("coinbase not provided")
+		return ErrNoCoinbase
 	}
 	if len(conf.Chain.PwdFile) == 0 {
-		return errors.New("coinbase keystore password file not provided")
+		return ErrNoCoinbasePwdFile
 	}
 	c.keystore = keystore.NewKeystoreWithConfig(conf)
 	if contains, _ := c.keystore.Contains(coinbase); !contains {
-		return errors.New("coinbase not found in keystore")
+		return ErrCoinbaseKeyNotFound
 	}
 	pwdContent, err := ioutil.ReadFile(conf.Chain.PwdFile)
 	if err != nil {
@@ -254,8 +260,12 @@ func (c *Core) GetSigner() crypto.Signer {
 	return signer
 }
 
-func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) { //从node的accountManager取
-	return nil, nil
+func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) {
+	//从node的accountManager取
+	if c.minerKey == nil {
+		return nil, ErrCoinbaseKeyNotFound
+	}
+	return c.minerKey, nil
 }
 
 func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {

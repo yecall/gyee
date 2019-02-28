@@ -42,4 +42,7 @@ type Engine interface {
 
 	// send tx hash to engine
 	SendTx(common.Hash)
+
+	// inform engine txs has been sealed in block
+	OnTxSealed([]common.Hash)
 }

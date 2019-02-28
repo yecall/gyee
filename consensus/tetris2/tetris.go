@@ -129,8 +129,13 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 	}
 
 	tetris.signer = core.GetSigner()
-	pk, _ := core.GetPrivateKeyOfDefaultAccount()
-	tetris.signer.InitSigner(pk)
+	pk, err := core.GetPrivateKeyOfDefaultAccount()
+	if err != nil {
+		return nil, err
+	}
+	if err := tetris.signer.InitSigner(pk); err != nil {
+		return nil, err
+	}
 
 	for _, value := range validatorList {
 		tetris.validators[value] = make(map[uint64]*Event)
@@ -181,6 +186,11 @@ func (t *Tetris) SendEvent(event []byte) {
 
 func (t *Tetris) SendTx(hash common.Hash) {
 	t.TxsCh <- hash
+}
+
+func (t *Tetris) OnTxSealed(txs []common.Hash) {
+	// clean up cache for txs
+	// TODO:
 }
 
 func (t *Tetris) loop() {

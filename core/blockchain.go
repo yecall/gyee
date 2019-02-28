@@ -28,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/consensus"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
@@ -50,6 +51,8 @@ type BlockChain struct {
 	chainID ChainID
 	storage persistent.Storage
 	stateDB state.Database
+	engine  consensus.Engine
+
 	genesis *Block
 
 	lastBlock atomic.Value
@@ -62,10 +65,10 @@ type BlockChain struct {
 }
 
 func NewBlockChainWithCore(core *Core) (*BlockChain, error) {
-	return NewBlockChain(ChainID(core.config.Chain.ChainID), core.storage)
+	return NewBlockChain(ChainID(core.config.Chain.ChainID), core.storage, core.engine)
 }
 
-func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, error) {
+func NewBlockChain(chainID ChainID, storage persistent.Storage, engine consensus.Engine) (*BlockChain, error) {
 	log.Info("Create New Blockchain")
 
 	// check storage
@@ -85,6 +88,7 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage) (*BlockChain, er
 		chainID: chainID,
 		storage: storage,
 		stateDB: stateDB,
+		engine:  engine,
 		quitCh:  make(chan struct{}),
 	}
 
@@ -231,6 +235,14 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 	}
 
 	bc.lastBlock.Store(b)
+
+	if engine := bc.engine; engine != nil {
+		txs := make([]common.Hash, 0, len(b.transactions))
+		for _, tx := range b.transactions {
+			txs = append(txs, *tx.Hash())
+		}
+		engine.OnTxSealed(txs)
+	}
 
 	return nil
 }
