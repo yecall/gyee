@@ -90,9 +90,20 @@ message UdpMessage {
         optional bytes          Extra           = 8;
     }
 
-    required MessageType    msgType     = 1;
-    optional Ping           ping        = 2;
-    optional Pong           pong        = 3;
-    optional FindNode       findNode    = 4;
-    optional Neighbors      neighbors   = 5;
+    message StaleAddress {
+        required Node           From            = 1;
+        required Node           To              = 2;
+        repeated SubNetworkID   FromSubNetId    = 3;
+        required int32          SignR           = 4;
+        required bytes          R               = 5;
+        required int32          SignS           = 6;
+        required bytes          S               = 7;
+    }
+
+    required MessageType        msgType         = 1;
+    optional Ping               ping            = 2;
+    optional Pong               pong            = 3;
+    optional FindNode           findNode        = 4;
+    optional Neighbors          neighbors       = 5;
+    optional StaleAddress       staleAddress    = 6;
 }

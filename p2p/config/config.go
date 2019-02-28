@@ -449,6 +449,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		DhtConCfg: Cfg4DhtConManager {
 			Local:				&DefaultDhtLocalNode,
 			MaxCon:				512,
+			MinCon:				8,
 			HsTimeout:			time.Second * 16,
 		},
 		DhtFdsCfg: Cfg4DhtFileDatastore {
