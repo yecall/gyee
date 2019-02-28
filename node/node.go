@@ -47,7 +47,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/theckman/go-flock"
+	"github.com/gofrs/flock"
 	"github.com/yeeco/gyee/accounts"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"

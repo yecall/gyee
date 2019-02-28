@@ -5,7 +5,7 @@ require (
 	github.com/allegro/bigcache v1.2.0
 	github.com/ethereum/go-ethereum v1.8.23
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
-	github.com/gofrs/flock v0.7.0 // indirect
+	github.com/gofrs/flock v0.7.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.2.0
 	github.com/golang/snappy v0.0.1 // indirect
@@ -30,7 +30,6 @@ require (
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/syndtr/goleveldb v0.0.0-20190203031304-2f17a3356c66
 	github.com/tebeka/strftime v0.0.0-20140926081919-3f9c7761e312 // indirect
-	github.com/theckman/go-flock v0.7.0
 	github.com/urfave/cli v1.20.0
 	golang.org/x/crypto v0.0.0-20190219172222-a4c6cb3142f2
 	golang.org/x/net v0.0.0-20190213061140-3a22650c66bd
