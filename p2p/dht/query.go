@@ -1548,6 +1548,10 @@ func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
 			return eno
 		}
 	}
-	return qryMgr.switch2NatAddr(nat.NATP_TCP)
+	qryMgr.switch2NatAddr(nat.NATP_TCP)
+	msg := new(sch.SchMessage)
+	qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnDhtMgr, sch.EvDhtQryMgrPubAddrSwitchInd, nil)
+	qryMgr.sdl.SchSendMessage(msg)
+	return DhtEnoNone
 }
 

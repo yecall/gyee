@@ -247,6 +247,9 @@ func (rutMgr *RutMgr)rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		rutLog.Debug("rutMgrProc: pong is not supported")
 		eno = sch.SchEnoNotImpl
 
+	case sch.EvDhtConMgrBootstrapReq:
+		eno = rutMgr.conMgrBootstrapReq()
+
 	default:
 		rutLog.Debug("rutMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -740,6 +743,13 @@ func (rutMgr *RutMgr)stopNotifyReq(req *sch.MsgDhtRutMgrStopNofiyReq) sch.SchErr
 	}
 	delete(rutMgr.ntfTab, nfi)
 	return sch.SchEnoNone
+}
+
+//
+// connection manager request to do bootstrap to get more connections
+//
+func (rutMgr *RutMgr)conMgrBootstrapReq() sch.SchErrno {
+	return rutMgr.bootstarpTimerHandler()
 }
 
 //

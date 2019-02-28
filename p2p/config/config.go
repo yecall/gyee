@@ -326,6 +326,7 @@ type Cfg4DhtConManager struct {
 	Local			*Node			// pointer to local node specification
 	BootstrapNode	bool			// bootstrap node flag
 	MaxCon    		int				// max number of connection
+	MinCon			int				// min number of connection
 	HsTimeout 		time.Duration	// handshake timeout duration
 }
 
@@ -526,6 +527,7 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		},
 		DhtConCfg: Cfg4DhtConManager {
 			MaxCon:				512,
+			MinCon:				8,
 			HsTimeout:			time.Second * 16,
 		},
 		DhtFdsCfg: Cfg4DhtFileDatastore {

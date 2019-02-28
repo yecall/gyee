@@ -456,14 +456,19 @@ type MsgDhtLsnMgrStatusInd struct {
 //
 // DHT connection manager event
 //
+const DhtConMgrMonitorTimerId 	= 1
 const (
-	EvDhtConMgrBase			= 2100
-	EvDhtConMgrConnectReq	= EvDhtConMgrBase + 1
-	EvDhtConMgrConnectRsp	= EvDhtConMgrBase + 2
-	EvDhtConMgrSendReq		= EvDhtConMgrBase + 3
-	EvDhtConMgrSendCfm		= EvDhtConMgrBase + 4
-	EvDhtConMgrCloseReq		= EvDhtConMgrBase + 5
-	EvDhtConMgrCloseRsp		= EvDhtConMgrBase + 6
+	EvDhtConMgrBase				= 2100
+	EvDhtConMgrMonitorTimer		= EvTimerBase + DhtConMgrMonitorTimerId
+	EvDhtConMgrConnectReq		= EvDhtConMgrBase + 1
+	EvDhtConMgrConnectRsp		= EvDhtConMgrBase + 2
+	EvDhtConMgrSendReq			= EvDhtConMgrBase + 3
+	EvDhtConMgrSendCfm			= EvDhtConMgrBase + 4
+	EvDhtConMgrCloseReq			= EvDhtConMgrBase + 5
+	EvDhtConMgrCloseRsp			= EvDhtConMgrBase + 6
+	EvDhtConMgrPubAddrSwitchBeg	= EvDhtConMgrBase + 7
+	EvDhtConMgrPubAddrSwitchEnd	= EvDhtConMgrBase + 8
+	EvDhtConMgrBootstrapReq		= EvDhtConMgrBase + 9
 )
 
 // EvDhtConMgrConnectReq
@@ -607,6 +612,7 @@ const (
 	EvDhtQryMgrQueryStopReq		= EvDhtQryMgrBase + 3
 	EvDhtQryMgrQueryStopRsp		= EvDhtQryMgrBase + 4
 	EvDhtQryMgrQueryResultInd	= EvDhtQryMgrBase + 5
+	EvDhtQryMgrPubAddrSwitchInd	= EvDhtQryMgrBase + 6
 )
 
 // EvDhtQryMgrQueryStartReq

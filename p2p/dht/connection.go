@@ -76,6 +76,7 @@ type conMgrCfg struct {
 	local			*config.Node					// pointer to local node specification
 	bootstarpNode	bool							// bootstrap node flag
 	maxCon			int								// max number of connection
+	minCon			int								// min number of connection
 	hsTimeout		time.Duration					// handshake timeout duration
 }
 
@@ -117,6 +118,7 @@ type ConMgr struct {
 	pubTcpPort		int								// public port
 	pasStatus		int								// public addr switching status
 	mfilter			interface{}						// message filter
+	tidMonitor		int								// monitor timer identity
 }
 
 //
@@ -131,6 +133,7 @@ func NewConMgr() *ConMgr {
 		ibInstTemp: make(map[string]*ConInst, 0),
 		pubTcpIp:	net.IPv4zero,
 		pubTcpPort:	0,
+		tidMonitor:	sch.SchInvalidTid,
 	}
 	conMgr.tep = conMgr.conMgrProc
 	chConMgrReady = make(chan bool, 1)
@@ -203,6 +206,9 @@ func (conMgr *ConMgr)conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvNatMgrPubAddrUpdateInd:
 		eno = conMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
 
+	case sch.EvDhtConMgrMonitorTimer:
+		eno = conMgr.monitorTimer()
+
 	default:
 		connLog.Debug("conMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -242,6 +248,20 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 	if conMgr.instCache, _ = lru.NewWithEvict(conMgr.cfg.maxCon, conMgr.onInstEvicted); conMgr.instCache == nil {
 		connLog.Debug("poweron: lru.New failed")
 		return sch.SchEnoUserTask
+	}
+
+	var td = sch.TimerDescription {
+		Name:	"TmPrdMgrCleanup",
+		Utid:	sch.DhtConMgrMonitorTimerId,
+		Tmt:	sch.SchTmTypePeriod,
+		Dur:	time.Second * 1,
+		Extra:	nil,
+	}
+	if eno, tid := conMgr.sdl.SchSetTimer(conMgr.ptnMe, &td); eno != sch.SchEnoNone {
+		connLog.Debug("poweron: SchSetTimer failed, eno: %d", eno)
+		return eno
+	} else {
+		conMgr.tidMonitor = tid
 	}
 
 	return sch.SchEnoNone
@@ -1126,6 +1146,18 @@ func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 }
 
 //
+// monitor timer to keep enough connections
+//
+func (conMgr *ConMgr)monitorTimer() sch.SchErrno {
+	if len(conMgr.ciTab) < conMgr.cfg.minCon {
+		msg := new(sch.SchMessage)
+		conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtConMgrBootstrapReq, nil)
+		conMgr.sdl.SchSendMessage(msg)
+	}
+	return sch.SchEnoNone
+}
+
+//
 // Get configuration for connection mananger
 //
 func (conMgr *ConMgr)getConfig() DhtErrno {
@@ -1133,6 +1165,7 @@ func (conMgr *ConMgr)getConfig() DhtErrno {
 	conMgr.cfg.local = cfg.Local
 	conMgr.cfg.bootstarpNode = cfg.BootstrapNode
 	conMgr.cfg.maxCon = cfg.MaxCon
+	conMgr.cfg.minCon = cfg.MinCon
 	conMgr.cfg.hsTimeout = cfg.HsTimeout
 	return DhtEnoNone
 }
@@ -1424,9 +1457,14 @@ func (conMgr *ConMgr)switch2NatAddr(proto string) DhtErrno {
 //
 func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	sdl := conMgr.sdl
-	msg := sch.SchMessage{}
-	sdl.SchMakeMessage(&msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrPauseReq, nil)
-	sdl.SchSendMessage(&msg)
+
+	msg := new(sch.SchMessage)
+	sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchBeg, nil)
+	sdl.SchSendMessage(msg)
+
+	msg = new(sch.SchMessage)
+	sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrPauseReq, nil)
+	sdl.SchSendMessage(msg)
 
 	for cid, ci := range conMgr.ciTab {
 		if ci.getStatus() >= CisInKilling {
@@ -1471,9 +1509,15 @@ func (conMgr *ConMgr)natMapSwitchEnd() DhtErrno {
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 	conMgr.switch2NatAddr(nat.NATP_TCP)
 	conMgr.mfilter = nil
-	msg := sch.SchMessage{}
-	conMgr.sdl.SchMakeMessage(&msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrResumeReq, nil)
-	conMgr.sdl.SchSendMessage(&msg)
+
+	msg := new(sch.SchMessage)
+	conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrResumeReq, nil)
+	conMgr.sdl.SchSendMessage(msg)
+
+	msg = new(sch.SchMessage)
+	conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchEnd, nil)
+	conMgr.sdl.SchSendMessage(msg)
+
 	return DhtEnoNone
 }
 

@@ -216,6 +216,15 @@ func (dhtMgr *DhtMgr)dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 	case sch.EvNatMgrPubAddrUpdateInd:
 		eno = dhtMgr.natPubAddrUpdateInd(msg)
 
+	case sch.EvDhtQryMgrPubAddrSwitchInd:
+		eno = dhtMgr.qryMgrPubAddrSwitchInd(msg)
+
+	case sch.EvDhtConMgrPubAddrSwitchBeg:
+		eno = dhtMgr.conMgrPubAddrSwitchBeg(msg)
+
+	case sch.EvDhtConMgrPubAddrSwitchEnd:
+		eno = dhtMgr.conMgrPubAddrSwitchEnd(msg)
+
 	default:
 		eno = sch.SchEnoParameter
 		dhtLog.Debug("dhtMgrProc: invalid event, id: %d", msg.Id)
@@ -575,10 +584,13 @@ func (dhtMgr *DhtMgr)conInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchEr
 //
 func (dhtMgr *DhtMgr)natMgrReadyInd(msg *sch.SchMessage) sch.SchErrno {
 	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
 	msg2 := *msg
 	dhtMgr.sdl.SchSetRecver(&msg2, dhtMgr.ptnConMgr)
-	dhtMgr.sdl.SchSendMessage(msg)
 	dhtMgr.sdl.SchSendMessage(&msg2)
+	msg3 := *msg
+	dhtMgr.sdl.SchSetRecver(&msg3, dhtMgr.ptnShMgr)
+	dhtMgr.sdl.SchSendMessage(&msg3)
 	return sch.SchEnoNone
 }
 
@@ -587,7 +599,11 @@ func (dhtMgr *DhtMgr)natMgrReadyInd(msg *sch.SchMessage) sch.SchErrno {
 //
 func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
-	return dhtMgr.sdl.SchSendMessage(msg)
+	dhtMgr.sdl.SchSendMessage(msg)
+	msg2 := *msg
+	dhtMgr.sdl.SchSetRecver(&msg2, dhtMgr.ptnShMgr)
+	dhtMgr.sdl.SchSendMessage(&msg2)
+	return sch.SchEnoNone
 }
 
 //
@@ -595,10 +611,40 @@ func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 //
 func (dhtMgr *DhtMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
 	msg2 := *msg
 	dhtMgr.sdl.SchSetRecver(&msg2, dhtMgr.ptnConMgr)
-	dhtMgr.sdl.SchSendMessage(msg)
 	dhtMgr.sdl.SchSendMessage(&msg2)
+	msg3 := *msg
+	dhtMgr.sdl.SchSetRecver(&msg3, dhtMgr.ptnShMgr)
+	dhtMgr.sdl.SchSendMessage(&msg3)
+	return sch.SchEnoNone
+}
+
+//
+// query manager public address switching indication
+//
+func (dhtMgr *DhtMgr)qryMgrPubAddrSwitchInd(msg *sch.SchMessage) sch.SchErrno {
+	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnShMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
+	return sch.SchEnoNone
+}
+
+//
+// connection manager public address switching begin indication
+//
+func (dhtMgr *DhtMgr)conMgrPubAddrSwitchBeg(msg *sch.SchMessage) sch.SchErrno {
+	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnShMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
+	return sch.SchEnoNone
+}
+
+//
+// connection manager public address switching end indication
+//
+func (dhtMgr *DhtMgr)conMgrPubAddrSwitchEnd(msg *sch.SchMessage) sch.SchErrno {
+	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnShMgr)
+	dhtMgr.sdl.SchSendMessage(msg)
 	return sch.SchEnoNone
 }
 
