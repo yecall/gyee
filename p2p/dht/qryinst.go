@@ -653,7 +653,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		Target:	icb.target,
 		Status:	qisNull,
 	}
-	icb.sdl.SchMakeMessage(&msgInd, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+	icb.sdl.SchMakeMessage(&msgInd, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	icb.sdl.SchSendMessage(&msgInd)
 	return sch.SchEnoNone
 }
