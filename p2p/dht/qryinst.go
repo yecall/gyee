@@ -105,9 +105,6 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 	case sch.EvDhtQryInstStartReq:
 		eno = qryInst.startReq()
 
-	case sch.EvDhtQryInstStopReq:
-		eno = qryInst.stopReq(msg.Body.(*sch.MsgDhtQryInstStopReq))
-
 	case sch.EvDhtQryMgrIcbTimer:
 		eno = qryInst.icbTimerHandler(msg.Body.(*QryInst))
 
@@ -263,49 +260,6 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 }
 
 //
-// Stop instance handler
-//
-func (qryInst *QryInst)stopReq(msg *sch.MsgDhtQryInstStopReq) sch.SchErrno {
-
-	icb := qryInst.icb
-	sdl := icb.sdl
-	schMsg := sch.SchMessage{}
-
-	if msg.Target != icb.target || msg.Peer != icb.to.ID {
-		qiLog.Debug("stopReq: mismatched")
-		return sch.SchEnoMismatched
-	}
-
-	qiLog.Debug("stopReq: stopped for eno: %d, target: %x, peer: %x",
-		msg.Eno, msg.Target, msg.Peer)
-
-	if icb.status == qisWaitConnect  || icb.status == qisWaitResponse {
-
-		if icb.qTid != sch.SchInvalidTid {
-			sdl.SchKillTimer(icb.ptnInst, icb.qTid)
-			icb.qTid = sch.SchInvalidTid
-		}
-
-		req := sch.MsgDhtConMgrCloseReq {
-			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
-			Peer:	&icb.to,
-			Dir:	icb.dir,
-		}
-
-		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
-		sdl.SchSendMessage(&schMsg)
-	}
-
-	rsp := sch.MsgDhtQryInstStopRsp {
-		To:		icb.to,
-		Target:	icb.target,
-	}
-
-	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStopRsp, &rsp)
-	return sdl.SchSendMessage(&schMsg)
-}
-
-//
 // instance timer handler
 //
 func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
@@ -382,7 +336,6 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	icb.status = qisDone
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	sdl.SchSendMessage(&schMsg)
-	sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
 
 	return sch.SchEnoNone
 }
@@ -565,9 +518,14 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 //
 func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErrno {
 
+	//
+	// notice: here response from peer got, means result of query instance obtained,
+	// we send the result to query manager and update the query instance to "qisDoneOk"
+	//
+
 	icb := qryInst.icb
 	icb.endTime = time.Now()
-	schMsg := sch.SchMessage{}
+	msgResult := sch.SchMessage{}
 
 	switch msg.ForWhat {
 
@@ -590,7 +548,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			Pcs:		nbs.Pcs,
 		}
 
-		icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+		icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 
 	case sch.EvDhtConInstGetValRsp:
 
@@ -618,7 +576,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 				Pcs:		gvr.Pcs,
 			}
 
-			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 
 		} else {
 
@@ -633,7 +591,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 				Pcs:		gvr.Pcs,
 			}
 
-			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 		}
 
 
@@ -663,7 +621,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 				Pcs:		gpr.Pcs,
 			}
 
-			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 
 		} else {
 
@@ -678,7 +636,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 				Pcs:		gpr.Pcs,
 			}
 
-			icb.sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 		}
 
 	default:
@@ -686,7 +644,18 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		return sch.SchEnoMismatched
 	}
 
-	return icb.sdl.SchSendMessage(&schMsg)
+	icb.sdl.SchSendMessage(&msgResult)
+
+	icb.status = qisDoneOk
+	msgInd := sch.SchMessage{}
+	ind := sch.MsgDhtQryInstStatusInd {
+		Peer:	icb.to.ID,
+		Target:	icb.target,
+		Status:	qisNull,
+	}
+	icb.sdl.SchMakeMessage(&msgInd, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
+	icb.sdl.SchSendMessage(&msgInd)
+	return sch.SchEnoNone
 }
 
 //

@@ -159,7 +159,8 @@ type conInstTxPkg struct {
 	responsed	chan bool			// wait response from peer signal. notice: this chan is not applied for
 									// syncing as a signal really in current implement, instead, it is used
 									// as a flag for response checking, if not nil, a package sent would be
-									// push into queue (ConInst.txWaitRsp), and timer start for response.
+									// push into queue (ConInst.txWaitRsp), and timer start for response,
+									// no other module access this filed now.
 
 	waitMid		int					// wait message identity
 	waitSeq		int64				// wait message sequence number
@@ -782,7 +783,6 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Elemen
 // Start tx-task
 //
 func (conInst *ConInst)txTaskStart() DhtErrno {
-
 	if conInst.txDone != nil {
 		ciLog.Debug("txTaskStart: non-nil chan for done")
 		return DhtEnoMismatched
@@ -794,9 +794,7 @@ func (conInst *ConInst)txTaskStart() DhtErrno {
 		return DhtEnoMismatched
 	}
 	conInst.txChan = make(chan interface{}, ciTxPendingQueueSize)
-
 	go conInst.txProc()
-
 	return DhtEnoNone
 }
 
@@ -891,7 +889,7 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 			}
 
 			//
-			// check if task still lived to confirm it
+			// check if task still be alive to confirm it
 			//
 
 			eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
@@ -1264,12 +1262,6 @@ _txLoop:
 
 		pbPkg = new(pb.DhtPackage)
 		dhtPkg.ToPbPackage(pbPkg)
-
-		//
-		// check if peer response needed, since we will block here until response from peer
-		// is received if it's the case, we had to start a timer for the connection instance
-		// task before we are blocked here.
-		//
 
 		if txPkg.responsed != nil {
 			if eno, el := conInst.txSetPending(txPkg); eno != DhtEnoNone || el == nil {
@@ -1762,11 +1754,6 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 				ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 
 				if txPkg.responsed != nil {
-
-					//
-					// see comments about field "responsed" please
-					//
-
 					txPkg.responsed<-true
 				}
 

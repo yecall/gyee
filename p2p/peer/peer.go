@@ -283,6 +283,11 @@ func (peMgr *PeerManager)peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 
 	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
+	if peMgr.msgFilter(msg) != PeMgrEnoNone {
+		peerLog.Debug("peerMgrProc: filtered out, id: %d", msg.Id)
+		return sch.SchEnoNone
+	}
+
 	var schEno = sch.SchEnoNone
 	var eno PeMgrErrno = PeMgrEnoNone
 

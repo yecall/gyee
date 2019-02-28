@@ -134,7 +134,8 @@ const (
 	qisInited						// had been inited to ready to start
 	qisWaitConnect					// connect request sent, wait response from connection manager task
 	qisWaitResponse					// query sent, wait response from peer
-	qisDone							// done
+	qisDone							// done with exception
+	qisDoneOk						// done normally
 )
 
 //
@@ -220,10 +221,8 @@ func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sc
 // Query manager entry
 //
 func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-
 	qryLog.Debug("qryMgrProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	eno := sch.SchEnoUnknown
-
 	switch msg.Id {
 
 	case sch.EvSchPoweron:
@@ -255,9 +254,6 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 
 	case sch.EvDhtQryInstResultInd:
 		eno = qryMgr.instResultInd(msg.Body.(*sch.MsgDhtQryInstResultInd))
-
-	case sch.EvDhtQryInstStopRsp:
-		eno = qryMgr.instStopRsp(msg.Body.(*sch.MsgDhtQryInstStopRsp))
 
 	case sch.EvNatMgrReadyInd:
 		eno = qryMgr.natMgrReadyInd(msg.Body.(*sch.MsgNatMgrReadyInd))
@@ -666,6 +662,8 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 		qryLog.Debug("instStatusInd: qisWaitConnect")
 	case qisWaitResponse:
 		qryLog.Debug("instStatusInd: qisWaitResponse")
+	case qisDoneOk:
+		qryLog.Debug("instStatusInd: qisDoneOk")
 
 	case qisDone:
 
@@ -759,11 +757,13 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	qryLog.Debug("instResultInd: ForWhat: %d", msg.ForWhat)
 
-	var qcb *qryCtrlBlock= nil
-	var qpiList = make([]*qryPendingInfo, 0)
-	var hashList = make([]*Hash, 0)
-	var distList = make([]int, 0)
-	var rutMgr = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
+	var (
+		qcb *qryCtrlBlock= nil
+		qpiList = make([]*qryPendingInfo, 0)
+		hashList = make([]*Hash, 0)
+		distList = make([]int, 0)
+		rutMgr = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
+	)
 
 	if len(msg.Peers) != len(msg.Pcs) {
 		qryLog.Debug("instResultInd: mismatched Peers and Pcs")
@@ -800,8 +800,8 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 	latency := msg.Latency
 
 	updateReq2RutMgr := func(peer *config.Node, dur time.Duration) sch.SchErrno {
-		var schMsg= sch.SchMessage{}
-		var updateReq = sch.MsgDhtRutMgrUpdateReq{
+		schMsg := sch.SchMessage{}
+		updateReq := sch.MsgDhtRutMgrUpdateReq{
 			Why: rutMgrUpdate4Query,
 			Eno: DhtEnoNone.GetEno(),
 			Seens: []config.Node{
@@ -947,8 +947,8 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		//
 
 		for idx, peer := range msg.Peers {
-			var qpi = qryPendingInfo{
-				rutMgrBucketNode: rutMgrBucketNode{
+			qpi := qryPendingInfo{
+					rutMgrBucketNode: rutMgrBucketNode{
 					node: *peer,
 					hash: *hashList[idx],
 					dist: distList[idx],
@@ -981,11 +981,13 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		if msg.ForWhat == sch.EvDhtConInstNeighbors ||
 			msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
 			msg.ForWhat == sch.EvDhtConInstGetValRsp {
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil);
+			dhtEno != DhtEnoNone {
 				qryLog.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			}
 		} else {
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil);
+			dhtEno != DhtEnoNone {
 				qryLog.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			}
 		}
@@ -1000,77 +1002,10 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 }
 
 //
-// Instance stop response handler
+// nat ready to work
 //
-func (qryMgr *QryMgr)instStopRsp(msg *sch.MsgDhtQryInstStopRsp) sch.SchErrno {
-
-	var qcb *qryCtrlBlock
-	var icb *qryInstCtrlBlock
-
-	target := msg.Target
-	to := msg.To.ID
-
-	if qcb = qryMgr.qcbTab[target]; qcb == nil {
-		qryLog.Debug("instStopRsp: target not found: %x", target)
-		return sch.SchEnoUserTask
-	}
-
-	//
-	// done the instancce task. Since here the instance tells it's stopped, we
-	// need not to send power off event, we done it directly.
-	//
-
-	if icb = qcb.qryActived[to]; icb == nil {
-		qryLog.Debug("instStopRsp: instance not found: %x", to)
-		icb.sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
-		return sch.SchEnoUserTask
-	}
-
-	delete(qcb.qryActived, to)
-
-	//
-	// check against abnormal cases
-	//
-
-	if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
-		qryLog.Debug("instStopRsp: internal errors")
-		return sch.SchEnoUserTask
-	}
-
-	//
-	// chcek if some activateds and pendings, if none of them, the query is over
-	// then, we can report the result about this query and free it.
-	//
-
-	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
-
-		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-			qryLog.Debug("instStopRsp: qryMgrResultReport failed, dhtEno: %d", dhtEno)
-			return sch.SchEnoUserTask
-		}
-
-		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
-			qryLog.Debug("instStopRsp: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
-			return sch.SchEnoUserTask
-		}
-
-		return sch.SchEnoNone
-	}
-
-	//
-	// here we try active more instances for one had been removed
-	//
-
-	if dhtEno, _ := qryMgr.qryMgrQcbPutActived(qcb); dhtEno != DhtEnoNone {
-		qryLog.Debug("instStopRsp: qryMgrQcbPutActived failed, eno: %d", dhtEno)
-		return sch.SchEnoUserTask
-	}
-
-	return sch.SchEnoNone
-}
-
 func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
-	p2plog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
+	qryLog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
 		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
@@ -1085,33 +1020,36 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
 		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			p2plog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
 	return sch.SchEnoNone
 }
 
+//
+// nat make mapping response
+//
 func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatMakeMapRsp for more please.
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
-		p2plog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
+		qryLog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
 	}
-	p2plog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
+	qryLog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
 		mmr.Proto, mmr.PubIp.String(), mmr.PubPort)
 
 	proto := strings.ToLower(mmr.Proto)
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(mmr.Status)
 		if qryMgr.natTcpResult {
-			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			qryLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
 				mmr.PubIp.String(), mmr.PubPort)
 			qryMgr.pubTcpIp = mmr.PubIp
 			qryMgr.pubTcpPort = mmr.PubPort
-			if eno := qryMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
-				p2plog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
-				return eno
+			if eno := qryMgr.switch2NatAddr(proto); eno != DhtEnoNone {
+				qryLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				return sch.SchEnoUserTask
 			}
 		} else {
 			qryMgr.pubTcpIp = net.IPv4zero
@@ -1122,39 +1060,40 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		return qryMgr.sdl.SchSendMessage(msg)
 	}
 
-	p2plog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	qryLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
+//
+// public address changed indication
+//
 func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch.SchErrno {
-	// see comments in function tabMgrNatPubAddrUpdateInd for more please.
-	if !nat.NatIsStatusOk(msg.Status) {
-		p2plog.Debug("natPubAddrUpdateInd: fail reported, msg: %+v", *msg)
-	}
-	p2plog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
-		msg.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
-
+	// see comments in function tabMgrNatPubAddrUpdateInd for more please. to query manager,
+	// when status from nat is bad, nothing to do but just backup the status.
 	proto := strings.ToLower(msg.Proto)
-	if proto == "tcp" {
-		qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
-		if qryMgr.natTcpResult {
-			qryMgr.pubTcpIp = msg.PubIp
-			qryMgr.pubTcpPort = msg.PubPort
-		} else {
-			qryMgr.pubTcpIp = net.IPv4zero
-			qryMgr.pubTcpPort = 0
-		}
-		if qryMgr.natTcpResult {
-			if eno := qryMgr.switch2NatAddr(proto); eno != sch.SchEnoNone {
-				p2plog.Debug("natPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
-				return eno
-			}
-		}
+	if proto != nat.NATP_TCP {
+		qryLog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
+		return sch.SchEnoParameter
+	}
+
+	oldResult := qryMgr.natTcpResult
+	if qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status); !qryMgr.natTcpResult {
+		qryLog.Debug("natPubAddrUpdateInd: result bad")
 		return sch.SchEnoNone
 	}
 
-	p2plog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", msg.Proto)
-	return sch.SchEnoParameter
+	qryLog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+		msg.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
+
+	qryMgr.pubTcpIp = msg.PubIp
+	qryMgr.pubTcpPort = msg.PubPort
+	if !oldResult || !msg.PubIp.Equal(qryMgr.pubTcpIp) || msg.PubPort != qryMgr.pubTcpPort {
+		if eno := qryMgr.natMapSwitch(); eno != DhtEnoNone {
+			qryLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
+			return sch.SchEnoUserTask
+		}
+	}
+	return sch.SchEnoNone
 }
 
 //
@@ -1186,14 +1125,11 @@ const (
 	delQcb4QryInstDoneInd			// query instance done is indicated
 	delQcb4QryInstResultInd			// query instance result indicated
 	delQcb4InteralErrors			// internal errors while tring to query
+	delQcb4PubAddrSwitch			// public address switching
 )
 
 func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
-
-	event := sch.EvSchPoweroff
-
 	switch why {
-
 	case delQcb4TargetFound:
 	case delQcb4NoMoreQueries:
 	case delQcb4Timeout:
@@ -1201,13 +1137,8 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	case delQcb4TargetInLocal:
 	case delQcb4QryInstDoneInd:
 	case delQcb4InteralErrors:
-
-		//
-		// nothing for above cases, see bellow outside of this "switch".
-		//
-
+	case delQcb4PubAddrSwitch:
 	case delQcb4Command:
-		event = sch.EvDhtQryInstStopReq
 
 	default:
 		qryLog.Debug("qryMgrDelQcb: parameters mismatched, why: %d", why)
@@ -1225,42 +1156,15 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 		return DhtEnoNone
 	}
 
-	//
-	// when we try to delete the query instance for external module command (why == delQcb4Command),
-	// we send request to each instance to ask them to stop and send response to us, so we do not
-	// release the query control block in this case.
-	//
-
-	if event == sch.EvDhtQryInstStopReq {
-		for _, icb := range qcb.qryActived {
-			req := sch.SchMessage{}
-			body := sch.MsgDhtQryInstStopReq{
-				Target: target,
-				Peer: icb.to.ID,
-				Eno: DhtEnoNone.GetEno(),
-			}
-			icb.sdl.SchMakeMessage(&req, qryMgr.ptnMe, icb.ptnInst, sch.EvDhtQryInstStopReq, &body)
-			icb.sdl.SchSendMessage(&req)
-		}
-		return DhtEnoNone
-	}
-
-	//
-	// other cases than a command, we send power off message to each instance, so they would kill
-	// themself, no responses for us, we free the query control block here.
-	//
-
 	if qcb.qryTid != sch.SchInvalidTid {
 		qryMgr.sdl.SchKillTimer(qryMgr.ptnMe, qcb.qryTid)
 		qcb.qryTid = sch.SchInvalidTid
 	}
 
-	if event == sch.EvSchPoweroff {
-		for _, icb := range qcb.qryActived {
-			po := sch.SchMessage{}
-			icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
-			icb.sdl.SchSendMessage(&po)
-		}
+	for _, icb := range qcb.qryActived {
+		po := sch.SchMessage{}
+		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
+		icb.sdl.SchSendMessage(&po)
 	}
 
 	if qcb.rutNtfFlag == true {
@@ -1274,7 +1178,6 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	}
 
 	delete(qryMgr.qcbTab, target)
-
 	return DhtEnoNone
 }
 
@@ -1608,12 +1511,43 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 	return DhtEnoNone
 }
 
-func (qryMgr *QryMgr)switch2NatAddr(proto string) sch.SchErrno {
+//
+// switch address to that reported from nat manager
+//
+func (qryMgr *QryMgr)switch2NatAddr(proto string) DhtErrno {
 	if proto == nat.NATP_TCP {
 		qryMgr.qmCfg.local.IP = qryMgr.pubTcpIp
 		qryMgr.qmCfg.local.TCP = uint16(qryMgr.pubTcpPort & 0xffff)
-		return sch.SchEnoNone
+		return DhtEnoNone
 	}
 	qryLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
-	return sch.SchEnoParameter
+	return DhtEnoParameter
 }
+
+//
+// start nat map switching procedure
+//
+func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
+	for k, qcb := range qryMgr.qcbTab {
+		fw := qcb.forWhat
+		ind := sch.MsgDhtQryMgrQueryResultInd{
+			Eno: DhtEnoNatMapping.GetEno(),
+			ForWhat: fw,
+			Target: k,
+			Peers: make([]*config.Node, 0),
+			Val: make([]byte, 0),
+			Prds: make([]*config.Node, 0),
+		}
+		msg := sch.SchMessage{}
+		if qcb.ptnOwner != nil {
+			qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
+			qryMgr.sdl.SchSendMessage(&msg)
+		}
+		if eno := qryMgr.qryMgrDelQcb(delQcb4PubAddrSwitch, k); eno != DhtEnoNone {
+			qryLog.Debug("natMapSwitch: qryMgrDelQcb failed, eno: %d", eno)
+			return eno
+		}
+	}
+	return qryMgr.switch2NatAddr(nat.NATP_TCP)
+}
+

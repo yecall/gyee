@@ -74,6 +74,7 @@ const (
 	DhtEnoDatastore				// data store errors
 	DhtEnoTimer					// timer errors
 	DhtEnoBootstrapNode			// bootstarp node related
+	DhtEnoNatMapping			// casued by nat mapping
 	DhtEnoUnknown				// unknown
 )
 

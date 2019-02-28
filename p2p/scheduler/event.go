@@ -650,8 +650,6 @@ type MsgDhtQryMgrQueryResultInd struct {
 const (
 	EvDhtQryInstBase			= 2400
 	EvDhtQryInstStartReq		= EvDhtQryInstBase + 1
-	EvDhtQryInstStopReq			= EvDhtQryInstBase + 2
-	EvDhtQryInstStopRsp			= EvDhtQryInstBase + 3
 	EvDhtQryInstResultInd		= EvDhtQryInstBase + 4
 	EvDhtQryInstStatusInd		= EvDhtQryInstBase + 5
 	EvDhtQryInstProtoMsgInd		= EvDhtQryInstBase + 6
