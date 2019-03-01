@@ -1281,7 +1281,7 @@ _txLoop:
 
 		if txPkg.responsed != nil {
 			if eno, el := conInst.txSetPending(txPkg); eno != DhtEnoNone || el == nil {
-				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
+				p2plog.Debug("txProc: txSetPending failed, eno: %d", eno)
 				goto _checkDone
 			} else {
 				conInst.txSetTimer(el)
@@ -1289,7 +1289,7 @@ _txLoop:
 		}
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-			ciLog.Debug("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+			p2plog.Debug("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _txLoop
 		}
@@ -1323,8 +1323,8 @@ _txLoop:
 
 		if conInst.getStatus() < CisOutOfService {
 			conInst.updateStatus(CisOutOfService)
+			conInst.statusReport()
 		}
-		conInst.statusReport()
 
 		<-conInst.txDone
 		conInst.txDone<-DhtEnoNone.GetEno()
@@ -1436,8 +1436,8 @@ _checkDone:
 
 		if conInst.getStatus() < CisOutOfService {
 			conInst.updateStatus(CisOutOfService)
+			conInst.statusReport()
 		}
-		conInst.statusReport()
 
 		<-conInst.rxDone
 		conInst.rxDone <- DhtEnoNone.GetEno()

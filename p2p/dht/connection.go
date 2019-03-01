@@ -1038,11 +1038,11 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 			if ci.getStatus() >= CisInKilling {
 				dup = true
 			} else {
-				ci.updateStatus(CisOutOfService)
+				ci.updateStatus(CisInKilling)
 				ind := sch.MsgDhtConInstStatusInd {
 					Peer: &msg.Peer,
 					Dir: int(ci.dir),
-					Status: CisOutOfService,
+					Status: CisInKilling,
 				}
 				schMsg := sch.SchMessage{}
 				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnMe, sch.EvDhtConInstStatusInd, &ind)
