@@ -684,9 +684,9 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	connLog.Debug("connctReq: create connection instance, peer ip: %s", msg.Peer.IP.String())
 
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
-	if dhtEno := conMgr.setupConInst(ci, sender, msg.Peer, nil); dhtEno != DhtEnoNone {
-		connLog.Debug("connctReq: setupConInst failed, eno: %d", dhtEno)
-		return sch.SchEnoUserTask
+	if eno := conMgr.setupConInst(ci, sender, msg.Peer, nil); eno != DhtEnoNone {
+		connLog.Debug("connctReq: setupConInst failed, eno: %d", eno)
+		return rsp2Sender(eno)
 	}
 	conMgr.ciSeq++
 
@@ -783,22 +783,9 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		if ci != nil {
 			found = true
 			if status := ci.getStatus(); status >= CisInKilling {
-				p2plog.Debug("closeReq: inst: %s, duplicated, current status: %d", ci.name, status)
 				dup = true
-			} else {
-				p2plog.Debug("closeReq: inst: %s, current status: %d", ci.name, status)
-				ci.updateStatus(CisInKilling)
-				ind := sch.MsgDhtConInstStatusInd {
-					Peer: &msg.Peer.ID,
-					Dir: int(ci.dir),
-					Status: CisInKilling,
-				}
-				schMsg := sch.SchMessage{}
-				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
-				conMgr.sdl.SchSendMessage(&schMsg)
-				if req2Inst(ci) != sch.SchEnoNone {
-					err = true
-				}
+			} else if req2Inst(ci) != sch.SchEnoNone {
+				err = true
 			}
 		}
 	}
@@ -1042,15 +1029,12 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	// when peer is removed from route table, we close all bound connection
 	// instances if any.
 	//
-
 	cid := conInstIdentity {
 		nid:	msg.Peer,
 		dir:	ConInstDirAllbound,
 	}
-
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
-
 	req2Inst := func(inst *ConInst) sch.SchErrno {
 		req := sch.MsgDhtConInstCloseReq{
 			Peer:	&msg.Peer,
@@ -1070,20 +1054,8 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 			found = true
 			if ci.getStatus() >= CisInKilling {
 				dup = true
-			} else {
-				ci.updateStatus(CisInKilling)
-				ind := sch.MsgDhtConInstStatusInd {
-					Peer: &msg.Peer,
-					Dir: int(ci.dir),
-					Status: CisInKilling,
-				}
-				schMsg := sch.SchMessage{}
-				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnMe, sch.EvDhtConInstStatusInd, &ind)
-				conMgr.sdl.SchSendMessage(&schMsg)
-
-				if req2Inst(ci) != sch.SchEnoNone {
-					err = true
-				}
+			} else if req2Inst(ci) != sch.SchEnoNone {
+				err = true
 			}
 		}
 	}
@@ -1092,17 +1064,14 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 		connLog.Debug("rutPeerRemoveInd: not found, id: %x", msg.Peer)
 		return sch.SchEnoNotFound
 	}
-
 	if dup {
 		connLog.Debug("rutPeerRemoveInd: kill more than once")
 		return sch.SchEnoDuplicated
 	}
-
 	if err {
 		connLog.Debug("rutPeerRemoveInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
@@ -1362,7 +1331,6 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	found := false
 	err := false
-
 	cis := conMgr.lookupConInst(&cid)
 	if len(cis) <= 0 {
 		p2plog.Debug("instClosedInd: not found, %+v", cid)
@@ -1379,6 +1347,7 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 				p2plog.Debug("instClosedInd: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
+
 			delete(conMgr.ciTab, cid)
 
 			key := instLruKey{
@@ -1391,9 +1360,8 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	if !found {
 		p2plog.Debug("instClosedInd: none is found, id: %x", msg.Peer)
-	}
-
-	if err {
+		return sch.SchEnoNotFound
+	} else if err {
 		p2plog.Debug("instClosedInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
@@ -1446,16 +1414,6 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 			}
 			if status := ci.getStatus(); status < CisInKilling {
 				p2plog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
-				ci.updateStatus(CisInKilling)
-				ind := sch.MsgDhtConInstStatusInd {
-					Peer: msg.Peer,
-					Dir: msg.Dir,
-					Status: CisInKilling,
-				}
-				schMsg := sch.SchMessage{}
-				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnMe, sch.EvDhtConInstStatusInd, &ind)
-				conMgr.sdl.SchSendMessage(&schMsg)
-
 				req := sch.MsgDhtConInstCloseReq{
 					Peer:	msg.Peer,
 					Why:	sch.EvDhtConInstStatusInd,

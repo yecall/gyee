@@ -612,6 +612,11 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 		return DhtEnoParameter
 	}
 
+	if status := conInst.getStatus(); status != CisInService {
+		p2plog.Debug("txPutPending: mismatched status: %d", status)
+		return DhtEnoMismatched
+	}
+
 	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
 		p2plog.Debug("txPutPending: trySendingCnt: %d, peer: %s:%d",
 			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
@@ -706,17 +711,13 @@ func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 
 	p2plog.Debug("txTimerHandler: inst: %s", conInst.name)
 
-	if status := conInst.getStatus(); status < CisInKilling {
+	if status := conInst.getStatus(); status < CisOutOfService {
 		p2plog.Debug("txTimerHandler: inst: %s, current status: %d", conInst.name, status)
-		conInst.updateStatus(CisInKilling)
-		conInst.statusReport()
-		req := sch.MsgDhtConInstCloseReq {
-			Peer: &conInst.cid.nid,
-			Why: sch.EvDhtConInstTxTimer,
+		conInst.updateStatus(CisOutOfService)
+		if eno := conInst.statusReport(); eno != DhtEnoNone {
+			p2plog.Debug("txTimerHandler: statusReport failed, eno: %d", eno)
+			return sch.SchEnoUserTask
 		}
-		schMsg := sch.SchMessage{}
-		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtConInstCloseReq, &req)
-		return conInst.sdl.SchSendMessage(&schMsg)
 	}
 
 	return sch.SchEnoNone
@@ -1315,7 +1316,9 @@ _txLoop:
 		if status := conInst.getStatus(); status < CisOutOfService {
 			p2plog.Debug("txProc: CisOutOfService, current status: %d", status)
 			conInst.updateStatus(CisOutOfService)
-			conInst.statusReport()
+			if eno := conInst.statusReport(); eno != DhtEnoNone {
+				p2plog.Debug("txProc: statusReport failed, eno: %d", eno)
+			}
 		}
 
 		p2plog.Debug("txProc: inst: %s, try to get signal from txDone", conInst.name)
@@ -1425,10 +1428,13 @@ _checkDone:
 		// the 1) case: report the status and then wait and then signal done
 		//
 		p2plog.Debug("rxProc: inst: %s, underlying error", conInst.name)
+
 		if status := conInst.getStatus(); status < CisOutOfService {
 			p2plog.Debug("rxProc: CisOutOfService, current status: %d", status)
 			conInst.updateStatus(CisOutOfService)
-			conInst.statusReport()
+			if eno := conInst.statusReport(); eno != DhtEnoNone {
+				p2plog.Debug("rxProc: statusReport failed, eno: %d", eno)
+			}
 		}
 
 		p2plog.Debug("rxProc: inst: %s, try to get signal from rxDone", conInst.name)
