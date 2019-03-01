@@ -47,7 +47,8 @@ const (
 	SchEnoSuspended		SchErrno = 14	// user task is suspended for some reasons
 	SchEnoUnknown		SchErrno = 15	// unknowns
 	SchEnoPowerOff		SchErrno = 16	// in power off stage
-	SchEnoMax			SchErrno = 17	// just for bound checking
+	SchEnoTimeout		SchErrno = 17	// timeout
+	SchEnoMax			SchErrno = 18	// just for bound checking
 )
 
 var SchErrnoDescription = []string {

@@ -336,6 +336,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	icb.status = qisDone
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	sdl.SchSendMessage(&schMsg)
+	sdl.SchTaskDone(icb.ptnInst, sch.SchEnoTimeout)
 
 	return sch.SchEnoNone
 }
