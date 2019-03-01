@@ -165,8 +165,8 @@ type bucket struct {
 // Table task configuration
 //
 const (
-	p2pTypeDynamic	= 0		// neighbor discovering needed
-	p2pTypeStatic	= 1		// no discovering
+	p2pTypeDynamic	= 0			// neighbor discovering needed
+	p2pTypeStatic	= 1			// no discovering
 )
 
 type tabConfig struct {
