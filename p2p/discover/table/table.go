@@ -50,7 +50,7 @@ type tabLogger struct {
 }
 
 var tabLog = tabLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log tabLogger)Debug(fmt string, args ... interface{}) {

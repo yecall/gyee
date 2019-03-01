@@ -1532,7 +1532,6 @@ func (conMgr *ConMgr)msgFilter(msg *sch.SchMessage) DhtErrno {
 		return DhtEnoNone
 	}
 	switch msg.Id {
-	case sch.EvSchPoweron:
 	case sch.EvSchPoweroff:
 	case sch.EvDhtConInstStatusInd:
 	case sch.EvDhtConInstCloseRsp:

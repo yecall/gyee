@@ -46,7 +46,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -1560,6 +1560,7 @@ func (peMgr *PeerManager)msgFilter(msg *sch.SchMessage) PeMgrErrno {
 		case sch.EvSchPoweroff:
 		case sch.EvNatMgrReadyInd:
 		case sch.EvNatMgrMakeMapRsp:
+		case sch.EvPeMgrStartReq:
 		default:
 			peerLog.Debug("msgFilter: filtered out for peMgrInNull, msg.Id: %d", msg.Id)
 			eno = PeMgrEnoMismatched
