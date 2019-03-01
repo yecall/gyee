@@ -384,7 +384,6 @@ func (yeShMgr *YeShellManager)Stop() {
 	close(yeShMgr.ddtChan)
 
 	stopCh := make(chan bool, 1)
-
 	yesLog.Debug("Stop: stop dht")
 	p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 	<-stopCh

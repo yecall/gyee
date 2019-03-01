@@ -257,43 +257,27 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 //
 func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
-	//
-	// Set power off stage first, and after that, we send poweroff message
-	// to all static tasks if it's still exist.
-	// Notice: some tasks might be not alived, according to the network type,
-	// they might be done when they receive the poweron message.
-	//
+	staticTasks := make([]string, 0)
+	powerOff := sch.SchMessage {
+		Id: sch.EvSchPoweroff,
+	}
 
 	p2pInstName := sdl.SchGetP2pCfgName()
 	appType := sdl.SchGetAppType()
 	stLog.Debug("P2pStop: inst: %s, total tasks: %d", p2pInstName, sdl.SchGetTaskNumber())
 
-	var staticTasks = make([]string, 0)
-
 	if P2pType(appType) == config.P2P_TYPE_CHAIN {
-
 		staticTasks = taskStaticPoweroffOrder4Chain
-
 	} else if P2pType(appType) == config.P2P_TYPE_DHT {
-
 		staticTasks = taskStaticPoweroffOrder4Dht
-
 	} else {
-
 		stLog.Debug("P2pStop: inst: %s, invalid application type: %d", p2pInstName, appType)
 		return sch.SchEnoMismatched
 	}
 
-	powerOff := sch.SchMessage {
-		Id:		sch.EvSchPoweroff,
-		Body:	nil,
-	}
-
 	sdl.SchSetPoweroffStage()
 
-	//for _, taskName := range staticTasks {
 	for loop := 0; loop < len(staticTasks); loop++ {
-
 		taskName := staticTasks[loop]
 		if sdl.SchTaskExist(taskName) != true {
 			stLog.Debug("P2pStop: inst: %s, type: %d, task not exist: %s", p2pInstName, appType, taskName)
@@ -304,25 +288,15 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 			p2pInstName, appType, taskName)
 
 		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
-
 			stLog.Debug("P2pStop: SchSendMessageByName failed, inst: %s, type: %d, eno: %d, task: %s",
 				p2pInstName, appType, eno, taskName)
-
 		} else {
-
 			stLog.Debug("P2pStop: send EvSchPoweroff ok, inst: %s, type: %d, eno: %d, task: %s",
 				p2pInstName, appType, eno, taskName)
-
-			//
-			// Wait current static task to be done, to ensure the poweroff order specified
-			// in table taskStaticPoweroffOrder4Chain or taskStaticPoweroffOrder4Dht.
-			//
-
 			for sdl.SchTaskExist(taskName) {
 				stLog.Debug("P2pStop: waiting inst: %s, type: %d, task: %s", p2pInstName, appType, taskName)
 				time.Sleep(time.Millisecond * 500)
 			}
-
 			stLog.Debug("P2pStop: done, inst: %s, type: %d, task: %s", p2pInstName, appType, taskName)
 		}
 	}
@@ -330,40 +304,18 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	stLog.Debug("P2pStop: inst: %s, type: %d, total tasks: %d", p2pInstName, appType, sdl.SchGetTaskNumber())
 	stLog.Debug("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
 
-	//
-	// Notice:
-	// All static tasks had been done when come here, BUT some dynamic tasks might be still
-	// alive, we just wait all to be done.
-	//
-
 	seconds := 0
-	tasks := 0
-
 	for {
-
 		time.Sleep(time.Second )
 		seconds++
-
-		tasks = sdl.SchGetTaskNumber()
-
+		tasks := sdl.SchGetTaskNumber()
 		if tasks == 0 {
 			stLog.Debug("P2pStop: inst: %s, type: %d, all tasks are done", p2pInstName, appType)
 			break
 		}
-
 		tkNames := sdl.SchShowTaskName()
-		strNames := ""
-		for _, n := range tkNames {
-			if len(strNames) != 0 {
-				strNames = fmt.Sprintf("%s,%s", strNames, n)
-			} else {
-				strNames = n
-			}
-		}
-
-		stLog.Debug("P2pStop: " +
-			"wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
-			seconds, p2pInstName, appType, tasks, strNames)
+		stLog.Debug("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
+			seconds, p2pInstName, appType, tasks, tkNames)
 	}
 
 	ch<-true

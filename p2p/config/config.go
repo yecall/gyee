@@ -368,9 +368,9 @@ const DefaultNodeDatabase = "nodes"
 // could never be applied), most of those defaults must be overided by higher
 // lever module of system.
 const (
-	DftUdpPort = 30304
-	DftTcpPort = 30304
-	DftDhtPort = 40405
+	DftUdpPort = 30303
+	DftTcpPort = 30303
+	DftDhtPort = 40404
 	DftSnmBits = 0
 )
 var DefaultLocalNode = Node {
