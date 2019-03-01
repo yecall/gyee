@@ -176,11 +176,11 @@ type conInstTxPkg struct {
 // Constants related to performance
 //
 const (
-	ciTxPendingQueueSize = 128				// max tx-pending queue size
+	ciTxPendingQueueSize = 1024				// max tx-pending queue size
 	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
-	ciTxMaxWaitResponseSize = 32			// tx max wait peer response queue size
+	ciTxMaxWaitResponseSize = 512			// tx max wait peer response queue size
 )
 
 //
