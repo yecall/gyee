@@ -153,7 +153,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var targetCase = "testCase0"
+var targetCase = "testCase16"
 
 //
 // switch for playing go-monitors, related commands:
@@ -166,12 +166,10 @@ const goMonitors = true
 // run target case
 //
 func main() {
-
 	if goMonitors {
 		startGoMemoryMonitor()
 		startGoRoutineMonitor()
 	}
-
 	for _, tc := range testCaseTable {
 		if tc.name == targetCase {
 			tc.entry(&tc)
@@ -887,7 +885,8 @@ func testCase16(tc *testCase) {
 
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
 	yeShMgr.Start()
-	waitInterrupt2Stop(yeShMgr)
+	waitInterrupt()
+	yeShMgr.Stop()
 }
 
 //

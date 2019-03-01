@@ -39,7 +39,7 @@ type udpmsgLogger struct {
 }
 
 var udpmsgLog = udpmsgLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log udpmsgLogger)Debug(fmt string, args ... interface{}) {
@@ -188,17 +188,14 @@ func NewUdpMsg() *UdpMsg {
 // Set raw message
 //
 func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) UdpMsgErrno {
-
 	if pbuf == nil || bytes == 0 || from == nil {
 		udpmsgLog.Debug("SetRawMessage: invalid parameter(s)")
 		return UdpMsgEnoParameter
 	}
-
 	pum.Eno = UdpMsgEnoNone
 	pum.Pbuf = pbuf
 	pum.Len = bytes
 	pum.From = from
-
 	return UdpMsgEnoNone
 }
 
@@ -206,18 +203,13 @@ func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) Udp
 // Decoding
 //
 func (pum *UdpMsg) Decode() UdpMsgErrno {
-
 	pum.Msg = new(pb.UdpMessage)
-
 	if err := proto.Unmarshal((*pum.Pbuf)[0:pum.Len], pum.Msg); err != nil {
-
 		udpmsgLog.Debug("Decode: " +
 			"Unmarshal failed, err: %s",
 			err.Error())
-
 		return UdpMsgEnoDecodeFailed
 	}
-
 	return UdpMsgEnoNone
 }
 
@@ -233,10 +225,6 @@ func (pum *UdpMsg) GetPbMessage() *pb.UdpMessage {
 //
 func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
-	//
-	// get type
-	//
-
 	mt := pum.GetDecodedMsgType()
 	if mt == UdpMsgTypeUnknown {
 		udpmsgLog.Debug("GetDecodedMsg: " +
@@ -245,10 +233,6 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 		return nil
 	}
 
-	//
-	// map type to function and the get
-	//
-
 	var funcMap = map[UdpMsgType]interface{} {
 		UdpMsgTypePing: pum.GetPing,
 		UdpMsgTypePong: pum.GetPong,
@@ -256,22 +240,17 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 		UdpMsgTypeNeighbors: pum.GetNeighbors,
 		UdpMsgTypeStaleAddress: pum.GetStaleAddress,
 	}
-
 	var f interface{}
 	var ok bool
 
 	if f, ok = funcMap[mt]; !ok {
-
 		udpmsgLog.Debug("GetDecodedMsg: " +
 			"invalid message type: %d",
 			mt)
-
 		return nil
 	}
-
 	pum.typ = mt
 	pum.pum = f.(func()interface{})()
-
 	return pum.pum
 }
 
@@ -279,16 +258,13 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 // Get deocded message type
 //
 func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
-
 	var pbMap = map[pb.UdpMessage_MessageType]UdpMsgType {
-
 		pb.UdpMessage_PING:			UdpMsgTypePing,
 		pb.UdpMessage_PONG:			UdpMsgTypePong,
 		pb.UdpMessage_FINDNODE:		UdpMsgTypeFindNode,
 		pb.UdpMessage_NEIGHBORS:	UdpMsgTypeNeighbors,
 		pb.UdpMessage_STALEADDRESS:	UdpMsgTypeStaleAddress,
 	}
-
 	var key pb.UdpMessage_MessageType
 	var val UdpMsgType
 	var ok bool
@@ -298,7 +274,6 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 		udpmsgLog.Debug("GetDecodedMsgType: invalid message type")
 		return UdpMsgTypeUnknown
 	}
-
 	return val
 }
 
@@ -481,34 +456,19 @@ func (pum *UdpMsg)GetStaleAddress() interface{} {
 // Check decoded message with endpoint where the message from
 //
 func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgErrno {
-
-	//
-	// We just check the ip address simply now, more might be needed.
-	// Also notice that, only IPV4 supported currently.
-	//
-
 	if !chkAddr {
 		return UdpMsgEnoNone
 	}
 
 	var ipv4 = net.IPv4zero
-
 	if *pum.Msg.MsgType == pb.UdpMessage_PING {
-
 		ipv4 = net.IP(pum.Msg.Ping.From.IP).To4()
-
 	} else if *pum.Msg.MsgType == pb.UdpMessage_PONG  {
-
 		ipv4 = net.IP(pum.Msg.Pong.From.IP).To4()
-
 	} else if *pum.Msg.MsgType == pb.UdpMessage_FINDNODE {
-
 		ipv4 = net.IP(pum.Msg.FindNode.From.IP).To4()
-
 	} else if *pum.Msg.MsgType == pb.UdpMessage_NEIGHBORS {
-
 		ipv4 = net.IP(pum.Msg.Neighbors.From.IP).To4()
-
 	} else {
 		udpmsgLog.Debug("CheckUdpMsgFromPeer: invalid message type: %d", *pum.Msg.MsgType)
 		return UdpMsgEnoMessage
@@ -518,7 +478,6 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 		udpmsgLog.Debug("CheckUdpMsgFromPeer: address mitched, source: %s, reported: %s", from.IP.String(), ipv4.String())
 		return UdpMsgEnoMessage
 	}
-
 	return UdpMsgEnoNone
 }
 
@@ -528,22 +487,15 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 // must be allocated firstly for this function.
 //
 func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
-
 	var err error
-
 	if *pum.Pbuf, err = proto.Marshal(pum.Msg); err != nil {
-
 		udpmsgLog.Debug("Encode: " +
 			"Marshal failed, err: %s",
 			err.Error())
-
 		pum.Eno = UdpMsgEnoEncodeFailed
-
 		return pum.Eno
 	}
-
 	pum.Eno = UdpMsgEnoNone
-
 	return pum.Eno
 }
 
@@ -553,7 +505,6 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 func (pum *UdpMsg)Encode(t int, msg interface{}) UdpMsgErrno {
 
 	var eno UdpMsgErrno
-
 	pum.Msg = new(pb.UdpMessage)
 
 	switch t {
@@ -584,7 +535,6 @@ func (pum *UdpMsg)Encode(t int, msg interface{}) UdpMsgErrno {
 	pum.Eno = eno
 	pum.typ = t
 	pum.pum = msg
-
 	return eno
 }
 
@@ -973,24 +923,15 @@ const (
 )
 
 func (n *Node) CompareWith(n2 *Node) int {
-
 	if n.UDP != n2.UDP {
-
 		return CmpNodeNotEquUdpPort
-
 	} else if n.TCP != n2.TCP {
-
 		return CmpNodeNotEquTcpPort
-
 	} else if n.IP.Equal(n2.IP) != true {
-
 		return CmpNodeNotEquIp
-
 	}	else	if n.NodeId != n2.NodeId {
-
 		return CmpNodeNotEquId
 	}
-
 	return CmpNodeEqu
 }
 
@@ -1126,4 +1067,3 @@ func (pum *UdpMsg)DebugMessageToPeer() {
 		}
 	}
 }
-
