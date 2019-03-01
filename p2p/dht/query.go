@@ -639,8 +639,7 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 			return sch.SchEnoUserTask
 		}
 		if eno, num := qryMgr.qryMgrQcbPutActived(qcb); true {
-			qryLog.Debug("instStatusInd: " +
-				"qryMgrQcbPutActived return with eno: %d, num: %d", eno, num)
+			qryLog.Debug("instStatusInd: qryMgrQcbPutActived return with eno: %d, num: %d", eno, num)
 		}
 		if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
 			qryLog.Debug("instStatusInd: internal errors")
@@ -649,12 +648,12 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 
 		// if pending queue and active queue all are empty, we just report query
 		// result and end the query.
-		qryLog.Debug("instStatusInd: pending: %d, actived: %d",
-			qcb.qryPending.Len(), len(qcb.qryActived))
+		qryLog.Debug("instStatusInd: pending: %d, actived: %d", qcb.qryPending.Len(), len(qcb.qryActived))
 
 		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
 			qryLog.Debug("instStatusInd: query done: %x", qcb.target)
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil);
+			dhtEno != DhtEnoNone {
 				qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 				return sch.SchEnoUserTask
 			}
@@ -1000,21 +999,32 @@ const (
 )
 
 func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
+	var strDebug = ""
 	switch why {
 	case delQcb4TargetFound:
+		strDebug = "delQcb4TargetFound"
 	case delQcb4NoMoreQueries:
+		strDebug = "delQcb4NoMoreQueries"
 	case delQcb4Timeout:
+		strDebug = "delQcb4Timeout"
 	case delQcb4NoSeeds:
+		strDebug = "delQcb4NoSeeds"
 	case delQcb4TargetInLocal:
+		strDebug = "delQcb4TargetInLocal"
 	case delQcb4QryInstDoneInd:
+		strDebug = "delQcb4QryInstDoneInd"
 	case delQcb4InteralErrors:
+		strDebug = "delQcb4InteralErrors"
 	case delQcb4PubAddrSwitch:
+		strDebug = "delQcb4PubAddrSwitch"
 	case delQcb4Command:
-
+		strDebug = "delQcb4Command"
 	default:
 		qryLog.Debug("qryMgrDelQcb: parameters mismatched, why: %d", why)
 		return DhtEnoMismatched
 	}
+
+	p2plog.Debug("qryMgrDelQcb: why: %s", strDebug)
 
 	qcb, ok := qryMgr.qcbTab[target]
 	if !ok {
@@ -1056,26 +1066,34 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 // Delete query instance control block
 //
 func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.NodeID) DhtErrno {
+
+	p2plog.Debug("qryMgrDelIcb: why: %d", why)
+
 	if why != delQcb4QryInstDoneInd && why != delQcb4QryInstResultInd {
-		qryLog.Debug("qryMgrDelIcb: why delete?! why: %d", why)
+		p2plog.Debug("qryMgrDelIcb: why delete?! why: %d", why)
 		return DhtEnoMismatched
 	}
 	qcb, ok := qryMgr.qcbTab[*target]
 	if !ok {
-		qryLog.Debug("qryMgrDelIcb: target not found: %x", target)
+		p2plog.Debug("qryMgrDelIcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
 	icb, ok := qcb.qryActived[*peer]
 	if !ok {
-		qryLog.Debug("qryMgrDelIcb: target not found: %x", target)
+		p2plog.Debug("qryMgrDelIcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
+
+	p2plog.Debug("qryMgrDelIcb: icb: %x", icb.name)
+
 	if why == delQcb4QryInstResultInd {
 		eno, ptn := icb.sdl.SchGetUserTaskNode(icb.name)
 		if eno == sch.SchEnoNone && ptn != nil && ptn == icb.ptnInst {
 			po := sch.SchMessage{}
 			icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
 			icb.sdl.SchSendMessage(&po)
+		} else {
+			p2plog.Debug("qryMgrDelIcb: not found, icb: %s", icb.name)
 		}
 	}
 	delete(qcb.qryActived, *peer)
@@ -1146,17 +1164,13 @@ func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) D
 // Put node to actived queue and start query to the node
 //
 func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
-	if qcb == nil {
-		qryLog.Debug("qryMgrQcbPutActived: invalid parameter")
-		return DhtEnoParameter, 0
-	}
 
 	if qcb.qryPending == nil || qcb.qryPending.Len() == 0 {
 		qryLog.Debug("qryMgrQcbPutActived: no pending")
 		return DhtEnoNotFound, 0
 	}
 
-	if len(qcb.qryActived) == qryMgr.qmCfg.maxActInsts {
+	if len(qcb.qryActived) >= qryMgr.qmCfg.maxActInsts {
 		qryLog.Debug("qryMgrQcbPutActived: no room")
 		return DhtEnoResource, 0
 	}
@@ -1239,6 +1253,8 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		start := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&start, qryMgr.ptnMe, ptn, sch.EvDhtQryInstStartReq, nil)
 		qryMgr.sdl.SchSendMessage(&start)
+
+		p2plog.Debug("qryMgrQcbPutActived: icb: %s, EvSchPoweron and EvDhtQryInstStartReq sent", icb.name)
 	}
 
 	for _, el := range act {
@@ -1256,14 +1272,13 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 // Start timer for query control block
 //
 func (qryMgr *QryMgr)qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
-	var td = sch.TimerDescription {
+	td := sch.TimerDescription {
 		Name:	"qryMgrQcbTimer" + fmt.Sprintf("%d", qcb.seq),
 		Utid:	sch.DhtQryMgrQcbTimerId,
 		Tmt:	sch.SchTmTypeAbsolute,
 		Dur:	qryMgr.qmCfg.qryExpired,
 		Extra:	qcb,
 	}
-
 	tid := sch.SchInvalidTid
 	eno := sch.SchEnoUnknown
 	if eno, tid = qryMgr.sdl.SchSetTimer(qryMgr.ptnMe, &td);

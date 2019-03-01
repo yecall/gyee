@@ -196,7 +196,6 @@ func (qryInst *QryInst)powerOff(ptn interface{}) sch.SchErrno {
 func (qryInst *QryInst)startReq() sch.SchErrno {
 
 	icb := qryInst.icb
-
 	if icb.status != qisInited {
 		qiLog.Debug("startReq: state mismatched: %d", icb.status)
 		return sch.SchEnoUserTask
@@ -214,8 +213,8 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
 	icb.sdl.SchSendMessage(&msg)
-
 	icb.conBegTime = time.Now()
+
 	td := sch.TimerDescription{
 		Name:	"qiConnTimer" + fmt.Sprintf("%d", icb.seq),
 		Utid:	sch.DhtQryMgrIcbTimerId,
@@ -226,32 +225,24 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 
 	var eno sch.SchErrno
 	var tid int
-
 	ind := sch.MsgDhtQryInstStatusInd {
 		Peer:	icb.to.ID,
 		Target:	icb.target,
 		Status:	qisNull,
 	}
-
 	eno, tid = icb.sdl.SchSetTimer(icb.ptnInst, &td)
-
 	if eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-
 		qiLog.Debug("startReq: SchSetTimer failed, eno: %d", eno)
-
 		ind.Status = qisDone
 		icb.status = qisDone
-
 		icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		icb.sdl.SchSendMessage(&msg)
 		icb.sdl.SchTaskDone(icb.ptnInst, sch.SchEnoInternal)
-
 		return eno
 	}
 
 	icb.qTid = tid
 	icb.status = qisWaitConnect
-
 	ind.Status = qisWaitConnect
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	icb.sdl.SchSendMessage(&msg)
@@ -346,11 +337,6 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 //
 func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno {
 
-	if msg == nil {
-		qiLog.Debug("connectRsp: invalid parameter")
-		return sch.SchEnoParameter
-	}
-
 	qiLog.Debug("connectRsp: ForWhat: %d, eno: %d, peer: %+v",
 		qryInst.icb.qryReq.ForWhat, msg.Eno, *msg.Peer)
 
@@ -371,7 +357,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	//
 
 	if icb.qTid != sch.SchInvalidTid {
-
 		sdl.SchKillTimer(icb.ptnInst, icb.qTid)
 		icb.qTid = sch.SchInvalidTid
 	}
@@ -388,7 +373,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		sdl.SchSendMessage(&schMsg)
 		sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
-
 		return sch.SchEnoNone
 	}
 
@@ -400,7 +384,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	//
 
 	eno, pkg := qryInst.setupQryPkg()
-
 	if eno != DhtEnoNone {
 
 		qiLog.Debug("connectRsp: setupQryPkg failed, ForWhat: %d, eno: %d",
@@ -408,11 +391,9 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 		ind.Status = qisDone
 		icb.status = qisDone
-
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		sdl.SchSendMessage(&schMsg)
 		sdl.SchTaskDone(icb.ptnInst, sch.SchEnoKilled)
-
 		return sch.SchEnoUserTask
 	}
 
@@ -455,7 +436,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	if icb.qryReq.ForWhat == MID_PUTVALUE || icb.qryReq.ForWhat == MID_PUTPROVIDER {
 
 		//
-		// tell query manager about result
+		// tell query manager the result
 		//
 
 		fwMap := map[int] int {
@@ -463,7 +444,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 			MID_PUTPROVIDER:	sch.EvDhtMgrPutProviderReq,
 		}
 		fw := fwMap[icb.qryReq.ForWhat]
-
 		indResult := sch.MsgDhtQryInstResultInd{
 			From:		icb.to,
 			Target:		icb.target,
@@ -474,7 +454,6 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 			Value:		nil,
 			Pcs:		[]int{pcsConnYes},
 		}
-
 		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
 		return sdl.SchSendMessage(&schMsg)

@@ -25,8 +25,8 @@ import (
 	"time"
 	"sync"
 	"io"
-	"fmt"
 	"container/list"
+	"github.com/pkg/errors"
 	ggio	"github.com/gogo/protobuf/io"
 	pb		"github.com/yeeco/gyee/p2p/dht/pb"
 	config	"github.com/yeeco/gyee/p2p/config"
@@ -99,6 +99,8 @@ type ConInst struct {
 	txqDiscardCnt	int64					// number of tx packages discarded for tx queue full
 	wrqDiscardCnt	int64					// number of tx packages discarded for wait-response queue full
 	trySendingCnt	int64					// number of trying to send data
+	txDtm			*DiffTimerManager		// difference timer manager for response waiting
+	txTmCycle		int						// wait peer response timer cycle in ticks
 }
 
 //
@@ -177,9 +179,10 @@ type conInstTxPkg struct {
 //
 const (
 	ciTxPendingQueueSize = 4096				// max tx-pending queue size
-	ciConn2PeerTimeout = time.Second * 16	// Connect to peer timeout vale
+	ciConn2PeerTimeout = time.Second * 8	// Connect to peer timeout vale
 	ciMaxPackageSize = 1024 * 1024			// bytes
 	ciTxTimerDuration = time.Second * 8		// tx timer duration
+	ciTxDtmTick = time.Second * 1			// tx difference timer mananger tick
 	ciTxMaxWaitResponseSize = 512			// tx max wait peer response queue size
 )
 
@@ -187,7 +190,6 @@ const (
 // Create connection instance
 //
 func newConInst(postFixed string, isBlind bool) *ConInst {
-
 	conInst := ConInst {
 		name:				"conInst" + postFixed,
 		status:				CisNull,
@@ -196,10 +198,9 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		isBlind:			isBlind,
 		txPkgCnt:			0,
 		rxPkgCnt:			0,
+		txDtm:				NewDiffTimerManager(ciTxDtmTick, nil),
 	}
-
 	conInst.tep = conInst.conInstProc
-
 	return &conInst
 }
 
@@ -290,6 +291,9 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 		return sch.SchEnoNone
 	}
 
+	conInst.txDtm.setCallback(conInst.txTimerHandler)
+	conInst.txTmCycle, _ = conInst.txDtm.dur2Ticks(ciTxTimerDuration)
+
 	return sch.SchEnoUserTask
 }
 
@@ -361,7 +365,6 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.Peer = &peer
 			rsp.Inst = conInst
 			rsp.HsInfo = &hsInfo
-
 			return rsp2ConMgr()
 		}
 
@@ -381,31 +384,23 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.statusReport()
 
 	if conInst.dir == ConInstDirOutbound {
-
 		if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
-
 			peer := conInst.hsInfo.peer
 			hsInfo := conInst.hsInfo
 			rsp.Eno = int(eno)
 			rsp.Peer = &peer
 			rsp.Inst = conInst
 			rsp.HsInfo = &hsInfo
-
 			return rsp2ConMgr()
 		}
-
 	} else {
-
 		ciLog.Debug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
-
 		if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
-
 			rsp.Eno = int(eno)
 			rsp.Peer = nil
 			rsp.HsInfo = nil
 			rsp.Inst = conInst
-
 			return rsp2ConMgr()
 		}
 	}
@@ -444,23 +439,18 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 // Instance-close-request handler
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
-
 	status := conInst.getStatus()
 	if status < CisHandshaked || status >= CisClosed {
-		ciLog.Debug("closeReq: " +
-			"status mismatched, dir: %d, status: %d",
-			conInst.dir, status)
+		ciLog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
 		return sch.SchEnoMismatched
 	}
 
 	if *msg.Peer != conInst.hsInfo.peer.ID {
-		ciLog.Debug("closeReq: peer node identity mismatched")
+		ciLog.Debug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	ciLog.Debug("closeReq: " +
-		"connection will be closed, why: %d, peer: %x",
-		msg.Why, *msg.Peer)
+	ciLog.Debug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
 
 	conInst.cleanUp(DhtEnoNone.GetEno())
 	conInst.updateStatus(CisClosed)
@@ -676,36 +666,42 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 //
 func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 
+	/*
+	 * the following statements commented implement the "wait peer response" timer
+	 * based on the timer manager provided by scheduler module. but in practice, it's
+	 * suitable for the application, and too much resources consumed. we introduce
+	 * the DTM(difference timer manager, see DiffTimerManager) to play the game.
+	 *
 	if el == nil {
-		ciLog.Debug("txSetTimer: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
-			conInst.name, conInst.hsInfo, *conInst.local)
+		ciLog.Debug("txSetTimer: invalid parameter, inst: %s", conInst.name)
 		return DhtEnoParameter
 	}
-
 	txPkg, ok := el.Value.(*conInstTxPkg)
 	if !ok {
-		ciLog.Debug("txSetTimer: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
-			conInst.name, conInst.hsInfo, *conInst.local)
+		ciLog.Debug("txSetTimer: invalid parameter, inst: %s", conInst.name)
 		return DhtEnoMismatched
 	}
-
-	var td = sch.TimerDescription {
-		Name:	fmt.Sprintf("%s%s", conInst.name, "_txTimer"),
-		Utid:	sch.DhtConInstTxTimerId,
-		Tmt:	sch.SchTmTypeAbsolute,
-		Dur:	ciTxTimerDuration,
-		Extra:	el,
+	var td = sch.TimerDescription{
+		Name:  fmt.Sprintf("%s%s", conInst.name, "_txTimer"),
+		Utid:  sch.DhtConInstTxTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   ciTxTimerDuration,
+		Extra: el,
 	}
-
 	eno, tid := conInst.sdl.SchSetTimer(conInst.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		ciLog.Debug("txSetTimer: invalid parameter, inst: %s, eno: %d, hsInfo: %+v, local: %+v",
-			conInst.name, eno, conInst.hsInfo, *conInst.local)
+		ciLog.Debug("txSetTimer: invalid parameter, inst: %s, eno: %d", conInst.name, eno)
 		return DhtEnoScheduler
 	}
-
 	txPkg.txTid = tid
+	return DhtEnoNone
+	*****************/
 
+	tid, err := conInst.txDtm.txSetTimer(el, conInst.txTmCycle)
+	if tid == nil || err != nil {
+		ciLog.Debug("txSetTimer: failed")
+		return DhtEnoInternal
+	}
 	return DhtEnoNone
 }
 
@@ -713,24 +709,21 @@ func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 // Tx timer expired event handler
 //
 func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
-
 	if el == nil {
-		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
-			conInst.name, conInst.hsInfo, *conInst.local)
+		p2plog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoParameter
 	}
 
-	txPkg, ok := el.Value.(*conInstTxPkg)
+	_, ok := el.Value.(*conInstTxPkg)
 	if !ok {
-		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
-			conInst.name, conInst.hsInfo, *conInst.local)
+		p2plog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	ciLog.Debug("txTimerHandler: inst: %s, hsInfo: %+v, local: %+v, txPkg: %+v",
-		conInst.name, conInst.hsInfo, *conInst.local, *txPkg)
+	p2plog.Debug("txTimerHandler: inst: %s", conInst.name)
 
-	if conInst.getStatus() < CisInKilling {
+	if status := conInst.getStatus(); status < CisInKilling {
+		p2plog.Debug("txTimerHandler: inst: %s, current status: %d", conInst.name, status)
 		conInst.updateStatus(CisInKilling)
 		conInst.statusReport()
 		req := sch.MsgDhtConInstCloseReq {
@@ -787,11 +780,9 @@ func (conInst *ConInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Element){
 	var el *list.Element = nil
 	if txPkg != nil {
-
 		txPkg.taskName = conInst.sdl.SchGetTaskName(txPkg.task)
 		if len(txPkg.taskName) == 0 {
 			ciLog.Debug("txSetPending: task without name")
-			//panic("txSetPending: task without name")
 			return DhtEnoScheduler, nil
 		}
 
@@ -1225,41 +1216,56 @@ func (conInst *ConInst)inboundHandshake() DhtErrno {
 //
 func (conInst *ConInst)txProc() {
 
-	//
-	// longlong loop in a blocked mode
-	//
-
+	// exception handler for debug
 	defer func() {
 		if err := recover(); err != nil {
 			p2plog.Debug("txProc: exception raised, wait done...")
 		}
 	}()
 
+	// socket in BLOCKED mode
 	conInst.con.SetDeadline(time.Time{})
+
+	// break loop for error from underlying or done
 	errUnderlying := false
 	isDone := false
 
+	// dtm scanner routine
+	ticker := time.NewTimer(ciTxDtmTick)
+	dtmDone := make(chan bool, 1)
+	go func() {
+		_dtmScanLoop:
+		for {
+			select {
+			case <-dtmDone:
+				goto _dtmScanLoop
+			case <-ticker.C:
+				conInst.txDtm.scan()
+			}
+		}
+		ticker.Stop()
+		connLog.Debug("txProc: dtm exit")
+	}()
+
+	//
+	// tx loop
+	//
+
 _txLoop:
-
 	for {
+		var (
+			txPkg	*conInstTxPkg	= nil
+			dhtPkg	*DhtPackage		= nil
+			pbPkg	*pb.DhtPackage	= nil
+		)
 
-		var txPkg *conInstTxPkg = nil
-		var dhtPkg *DhtPackage = nil
-		var pbPkg *pb.DhtPackage = nil
-
-		//
 		// fetch pending signal
-		//
-
 		inf, ok := <-conInst.txChan
 		if !ok {
 			goto _checkDone
 		}
 
-		//
 		// get pending and send it
-		//
-
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
 			p2plog.Debug("txProc: mismatched type, inst: %s", conInst.name)
@@ -1299,6 +1305,9 @@ _txLoop:
 		}
 	}
 
+	// done dtm
+	close(dtmDone)
+
 	//
 	// here we get out, it might be:
 	// 1) errors fired by underlying network;
@@ -1308,17 +1317,17 @@ _txLoop:
 	if errUnderlying == true {
 
 		//
-		// the 1) case: report the status and then wait and hen singal done
+		// the 1) case: report the status and then wait singal done
 		//
 
-		if conInst.getStatus() < CisOutOfService {
+		if status := conInst.getStatus(); status < CisOutOfService {
+			p2plog.Debug("txProc: CisOutOfService, current status: %d", status)
 			conInst.updateStatus(CisOutOfService)
 			conInst.statusReport()
 		}
 
 		<-conInst.txDone
 		conInst.txDone<-DhtEnoNone.GetEno()
-
 		return
 	}
 
@@ -1329,7 +1338,6 @@ _txLoop:
 		//
 
 		conInst.txDone<-DhtEnoNone.GetEno()
-
 		return
 	}
 
@@ -1341,15 +1349,16 @@ _txLoop:
 //
 func (conInst *ConInst)rxProc() {
 
-	//
-	// longlong loop in a blocked mode
-	//
-
+	// exception handler for debug
 	defer func() {
 		if err := recover(); err != nil {
 			p2plog.Debug("rxProc: exception raised, wait done...")
 		}
 	}()
+
+	//
+	// longlong loop in a blocked mode
+	//
 
 	conInst.con.SetDeadline(time.Time{})
 	errUnderlying := false
@@ -1363,8 +1372,7 @@ _rxLoop:
 
 		pbPkg := new(pb.DhtPackage)
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s, hsInfo: %+v, local: %+v",
-				conInst.name, err.Error(), conInst.hsInfo, *conInst.local)
+			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _rxLoop
 		}
@@ -1377,21 +1385,17 @@ _rxLoop:
 		pkg.FromPbPackage(pbPkg)
 
 		if pb.ProtocolId(pkg.Pid) == PID_EXT {
-
 			conInst.cbRxLock.Lock()
-
 			if conInst.cbfRxData != nil {
 				conInst.cbfRxData(conInst, pkg.Pid, pkg.Payload)
 			}
-
 			conInst.cbRxLock.Unlock()
-
 			goto _checkDone
 		}
 
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
-			ciLog.Debug("rxProc:GetMessage failed, inst: %s, eno: %d", conInst.name, eno)
+			p2plog.Debug("rxProc:GetMessage failed, inst: %s, eno: %d", conInst.name, eno)
 			goto _checkDone
 		}
 
@@ -1422,14 +1426,14 @@ _checkDone:
 		// the 1) case: report the status and then wait and then signal done
 		//
 
-		if conInst.getStatus() < CisOutOfService {
+		if status := conInst.getStatus(); status < CisOutOfService {
+			p2plog.Debug("rxProc: CisOutOfService, current status: %d", status)
 			conInst.updateStatus(CisOutOfService)
 			conInst.statusReport()
 		}
 
 		<-conInst.rxDone
 		conInst.rxDone <- DhtEnoNone.GetEno()
-
 		return
 	}
 
@@ -1440,7 +1444,6 @@ _checkDone:
 		//
 
 		conInst.rxDone <- DhtEnoNone.GetEno()
-
 		return
 	}
 
@@ -1750,9 +1753,7 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 	que := conInst.txWaitRsp
 
 	for el := que.Front(); el != nil; el = el.Next() {
-
 		if txPkg, ok := el.Value.(*conInstTxPkg); ok {
-
 			if txPkg.waitMid == mid && txPkg.waitSeq == seq {
 
 				ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
@@ -1762,19 +1763,20 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 				}
 
 				if txPkg.txTid != sch.SchInvalidTid {
-					conInst.sdl.SchKillTimer(conInst.ptnMe, txPkg.txTid)
+					// use DTM instead of the scheduler timer manager, see function txSetTimer
+					// for more please.
+					// conInst.sdl.SchKillTimer(conInst.ptnMe, txPkg.txTid)
+					conInst.txDtm.txDelTimer(el)
 					txPkg.txTid = sch.SchInvalidTid
 				}
 
 				que.Remove(el)
-
 				return DhtEnoNone, txPkg
 			}
 		}
 	}
 
 	ciLog.Debug("checkTxWaitResponse: not found, mid: %d, seq: %d", mid, seq)
-
 	return DhtEnoNotFound, nil
 }
 
@@ -1822,4 +1824,108 @@ func (conInst *ConInst)getStatus() conInstStatus {
 	conInst.cisLock.Lock()
 	defer conInst.cisLock.Unlock()
 	return conInst.status
+}
+
+//
+// DTM(Difference Timer Manager)
+//
+type DiffTimerCallback func(el *list.Element) sch.SchErrno
+
+type DiffTimerManager struct {
+	lock	sync.Mutex
+	tick	time.Duration
+	tmq		*list.List
+	sum		int
+	cbf		DiffTimerCallback
+}
+
+type DiffTimer struct {
+	ud		interface{}
+	tv		int
+}
+
+func NewDiffTimerManager(tick time.Duration, cbf DiffTimerCallback) *DiffTimerManager {
+	return &DiffTimerManager {
+		tick:	tick,
+		tmq:	list.New(),
+		sum:	0,
+		cbf:	cbf,
+	}
+}
+
+func (dtm *DiffTimerManager)setCallback(cbf DiffTimerCallback) {
+	dtm.cbf = cbf
+}
+
+func (dtm *DiffTimerManager)dur2Ticks(d time.Duration) (tv int, err error) {
+	if tv = int(d/dtm.tick); tv == 0 {
+		return 0, errors.New("dur2Ticks: too small tv")
+	}
+	return tv, nil
+}
+
+func (dtm *DiffTimerManager)txSetTimer(ud interface{}, tv int) (tid interface{}, err error) {
+	dtm.lock.Lock()
+	defer dtm.lock.Unlock()
+	tid = nil
+	err = nil
+	tm := DiffTimer {ud: ud, tv: 0}
+	if dtm.tmq == nil {
+		err = errors.New("txSetTimer: tmq not init")
+	} else if tv >= dtm.sum {
+		tm.tv = tv - dtm.sum
+		dtm.sum = tv
+		tid = dtm.tmq.PushBack(&tm)
+	} else {
+		sum := 0
+		el := dtm.tmq.Front()
+		for {
+			old := el.Value.(*DiffTimer)
+			if sum + old.tv >= tv {
+				tm.tv = tv - sum
+				old.tv = sum + old.tv - tv
+				tid = dtm.tmq.InsertBefore(&tm, el)
+				break
+			}
+			el = el.Next()
+		}
+		if tid == nil {
+			panic("txSetTimer: tell me why...")
+		}
+	}
+	return tid, err
+}
+
+func (dtm *DiffTimerManager)txDelTimer(tid interface{}) error {
+	dtm.lock.Lock()
+	defer dtm.lock.Unlock()
+	dtm.tmq.Remove(tid.(*list.Element))
+	return nil
+}
+
+func (dtm *DiffTimerManager)scan() error {
+	dtm.lock.Lock()
+	defer dtm.lock.Unlock()
+	if dtm.tmq.Len() <= 0 {
+		return nil
+	}
+	for dtm.tmq.Len() > 0{
+		dtm.sum--
+		dtm.tmq.Front().Value.(*DiffTimer).tv--
+		if dtm.tmq.Front().Value.(*DiffTimer).tv > 0 {
+			break
+		} else {
+			tm := dtm.tmq.Remove(dtm.tmq.Front()).(*DiffTimer)
+			if dtm.cbf != nil {
+				dtm.cbf(tm.ud.(*list.Element))
+			}
+		}
+	}
+	return nil
+}
+
+func (dtm *DiffTimerManager)size() int {
+	dtm.lock.Lock()
+	defer dtm.lock.Unlock()
+	return dtm.tmq.Len()
 }
