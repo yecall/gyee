@@ -469,7 +469,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstCloseRsp, &rsp)
 	conInst.sdl.SchSendMessage(&schMsg)
 
-	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoUserTask)
+	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
 }
 
 //
@@ -1323,8 +1323,8 @@ _txLoop:
 
 		if conInst.getStatus() < CisOutOfService {
 			conInst.updateStatus(CisOutOfService)
-			conInst.statusReport()
 		}
+		conInst.statusReport()
 
 		<-conInst.txDone
 		conInst.txDone<-DhtEnoNone.GetEno()
@@ -1436,8 +1436,8 @@ _checkDone:
 
 		if conInst.getStatus() < CisOutOfService {
 			conInst.updateStatus(CisOutOfService)
-			conInst.statusReport()
 		}
+		conInst.statusReport()
 
 		<-conInst.rxDone
 		conInst.rxDone <- DhtEnoNone.GetEno()
