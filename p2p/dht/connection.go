@@ -630,10 +630,12 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		Peer:	msg.Peer,
 		Ptn:	nil,
 	}
-
 	var rsp interface{}
 	var rspEvent int
 	var ptrEno *int
+	var sender = msg.Task
+	var sdl = conMgr.sdl
+
 	if msg.IsBlind {
 		rsp = &rspBlind
 		ptrEno = &rspBlind.Eno
@@ -644,8 +646,6 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		rspEvent = sch.EvDhtConMgrConnectRsp
 	}
 
-	var sender = msg.Task
-	var sdl = conMgr.sdl
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno {
 		msg := sch.SchMessage{}
 		*ptrEno = int(eno)
@@ -677,7 +677,22 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		return sch.SchEnoNone
 	}
 
-	if ci := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != nil {
+	isInstInClosing := func () bool {
+		cid := conInstIdentity{
+			nid:	msg.Peer.ID,
+			dir:	ConInstDirOutbound,
+		}
+		if _, yes := conMgr.instInClosing[cid]; yes {
+			return true
+		}
+		cid.dir = ConInstDirInbound
+		_, yes := conMgr.instInClosing[cid]
+		return yes
+	}
+
+	if isInstInClosing() {
+		return rsp2Sender(DhtErrno(DhtEnoResource))
+	} else if ci := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != nil {
 		return  dupConnProc(ci)
 	} else if ci := conMgr.lookupInboundConInst(&msg.Peer.ID); ci != nil {
 		return  dupConnProc(ci)
@@ -726,11 +741,8 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 	conMgr.ciTab[cid] = ci
 
-	//
-	// should not send connect-response message to source task here, instead, this is done
-	// when handshake procedure is completed.
-	//
-
+	// do not send connect-response message to source task here, instead,
+	// this is done when handshake procedure is completed.
 	return sch.SchEnoNone
 }
 
