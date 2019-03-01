@@ -120,6 +120,7 @@ type ConMgr struct {
 	mfilter			interface{}						// message filter
 	tidMonitor		int								// monitor timer identity
 	bakReq2Conn		map[string]interface{}			// connection request backup map, k: task name, v: message
+	instInClosing	map[conInstIdentity]*ConInst	// instance in closing waiting for response from instance
 }
 
 //
@@ -136,6 +137,7 @@ func NewConMgr() *ConMgr {
 		pubTcpPort:		0,
 		tidMonitor:		sch.SchInvalidTid,
 		bakReq2Conn:	make(map[string]interface{}, 0),
+		instInClosing:	make(map[conInstIdentity]*ConInst, 0),
 	}
 	conMgr.tep = conMgr.conMgrProc
 	chConMgrReady = make(chan bool, 1)
@@ -766,6 +768,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	}
 
 	req2Inst := func(inst *ConInst) sch.SchErrno {
+		p2plog.Debug("closeReq: req2Inst: inst: %s", inst.name)
 		req := sch.MsgDhtConInstCloseReq {
 			Peer:	&msg.Peer.ID,
 			Why:	sch.EvDhtConMgrCloseReq,
@@ -777,7 +780,6 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	found := false
 	err := false
 	dup := false
-
 	cis := conMgr.lookupConInst(&cid)
 	for _, ci := range cis {
 		if ci != nil {
@@ -830,7 +832,7 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	if ci != nil {
 		connLog.Debug("sendReq: connection instance found: %+v", *ci)
 		if curStat := ci.getStatus(); curStat != CisInService {
-			connLog.Debug("sendReq: can't send, status: %d", curStat)
+			connLog.Debug("sendReq: can't send in status: %d", curStat)
 			return sch.SchEnoUserTask
 		}
 
@@ -950,15 +952,12 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 // Close-instance-request handler
 //
 func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
-
 	cid := conInstIdentity {
 		nid:	*msg.Peer,
 		dir:	ConInstDir(msg.Dir),
 	}
-
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
-
 	rsp2Sender := func(eno DhtErrno, peer *config.Node, task interface{}) sch.SchErrno{
 		rsp := sch.MsgDhtConMgrCloseRsp{
 			Eno:	int(eno),
@@ -986,37 +985,27 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 
 	found := false
 	err := false
-	cis := conMgr.lookupConInst(&cid)
-	if len(cis) <= 0 {
-		p2plog.Debug("instCloseRsp: not found, %+v", cid)
-	} else if len(cis) > 1 {
-		p2plog.Debug("instCloseRsp: too much, inst: %s, %s", cis[0].name, cis[1].name)
-	} else {
-		p2plog.Debug("instCloseRsp: inst: %s, current status: %d", cis[0].name, cis[0].getStatus())
-	}
-
-	for _, ci := range cis {
-		if ci != nil {
-			found = true
-			p2plog.Debug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
-			if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
-				p2plog.Debug("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
-				err = true
-			}
-			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-				p2plog.Debug("instCloseRsp: isnt: %s, rutUpdate failed, eno: %d", ci.name, eno)
-				err = true
-			}
+	if ci := conMgr.instInClosing[cid]; ci != nil {
+		found = true
+		delete(conMgr.instInClosing, cid)
+		p2plog.Debug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
+		if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
+			p2plog.Debug("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
+			err = true
+		}
+		if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
+			p2plog.Debug("instCloseRsp: isnt: %s, rutUpdate failed, eno: %d", ci.name, eno)
+			err = true
 		}
 	}
 	if !found {
 		p2plog.Debug("instCloseRsp: none is found, id: %x", msg.Peer)
+		return sch.SchEnoNotFound
 	}
 	if err {
 		p2plog.Debug("instCloseRsp: seems some errors")
 		return sch.SchEnoUserTask
 	}
-
 	return sch.SchEnoNone
 }
 
@@ -1414,6 +1403,10 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 			}
 			if status := ci.getStatus(); status < CisInKilling {
 				p2plog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
+
+				conMgr.instInClosing[cid] = ci
+				delete(conMgr.ciTab, cid)
+
 				req := sch.MsgDhtConInstCloseReq{
 					Peer:	msg.Peer,
 					Why:	sch.EvDhtConInstStatusInd,
