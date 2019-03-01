@@ -769,6 +769,8 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
 	req2Inst := func(inst *ConInst) sch.SchErrno {
 		p2plog.Debug("closeReq: req2Inst: inst: %s", inst.name)
+		conMgr.instInClosing[cid] = inst
+		delete(conMgr.ciTab, cid)
 		req := sch.MsgDhtConInstCloseReq {
 			Peer:	&msg.Peer.ID,
 			Why:	sch.EvDhtConMgrCloseReq,
