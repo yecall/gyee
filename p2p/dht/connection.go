@@ -1149,10 +1149,12 @@ func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 // monitor timer to keep enough connections
 //
 func (conMgr *ConMgr)monitorTimer() sch.SchErrno {
-	if len(conMgr.ciTab) < conMgr.cfg.minCon {
-		msg := new(sch.SchMessage)
-		conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtConMgrBootstrapReq, nil)
-		conMgr.sdl.SchSendMessage(msg)
+	if conMgr.natTcpResult {
+		if len(conMgr.ciTab) < conMgr.cfg.minCon {
+			msg := new(sch.SchMessage)
+			conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtConMgrBootstrapReq, nil)
+			conMgr.sdl.SchSendMessage(msg)
+		}
 	}
 	return sch.SchEnoNone
 }
