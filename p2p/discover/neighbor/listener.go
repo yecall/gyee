@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"time"
 	"sync"
+	"crypto/ecdsa"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	config	"github.com/yeeco/gyee/p2p/config"
 	umsg	"github.com/yeeco/gyee/p2p/discover/udpmsg"
@@ -271,6 +272,7 @@ func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
 }
 
 func (lsnMgr *ListenerManager)nblDataReq(ptn interface{}, msg interface{}) sch.SchErrno {
+	_ = ptn
 	req := msg.(*sch.NblDataReq)
 	return lsnMgr.sendUdpMsg(req.Payload, req.TgtAddr)
 }
@@ -288,6 +290,7 @@ type UdpReaderTask struct {
 	lsnMgr		*ListenerManager		// pointer to listener manager
 	name		string					// name
 	tep			sch.SchUserTaskEp		// entry
+	priKey		*ecdsa.PrivateKey		// local node private key
 	conn		*net.UDPConn			// udp connection
 	ptnMe		interface{}				// pointer to myself task
 	ptnNgbMgr	interface{}				// pointer to neighbor manager task
@@ -330,12 +333,16 @@ func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, _ *sch.SchMessage)
 	buf := make([]byte, udpMaxMsgSize)
 	udpReader.ptnMe = ptn
 	_, udpReader.ptnNgbMgr = udpReader.sdl.SchGetUserTaskNode(NgbMgrName)
+	udpReader.priKey = udpReader.sdl.SchGetP2pConfig().PrivateKey
+	udpReader.udpMsg.Key = udpReader.priKey
+
 	// We just read until errors fired from udp, for example, when
 	// the mamager is asked to stop the reader, it can close the
 	// connection. See function procStop for details please.
 	// When a message recevied, the reader decode it to get an UDP
 	// discover protocol message, it than create a protocol task to
 	// deal with the message received.
+
 _loop:
 	for {
 		if NgbProtoReadTimeout > 0 {
@@ -441,4 +448,8 @@ func sendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []b
 	sdl.SchMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req)
 	sdl.SchSendMessage(&schMsg)
 	return sch.SchEnoNone
+}
+
+func SendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
+	return sendUdpMsg(sdl, lsn, sender, buf, toAddr)
 }

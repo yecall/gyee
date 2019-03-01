@@ -23,6 +23,7 @@ package udpmsg
 import (
 	"fmt"
 	"net"
+	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/p2p/config"
@@ -53,6 +54,7 @@ const (
 	UdpMsgTypePong
 	UdpMsgTypeFindNode
 	UdpMsgTypeNeighbors
+	UdpMsgTypeStaleAddress
 	UdpMsgTypeUnknown
 	UdpMsgTypeAny
 )
@@ -127,6 +129,13 @@ type (
 		Expiration		uint64			// time to expired of this message
 		Extra			[]byte			// extra info
 	}
+
+	// StaleAddress: tell bootstarp node to teardown stale ip address
+	StaleAddress struct {
+		From			Node			// source node
+		To				Node			// destination node
+		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
+	}
 )
 
 //
@@ -140,6 +149,7 @@ type UdpMsg struct {
 	From	*net.UDPAddr	// source address from underlying network library
 	Msg		*pb.UdpMessage	// protobuf message
 	Eno		UdpMsgErrno		// current errno
+	Key		interface{}		// private key
 	typ		UdpMsgType		// message type
 	pum		interface{}		// pointer to Ping, Pong...
 }
@@ -228,13 +238,10 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 	//
 
 	mt := pum.GetDecodedMsgType()
-
 	if mt == UdpMsgTypeUnknown {
-
 		udpmsgLog.Debug("GetDecodedMsg: " +
 			"GetDecodedMsgType failed, mt: %d",
 			mt)
-
 		return nil
 	}
 
@@ -243,11 +250,11 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 	//
 
 	var funcMap = map[UdpMsgType]interface{} {
-
 		UdpMsgTypePing: pum.GetPing,
 		UdpMsgTypePong: pum.GetPong,
 		UdpMsgTypeFindNode: pum.GetFindNode,
 		UdpMsgTypeNeighbors: pum.GetNeighbors,
+		UdpMsgTypeStaleAddress: pum.GetStaleAddress,
 	}
 
 	var f interface{}
@@ -279,6 +286,7 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 		pb.UdpMessage_PONG:			UdpMsgTypePong,
 		pb.UdpMessage_FINDNODE:		UdpMsgTypeFindNode,
 		pb.UdpMessage_NEIGHBORS:	UdpMsgTypeNeighbors,
+		pb.UdpMessage_STALEADDRESS:	UdpMsgTypeStaleAddress,
 	}
 
 	var key pb.UdpMessage_MessageType
@@ -286,9 +294,7 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 	var ok bool
 
 	key = pum.Msg.GetMsgType()
-
 	if val, ok = pbMap[key]; !ok {
-
 		udpmsgLog.Debug("GetDecodedMsgType: invalid message type")
 		return UdpMsgTypeUnknown
 	}
@@ -442,6 +448,36 @@ func (pum *UdpMsg) GetNeighbors() interface{} {
 }
 
 //
+// Get decoded StaleAddress
+//
+func (pum *UdpMsg)GetStaleAddress() interface{} {
+	pbSA := pum.Msg.StaleAddress
+	if !pum.verify(pbSA.R, *pbSA.SignR, pbSA.S, *pbSA.SignS, pbSA.From.NodeId) {
+		udpmsgLog.Debug("GetStaleAddress: verify failed")
+		return nil
+	}
+
+	sa := new(StaleAddress)
+	sa.From.IP = append(sa.From.IP, pbSA.From.IP...)
+	sa.From.TCP = uint16(*pbSA.From.TCP)
+	sa.From.UDP = uint16(*pbSA.From.UDP)
+	copy(sa.From.NodeId[:], pbSA.From.NodeId)
+
+	sa.To.IP = append(sa.To.IP, pbSA.To.IP...)
+	sa.To.TCP = uint16(*pbSA.To.TCP)
+	sa.To.UDP = uint16(*pbSA.To.UDP)
+	copy(sa.To.NodeId[:], pbSA.To.NodeId)
+
+	for _, snid := range pbSA.FromSubNetId {
+		var id SubNetworkID
+		copy(id[0:], snid.Id[:])
+		sa.FromSubNetId = append(sa.FromSubNetId, id)
+	}
+
+	return sa
+}
+
+//
 // Check decoded message with endpoint where the message from
 //
 func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgErrno {
@@ -514,7 +550,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 //
 // Encode for UDP messages
 //
-func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
+func (pum *UdpMsg)Encode(t int, msg interface{}) UdpMsgErrno {
 
 	var eno UdpMsgErrno
 
@@ -533,6 +569,9 @@ func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 
 	case UdpMsgTypeNeighbors:
 		eno = pum.EncodeNeighbors(msg.(*Neighbors))
+
+	case UdpMsgTypeStaleAddress:
+		eno = pum.EncodeStaleAddress(msg.(*StaleAddress))
 
 	default:
 		eno = UdpMsgEnoParameter
@@ -561,10 +600,6 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 	pbPing = new(pb.UdpMessage_Ping)
 	*pbm.MsgType = pb.UdpMessage_PING
 	pbm.Ping = pbPing
-	pbm.Pong = nil
-	pbm.FindNode = nil
-	pbm.Neighbors = nil
-	pbm.XXX_unrecognized = nil
 
 	pbPing.From = new(pb.UdpMessage_Node)
 	pbPing.From.UDP = new(uint32)
@@ -628,12 +663,7 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 	pbm.MsgType = new(pb.UdpMessage_MessageType)
 	*pbm.MsgType = pb.UdpMessage_PONG
 	pbPong = new(pb.UdpMessage_Pong)
-	pbm.Ping = nil
 	pbm.Pong = pbPong
-	pbm.FindNode = nil
-	pbm.Neighbors = nil
-	pbm.XXX_unrecognized = nil
-
 
 	pbPong.From = new(pb.UdpMessage_Node)
 	pbPong.From.UDP = new(uint32)
@@ -728,11 +758,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 	}
 
 	*pbm.MsgType = pb.UdpMessage_FINDNODE
-	pbm.Ping = nil
-	pbm.Pong = nil
 	pbm.FindNode = pbFN
-	pbm.Neighbors = nil
-	pbm.XXX_unrecognized = nil
 
 	pbFN.From.IP = append(pbFN.From.IP, fn.From.IP...)
 	*pbFN.From.TCP = uint32(fn.From.TCP)
@@ -787,11 +813,7 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	pbm.MsgType = new(pb.UdpMessage_MessageType)
 	pbNgb = new(pb.UdpMessage_Neighbors)
 	*pbm.MsgType = pb.UdpMessage_NEIGHBORS
-	pbm.Ping = nil
-	pbm.Pong = nil
-	pbm.FindNode = nil
 	pbm.Neighbors = pbNgb
-	pbm.XXX_unrecognized = nil
 
 	pbNgb.From = new(pb.UdpMessage_Node)
 	pbNgb.From.TCP = new(uint32)
@@ -832,7 +854,6 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	pbNgb.Nodes = make([]*pb.UdpMessage_Node, len(ngb.Nodes))
 
 	for idx, n := range ngb.Nodes {
-
 		nn := new(pb.UdpMessage_Node)
 		nn.TCP = new(uint32)
 		nn.UDP = new(uint32)
@@ -849,7 +870,6 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	var buf []byte
 
 	if buf, err = proto.Marshal(pbm); err != nil {
-
 		udpmsgLog.Debug("EncodeNeighbors: failed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
@@ -860,11 +880,85 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	return UdpMsgEnoNone
 }
 
+//
+// Encode StaleAddress
+//
+func (pum *UdpMsg)EncodeStaleAddress(sa *StaleAddress) UdpMsgErrno {
+	
+	var pbm = pum.Msg
+	var pbSA *pb.UdpMessage_StaleAddress
+
+	pbm.MsgType = new(pb.UdpMessage_MessageType)
+	pbSA = new(pb.UdpMessage_StaleAddress)
+	*pbm.MsgType = pb.UdpMessage_NEIGHBORS
+	pbm.StaleAddress = pbSA
+
+	pbSA.From = new(pb.UdpMessage_Node)
+	pbSA.From.TCP = new(uint32)
+	pbSA.From.UDP = new(uint32)
+
+	pbSA.From.IP = append(pbSA.From.IP, sa.From.IP...)
+	*pbSA.From.TCP = uint32(sa.From.TCP)
+	*pbSA.From.UDP = uint32(sa.From.UDP)
+	pbSA.From.NodeId = append(pbSA.From.NodeId, sa.From.NodeId[:]...)
+
+	pbSA.To = new(pb.UdpMessage_Node)
+	pbSA.To.TCP = new(uint32)
+	pbSA.To.UDP = new(uint32)
+
+	pbSA.To.IP = append(pbSA.To.IP, sa.To.IP...)
+	*pbSA.To.TCP = uint32(sa.To.TCP)
+	*pbSA.To.UDP = uint32(sa.To.UDP)
+	pbSA.To.NodeId = append(pbSA.To.NodeId, sa.To.NodeId[:]...)
+
+	for _, snid := range sa.FromSubNetId {
+		pbSnid := new(pb.UdpMessage_SubNetworkID)
+		pbSnid.Id = append(pbSnid.Id, snid[:]...)
+		pbSA.FromSubNetId = append(pbSA.FromSubNetId, pbSnid)
+	}
+
+	priKey := pum.Key.(*ecdsa.PrivateKey)
+	R, SignR, S, SignS := pum.sign(priKey, sa.From.NodeId[0:])
+	pbSA.SignR = new(int32)
+	*pbSA.SignR = SignR
+	pbSA.R = make([]byte, 0)
+	pbSA.R = append(pbSA.R, R...)
+	pbSA.SignS = new(int32)
+	*pbSA.SignS = SignS
+	pbSA.S = make([]byte, 0)
+	pbSA.S = append(pbSA.S, S...)
+
+	return UdpMsgEnoNone
+}
+
+
 func (pum *UdpMsg) GetRawMessage() (buf []byte, len int) {
 	if pum.Eno != UdpMsgEnoNone {
 		return nil, 0
 	}
 	return *pum.Pbuf, pum.Len
+}
+
+//
+// sign with node identity
+//
+func (pum *UdpMsg)sign(priKey *ecdsa.PrivateKey, nodeId []byte)(R []byte, SignR int32 , S []byte, SignS int32) {
+	r, s, _ := config.P2pSign(priKey, nodeId)
+	SignR = int32(config.P2pSignBigInt(r))
+	R = append(R, config.P2pBigIntAbs2Bytes(r)...)
+	SignS = int32(config.P2pSignBigInt(s))
+	S = append(S, config.P2pBigIntAbs2Bytes(s)...)
+	return
+}
+
+//
+// verify with node identity
+//
+func (pum *UdpMsg)verify(R []byte, SignR int32, S []byte, SignS int32, nodeId []byte) bool {
+	pubKey := config.P2pNodeId2Pubkey(nodeId)
+	r := config.P2pBigInt(int(SignR), R)
+	s := config.P2pBigInt(int(SignS), S)
+	return config.P2pVerify(pubKey, nodeId[0:], r, s)
 }
 
 //
@@ -1032,3 +1126,4 @@ func (pum *UdpMsg)DebugMessageToPeer() {
 		}
 	}
 }
+

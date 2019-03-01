@@ -30,21 +30,22 @@ package udpmsg.pb;
 message UdpMessage {
 
     enum MessageType {
-        PING        = 0;
-        PONG        = 1;
-        FINDNODE    = 2;
-        NEIGHBORS   = 3;
+        PING            = 0;
+        PONG            = 1;
+        FINDNODE        = 2;
+        NEIGHBORS       = 3;
+        STALEADDRESS    = 4;
     }
 
     message SubNetworkID {
-        required bytes Id = 1;
+        required bytes          Id              = 1;
     }
 
     message Node {
-        required bytes  IP      = 1;
-        required uint32 UDP     = 2;
-        required uint32 TCP     = 3;
-        required bytes  NodeId  = 4;
+        required bytes          IP              = 1;
+        required uint32         UDP             = 2;
+        required uint32         TCP             = 3;
+        required bytes          NodeId          = 4;
     }
 
     message Ping {

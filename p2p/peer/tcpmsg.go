@@ -381,7 +381,7 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) P
 //
 func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMgrErrno {
 
-	pbPing := pb.P2PMessage{
+	pbPing := pb.P2PMessage {
 		Mid: 		new(pb.MessageId),
 		Ping:		&pb.P2PMessage_Ping{
 			Seq:	&ping.Seq,

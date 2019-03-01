@@ -308,6 +308,7 @@ type NeighborManager struct {
 	sdl			*sch.Scheduler				// pointer to scheduler
 	name		string						// name
 	tep			sch.SchUserTaskEp			// entry
+	bootstrap	bool						// bootstrap node flag
 	ptnMe		interface{}					// pointer to task node of myself
 	ptnTab		interface{}					// pointer to task node of table task
 
@@ -384,6 +385,7 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 
 	ngbMgr.ptnMe = ptn
 	ngbMgr.sdl = sch.SchGetScheduler(ptn)
+	ngbMgr.bootstrap = ngbMgr.sdl.SchGetP2pConfig().BootstrapNode
 	if eno = ngbMgr.setupConfig(); eno != sch.SchEnoNone {
 		ngbLog.Debug("PoweronHandler: setupConfig failed, eno: %d", eno)
 		return eno
@@ -459,6 +461,8 @@ func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 		eno = ngbMgr.FindNodeHandler(msg.msgBody.(*um.FindNode))
 	case um.UdpMsgTypeNeighbors:
 		eno = ngbMgr.NeighborsHandler(msg.msgBody.(*um.Neighbors))
+	case um.UdpMsgTypeStaleAddress:
+		eno = ngbMgr.StaleAddrHandler(msg.msgBody.(*um.StaleAddress))
 	default:
 		ngbLog.Debug("NgbMgrUdpMsgHandler: invalid udp message type: %d", msg.msgType)
 		eno = NgbMgrEnoParameter
@@ -723,6 +727,17 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
+func (ngbMgr *NeighborManager)StaleAddrHandler(sa *um.StaleAddress) NgbMgrErrno {
+	if !ngbMgr.bootstrap {
+		ngbLog.Debug("StaleAddrHandler: discarded for local not a bootstrp node")
+		return NgbMgrEnoMismatched
+	}
+	msg := new(sch.SchMessage)
+	ngbMgr.sdl.SchMakeMessage(msg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblStaleAddrInd, sa)
+	ngbMgr.sdl.SchSendMessage(msg)
+	return NgbMgrEnoNone
+}
+
 func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	var rsp = sch.NblFindNodeRsp{}
 	var schMsg  = sch.SchMessage{}
@@ -963,8 +978,7 @@ func (ngbMgr *NeighborManager)checkDestNode(dst *um.Node, snid config.SubNetwork
 		return true
 	}
 
-	cfg := ngbMgr.sdl.SchGetP2pConfig()
-	if cfg.BootstrapNode && ngbMgr.cfg.ID == dst.NodeId {
+	if ngbMgr.bootstrap && ngbMgr.cfg.ID == dst.NodeId {
 		return true
 	} else if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
 		return me.ID == dst.NodeId
