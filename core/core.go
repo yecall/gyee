@@ -202,14 +202,23 @@ func (c *Core) loop() {
 	defer c.wg.Done()
 	log.Info("Core loop...")
 	for {
+		var (
+			outputChan = c.engineOutputCh
+			msgChan    chan p2p.Message
+		)
+
+		if c.subscriber != nil {
+			msgChan = c.subscriber.MsgChan
+		}
+
 		select {
 		case <-c.quitCh:
 			log.Info("Core loop end.")
 			return
-		case output := <-c.engineOutputCh:
+		case output := <-outputChan:
 			log.Info("core receive engine output", "output", output)
 			// TODO: build block
-		case msg := <-c.subscriber.MsgChan:
+		case msg := <-msgChan:
 			log.Info("core receive ", msg.MsgType, " ", msg.From)
 			switch msg.MsgType {
 			case p2p.MessageTypeEvent:

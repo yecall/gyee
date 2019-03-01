@@ -25,12 +25,13 @@ import (
 	"testing"
 
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/persistent"
 )
 
 func TestNewBlockChain(t *testing.T) {
 	storage := persistent.NewMemoryStorage()
-	_, err := NewBlockChain(MainNetID, storage)
+	_, err := NewBlockChain(MainNetID, storage, nil)
 	if err != nil {
 		t.Fatalf("NewBlockChain %v", err)
 	}
@@ -53,7 +54,7 @@ func TestBlockChainStorageCheck(t *testing.T) {
 		t.Fatalf("prepareStorage %v", err)
 	}
 	// reuse storage with test net should fail
-	_, err := NewBlockChain(TestNetID, storage)
+	_, err := NewBlockChain(TestNetID, storage, nil)
 	if err != ErrBlockChainIDMismatch {
 		t.Fatalf("prepareStorage %v", err)
 	}
@@ -68,7 +69,7 @@ func TestBlockChainGrow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newDB() %v", err)
 	}
-	chain, err := NewBlockChain(TestNetID, storage)
+	chain, err := NewBlockChain(TestNetID, storage, nil)
 	if err != nil {
 		t.Fatalf("newChain() %v", err)
 	}
@@ -79,7 +80,7 @@ func TestBlockChainGrow(t *testing.T) {
 		t.Fatalf("nil stateTrie")
 	}
 
-	account0, err := AddressParse("0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21")
+	account0, err := address.AddressParse("0105cfa04d12fb46fcea51d22cf1f340631bbe930dc0e026ba21")
 	if err != nil {
 		t.Fatalf("AddressParse %v", err)
 	}
@@ -114,7 +115,7 @@ func benchAddBlock(b *testing.B, storage persistent.Storage, cnt int) {
 	if err := prepareStorage(storage, TestNetID); err != nil {
 		b.Fatalf("prepareStorage() failed %v", err)
 	}
-	chain, err := NewBlockChain(TestNetID, storage)
+	chain, err := NewBlockChain(TestNetID, storage, nil)
 	if err != nil {
 		b.Fatalf("NewBlockChain() failed %v", err)
 	}
