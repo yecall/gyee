@@ -395,6 +395,58 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 	}
 }
 
+func yeChainProcEx(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep2p.Message, bk yep2p.Message, done chan bool) {
+	go func() {
+		cnt := 0
+		for {
+			select {
+			case _, ok := <-done:
+				if ok {
+					close(done)
+				}
+				return
+			default:
+			}
+
+			cnt++
+			now := time.Now().UnixNano()
+
+			data := []byte(fmt.Sprintf("ev: %d", now))
+			ev.Data = append(ev.Data[0:0], data...)
+			key := sha256.Sum256(data)
+			ev.Key = append(ev.Key[0:0], key[0:]...)
+			yeShMgr.BroadcastMessageOsn(ev)
+
+			data = []byte(fmt.Sprintf("tx: %d", now))
+			tx.Data = append(tx.Data[0:0], data...)
+			key = sha256.Sum256(data)
+			tx.Key = append(tx.Key[0:0], key[0:]...)
+			yeShMgr.BroadcastMessageOsn(tx)
+
+			data = []byte(fmt.Sprintf("bh: %d", now))
+			bh.Data = append(bh.Data[0:0], data...)
+			key = sha256.Sum256(data)
+			bh.Key = append(bh.Key[0:0], key[0:]...)
+			yeShMgr.BroadcastMessageOsn(bh)
+
+			data = []byte(fmt.Sprintf("bk: %d", now))
+			bk.Data = append(bk.Data[0:0], data...)
+			key = sha256.Sum256(data)
+			bk.Key = append(bk.Key[0:0], key[0:]...)
+			yeShMgr.BroadcastMessageOsn(bk)
+
+			if cnt&0x7f == 0 {
+				log.Debug("yeChainProc: cnt: %d, loop BroadcastMessageOsn", cnt)
+			}
+
+			time.Sleep(time.Millisecond * 20)
+			//time.Sleep(time.Millisecond * 50)
+			//time.Sleep(time.Millisecond * 100)
+			//time.Sleep(time.Millisecond * 1000)
+		}
+	}()
+}
+
 func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep2p.Message, bk yep2p.Message) {
 	cnt := 0
 	cnt_max := 100 * 100 * 100
@@ -917,8 +969,15 @@ func testCase17(tc *testCase) {
 	go subFunc(subTx, "tx")
 	go subFunc(subBh, "bh")
 
-	if true {
+	if false {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
+	} else if true {
+		done := make(chan bool)
+		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
+		waitInterrupt()
+		done<-true
+		<-done
+		yeChainStop(yeShMgr, subEv, subTx, subBh)
 	} else {
 		time.Sleep(time.Second * 10)
 		yeChainProc(yeShMgr, ev, tx, bh, bk)
