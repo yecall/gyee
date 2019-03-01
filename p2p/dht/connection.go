@@ -1078,6 +1078,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 //
 func (conMgr *ConMgr)natReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 	if msg.NatType == config.NATT_NONE {
+		conMgr.natTcpResult = true
 		conMgr.pubTcpIp = conMgr.cfg.local.IP
 		conMgr.pubTcpPort = int(conMgr.cfg.local.TCP)
 		chConMgrReady<-true
