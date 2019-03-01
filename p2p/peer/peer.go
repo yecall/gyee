@@ -125,7 +125,7 @@ const (
 													// it's a fixed value here than can be configurated
 													// by other module.
 
-	durDcvFindNodeTimer = time.Second * 4			// duration to wait for find node response from discover task,
+	durDcvFindNodeTimer = time.Second * 2			// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 
 	durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers

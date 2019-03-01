@@ -96,6 +96,9 @@ type ConInst struct {
 	isBlind			bool					// is blind connection instance
 	txPkgCnt		int64					// statistics for number of packages sent
 	rxPkgCnt		int64					// statistics for number off package received
+	txqDiscardCnt	int64					// number of tx packages discarded for tx queue full
+	wrqDiscardCnt	int64					// number of tx packages discarded for wait-response queue full
+	trySendingCnt	int64					// number of trying to send data
 }
 
 //
@@ -625,27 +628,40 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	if pkg == nil {
-		ciLog.Debug("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
+		p2plog.Debug("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		return DhtEnoParameter
 	}
 
+	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
+		p2plog.Debug("txPutPending: trySendingCnt: %d, peer: %s:%d",
+			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
+	}
+
 	if len(conInst.txChan) >= cap(conInst.txChan) {
-		ciLog.Debug("txPutPending: pending queue full, inst: %s, hsInfo: %+v, local: %+v",
+		p2plog.Debug("txPutPending: pending queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
+		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt & 0x1f == 0 {
+			p2plog.Debug("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
+				conInst.txqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
+		}
 		return DhtEnoResource
 	}
 
 	if conInst.txWaitRsp.Len() >= ciTxMaxWaitResponseSize {
-		ciLog.Debug("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
+		p2plog.Debug("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
+		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt & 0x1f == 0 {
+			p2plog.Debug("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
+				conInst.wrqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
+		}
 		return DhtEnoResource
 	}
 
-	ciLog.Debug("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
-		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
-
 	conInst.txChan<-pkg
+
+	p2plog.Debug("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
+		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
 	return DhtEnoNone
 }
@@ -1223,7 +1239,7 @@ func (conInst *ConInst)txProc() {
 
 	defer func() {
 		if err := recover(); err != nil {
-			ciLog.Debug("txProc: exception raised, wait done...")
+			p2plog.Debug("txProc: exception raised, wait done...")
 			<-conInst.txDone
 			conInst.txDone<-DhtEnoOs.GetEno()
 		}
@@ -1256,7 +1272,7 @@ _txLoop:
 
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			ciLog.Debug("txProc: mismatched type, inst: %s", conInst.name)
+			p2plog.Debug("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
 		}
 
@@ -1278,15 +1294,15 @@ _txLoop:
 			break _txLoop
 		}
 
-		if conInst.txPkgCnt++; conInst.txPkgCnt % 16 == 0 {
-			ciLog.Debug("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
+		if conInst.txPkgCnt++; conInst.txPkgCnt & 0xff == 0 {
+			p2plog.Debug("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
 		}
 
 	_checkDone:
 
 		select {
 		case done := <-conInst.txDone:
-			ciLog.Debug("txProc: inst: %s, done by: %d", conInst.name, done)
+			p2plog.Debug("txProc: inst: %s, done by: %d", conInst.name, done)
 			isDone = true
 			break _txLoop
 		default:
@@ -1327,7 +1343,7 @@ _txLoop:
 		return
 	}
 
-	ciLog.Debug("txProc: wow! impossible errors, inst: %s", conInst.name)
+	p2plog.Debug("txProc: wow! impossible errors, inst: %s", conInst.name)
 }
 
 //
@@ -1341,7 +1357,7 @@ func (conInst *ConInst)rxProc() {
 
 	defer func() {
 		if err := recover(); err != nil {
-			ciLog.Debug("rxProc: exception raised, wait done...")
+			p2plog.Debug("rxProc: exception raised, wait done...")
 			<-conInst.rxDone
 			conInst.rxDone<-DhtEnoOs.GetEno()
 		}
@@ -1365,8 +1381,8 @@ _rxLoop:
 			break _rxLoop
 		}
 
-		if conInst.rxPkgCnt++; conInst.rxPkgCnt % 16 == 0 {
-			ciLog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
+		if conInst.rxPkgCnt++; conInst.rxPkgCnt & 0xff == 0 {
+			p2plog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
 		}
 
 		pkg := new(DhtPackage)
@@ -1400,7 +1416,7 @@ _checkDone:
 		select {
 		case done := <-conInst.rxDone:
 			isDone = true
-			ciLog.Debug("rxProc: inst: %s, done by: %d", conInst.name, done)
+			p2plog.Debug("rxProc: inst: %s, done by: %d", conInst.name, done)
 			break _rxLoop
 		default:
 		}
@@ -1440,7 +1456,7 @@ _checkDone:
 		return
 	}
 
-	ciLog.Debug("rxProc: wow! impossible errors, inst: %s", conInst.name)
+	p2plog.Debug("rxProc: wow! impossible errors, inst: %s", conInst.name)
 }
 
 //

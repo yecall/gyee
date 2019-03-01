@@ -153,7 +153,7 @@ var testCaseTable = []testCase{
 //
 // target case
 //
-var targetCase = "testCase16"
+var targetCase = "testCase17"
 
 //
 // switch for playing go-monitors, related commands:
@@ -917,7 +917,7 @@ func testCase17(tc *testCase) {
 	go subFunc(subTx, "tx")
 	go subFunc(subBh, "bh")
 
-	if true {
+	if false {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
 	} else {
 		time.Sleep(time.Second * 10)
