@@ -660,7 +660,7 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	conInst.txChan<-pkg
 
-	p2plog.Debug("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
+	ciLog.Debug("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
 		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
 	return DhtEnoNone
