@@ -922,7 +922,8 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 		return sch.SchEnoNotFound
 	}
 
-	p2plog.Debug("instStatusInd: inst: %s, current status: %d", cis[0].name, cis[0].getStatus())
+	p2plog.Debug("instStatusInd: inst: %s, msg.Status: %d, current status: %d",
+		cis[0].name, msg.Status, cis[0].getStatus())
 
 	switch msg.Status {
 	case CisOutOfService:
@@ -1209,7 +1210,6 @@ func (conMgr *ConMgr)getConfig() DhtErrno {
 // Lookup connection instance by instance identity
 //
 func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
-
 	conMgr.lockInstTab.Lock()
 	defer conMgr.lockInstTab.Unlock()
 
@@ -1238,8 +1238,7 @@ func (conMgr *ConMgr)lookupConInst(cid *conInstIdentity) []*ConInst {
 			return []*ConInst{inst[0]}
 		}
 	}
-
-	return []*ConInst{}
+	return nil
 }
 
 //
@@ -1436,7 +1435,8 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 	} else if len(cis) > 1 {
 		p2plog.Debug("instOutOfServiceInd: too much, inst: %s, %s", cis[0].name, cis[1].name)
 	} else {
-		p2plog.Debug("instOutOfServiceInd: inst: %s, current status: %d", cis[0].name, cis[0].getStatus())
+		p2plog.Debug("instOutOfServiceInd: inst: %s, msg.Status: %d, current status: %d",
+			cis[0].name, msg.Status, cis[0].getStatus())
 	}
 
 	for _, ci := range cis {
