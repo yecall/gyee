@@ -1418,8 +1418,9 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 					Peer:	msg.Peer,
 					Why:	sch.EvDhtConInstStatusInd,
 				}
-				sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
-				sdl.SchSendMessage(&schMsg)
+				msg := new(sch.SchMessage)
+				sdl.SchMakeMessage(msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
+				sdl.SchSendMessage(msg)
 			}
 		}
 	}
