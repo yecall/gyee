@@ -879,7 +879,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 // nat ready to work
 //
 func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
-	qryLog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
+	p2plog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
 		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
@@ -894,7 +894,7 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
 		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+			p2plog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -908,21 +908,21 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatMakeMapRsp for more please.
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
-		qryLog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
+		p2plog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
 	}
-	qryLog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
+	p2plog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
 		mmr.Proto, mmr.PubIp.String(), mmr.PubPort)
 
 	proto := strings.ToLower(mmr.Proto)
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(mmr.Status)
 		if qryMgr.natTcpResult {
-			qryLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
 				mmr.PubIp.String(), mmr.PubPort)
 			qryMgr.pubTcpIp = mmr.PubIp
 			qryMgr.pubTcpPort = mmr.PubPort
 			if eno := qryMgr.switch2NatAddr(proto); eno != DhtEnoNone {
-				qryLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				p2plog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 		} else {
@@ -934,7 +934,7 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		return qryMgr.sdl.SchSendMessage(msg)
 	}
 
-	qryLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	p2plog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -946,24 +946,24 @@ func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 	// when status from nat is bad, nothing to do but just backup the status.
 	proto := strings.ToLower(msg.Proto)
 	if proto != nat.NATP_TCP {
-		qryLog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
+		p2plog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
 		return sch.SchEnoParameter
 	}
 
 	oldResult := qryMgr.natTcpResult
 	if qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status); !qryMgr.natTcpResult {
-		qryLog.Debug("natPubAddrUpdateInd: result bad")
+		p2plog.Debug("natPubAddrUpdateInd: result bad")
 		return sch.SchEnoNone
 	}
 
-	qryLog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+	p2plog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
 		msg.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
 
 	qryMgr.pubTcpIp = msg.PubIp
 	qryMgr.pubTcpPort = msg.PubPort
 	if !oldResult || !msg.PubIp.Equal(qryMgr.pubTcpIp) || msg.PubPort != qryMgr.pubTcpPort {
 		if eno := qryMgr.natMapSwitch(); eno != DhtEnoNone {
-			qryLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
+			p2plog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
 			return sch.SchEnoUserTask
 		}
 	}

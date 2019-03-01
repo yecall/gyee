@@ -1558,6 +1558,8 @@ func (peMgr *PeerManager)msgFilter(msg *sch.SchMessage) PeMgrErrno {
 		switch msg.Id {
 		case sch.EvSchPoweron:
 		case sch.EvSchPoweroff:
+		case sch.EvNatMgrReadyInd:
+		case sch.EvNatMgrMakeMapRsp:
 		default:
 			peerLog.Debug("msgFilter: filtered out for peMgrInNull, msg.Id: %d", msg.Id)
 			eno = PeMgrEnoMismatched

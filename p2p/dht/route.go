@@ -1407,7 +1407,7 @@ func (rutMgr *RutMgr)rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 // Just for debug to show the route table
 //
 func (rutMgr *RutMgr)showRoute(tag string) {
-	if true {
+	if false {
 		dht := rutMgr.sdl.SchGetP2pCfgName()
 		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
 		rt := rutMgr.rutTab

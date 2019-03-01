@@ -1091,18 +1091,18 @@ func (conMgr *ConMgr)natReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 //
 func (conMgr *ConMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 	if !nat.NatIsResultOk(msg.Result) {
-		connLog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
+		p2plog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
 	proto := strings.ToLower(msg.Proto)
 	if proto == "tcp" {
 		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if conMgr.natTcpResult {
-			connLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
 				msg.PubIp.String(), msg.PubPort)
 			conMgr.pubTcpIp = msg.PubIp
 			conMgr.pubTcpPort = msg.PubPort
 			if eno := conMgr.switch2NatAddr(proto); eno != DhtEnoNone  {
-				connLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				p2plog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 			chConMgrReady<-true
@@ -1112,7 +1112,7 @@ func (conMgr *ConMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 		}
 		return sch.SchEnoNone
 	}
-	connLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	p2plog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1124,16 +1124,16 @@ func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 	if proto == "tcp" {
 		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if conMgr.natTcpResult {
-			connLog.Debug("natPubAddrUpdateInd: public dht addr: %s:%d",
+			p2plog.Debug("natPubAddrUpdateInd: public dht addr: %s:%d",
 				msg.PubIp.String(), msg.PubPort)
 			if conMgr.pasStatus != pasInNull {
-				connLog.Debug("natPubAddrUpdateInd: had been in switching, pasStatus: %d", conMgr.pasStatus)
+				p2plog.Debug("natPubAddrUpdateInd: had been in switching, pasStatus: %d", conMgr.pasStatus)
 				return sch.SchEnoMismatched
 			}
 			conMgr.pubTcpIp = msg.PubIp
 			conMgr.pubTcpPort = msg.PubPort
 			if eno := conMgr.natMapSwitch(); eno != DhtEnoNone {
-				connLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, eno: %d", eno)
+				p2plog.Debug("natPubAddrUpdateInd: natMapSwitch failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 		} else {
@@ -1142,7 +1142,7 @@ func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 		}
 		return sch.SchEnoNone
 	}
-	connLog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
+	p2plog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
