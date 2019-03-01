@@ -413,11 +413,6 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.updateStatus(CisHandshaked)
 	conInst.statusReport()
 
-	rsp.Eno = DhtEnoNone.GetEno()
-	rsp.Peer = &conInst.hsInfo.peer
-	rsp.HsInfo = &conInst.hsInfo
-	rsp2ConMgr()
-
 	//
 	// service startup
 	//
@@ -426,11 +421,21 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
+	conInst.updateStatus(CisInService)
+	conInst.statusReport()
+
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
 
-	conInst.updateStatus(CisInService)
-	conInst.statusReport()
+	//
+	// don't tell the connection manager too early since it would try to send data on the
+	// instance.
+	//
+
+	rsp.Eno = DhtEnoNone.GetEno()
+	rsp.Peer = &conInst.hsInfo.peer
+	rsp.HsInfo = &conInst.hsInfo
+	rsp2ConMgr()
 
 	return sch.SchEnoNone
 }
@@ -799,16 +804,7 @@ func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno, *list.Elemen
 // Start tx-task
 //
 func (conInst *ConInst)txTaskStart() DhtErrno {
-	if conInst.txDone != nil {
-		ciLog.Debug("txTaskStart: non-nil chan for done")
-		return DhtEnoMismatched
-	}
 	conInst.txDone = make(chan int)
-
-	if conInst.txChan != nil {
-		ciLog.Debug("txTaskStart: non-nil chan for txChan")
-		return DhtEnoMismatched
-	}
 	conInst.txChan = make(chan interface{}, ciTxPendingQueueSize)
 	go conInst.txProc()
 	return DhtEnoNone
@@ -818,10 +814,6 @@ func (conInst *ConInst)txTaskStart() DhtErrno {
 // Start rx-task
 //
 func (conInst *ConInst)rxTaskStart() DhtErrno {
-	if conInst.rxDone != nil {
-		ciLog.Debug("rxTaskStart: non-nil chan for done")
-		return DhtEnoMismatched
-	}
 	conInst.rxDone = make(chan int)
 	go conInst.rxProc()
 	return DhtEnoNone
