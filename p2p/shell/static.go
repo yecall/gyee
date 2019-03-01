@@ -23,7 +23,6 @@ package shell
 
 import (
 	"time"
-	"fmt"
 	config	"github.com/yeeco/gyee/p2p/config"
 	sch 	"github.com/yeeco/gyee/p2p/scheduler"
 	dcv		"github.com/yeeco/gyee/p2p/discover"

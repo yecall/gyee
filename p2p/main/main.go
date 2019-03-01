@@ -455,14 +455,6 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 // testCase0
 //
 func testCase0(tc *testCase) {
-
-	liyy := []string{"1", "2", "3"}
-	fmt.Printf("%s", liyy)
-	fmt.Printf("%s", liyy)
-	fmt.Printf("%s", liyy)
-	fmt.Printf("%s", liyy)
-
-
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.BootstrapNode = true
 	yesCfg.SubNetMaskBits = 0
