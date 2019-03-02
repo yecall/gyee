@@ -80,14 +80,10 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage, engine consensus
 		return nil, err
 	}
 
-	// TODO: stateDB cache
-	stateDB := state.NewDatabaseWithCache(
-		persistent.NewTable(storage, KeyPrefixStateTrie),
-		0)
 	bc := &BlockChain{
 		chainID: chainID,
 		storage: storage,
-		stateDB: stateDB,
+		stateDB: GetStateDB(storage),
 		engine:  engine,
 		quitCh:  make(chan struct{}),
 	}
@@ -357,6 +353,14 @@ func (bc *BlockChain) CurrentBlockHeight() uint64 {
 func (bc *BlockChain) GetValidators() []string {
 	b := bc.LastBlock()
 	return b.consensusTrie.GetValidators()
+}
+
+func GetStateDB(storage persistent.Storage) state.Database {
+	// TODO: stateDB cache
+	stateDB := state.NewDatabaseWithCache(
+		persistent.NewTable(storage, KeyPrefixStateTrie),
+		0)
+	return stateDB
 }
 
 //非验证节点，是否需要启txPool?

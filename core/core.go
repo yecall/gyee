@@ -45,7 +45,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
@@ -89,6 +88,10 @@ type Core struct {
 }
 
 func NewCore(node INode, conf *config.Config) (*Core, error) {
+	return NewCoreWithGenesis(node, conf, nil)
+}
+
+func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Core, error) {
 	log.Info("Create new core")
 
 	// prepare chain db
@@ -96,6 +99,15 @@ func NewCore(node INode, conf *config.Config) (*Core, error) {
 	storage, err := persistent.NewLevelStorage(dbPath)
 	if err != nil {
 		return nil, err
+	}
+
+	// prepare storage with genesis
+	// for unit tests only
+	if genesis != nil {
+		stateDB := GetStateDB(storage)
+		if _, err := genesis.Commit(stateDB, storage); err != nil {
+			return nil, err
+		}
 	}
 
 	core := &Core{
@@ -233,6 +245,13 @@ func (c *Core) loop() {
 
 func (c *Core) loadCoinbaseKey() error {
 	conf := c.config
+
+	if key := conf.Chain.Key; len(key) > 0 {
+		// private key provided in config
+		c.minerKey = key
+		return nil
+	}
+
 	coinbase := conf.Chain.Coinbase
 	if len(coinbase) == 0 {
 		return ErrNoCoinbase
@@ -249,9 +268,6 @@ func (c *Core) loadCoinbaseKey() error {
 		return err
 	}
 	pwd := []byte(strings.Split(string(pwdContent), "\n")[0])
-	if err := c.keystore.Unlock(coinbase, pwd, time.Minute); err != nil {
-		return err
-	}
 	key, err := c.keystore.GetKey(coinbase, pwd)
 	if err != nil {
 		return err

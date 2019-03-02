@@ -95,6 +95,7 @@ type ChainConfig struct {
 	Mine     bool   `toml:"mine"`
 	Coinbase string `toml:"coinbase"`
 	PwdFile  string `toml:"pwdfile"`
+	Key      []byte // raw private key used in unit test
 }
 
 //cpu, mem, disk profile,

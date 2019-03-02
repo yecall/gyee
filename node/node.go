@@ -71,6 +71,10 @@ type Node struct {
 }
 
 func NewNode(conf *config.Config) (*Node, error) {
+	return NewNodeWithGenesis(conf, nil)
+}
+
+func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis) (*Node, error) {
 	log.Info("Create new node")
 	if conf.NodeDir != "" {
 		absdatadir, err := filepath.Abs(conf.NodeDir)
@@ -90,7 +94,7 @@ func NewNode(conf *config.Config) (*Node, error) {
 		log.Crit("node: accountMgr: ", err)
 	}
 
-	node.core, err = core.NewCore(node, conf)
+	node.core, err = core.NewCoreWithGenesis(node, conf, genesis)
 	if err != nil {
 		log.Crit("node: core: ", err)
 	}

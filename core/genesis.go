@@ -32,6 +32,10 @@ import (
 	"github.com/yeeco/gyee/res"
 )
 
+type InitYeeDist struct {
+	Address, Value string
+}
+
 type Genesis struct {
 	ChainID   ChainID
 	Time      int64
@@ -41,9 +45,7 @@ type Genesis struct {
 			Validators []string
 		}
 	}
-	InitYeeDist []struct {
-		Address, Value string
-	}
+	InitYeeDist []InitYeeDist
 	// block header hash generated with info above
 	Hash string
 }
@@ -121,8 +123,4 @@ func (g *Genesis) Commit(stateDB state.Database, putter persistent.Putter) (*Blo
 	}
 	putLastBlock(putter, b.Hash())
 	return b, nil
-}
-
-func NewGenesisBlock() {
-
 }
