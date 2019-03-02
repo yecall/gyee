@@ -236,7 +236,6 @@ const (
 	EvNblPongedInd			= EvNblUdpBase	+ 6
 	EvNblQueriedInd			= EvNblUdpBase	+ 7
 	EvNblCleanMapReq		= EvNblUdpBase	+ 8
-	EvNblStaleAddrInd		= EvNblUdpBase	+ 9
 )
 
 // EvNblFindNodeRsp message

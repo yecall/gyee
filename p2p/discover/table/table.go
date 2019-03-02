@@ -350,9 +350,6 @@ func (tabMgr *TableManager)tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 	case sch.EvNatMgrPubAddrUpdateInd:
 		eno = tabMgr.tabMgrNatPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
 
-	case sch.EvNblStaleAddrInd:
-		eno = tabMgr.tabMgrNblStaleAddrInd(msg.Body.(*um.StaleAddress))
-
 	default:
 		tabLog.Debug("TabMgrProc: invalid message: %d", msg.Id)
 		eno = TabMgrEnoParameter
@@ -463,7 +460,7 @@ func (tabMgr *TableManager)stopSubnetRefresh() TabMgrErrno {
 	return TabMgrEnoNone
 }
 
-func (tabMgr *TableManager)startSubnetRefresh() TabMgrErrno {
+func (tabMgr *TableManager)startSubnetRefresh(targetId *config.NodeID) TabMgrErrno {
 	cycle := autoRefreshCycle
 	if tabMgr.cfg.bootstrapNode {
 		cycle = autoBsnRefreshCycle
@@ -474,7 +471,7 @@ func (tabMgr *TableManager)startSubnetRefresh() TabMgrErrno {
 		return eno
 	}
 
-	if eno := tabMgr.tabRefresh(&tabMgr.snid, nil); eno != TabMgrEnoNone {
+	if eno := tabMgr.tabRefresh(&tabMgr.snid, targetId); eno != TabMgrEnoNone {
 		tabLog.Debug("startSubnetRefresh: tabRefresh sub network failed, eno: %d, subnet: %x", eno, tabMgr.snid)
 		return eno
 	}
@@ -616,7 +613,7 @@ func (tabMgr *TableManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMgr
 		tabMgr.subNetMgrList[add.SubNetId] = mgr
 		tabLog.Debug("shellReconfigReq: subnet manager added: %x", add.SubNetId)
 
-		if eno := mgr.startSubnetRefresh(); eno != TabMgrEnoNone {
+		if eno := mgr.startSubnetRefresh(nil); eno != TabMgrEnoNone {
 			tabLog.Debug("shellReconfigReq: failed, eno: %d, snid: %x", eno, mgr.snid)
 			return eno
 		}
@@ -1041,7 +1038,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 			return eno
 		} else if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
-				mgr.startSubnetRefresh()
+				mgr.startSubnetRefresh(nil)
 			}
 		}
 	}
@@ -1102,7 +1099,9 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 		}
 		if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
-				mgr.startSubnetRefresh()
+				// notice: here we start refreshing with the local node identity, so, peer would update to our
+				// new address with this identity(to overlap the old one), it can try to connect us also.
+				mgr.startSubnetRefresh(&mgr.cfg.local.ID)
 			}
 		}
 	} else if old {
@@ -1111,53 +1110,6 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 		}
 	}
 
-	return TabMgrEnoNone
-}
-
-func (tabMgr *TableManager)tabMgrNblStaleAddrInd(sa *um.StaleAddress) TabMgrErrno {
-	if !tabMgr.cfg.bootstrapNode {
-		tabLog.Debug("tabMgrNblStaleAddrInd: discarded for it's not a bootstrap node")
-		return TabMgrEnoParameter
-	}
-	staleIp := sa.From.IP
-	node := &sa.From.NodeId
-	for _, snid := range sa.FromSubNetId {
-		if snid == AnySubNet {
-			return tabMgr.tabBucketStaleAll(node, staleIp)
-		}
-	}
-	for _, snid := range sa.FromSubNetId {
-		if mgr, ok := tabMgr.subNetMgrList[snid]; ok {
-			mgr.tabBucketStale(node, staleIp)
-		}
-	}
-	return TabMgrEnoNone
-}
-
-func (tabMgr *TableManager)tabBucketStaleAll(node *config.NodeID, staleIp net.IP) TabMgrErrno {
-	for _, mgr := range tabMgr.subNetMgrList {
-		mgr.tabBucketStale(node, staleIp)
-	}
-	return TabMgrEnoNone
-}
-
-func (tabMgr *TableManager)tabBucketStale(node *config.NodeID, staleIp net.IP) TabMgrErrno {
-	for _, bk := range tabMgr.buckets {
-		if bk != nil {
-			if bk.nodes != nil && len(bk.nodes) > 0 {
-				for idx, n := range bk.nodes {
-					if n.ID == *node && n.IP.Equal(staleIp) {
-						if idx != len(bk.nodes) - 1 {
-							bk.nodes = append(bk.nodes[0:idx], bk.nodes[idx+1:]...)
-						} else {
-							bk.nodes = bk.nodes[0:idx]
-						}
-						break
-					}
-				}
-			}
-		}
-	}
 	return TabMgrEnoNone
 }
 
@@ -2673,54 +2625,4 @@ func (tabMgr *TableManager)subnetPubAddrSwitchPrepare() TabMgrErrno {
 		}
 	}
 	return TabMgrEnoNone
-}
-
-func (tabMgr *TableManager)staleMyself() {
-	pum := new(um.UdpMsg)
-	pum.Key = tabMgr.sdl.SchGetP2pConfig().PrivateKey
-	_, lsn := tabMgr.sdl.SchGetUserTaskNode(sch.NgbLsnName)
-	from := um.Node{
-		NodeId: tabMgr.cfg.local.ID,
-		IP:     tabMgr.cfg.local.IP,
-		UDP:    tabMgr.cfg.local.UDP,
-		TCP:    tabMgr.cfg.local.TCP,
-	}
-	stale := um.StaleAddress{
-		From:         from,
-		FromSubNetId: make([]config.SubNetworkID, 0),
-	}
-	for snid, _ := range tabMgr.subNetMgrList {
-		stale.FromSubNetId = append(stale.FromSubNetId, snid)
-	}
-	for _, bsn := range tabMgr.cfg.bootstrapNodes {
-		to := um.Node{
-			NodeId: bsn.ID,
-			IP:     bsn.IP,
-			UDP:    bsn.UDP,
-			TCP:    bsn.TCP,
-		}
-		stale.To = to
-		if eno := pum.Encode(um.UdpMsgTypeStaleAddress, &stale); eno != um.UdpMsgEnoNone {
-			tabLog.Debug("FindNodeHandler: Encode failed")
-			continue
-		}
-		buf, bytes := pum.GetRawMessage()
-		if buf == nil || bytes <= 0 {
-			tabLog.Debug("staleMyself: GetRawMessage failed")
-			continue
-		}
-
-		bsnAddr := &net.UDPAddr {
-			IP: 	bsn.IP,
-			Port:	int(bsn.UDP),
-			Zone:	"",
-		}
-		msg := new(sch.SchMessage)
-		dr := sch.NblDataReq {
-			Payload:	buf,
-			TgtAddr:	bsnAddr,
-		}
-		tabMgr.sdl.SchMakeMessage(msg, tabMgr.ptnMe, lsn, sch.EvNblDataReq, &dr)
-		tabMgr.sdl.SchSendMessage(msg)
-	}
 }

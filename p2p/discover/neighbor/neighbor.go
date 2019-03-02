@@ -311,16 +311,7 @@ type NeighborManager struct {
 	bootstrap	bool						// bootstrap node flag
 	ptnMe		interface{}					// pointer to task node of myself
 	ptnTab		interface{}					// pointer to task node of table task
-
-	//
-	// Notice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// here we backup the pointer of table manger to access it, this is dangerous
-	// for the procedure of "poweroff", we take this into account in the "poweroff"
-	// order of these two tasks, see var taskStaticPoweroffOrder4Chain please. We
-	// should solve this issue later.
-	//
 	tabMgr		*tab.TableManager			// pointer to table manager
-
 	ptnLsn		interface{}					// pointer to task node of listner
 	ngbMap		map[string]*neighborInst	// map neighbor node id to task node pointer
 	fnInstSeq	int							// findnode instance sequence number
@@ -461,8 +452,6 @@ func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 		eno = ngbMgr.FindNodeHandler(msg.msgBody.(*um.FindNode))
 	case um.UdpMsgTypeNeighbors:
 		eno = ngbMgr.NeighborsHandler(msg.msgBody.(*um.Neighbors))
-	case um.UdpMsgTypeStaleAddress:
-		eno = ngbMgr.StaleAddrHandler(msg.msgBody.(*um.StaleAddress))
 	default:
 		ngbLog.Debug("NgbMgrUdpMsgHandler: invalid udp message type: %d", msg.msgType)
 		eno = NgbMgrEnoParameter
@@ -724,17 +713,6 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptnNgb, sch.EvNblFindNodeRsp, nbs)
 	ngbMgr.sdl.SchSendMessage(&schMsg)
 
-	return NgbMgrEnoNone
-}
-
-func (ngbMgr *NeighborManager)StaleAddrHandler(sa *um.StaleAddress) NgbMgrErrno {
-	if !ngbMgr.bootstrap {
-		ngbLog.Debug("StaleAddrHandler: discarded for local not a bootstrp node")
-		return NgbMgrEnoMismatched
-	}
-	msg := new(sch.SchMessage)
-	ngbMgr.sdl.SchMakeMessage(msg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblStaleAddrInd, sa)
-	ngbMgr.sdl.SchSendMessage(msg)
 	return NgbMgrEnoNone
 }
 

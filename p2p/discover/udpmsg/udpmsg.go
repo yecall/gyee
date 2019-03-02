@@ -54,7 +54,6 @@ const (
 	UdpMsgTypePong
 	UdpMsgTypeFindNode
 	UdpMsgTypeNeighbors
-	UdpMsgTypeStaleAddress
 	UdpMsgTypeUnknown
 	UdpMsgTypeAny
 )
@@ -128,13 +127,6 @@ type (
 		Id				uint64			// message identity
 		Expiration		uint64			// time to expired of this message
 		Extra			[]byte			// extra info
-	}
-
-	// StaleAddress: tell bootstarp node to teardown stale ip address
-	StaleAddress struct {
-		From			Node			// source node
-		To				Node			// destination node
-		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
 	}
 )
 
@@ -238,7 +230,6 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 		UdpMsgTypePong: pum.GetPong,
 		UdpMsgTypeFindNode: pum.GetFindNode,
 		UdpMsgTypeNeighbors: pum.GetNeighbors,
-		UdpMsgTypeStaleAddress: pum.GetStaleAddress,
 	}
 	var f interface{}
 	var ok bool
@@ -263,7 +254,6 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 		pb.UdpMessage_PONG:			UdpMsgTypePong,
 		pb.UdpMessage_FINDNODE:		UdpMsgTypeFindNode,
 		pb.UdpMessage_NEIGHBORS:	UdpMsgTypeNeighbors,
-		pb.UdpMessage_STALEADDRESS:	UdpMsgTypeStaleAddress,
 	}
 	var key pb.UdpMessage_MessageType
 	var val UdpMsgType
@@ -423,36 +413,6 @@ func (pum *UdpMsg) GetNeighbors() interface{} {
 }
 
 //
-// Get decoded StaleAddress
-//
-func (pum *UdpMsg)GetStaleAddress() interface{} {
-	pbSA := pum.Msg.StaleAddress
-	if !pum.verify(pbSA.R, *pbSA.SignR, pbSA.S, *pbSA.SignS, pbSA.From.NodeId) {
-		udpmsgLog.Debug("GetStaleAddress: verify failed")
-		return nil
-	}
-
-	sa := new(StaleAddress)
-	sa.From.IP = append(sa.From.IP, pbSA.From.IP...)
-	sa.From.TCP = uint16(*pbSA.From.TCP)
-	sa.From.UDP = uint16(*pbSA.From.UDP)
-	copy(sa.From.NodeId[:], pbSA.From.NodeId)
-
-	sa.To.IP = append(sa.To.IP, pbSA.To.IP...)
-	sa.To.TCP = uint16(*pbSA.To.TCP)
-	sa.To.UDP = uint16(*pbSA.To.UDP)
-	copy(sa.To.NodeId[:], pbSA.To.NodeId)
-
-	for _, snid := range pbSA.FromSubNetId {
-		var id SubNetworkID
-		copy(id[0:], snid.Id[:])
-		sa.FromSubNetId = append(sa.FromSubNetId, id)
-	}
-
-	return sa
-}
-
-//
 // Check decoded message with endpoint where the message from
 //
 func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgErrno {
@@ -520,9 +480,6 @@ func (pum *UdpMsg)Encode(t int, msg interface{}) UdpMsgErrno {
 
 	case UdpMsgTypeNeighbors:
 		eno = pum.EncodeNeighbors(msg.(*Neighbors))
-
-	case UdpMsgTypeStaleAddress:
-		eno = pum.EncodeStaleAddress(msg.(*StaleAddress))
 
 	default:
 		eno = UdpMsgEnoParameter
@@ -829,58 +786,6 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 
 	return UdpMsgEnoNone
 }
-
-//
-// Encode StaleAddress
-//
-func (pum *UdpMsg)EncodeStaleAddress(sa *StaleAddress) UdpMsgErrno {
-	
-	var pbm = pum.Msg
-	var pbSA *pb.UdpMessage_StaleAddress
-
-	pbm.MsgType = new(pb.UdpMessage_MessageType)
-	pbSA = new(pb.UdpMessage_StaleAddress)
-	*pbm.MsgType = pb.UdpMessage_NEIGHBORS
-	pbm.StaleAddress = pbSA
-
-	pbSA.From = new(pb.UdpMessage_Node)
-	pbSA.From.TCP = new(uint32)
-	pbSA.From.UDP = new(uint32)
-
-	pbSA.From.IP = append(pbSA.From.IP, sa.From.IP...)
-	*pbSA.From.TCP = uint32(sa.From.TCP)
-	*pbSA.From.UDP = uint32(sa.From.UDP)
-	pbSA.From.NodeId = append(pbSA.From.NodeId, sa.From.NodeId[:]...)
-
-	pbSA.To = new(pb.UdpMessage_Node)
-	pbSA.To.TCP = new(uint32)
-	pbSA.To.UDP = new(uint32)
-
-	pbSA.To.IP = append(pbSA.To.IP, sa.To.IP...)
-	*pbSA.To.TCP = uint32(sa.To.TCP)
-	*pbSA.To.UDP = uint32(sa.To.UDP)
-	pbSA.To.NodeId = append(pbSA.To.NodeId, sa.To.NodeId[:]...)
-
-	for _, snid := range sa.FromSubNetId {
-		pbSnid := new(pb.UdpMessage_SubNetworkID)
-		pbSnid.Id = append(pbSnid.Id, snid[:]...)
-		pbSA.FromSubNetId = append(pbSA.FromSubNetId, pbSnid)
-	}
-
-	priKey := pum.Key.(*ecdsa.PrivateKey)
-	R, SignR, S, SignS := pum.sign(priKey, sa.From.NodeId[0:])
-	pbSA.SignR = new(int32)
-	*pbSA.SignR = SignR
-	pbSA.R = make([]byte, 0)
-	pbSA.R = append(pbSA.R, R...)
-	pbSA.SignS = new(int32)
-	*pbSA.SignS = SignS
-	pbSA.S = make([]byte, 0)
-	pbSA.S = append(pbSA.S, S...)
-
-	return UdpMsgEnoNone
-}
-
 
 func (pum *UdpMsg) GetRawMessage() (buf []byte, len int) {
 	if pum.Eno != UdpMsgEnoNone {
