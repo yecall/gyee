@@ -414,9 +414,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	rsp.Eno = DhtEnoNone.GetEno()
 	rsp.Peer = &conInst.hsInfo.peer
 	rsp.HsInfo = &conInst.hsInfo
-	rsp2ConMgr()
-
-	return sch.SchEnoNone
+	return rsp2ConMgr()
 }
 
 //

@@ -400,10 +400,7 @@ func yeChainProcEx(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh
 		cnt := 0
 		for {
 			select {
-			case _, ok := <-done:
-				if ok {
-					close(done)
-				}
+			case <-done:
 				return
 			default:
 			}
@@ -500,6 +497,12 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 	yeShMgr.UnRegister(&subBh)
 	yeShMgr.Stop()
 }
+
+func yeChainStopEx(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subscriber, subBh yep2p.Subscriber, done chan bool) {
+	close(done)
+	yeChainStop(yeShMgr, subEv, subTx, subBh )
+}
+
 
 //
 // testCase0
@@ -975,9 +978,7 @@ func testCase17(tc *testCase) {
 		done := make(chan bool)
 		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
 		waitInterrupt()
-		done<-true
-		<-done
-		yeChainStop(yeShMgr, subEv, subTx, subBh)
+		yeChainStopEx(yeShMgr, subEv, subTx, subBh, done)
 	} else {
 		time.Sleep(time.Second * 10)
 		yeChainProc(yeShMgr, ev, tx, bh, bk)
