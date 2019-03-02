@@ -65,29 +65,29 @@ func (log cfgLogger)Debug(fmt string, args ... interface{}) {
 type P2pCfgErrno int
 
 const (
-	PcfgEnoNone P2pCfgErrno = iota
-	PcfgEnoParameter
-	PcfgEnoPublicKye
-	PcfgEnoPrivateKye
-	PcfgEnoDataDir
-	PcfgEnoDatabase
-	PcfgEnoIpAddr
-	PcfgEnoNodeId
-	PcfgEnoNat
-	PcfgEnoUnknown
+	P2pCfgEnoNone P2pCfgErrno = iota
+	P2pCfgEnoParameter
+	P2pCfgEnoPublicKye
+	P2pCfgEnoPrivateKye
+	P2pCfgEnoDataDir
+	P2pCfgEnoDatabase
+	P2pCfgEnoIpAddr
+	P2pCfgEnoNodeId
+	P2pCfgEnoNat
+	P2pCfgEnoUnknown
 )
 
 func (eno P2pCfgErrno)Error() string {
 	errMsg := map[P2pCfgErrno]string {
-		PcfgEnoNone: "none",
-		PcfgEnoParameter: "parameters",
-		PcfgEnoPublicKye: "public key",
-		PcfgEnoPrivateKye: "private key",
-		PcfgEnoDataDir: "data directory",
-		PcfgEnoDatabase: "database",
-		PcfgEnoIpAddr: "ip address",
-		PcfgEnoNodeId: "node identity",
-		PcfgEnoUnknown: "unknown",
+		P2pCfgEnoNone: "none",
+		P2pCfgEnoParameter: "parameters",
+		P2pCfgEnoPublicKye: "public key",
+		P2pCfgEnoPrivateKye: "private key",
+		P2pCfgEnoDataDir: "data directory",
+		P2pCfgEnoDatabase: "database",
+		P2pCfgEnoIpAddr: "ip address",
+		P2pCfgEnoNodeId: "node identity",
+		P2pCfgEnoUnknown: "unknown",
 	}
 	return errMsg[eno]
 }
@@ -563,7 +563,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 
 	if cfg == nil {
 		cfgLog.Debug("P2pSetConfig: invalid configuration")
-		return name, PcfgEnoParameter
+		return name, P2pCfgEnoParameter
 	}
 
 	if cfg.PrivateKey == nil {
@@ -578,13 +578,13 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxInBounds),
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxOutbounds); !(m1 && m2 && m3) {
 		cfgLog.Debug("P2pSetConfig: invalid sub network configuration")
-		return name, PcfgEnoParameter
+		return name, P2pCfgEnoParameter
 	}
 
 	for key, maxPeers := range cfg.SubNetMaxPeers {
 		if maxPeers < cfg.SubNetMaxOutbounds[key] + cfg.SubNetMaxInBounds[key] {
 			cfgLog.Debug("P2pSetConfig: invalid sub network configuration")
-			return name, PcfgEnoParameter
+			return name, P2pCfgEnoParameter
 		}
 	}
 
@@ -601,18 +601,18 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 
 	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
-		cfgLog.Debug("P2pSetConfig: invaid data directory")
-		return name, PcfgEnoDataDir
+		cfgLog.Debug("P2pSetConfig: invalid data directory")
+		return name, P2pCfgEnoDataDir
 	}
 
 	if len(cfg.NodeDatabase) == 0 {
 		cfgLog.Debug("P2pSetConfig: invalid database name")
-		return name, PcfgEnoDatabase
+		return name, P2pCfgEnoDatabase
 	}
 
 	if cfg.Local.IP == nil {
 		cfgLog.Debug("P2pSetConfig: invalid ip address")
-		return name, PcfgEnoIpAddr
+		return name, P2pCfgEnoIpAddr
 	}
 	cfgLog.Debug("P2pSetConfig: [ip, udp, tcp]=[%s, %d, %d]",
 		cfg.Local.IP.String(), cfg.Local.UDP, cfg.Local.TCP)
@@ -621,7 +621,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	if len(name) == 0 {
 		if len(cfg.CfgName) == 0 {
 			cfgLog.Debug("P2pSetConfig: empty configuration name")
-			return name, PcfgEnoParameter
+			return name, P2pCfgEnoParameter
 		}
 		name = cfg.CfgName
 	} else {
@@ -635,16 +635,16 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		cfgLog.Debug("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
 	}
 
-	if p2pSetupLocalNodeId(cfg) != PcfgEnoNone {
+	if p2pSetupLocalNodeId(cfg) != P2pCfgEnoNone {
 		cfgLog.Debug("P2pSetConfig: invalid ip address")
-		return name, PcfgEnoNodeId
+		return name, P2pCfgEnoNodeId
 	}
 	cfgLog.Debug("P2pSetConfig: local node identity: \n\t%s", P2pNodeId2HexString(cfg.Local.ID))
 
 	cfg.DhtLocal.ID = cfg.Local.ID
 	config[name] = cfg
 
-	return name, PcfgEnoNone
+	return name, P2pCfgEnoNone
 }
 
 // Get global configuration pointer
@@ -823,22 +823,22 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 	} else if cfg.PublicKey == nil {
 		if cfg.PrivateKey = p2pBuildPrivateKey(cfg); cfg.PrivateKey == nil {
 			cfgLog.Debug("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
-			return PcfgEnoPrivateKye
+			return P2pCfgEnoPrivateKye
 		}
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	} else {
 		cfgLog.Debug("p2pSetupLocalNodeId: nil private key")
-		return PcfgEnoPrivateKye
+		return P2pCfgEnoPrivateKye
 	}
 
 	pnid := p2pPubkey2NodeId(cfg.PublicKey)
 	if pnid == nil {
 		cfgLog.Debug("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
-		return PcfgEnoPublicKye
+		return P2pCfgEnoPublicKye
 	}
 
 	cfg.Local.ID = *pnid
-	return PcfgEnoNone
+	return P2pCfgEnoNone
 }
 
 // Trans node identity to public key
@@ -892,7 +892,7 @@ func P2pVerify(pubKey *ecdsa.PublicKey, data [] byte, r, s *big.Int) bool {
 func P2pSetLocalPort(cfg *Config, udpp uint16, tcpp uint16) P2pCfgErrno {
 	cfg.Local.UDP = udpp
 	cfg.Local.TCP = tcpp
-	return PcfgEnoNone
+	return P2pCfgEnoNone
 }
 
 // Set local ip address and port for chain application
@@ -900,14 +900,14 @@ func P2pSetLocalIpAddr(cfg *Config, ip string, udpp uint16, tcpp uint16) P2pCfgE
 	cfg.Local.IP = net.ParseIP(ip)
 	cfg.Local.UDP = udpp
 	cfg.Local.TCP = tcpp
-	return PcfgEnoNone
+	return P2pCfgEnoNone
 }
 
 // Set local dht port
 func P2pSetLocalDhtPort(cfg *Config, port uint16) P2pCfgErrno {
 	cfg.DhtLocal.UDP = 0
 	cfg.DhtLocal.TCP = port
-	return PcfgEnoNone
+	return P2pCfgEnoNone
 }
 
 // Set local ip address and port for dht application
@@ -915,7 +915,7 @@ func P2pSetLocalDhtIpAddr(cfg *Config, ip string, port uint16) P2pCfgErrno {
 	cfg.DhtLocal.IP = net.ParseIP(ip)
 	cfg.DhtLocal.UDP = 0
 	cfg.DhtLocal.TCP = port
-	return PcfgEnoNone
+	return P2pCfgEnoNone
 }
 
 // Setup local node identity
@@ -1174,17 +1174,17 @@ func P2pIsValidNatType(natt string) bool {
 func P2pSetupNatType(cfg *Config, natType string, gwIp string) P2pCfgErrno {
 	if P2pIsValidNatType(natType) != true {
 		cfgLog.Debug("P2pSetupNat: invalid nat type: %s", natType)
-		return PcfgEnoNat
+		return P2pCfgEnoNat
 	}
 	natt := strings.TrimSpace(natType)
 	if natt == strings.ToLower(NATT_PMP) {
 		gwIp = strings.TrimSpace(gwIp)
 		if len(gwIp) == 0 {
 			cfgLog.Debug("")
-			return PcfgEnoNat
+			return P2pCfgEnoNat
 		}
 		cfg.NatCfg.GwIp = net.ParseIP(gwIp)
 	}
 	cfg.NatCfg.NatType = natt
-	return PcfgEnoNone
+	return P2pCfgEnoNone
 }
