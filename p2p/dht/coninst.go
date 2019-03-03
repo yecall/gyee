@@ -107,6 +107,7 @@ type ConInst struct {
 	txqDiscardCnt	int64						// number of tx packages discarded for tx queue full
 	wrqDiscardCnt	int64						// number of tx packages discarded for wait-response queue full
 	trySendingCnt	int64						// number of trying to send data
+	dtmDone			chan bool					// signal DTM to done
 	txDtm			*DiffTimerManager			// difference timer manager for response waiting
 	txTmCycle		int							// wait peer response timer cycle in ticks
 }
@@ -206,6 +207,7 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		isBlind:			isBlind,
 		txPkgCnt:			0,
 		rxPkgCnt:			0,
+		dtmDone:			make(chan bool, 1),
 		txDtm:				NewDiffTimerManager(ciTxDtmTick, nil),
 	}
 	conInst.tep = conInst.conInstProc
@@ -892,6 +894,7 @@ func (conInst *ConInst)cleanUp(why int) DhtErrno {
 		}
 	}
 	conInst.txWaitRsp = make(map[txPkgId]*conInstTxPkg, 0)
+	close(conInst.dtmDone)
 	conInst.txDtm.reset()
 	return DhtEnoNone
 }
@@ -1205,12 +1208,11 @@ func (conInst *ConInst)txProc() {
 
 	// dtm scanner routine
 	ticker := time.NewTimer(ciTxDtmTick)
-	dtmDone := make(chan bool, 1)
 	go func() {
 		_dtmScanLoop:
 		for {
 			select {
-			case <-dtmDone:
+			case <-conInst.dtmDone:
 				goto _dtmScanLoop
 			case <-ticker.C:
 				conInst.txDtm.scan()
@@ -1277,9 +1279,6 @@ _txLoop:
 		default:
 		}
 	}
-
-	// done dtm
-	close(dtmDone)
 
 	//
 	// here we get out, it might be:
