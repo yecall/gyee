@@ -256,7 +256,11 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 		eno = conInst.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
 
 	case sch.EvDhtConInstTxTimer:
-		eno = conInst.txTimerHandler(msg.Body.(*list.Element))
+		err := conInst.txTimerHandler(msg.Body.(*list.Element))
+		if err != nil {
+			return err.(sch.SchErrno)
+		}
+		eno = sch.SchEnoNone
 
 	case sch.EvDhtQryInstProtoMsgInd:
 		eno = conInst.protoMsgInd(msg.Body.(*sch.MsgDhtQryInstProtoMsgInd))
@@ -714,12 +718,12 @@ func (conInst *ConInst)txSetPkgTimer(userData interface{}) DhtErrno {
 //
 // Tx timer expired event handler
 //
-func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
-	if el == nil {
+func (conInst *ConInst)txTimerHandler(userData interface{}) error {
+	if userData == nil {
 		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoParameter
 	}
-	txPkg, ok := el.Value.(*conInstTxPkg)
+	txPkg, ok := userData.(*conInstTxPkg)
 	if !ok || txPkg == nil {
 		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoMismatched
@@ -1818,7 +1822,7 @@ func (conInst *ConInst)getStatus() conInstStatus {
 //
 // DTM(Difference Timer Manager)
 //
-type DiffTimerCallback func(el *list.Element) sch.SchErrno
+type DiffTimerCallback func(interface{}) error
 
 type DiffTimerManager struct {
 	lock	sync.Mutex
@@ -1906,7 +1910,7 @@ func (dtm *DiffTimerManager)scan() error {
 		} else {
 			tm := dtm.tmq.Remove(dtm.tmq.Front()).(*DiffTimer)
 			if dtm.cbf != nil {
-				dtm.cbf(tm.ud.(*list.Element))
+				dtm.cbf(tm.ud)
 			}
 		}
 	}
