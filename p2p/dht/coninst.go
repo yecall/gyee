@@ -667,7 +667,7 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 //
 // Set timer for tx-package which would wait response from peer
 //
-func (conInst *ConInst)setTimer(userData interface{}) DhtErrno {
+func (conInst *ConInst)txSetPkgTimer(userData interface{}) DhtErrno {
 
 	/*
 	 * the following statements commented implement the "wait peer response" timer
@@ -1255,7 +1255,7 @@ _txLoop:
 				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
 				goto _checkDone
 			} else {
-				conInst.setTimer(txPkg)
+				conInst.txSetPkgTimer(txPkg)
 			}
 		}
 
@@ -1920,6 +1920,8 @@ func (dtm *DiffTimerManager)size() int {
 }
 
 func (dtm *DiffTimerManager)reset() {
+	dtm.lock.Lock()
+	defer dtm.lock.Unlock()
 	dtm.tmq = nil
 	dtm.sum = 0
 	dtm.cbf = nil
