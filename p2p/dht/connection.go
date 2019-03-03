@@ -725,7 +725,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 //
 func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
-	p2plog.Debug("closeReq: peer id: %x, dir: %d", msg.Peer.ID, msg.Dir)
+	connLog.Debug("closeReq: peer id: %x, dir: %d", msg.Peer.ID, msg.Dir)
 
 	cid := conInstIdentity {
 		nid:	msg.Peer.ID,
@@ -754,7 +754,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	}
 
 	req2Inst := func(inst *ConInst) sch.SchErrno {
-		p2plog.Debug("closeReq: req2Inst: inst: %s", inst.name)
+		connLog.Debug("closeReq: req2Inst: inst: %s", inst.name)
 		conMgr.instInClosing[cid] = inst
 		delete(conMgr.ciTab, cid)
 		req := sch.MsgDhtConInstCloseReq {
@@ -780,7 +780,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		}
 	}
 
-	p2plog.Debug("closeReq: found: %t, err: %t, dup: %t", found, err, dup)
+	connLog.Debug("closeReq: found: %t, err: %t, dup: %t", found, err, dup)
 
 	if !found {
 		return rsp2Sender(DhtEnoNotFound)
@@ -891,15 +891,15 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	}
 	cis := conMgr.lookupConInst(&cid)
 	if len(cis) == 0 {
-		p2plog.Debug("instStatusInd: none of instances found")
+		connLog.Debug("instStatusInd: none of instances found")
 		return sch.SchEnoNotFound
 	}
 	if len(cis) > 1 {
-		p2plog.Debug("instStatusInd: too much found, cid: %+v", cid)
+		connLog.Debug("instStatusInd: too much found, cid: %+v", cid)
 		return sch.SchEnoNotFound
 	}
 
-	p2plog.Debug("instStatusInd: inst: %s, msg.Status: %d, current status: %d",
+	connLog.Debug("instStatusInd: inst: %s, msg.Status: %d, current status: %d",
 		cis[0].name, msg.Status, cis[0].getStatus())
 
 	switch msg.Status {
@@ -918,7 +918,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	case CisInService:
 	case CisInKilling:
 	default:
-		p2plog.Debug("instStatusInd: invalid status: %d", msg.Status)
+		connLog.Debug("instStatusInd: invalid status: %d", msg.Status)
 		return sch.SchEnoMismatched
 	}
 
@@ -928,7 +928,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 
 	if conMgr.pasStatus == pasInSwitching && len(conMgr.ciTab) == 0 {
 		if eno := conMgr.natMapSwitchEnd(); eno != DhtEnoNone {
-			p2plog.Debug("instStatusInd: natMapSwitchEnd failed, eno: %d", eno)
+			connLog.Debug("instStatusInd: natMapSwitchEnd failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -976,22 +976,22 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 	if ci := conMgr.instInClosing[cid]; ci != nil {
 		found = true
 		delete(conMgr.instInClosing, cid)
-		p2plog.Debug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
+		connLog.Debug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
 		if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
-			p2plog.Debug("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
+			connLog.Debug("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
 			err = true
 		}
 		if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-			p2plog.Debug("instCloseRsp: isnt: %s, rutUpdate failed, eno: %d", ci.name, eno)
+			connLog.Debug("instCloseRsp: isnt: %s, rutUpdate failed, eno: %d", ci.name, eno)
 			err = true
 		}
 	}
 	if !found {
-		p2plog.Debug("instCloseRsp: none is found, id: %x", msg.Peer)
+		connLog.Debug("instCloseRsp: none is found, id: %x", msg.Peer)
 		return sch.SchEnoNotFound
 	}
 	if err {
-		p2plog.Debug("instCloseRsp: seems some errors")
+		connLog.Debug("instCloseRsp: seems some errors")
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -1070,18 +1070,18 @@ func (conMgr *ConMgr)natReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 //
 func (conMgr *ConMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 	if !nat.NatIsResultOk(msg.Result) {
-		p2plog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
+		connLog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
 	proto := strings.ToLower(msg.Proto)
 	if proto == "tcp" {
 		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if conMgr.natTcpResult {
-			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			connLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
 				msg.PubIp.String(), msg.PubPort)
 			conMgr.pubTcpIp = msg.PubIp
 			conMgr.pubTcpPort = msg.PubPort
 			if eno := conMgr.switch2NatAddr(proto); eno != DhtEnoNone  {
-				p2plog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				connLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 			chConMgrReady<-true
@@ -1091,7 +1091,7 @@ func (conMgr *ConMgr)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 		}
 		return sch.SchEnoNone
 	}
-	p2plog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	connLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1103,16 +1103,16 @@ func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 	if proto == "tcp" {
 		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if conMgr.natTcpResult {
-			p2plog.Debug("natPubAddrUpdateInd: public dht addr: %s:%d",
+			connLog.Debug("natPubAddrUpdateInd: public dht addr: %s:%d",
 				msg.PubIp.String(), msg.PubPort)
 			if conMgr.pasStatus != pasInNull {
-				p2plog.Debug("natPubAddrUpdateInd: had been in switching, pasStatus: %d", conMgr.pasStatus)
+				connLog.Debug("natPubAddrUpdateInd: had been in switching, pasStatus: %d", conMgr.pasStatus)
 				return sch.SchEnoMismatched
 			}
 			conMgr.pubTcpIp = msg.PubIp
 			conMgr.pubTcpPort = msg.PubPort
 			if eno := conMgr.natMapSwitch(); eno != DhtEnoNone {
-				p2plog.Debug("natPubAddrUpdateInd: natMapSwitch failed, eno: %d", eno)
+				connLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 		} else {
@@ -1121,7 +1121,7 @@ func (conMgr *ConMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 		}
 		return sch.SchEnoNone
 	}
-	p2plog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
+	connLog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1310,18 +1310,18 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	err := false
 	cis := conMgr.lookupConInst(&cid)
 	if len(cis) <= 0 {
-		p2plog.Debug("instClosedInd: not found, %+v", cid)
+		connLog.Debug("instClosedInd: not found, %+v", cid)
 	} else if len(cis) > 1 {
-		p2plog.Debug("instClosedInd: too much, inst: %s, %s", cis[0].name, cis[1].name)
+		connLog.Debug("instClosedInd: too much, inst: %s, %s", cis[0].name, cis[1].name)
 	} else {
-		p2plog.Debug("instClosedInd: inst: %s, current status: %d", cis[0].name , cis[0].getStatus())
+		connLog.Debug("instClosedInd: inst: %s, current status: %d", cis[0].name , cis[0].getStatus())
 	}
 
 	for _, ci := range cis {
 		if ci != nil {
 			found = true
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-				p2plog.Debug("instClosedInd: rutUpdate failed, eno: %d", eno)
+				connLog.Debug("instClosedInd: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
 
@@ -1336,10 +1336,10 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	}
 
 	if !found {
-		p2plog.Debug("instClosedInd: none is found, id: %x", msg.Peer)
+		connLog.Debug("instClosedInd: none is found, id: %x", msg.Peer)
 		return sch.SchEnoNotFound
 	} else if err {
-		p2plog.Debug("instClosedInd: seems some errors")
+		connLog.Debug("instClosedInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
 
@@ -1376,21 +1376,21 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 
 	cis := conMgr.lookupConInst(&cid)
 	if len(cis) <= 0 {
-		p2plog.Debug("instOutOfServiceInd: not found, %+v", cid)
+		connLog.Debug("instOutOfServiceInd: not found, %+v", cid)
 	} else if len(cis) > 1 {
-		p2plog.Debug("instOutOfServiceInd: too much, inst: %s, %s", cis[0].name, cis[1].name)
+		connLog.Debug("instOutOfServiceInd: too much, inst: %s, %s", cis[0].name, cis[1].name)
 	} else {
-		p2plog.Debug("instOutOfServiceInd: inst: %s, msg.Status: %d, current status: %d",
+		connLog.Debug("instOutOfServiceInd: inst: %s, msg.Status: %d, current status: %d",
 			cis[0].name, msg.Status, cis[0].getStatus())
 	}
 
 	for _, ci := range cis {
 		if ci != nil {
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-				p2plog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
+				connLog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
 			}
 			if status := ci.getStatus(); status < CisInKilling {
-				p2plog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
+				connLog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
 
 				conMgr.instInClosing[cid] = ci
 				delete(conMgr.ciTab, cid)

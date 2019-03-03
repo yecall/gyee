@@ -294,7 +294,7 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (conInst *ConInst)poweroff(ptn interface{}) sch.SchErrno {
-	p2plog.Debug("poweroff: inst: %s, task will be done ...", conInst.name)
+	ciLog.Debug("poweroff: inst: %s, task will be done ...", conInst.name)
 	conInst.cleanUp(DhtEnoScheduler.GetEno())
 	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
 }
@@ -423,16 +423,16 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	status := conInst.getStatus()
 	if status < CisHandshaked || status >= CisClosed {
-		p2plog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
+		ciLog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
 		return sch.SchEnoMismatched
 	}
 
 	if *msg.Peer != conInst.hsInfo.peer.ID {
-		p2plog.Debug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
+		ciLog.Debug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	p2plog.Debug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
+	ciLog.Debug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
 
 	conInst.cleanUp(DhtEnoNone.GetEno())
 	conInst.updateStatus(CisClosed)
@@ -605,36 +605,36 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	if pkg == nil {
-		p2plog.Debug("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
+		ciLog.Debug("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		return DhtEnoParameter
 	}
 
 	if status := conInst.getStatus(); status != CisInService {
-		p2plog.Debug("txPutPending: mismatched status: %d", status)
+		ciLog.Debug("txPutPending: mismatched status: %d", status)
 		return DhtEnoMismatched
 	}
 
 	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
-		p2plog.Debug("txPutPending: trySendingCnt: %d, peer: %s:%d",
+		ciLog.Debug("txPutPending: trySendingCnt: %d, peer: %s:%d",
 			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 	}
 
 	if len(conInst.txChan) >= cap(conInst.txChan) {
-		p2plog.Debug("txPutPending: pending queue full, inst: %s, hsInfo: %+v, local: %+v",
+		ciLog.Debug("txPutPending: pending queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt & 0x1f == 0 {
-			p2plog.Debug("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
+			ciLog.Debug("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
 				conInst.txqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		}
 		return DhtEnoResource
 	}
 
 	if conInst.txWaitRsp.Len() >= ciTxMaxWaitResponseSize {
-		p2plog.Debug("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
+		ciLog.Debug("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt & 0x1f == 0 {
-			p2plog.Debug("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
+			ciLog.Debug("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
 				conInst.wrqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		}
 		return DhtEnoResource
@@ -697,23 +697,23 @@ func (conInst *ConInst)txSetTimer(el *list.Element) DhtErrno {
 //
 func (conInst *ConInst)txTimerHandler(el *list.Element) sch.SchErrno {
 	if el == nil {
-		p2plog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
+		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoParameter
 	}
 
 	_, ok := el.Value.(*conInstTxPkg)
 	if !ok {
-		p2plog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
+		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	p2plog.Debug("txTimerHandler: inst: %s", conInst.name)
+	ciLog.Debug("txTimerHandler: inst: %s", conInst.name)
 
 	if status := conInst.getStatus(); status < CisOutOfService {
-		p2plog.Debug("txTimerHandler: inst: %s, current status: %d", conInst.name, status)
+		ciLog.Debug("txTimerHandler: inst: %s, current status: %d", conInst.name, status)
 		conInst.updateStatus(CisOutOfService)
 		if eno := conInst.statusReport(); eno != DhtEnoNone {
-			p2plog.Debug("txTimerHandler: statusReport failed, eno: %d", eno)
+			ciLog.Debug("txTimerHandler: statusReport failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -800,24 +800,24 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 
 	if conInst.txDone != nil {
 
-		p2plog.Debug("cleanUp: inst: %s, try to close txChan", conInst.name)
+		ciLog.Debug("cleanUp: inst: %s, try to close txChan", conInst.name)
 		close(conInst.txChan)
 
 		if conInst.con != nil {
-			p2plog.Debug("cleanUp: inst: %s, try to close con", conInst.name)
+			ciLog.Debug("cleanUp: inst: %s, try to close con", conInst.name)
 			conInst.con.Close()
 		}
 
-		p2plog.Debug("txTaskStop: inst: %s, try to signal txDone", conInst.name)
+		ciLog.Debug("txTaskStop: inst: %s, try to signal txDone", conInst.name)
 		conInst.txDone<-why
 
-		p2plog.Debug("txTaskStop: inst: %s, try to get feedback from signal txDone", conInst.name)
+		ciLog.Debug("txTaskStop: inst: %s, try to get feedback from signal txDone", conInst.name)
 		done := <-conInst.txDone
 
-		p2plog.Debug("txTaskStop: inst: %s, try to close txDone", conInst.name)
+		ciLog.Debug("txTaskStop: inst: %s, try to close txDone", conInst.name)
 		close(conInst.txDone)
 
-		p2plog.Debug("txTaskStop: inst: %s, it's ok", conInst.name)
+		ciLog.Debug("txTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
 	}
 
@@ -832,20 +832,20 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 	if conInst.rxDone != nil {
 
 		if conInst.con != nil {
-			p2plog.Debug("rxTaskStop: inst: %s, close con", conInst.name)
+			ciLog.Debug("rxTaskStop: inst: %s, close con", conInst.name)
 			conInst.con.Close()
 		}
 
-		p2plog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
+		ciLog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
 		conInst.rxDone<-why
 
-		p2plog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
+		ciLog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
 		done := <-conInst.rxDone
 
-		p2plog.Debug("rxTaskStop: inst: %s, try to get feedback from signal rxDone", conInst.name)
+		ciLog.Debug("rxTaskStop: inst: %s, try to get feedback from signal rxDone", conInst.name)
 		close(conInst.rxDone)
 
-		p2plog.Debug("rxTaskStop: inst: %s, it's ok", conInst.name)
+		ciLog.Debug("rxTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
 	}
 
@@ -857,13 +857,13 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 //
 func (conInst *ConInst)cleanUp(why int) DhtErrno {
 
-	p2plog.Debug("cleanUp: inst: %s, why: %d", conInst.name, why)
+	ciLog.Debug("cleanUp: inst: %s, why: %d", conInst.name, why)
 
 	conInst.txTaskStop(why)
-	p2plog.Debug("cleanUp: inst: %s, tx done", conInst.name)
+	ciLog.Debug("cleanUp: inst: %s, tx done", conInst.name)
 
 	conInst.rxTaskStop(why)
-	p2plog.Debug("cleanUp: inst: %s, rx done", conInst.name)
+	ciLog.Debug("cleanUp: inst: %s, rx done", conInst.name)
 
 	que := conInst.txWaitRsp
 
@@ -1209,7 +1209,7 @@ func (conInst *ConInst)txProc() {
 	// exception handler for debug
 	defer func() {
 		if err := recover(); err != nil {
-			p2plog.Debug("txProc: exception raised, wait done...")
+			ciLog.Debug("txProc: exception raised, wait done...")
 		}
 	}()
 
@@ -1258,7 +1258,7 @@ _txLoop:
 		// get pending and send it
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			p2plog.Debug("txProc: mismatched type, inst: %s", conInst.name)
+			ciLog.Debug("txProc: mismatched type, inst: %s", conInst.name)
 			goto _checkDone
 		}
 
@@ -1267,7 +1267,7 @@ _txLoop:
 
 		if txPkg.responsed != nil {
 			if eno, el := conInst.txSetPending(txPkg); eno != DhtEnoNone || el == nil {
-				p2plog.Debug("txProc: txSetPending failed, eno: %d", eno)
+				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
 				goto _checkDone
 			} else {
 				conInst.txSetTimer(el)
@@ -1275,20 +1275,20 @@ _txLoop:
 		}
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-			p2plog.Debug("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+			ciLog.Debug("txProc: WriteMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _txLoop
 		}
 
 		if conInst.txPkgCnt++; conInst.txPkgCnt & 0xff == 0 {
-			p2plog.Debug("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
+			ciLog.Debug("txProc: inst: %s, txPkgCnt: %d", conInst.name, conInst.txPkgCnt)
 		}
 
 	_checkDone:
 
 		select {
 		case done := <-conInst.txDone:
-			p2plog.Debug("txProc: inst: %s, done by: %d", conInst.name, done)
+			ciLog.Debug("txProc: inst: %s, done by: %d", conInst.name, done)
 			isDone = true
 			break _txLoop
 		default:
@@ -1309,23 +1309,23 @@ _txLoop:
 		//
 		// the 1) case: report the status and then wait singal done
 		//
-		p2plog.Debug("txProc: inst: %s, underlying error", conInst.name)
+		ciLog.Debug("txProc: inst: %s, underlying error", conInst.name)
 
 		if status := conInst.getStatus(); status < CisOutOfService {
-			p2plog.Debug("txProc: CisOutOfService, current status: %d", status)
+			ciLog.Debug("txProc: CisOutOfService, current status: %d", status)
 			conInst.updateStatus(CisOutOfService)
 			if eno := conInst.statusReport(); eno != DhtEnoNone {
-				p2plog.Debug("txProc: statusReport failed, eno: %d", eno)
+				ciLog.Debug("txProc: statusReport failed, eno: %d", eno)
 			}
 		}
 
-		p2plog.Debug("txProc: inst: %s, try to get signal from txDone", conInst.name)
+		ciLog.Debug("txProc: inst: %s, try to get signal from txDone", conInst.name)
 		<-conInst.txDone
 
-		p2plog.Debug("txProc: inst: %s, try to feedback signal to txDone", conInst.name)
+		ciLog.Debug("txProc: inst: %s, try to feedback signal to txDone", conInst.name)
 		conInst.txDone<-DhtEnoNone.GetEno()
 
-		p2plog.Debug("txProc: inst: %s, it's ok", conInst.name)
+		ciLog.Debug("txProc: inst: %s, it's ok", conInst.name)
 		return
 	}
 
@@ -1334,14 +1334,14 @@ _txLoop:
 		//
 		// the 2) case: signal the done
 		//
-		p2plog.Debug("txProc: inst: %s, we are done, try to feedback signal to txDone", conInst.name)
+		ciLog.Debug("txProc: inst: %s, we are done, try to feedback signal to txDone", conInst.name)
 		conInst.txDone<-DhtEnoNone.GetEno()
 
-		p2plog.Debug("txProc: inst: %s, it's ok", conInst.name)
+		ciLog.Debug("txProc: inst: %s, it's ok", conInst.name)
 		return
 	}
 
-	p2plog.Debug("txProc: wow! impossible errors, inst: %s", conInst.name)
+	ciLog.Debug("txProc: wow! impossible errors, inst: %s", conInst.name)
 }
 
 //
@@ -1352,7 +1352,7 @@ func (conInst *ConInst)rxProc() {
 	// exception handler for debug
 	defer func() {
 		if err := recover(); err != nil {
-			p2plog.Debug("rxProc: exception raised, wait done...")
+			ciLog.Debug("rxProc: exception raised, wait done...")
 		}
 	}()
 
@@ -1372,13 +1372,13 @@ _rxLoop:
 
 		pbPkg := new(pb.DhtPackage)
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-			p2plog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _rxLoop
 		}
 
 		if conInst.rxPkgCnt++; conInst.rxPkgCnt & 0xff == 0 {
-			p2plog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
+			ciLog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
 		}
 
 		pkg := new(DhtPackage)
@@ -1395,7 +1395,7 @@ _rxLoop:
 
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
-			p2plog.Debug("rxProc: inst: %s, eno: %d, GetMessage failed", conInst.name, eno)
+			ciLog.Debug("rxProc: inst: %s, eno: %d, GetMessage failed", conInst.name, eno)
 			goto _checkDone
 		}
 
@@ -1408,7 +1408,7 @@ _checkDone:
 		select {
 		case done := <-conInst.rxDone:
 			isDone = true
-			p2plog.Debug("rxProc: inst: %s, done by: %d", conInst.name, done)
+			ciLog.Debug("rxProc: inst: %s, done by: %d", conInst.name, done)
 			break _rxLoop
 		default:
 		}
@@ -1425,23 +1425,23 @@ _checkDone:
 		//
 		// the 1) case: report the status and then wait and then signal done
 		//
-		p2plog.Debug("rxProc: inst: %s, underlying error", conInst.name)
+		ciLog.Debug("rxProc: inst: %s, underlying error", conInst.name)
 
 		if status := conInst.getStatus(); status < CisOutOfService {
-			p2plog.Debug("rxProc: CisOutOfService, current status: %d", status)
+			ciLog.Debug("rxProc: CisOutOfService, current status: %d", status)
 			conInst.updateStatus(CisOutOfService)
 			if eno := conInst.statusReport(); eno != DhtEnoNone {
-				p2plog.Debug("rxProc: statusReport failed, eno: %d", eno)
+				ciLog.Debug("rxProc: statusReport failed, eno: %d", eno)
 			}
 		}
 
-		p2plog.Debug("rxProc: inst: %s, try to get signal from rxDone", conInst.name)
+		ciLog.Debug("rxProc: inst: %s, try to get signal from rxDone", conInst.name)
 		<-conInst.rxDone
 
-		p2plog.Debug("rxProc: inst: %s, try to get feedback signal to rxDone", conInst.name)
+		ciLog.Debug("rxProc: inst: %s, try to get feedback signal to rxDone", conInst.name)
 		conInst.rxDone <- DhtEnoNone.GetEno()
 
-		p2plog.Debug("rxProc: inst: %s, it's ok", conInst.name)
+		ciLog.Debug("rxProc: inst: %s, it's ok", conInst.name)
 		return
 	}
 
@@ -1450,14 +1450,14 @@ _checkDone:
 		//
 		// the 2) case: signal the done
 		//
-		p2plog.Debug("rxProc: inst: %s, we are done, try to feedback signal to rxDone", conInst.name)
+		ciLog.Debug("rxProc: inst: %s, we are done, try to feedback signal to rxDone", conInst.name)
 		conInst.rxDone <- DhtEnoNone.GetEno()
 
-		p2plog.Debug("rxProc: inst: %s, it's ok", conInst.name)
+		ciLog.Debug("rxProc: inst: %s, it's ok", conInst.name)
 		return
 	}
 
-	p2plog.Debug("rxProc: wow! impossible errors, inst: %s", conInst.name)
+	ciLog.Debug("rxProc: wow! impossible errors, inst: %s", conInst.name)
 }
 
 //

@@ -1249,7 +1249,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
 
 	if why, ok := req.Why.(string); ok {
-		p2plog.Debug("peMgrCloseReq: why: %s, snid: %x, dir: %d, ip: %s, port: %d",
+		peerLog.Debug("peMgrCloseReq: why: %s, snid: %x, dir: %d, ip: %s, port: %d",
 			why, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
 	}
 
@@ -2914,7 +2914,7 @@ _txLoop:
 		}
 
 		if pi.txSeq & 0x3ff == 0 {
-			p2plog.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. snid: %x, dir: %d, peer: %x",
+			peerLog.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. snid: %x, dir: %d, peer: %x",
 				pi.txSeq, pi.txOkCnt, pi.txFailedCnt, pi.snid, pi.dir, pi.node.ID)
 		}
 	}
@@ -3028,7 +3028,7 @@ _rxLoop:
 					pi.snid, pi.dir, pi.name, pi.node.ID)
 
 				if pi.rxDiscard += 1; pi.rxDiscard & 0x1f == 0 {
-					p2plog.Debug("piRx: snid: %x, dir: %d, pi: %s, rxDiscard: %d",
+					peerLog.Debug("piRx: snid: %x, dir: %d, pi: %s, rxDiscard: %d",
 						pi.snid, pi.dir, pi.name, pi.rxDiscard)
 				}
 
@@ -3057,7 +3057,7 @@ _rxLoop:
 				pi.rxChan <- &pkgCb
 
 				if pi.rxOkCnt += 1; pi.rxOkCnt & 0x3ff == 0 {
-					p2plog.Debug("piRx: rxOkCnt: %d, snid: %x, dir: %d, pi: %s",
+					peerLog.Debug("piRx: rxOkCnt: %d, snid: %x, dir: %d, pi: %s",
 						pi.rxOkCnt, pi.snid, pi.dir, pi.name)
 				}
 			}

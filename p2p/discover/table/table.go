@@ -946,7 +946,7 @@ func (tabMgr *TableManager)tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno {
 }
 
 func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrErrno {
-	p2plog.Debug("tabMgrNatReadyInd: nat type: %s", msg.NatType)
+	tabLog.Debug("tabMgrNatReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		tabMgr.pubTcpIp = tabMgr.cfg.local.IP
 		tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
@@ -963,7 +963,7 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 		}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			p2plog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 			return TabMgrEnoScheduler
 		}
 		reqTcp := reqUdp
@@ -972,7 +972,7 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 		reqTcp.ToPort = int(tabMgr.cfg.local.TCP)
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			p2plog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 			return TabMgrEnoScheduler
 		}
 	}
@@ -991,9 +991,9 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 	// address is needed, for rebuilding about address switching, see function
 	// tabMgrNatPubAddrUpdateInd for details please.
 	if !nat.NatIsResultOk(msg.Result) {
-		p2plog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
+		tabLog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
-	p2plog.Debug("tabMgrNatMakeMapRsp: proto: %s, ip:port = %s:%d",
+	tabLog.Debug("tabMgrNatMakeMapRsp: proto: %s, ip:port = %s:%d",
 		msg.Proto, msg.PubIp.String(), msg.PubPort)
 
 	proto := strings.ToLower(msg.Proto)
@@ -1002,7 +1002,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 		if tabMgr.natUdpResult && nat.NatIsStatusOk(msg.Status) {
 			tabMgr.pubUdpIp = msg.PubIp
 			tabMgr.pubUdpPort = msg.PubPort
-			p2plog.Debug("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
+			tabLog.Debug("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
 				tabMgr.pubUdpIp.String(), tabMgr.pubUdpPort)
 		} else {
 			tabMgr.pubUdpIp = net.IPv4zero
@@ -1013,7 +1013,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 		if tabMgr.natTcpResult && nat.NatIsStatusOk(msg.Status) {
 			tabMgr.pubTcpIp = msg.PubIp
 			tabMgr.pubTcpPort = msg.PubPort
-			p2plog.Debug("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
+			tabLog.Debug("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
 				tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort)
 		} else {
 			tabMgr.pubTcpIp = net.IPv4zero
@@ -1023,7 +1023,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrMakeMapRsp, msg)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
-		p2plog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
+		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
@@ -1034,7 +1034,7 @@ func (tabMgr *TableManager)tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Tab
 
 	if tabMgr.natUdpResult {
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			p2plog.Debug("tabMgrNatMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+			tabLog.Debug("tabMgrNatMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
@@ -1050,9 +1050,9 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 	// see function nat.refreshInstance, the indication would be received after nat manager
 	// refreshed itself ok, here the msg.Result must be good.
 	if !nat.NatIsStatusOk(msg.Status) {
-		p2plog.Debug("tabMgrNatPubAddrUpdateInd: fail reported, msg: %+v", *msg)
+		tabLog.Debug("tabMgrNatPubAddrUpdateInd: fail reported, msg: %+v", *msg)
 	}
-	p2plog.Debug("tabMgrNatPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+	tabLog.Debug("tabMgrNatPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
 		msg.Proto, tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
 
 	old := tabMgr.natUdpResult
@@ -1081,7 +1081,7 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrPubAddrUpdateInd, msg)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
-		p2plog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
+		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
@@ -1089,12 +1089,12 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 	if tabMgr.natUdpResult {
 		if !tabMgr.pubUdpIp.Equal(oldUdpIp) || oldUdpPort != tabMgr.pubUdpPort {
 			if eno := tabMgr.pubAddrSwitchPrepare(); eno != TabMgrEnoNone {
-				p2plog.Debug("tabMgrNatPubAddrUpdateInd: pubAddrSwitchPrepare failed, eno: %d", eno)
+				tabLog.Debug("tabMgrNatPubAddrUpdateInd: pubAddrSwitchPrepare failed, eno: %d", eno)
 				return eno
 			}
 		}
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			p2plog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		}
 		if proto == "udp" {
@@ -1287,9 +1287,9 @@ func (tabMgr *TableManager)tabNodeDbPrepare() TabMgrErrno {
 
 	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.name, tabMgr.cfg.nodeDb)
 	if runtime.GOOS == "windows" {
-		p2plog.Debug("tabMgr: nodeDb will be created at: %s", strings.Replace(dbPath, "/", "\\", -1))
+		tabLog.Debug("tabMgr: nodeDb will be created at: %s", strings.Replace(dbPath, "/", "\\", -1))
 	} else {
-		p2plog.Debug("tabMgr: nodeDb will be created at: %s", dbPath)
+		tabLog.Debug("tabMgr: nodeDb will be created at: %s", dbPath)
 	}
 
 	if tabMgr.cfg.noHistory {

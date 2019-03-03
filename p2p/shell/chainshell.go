@@ -240,7 +240,7 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 	shMgr.peerActived[peerId] = &peerInst
 	shMgr.peerLock.Unlock()
 
-	p2plog./*chainLog*/Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
+	p2plog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
 		peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
 
 	approc := func() {
@@ -303,13 +303,13 @@ func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 		dir: cfm.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		p2plog./*chainLog*/Debug("peerCloseCfm: peer not found, peerId: %+v", peerId)
+		p2plog.Debug("peerCloseCfm: peer not found, peerId: %+v", peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisClosing {
-		p2plog./*chainLog*/Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		p2plog.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
-		p2plog./*chainLog*/Debug("peerCloseCfm: peer info: %+v", *peerInst.hsInfo)
+		p2plog.Debug("peerCloseCfm: peer info: %+v", *peerInst.hsInfo)
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
 	}
@@ -332,13 +332,13 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 		dir: ind.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		p2plog./*chainLog*/Debug("peerAskToCloseInd: peer not found, peerId: %+v", peerId)
+		p2plog.Debug("peerAskToCloseInd: peer not found, peerId: %+v", peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		p2plog./*chainLog*/Debug("peerAskToCloseInd : status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		p2plog.Debug("peerAskToCloseInd : status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
-		p2plog./*chainLog*/Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager, peer info: %+v", *peerInst.hsInfo)
+		p2plog.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager, peer info: %+v", *peerInst.hsInfo)
 		req := sch.MsgPeCloseReq {
 			Ptn: nil,
 			Snid: peerId.snid,
@@ -433,7 +433,7 @@ func (shMgr *ShellManager)send2Peer(spi *shellPeerInst, req *sch.MsgShellBroadca
 		chainLog.Debug("send2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.snid, spi.dir, spi.nodeId)
 		if spi.txDiscrd += 1; spi.txDiscrd & 0x1f == 0 {
-			p2plog.Debug("send2Peer：sind: %x, dir: %d, txDiscrd: %d",
+			chainLog.Debug("send2Peer：sind: %x, dir: %d, txDiscrd: %d",
 				spi.snid, spi.dir, spi.txDiscrd)
 		}
 		return sch.SchEnoResource

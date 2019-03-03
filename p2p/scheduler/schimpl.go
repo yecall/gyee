@@ -1426,7 +1426,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	msg2MailBox := func(msg *schMessage) SchErrno {
 		if target.mailbox.que == nil {
-			// target had been killed
+			// not found, target had been killed
 			schLog.Debug("schSendMsg: mailbox of target is empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
 			return SchEnoInternal
 		}
@@ -1437,7 +1437,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 			target.discardMessages += 1
 
 			if target.discardMessages & (0x1f) == 0 {
-				p2plog./*schLog*/Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
+				p2plog.Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
 					sdl.p2pCfg.CfgName, target.name, target.discardMessages)
 			}
 

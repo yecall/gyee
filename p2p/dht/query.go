@@ -878,7 +878,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 // nat ready to work
 //
 func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
-	p2plog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
+	qryLog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
 		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
@@ -893,7 +893,7 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
 		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			p2plog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -907,21 +907,21 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatMakeMapRsp for more please.
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
-		p2plog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
+		qryLog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
 	}
-	p2plog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
+	qryLog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
 		mmr.Proto, mmr.PubIp.String(), mmr.PubPort)
 
 	proto := strings.ToLower(mmr.Proto)
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(mmr.Status)
 		if qryMgr.natTcpResult {
-			p2plog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			qryLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
 				mmr.PubIp.String(), mmr.PubPort)
 			qryMgr.pubTcpIp = mmr.PubIp
 			qryMgr.pubTcpPort = mmr.PubPort
 			if eno := qryMgr.switch2NatAddr(proto); eno != DhtEnoNone {
-				p2plog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				qryLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 		} else {
@@ -933,7 +933,7 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		return qryMgr.sdl.SchSendMessage(msg)
 	}
 
-	p2plog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	qryLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -945,24 +945,24 @@ func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch
 	// when status from nat is bad, nothing to do but just backup the status.
 	proto := strings.ToLower(msg.Proto)
 	if proto != nat.NATP_TCP {
-		p2plog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
+		qryLog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
 		return sch.SchEnoParameter
 	}
 
 	oldResult := qryMgr.natTcpResult
 	if qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status); !qryMgr.natTcpResult {
-		p2plog.Debug("natPubAddrUpdateInd: result bad")
+		qryLog.Debug("natPubAddrUpdateInd: result bad")
 		return sch.SchEnoNone
 	}
 
-	p2plog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+	qryLog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
 		msg.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
 
 	qryMgr.pubTcpIp = msg.PubIp
 	qryMgr.pubTcpPort = msg.PubPort
 	if !oldResult || !msg.PubIp.Equal(qryMgr.pubTcpIp) || msg.PubPort != qryMgr.pubTcpPort {
 		if eno := qryMgr.natMapSwitch(); eno != DhtEnoNone {
-			p2plog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
+			qryLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
 			return sch.SchEnoUserTask
 		}
 	}
@@ -1024,7 +1024,7 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 		return DhtEnoMismatched
 	}
 
-	p2plog.Debug("qryMgrDelQcb: why: %s", strDebug)
+	qryLog.Debug("qryMgrDelQcb: why: %s", strDebug)
 
 	qcb, ok := qryMgr.qcbTab[target]
 	if !ok {
@@ -1067,24 +1067,24 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 //
 func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.NodeID) DhtErrno {
 
-	p2plog.Debug("qryMgrDelIcb: why: %d", why)
+	qryLog.Debug("qryMgrDelIcb: why: %d", why)
 
 	if why != delQcb4QryInstDoneInd && why != delQcb4QryInstResultInd {
-		p2plog.Debug("qryMgrDelIcb: why delete?! why: %d", why)
+		qryLog.Debug("qryMgrDelIcb: why delete?! why: %d", why)
 		return DhtEnoMismatched
 	}
 	qcb, ok := qryMgr.qcbTab[*target]
 	if !ok {
-		p2plog.Debug("qryMgrDelIcb: target not found: %x", target)
+		qryLog.Debug("qryMgrDelIcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
 	icb, ok := qcb.qryActived[*peer]
 	if !ok {
-		p2plog.Debug("qryMgrDelIcb: target not found: %x", target)
+		qryLog.Debug("qryMgrDelIcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
 
-	p2plog.Debug("qryMgrDelIcb: icb: %x", icb.name)
+	qryLog.Debug("qryMgrDelIcb: icb: %x", icb.name)
 
 	if why == delQcb4QryInstResultInd {
 		eno, ptn := icb.sdl.SchGetUserTaskNode(icb.name)
@@ -1093,7 +1093,7 @@ func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.No
 			icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
 			icb.sdl.SchSendMessage(&po)
 		} else {
-			p2plog.Debug("qryMgrDelIcb: not found, icb: %s", icb.name)
+			qryLog.Debug("qryMgrDelIcb: not found, icb: %s", icb.name)
 		}
 	}
 	delete(qcb.qryActived, *peer)
@@ -1254,7 +1254,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qryMgr.sdl.SchMakeMessage(&start, qryMgr.ptnMe, ptn, sch.EvDhtQryInstStartReq, nil)
 		qryMgr.sdl.SchSendMessage(&start)
 
-		p2plog.Debug("qryMgrQcbPutActived: icb: %s, EvSchPoweron and EvDhtQryInstStartReq sent", icb.name)
+		qryLog.Debug("qryMgrQcbPutActived: icb: %s, EvSchPoweron and EvDhtQryInstStartReq sent", icb.name)
 	}
 
 	for _, el := range act {
