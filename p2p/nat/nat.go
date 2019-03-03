@@ -198,7 +198,7 @@ func (natMgr *NatManager)natMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	case sch.EvNatMgrGetPublicAddrReq:
 		eno = natMgr.getPubAddrReq(msg)
 	default:
-		natLog.Debug("natMgrProc: unknown message: %d", msg.Id)
+		p2plog.Debug("natMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 	return eno
@@ -214,23 +214,23 @@ func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 	appt := natMgr.sdl.SchGetAppType()
 	if appt == int(config.P2P_TYPE_CHAIN) {
 		if _, natMgr.ptnTabMgr = natMgr.sdl.SchGetUserTaskNode(sch.TabMgrName); natMgr.ptnTabMgr == nil {
-			natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.TabMgrName)
+			p2plog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.TabMgrName)
 		}
 	} else if appt == int(config.P2P_TYPE_DHT) {
 		if _, natMgr.ptnDhtMgr = natMgr.sdl.SchGetUserTaskNode(sch.DhtMgrName); natMgr.ptnDhtMgr == nil {
-			natLog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.DhtMgrName)
+			p2plog.Debug("poweron: SchGetUserTaskNode failed with task name: %s", sch.DhtMgrName)
 		}
 	} else {
-		natLog.Debug("poweron: unknown application type: %d", appt)
+		p2plog.Debug("poweron: unknown application type: %d", appt)
 	}
 
 	if eno := natMgr.getConfig(); eno != NatEnoNone {
-		natLog.Debug("poweron: getConfig failed, error: %s", eno.Error())
+		p2plog.Debug("poweron: getConfig failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
 	}
 
 	if eno := natMgr.setupNatInterface(); eno != NatEnoNone {
-		natLog.Debug("poweron: setupNatInterface failed, error: %s", eno.Error())
+		p2plog.Debug("poweron: setupNatInterface failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
 	}
 
@@ -258,7 +258,7 @@ func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 }
 
 func (natMgr *NatManager)poweroff(msg *sch.SchMessage) sch.SchErrno {
-	natLog.Debug("lsnMgrPoweroff: task will be done, name: %s", natMgr.name)
+	p2plog.Debug("lsnMgrPoweroff: task will be done, name: %s", natMgr.name)
 	natMgr.stop()
 	return natMgr.sdl.SchTaskDone(natMgr.ptnMe, sch.SchEnoKilled)
 }
@@ -291,7 +291,7 @@ func (natMgr *NatManager)refreshTimerHandler(msg *sch.SchMessage) sch.SchErrno {
 
 	inst, _ := msg.Body.(*NatMapInstance)
 	if eno := natMgr.refreshInstance(inst); eno != NatEnoNone {
-		natLog.Debug("refreshTimerHandler: refreshInstance failed, error: %s", eno.Error())
+		p2plog.Debug("refreshTimerHandler: refreshInstance failed, error: %s", eno.Error())
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -327,7 +327,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	}
 
 	if eno = natMgr.checkMakeMapReq(mmr); eno != NatEnoNone {
-		natLog.Debug("makeMapReq: checkMakeMapReq failed, error: %s", eno.Error())
+		p2plog.Debug("makeMapReq: checkMakeMapReq failed, error: %s", eno.Error())
 		goto _rsp2sender
 	}
 
@@ -337,7 +337,7 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	}
 
 	if _, ok := natMgr.instTab[id]; ok {
-		natLog.Debug("makeMapReq: duplicated, id: %+v", id)
+		p2plog.Debug("makeMapReq: duplicated, id: %+v", id)
 		eno = NatEnoDuplicated
 		goto _rsp2sender
 	}
@@ -355,11 +355,11 @@ func (natMgr *NatManager)makeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	}
 
 	if eno := natMgr.nat.makeMap(inst.id.toString(), inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep); eno != NatEnoNone {
-		natLog.Debug("makeMapReq: makeMap failed, error: %s", eno.Error())
+		p2plog.Debug("makeMapReq: makeMap failed, error: %s", eno.Error())
 		goto _rsp2sender
 	}
 	if eno := natMgr.startRefreshTimer(&inst); eno != NatEnoNone {
-		natLog.Debug("makeMapReq: makeMap failed, error: %s", eno.Error())
+		p2plog.Debug("makeMapReq: makeMap failed, error: %s", eno.Error())
 		goto _rsp2sender
 
 	}
@@ -384,6 +384,8 @@ _rsp2sender:
 		PubIp: pubIp,
 		PubPort: pubPort,
 	}
+	p2plog.Debug("makeMapReq: respone to sender %s with rsp: %+v",
+		natMgr.sdl.SchGetTaskName(sender), rsp)
 	schMsg := sch.SchMessage{}
 	natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, sender, sch.EvNatMgrMakeMapRsp, &rsp)
 	return natMgr.sdl.SchSendMessage(&schMsg)
@@ -410,13 +412,13 @@ func (natMgr *NatManager)removeMapReq(msg *sch.SchMessage) sch.SchErrno {
 	if natMgr.cfg.natType != NATT_NONE {
 		if inst.status == NatEnoNone {
 			if eno = natMgr.nat.removeMap(inst.id.proto, inst.id.fromPort, inst.pubPort); eno != NatEnoNone {
-				natLog.Debug("removeMapReq: removeMap failed, error: %s", eno.Error())
+				p2plog.Debug("removeMapReq: removeMap failed, error: %s", eno.Error())
 				goto _rsp2sender
 			}
 		}
 		if inst.tidRefresh != sch.SchInvalidTid {
 			if schEno := natMgr.sdl.SchKillTimer(natMgr.ptnMe, inst.tidRefresh); schEno != sch.SchEnoNone {
-				natLog.Debug("removeMapReq: SchKillTimer failed, eno: %d", schEno)
+				p2plog.Debug("removeMapReq: SchKillTimer failed, eno: %d", schEno)
 				eno = NatEnoScheduler
 				goto _rsp2sender
 			}
@@ -440,7 +442,7 @@ func (natMgr *NatManager)getPubAddrReq(msg *sch.SchMessage) sch.SchErrno {
 	defer natLock.Unlock()
 
 	if natMgr.cfg.natType == NATT_NONE {
-		natLog.Debug("getPubAddrReq: type mismatche, current: %s", natMgr.cfg.natType)
+		p2plog.Debug("getPubAddrReq: type mismatche, current: %s", natMgr.cfg.natType)
 		return sch.SchEnoUserTask
 	}
 
@@ -540,12 +542,12 @@ func (natMgr *NatManager)setupNatInterface() NatEno {
 			}
 		}
 	} else {
-		natLog.Debug("setupNatInterface: invalid nat type: %s", natMgr.cfg.natType)
+		p2plog.Debug("setupNatInterface: invalid nat type: %s", natMgr.cfg.natType)
 		return NatEnoParameter
 	}
 
 	if natMgr.cfg.natType != NATT_NONE && reflect.ValueOf(natMgr.nat).IsNil() {
-		natLog.Debug("setupNatInterface: null nat, natType: %s", natMgr.cfg.natType)
+		p2plog.Debug("setupNatInterface: null nat, natType: %s", natMgr.cfg.natType)
 		return NatEnoNullNat
 	}
 
@@ -555,7 +557,7 @@ func (natMgr *NatManager)setupNatInterface() NatEno {
 func (natMgr *NatManager)stop()  {
 	for _, inst := range natMgr.instTab {
 		if eno := natMgr.deleteInstance(inst); eno != NatEnoNone {
-			natLog.Debug("stopInstance: failed, id: %+v", inst.id)
+			p2plog.Debug("stopInstance: failed, id: %+v", inst.id)
 		}
 	}
 	natMgr.nat = nil
@@ -563,16 +565,16 @@ func (natMgr *NatManager)stop()  {
 
 func (natMgr *NatManager)deleteInstance(inst *NatMapInstance) NatEno {
 	if inst == nil {
-		natLog.Debug("deleteInstance: invalid instance")
+		p2plog.Debug("deleteInstance: invalid instance")
 		return NatEnoParameter
 	}
 	if natMgr.cfg.natType != NATT_NONE {
 		if inst.tidRefresh == sch.SchInvalidTid {
-			natLog.Debug("deleteInstance: invalid timer")
+			p2plog.Debug("deleteInstance: invalid timer")
 			return NatEnoParameter
 		}
 		if eno := natMgr.sdl.SchKillTimer(natMgr.ptnMe, inst.tidRefresh); eno != sch.SchEnoNone {
-			natLog.Debug("deleteInstance: SchKillTimer failed, eno: %d", eno)
+			p2plog.Debug("deleteInstance: SchKillTimer failed, eno: %d", eno)
 			return NatEnoScheduler
 		}
 		inst.tidRefresh = sch.SchInvalidTid
@@ -584,18 +586,18 @@ func (natMgr *NatManager)deleteInstance(inst *NatMapInstance) NatEno {
 func (natMgr *NatManager)reconfig(dcvReq *sch.MsgNatMgrDiscoverReq) NatEno {
 	// notice: "ANY" type is not supported by reconfiguration
 	if dcvReq == nil {
-		natLog.Debug("reconfig: invalid parameters")
+		p2plog.Debug("reconfig: invalid parameters")
 		return NatEnoParameter
 	}
 	switch dcvReq.NatType {
 	case NATT_NONE, NATT_UPNP:
 	case NATT_PMP:
 		if dcvReq.GwIp == nil {
-			natLog.Debug("reconfig: invalid GwIp for type: %s", NATT_PMP)
+			p2plog.Debug("reconfig: invalid GwIp for type: %s", NATT_PMP)
 			return NatEnoParameter
 		}
 	default:
-		natLog.Debug("reconfig: invalid type: %s", dcvReq.NatType)
+		p2plog.Debug("reconfig: invalid type: %s", dcvReq.NatType)
 		return NatEnoParameter
 	}
 	natMgr.stop()
@@ -608,19 +610,19 @@ func (natMgr *NatManager)reconfig(dcvReq *sch.MsgNatMgrDiscoverReq) NatEno {
 
 func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 	if _, ok := natMgr.instTab[inst.id]; !ok {
-		natLog.Debug("refreshInstance: instance not exist, id: %+v", inst.id)
+		p2plog.Debug("refreshInstance: instance not exist, id: %+v", inst.id)
 		return NatEnoMismatched
 	}
 	eno := natMgr.nat.makeMap(inst.id.toString(), inst.id.proto, inst.id.fromPort, inst.toPort, inst.durKeep)
 	if eno != NatEnoNone {
-		natLog.Debug("refreshInstance: makeMap failed, inst: %+v", *inst)
+		p2plog.Debug("refreshInstance: makeMap failed, inst: %+v", *inst)
 		return eno
 	}
 
 	// when failed to get public address, we do not send indication, so nat client will
 	// keep the old public address version and go on.
 	if curIp, eno := natMgr.nat.getPublicIpAddr(); eno != NatEnoNone {
-		natLog.Debug("refreshInstance: getPublicIpAddr failed, error: %s", eno.Error())
+		p2plog.Debug("refreshInstance: getPublicIpAddr failed, error: %s", eno.Error())
 	} else {
 		if bytes.Compare(inst.pubIp, curIp) != 0 {
 			inst.pubIp = curIp
@@ -631,6 +633,7 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 				PubIp: inst.pubIp,
 				PubPort: inst.pubPort,
 			}
+			p2plog.Debug("refreshInstance: send to %s with ind: %v", natMgr.sdl.SchGetTaskName(inst.owner), ind)
 			schMsg := sch.SchMessage{}
 			natMgr.sdl.SchMakeMessage(&schMsg, natMgr.ptnMe, inst.owner, sch.EvNatMgrPubAddrUpdateInd, &ind)
 			natMgr.sdl.SchSendMessage(&schMsg)
@@ -642,22 +645,22 @@ func (natMgr *NatManager)refreshInstance(inst *NatMapInstance) NatEno {
 
 func (natMgr *NatManager)checkMakeMapReq(mmr *sch.MsgNatMgrMakeMapReq) NatEno {
 	if mmr == nil {
-		natLog.Debug("checkMakeMapReq: invalid prameters")
+		p2plog.Debug("checkMakeMapReq: invalid prameters")
 		return NatEnoParameter
 	}
 	if strings.Compare(strings.ToLower(mmr.Proto), NATP_UDP) != 0 &&
 		strings.Compare(strings.ToLower(mmr.Proto), NATP_TCP) != 0 {
-		natLog.Debug("checkMakeMapReq: invalid protocol: %s", mmr.Proto)
+		p2plog.Debug("checkMakeMapReq: invalid protocol: %s", mmr.Proto)
 		return NatEnoParameter
 	}
 	if mmr.DurKeep < minKeepDuration {
-		natLog.Debug("checkMakeMapReq: invalid DurKeep: %d, min: %d", mmr.DurKeep, minKeepDuration)
+		p2plog.Debug("checkMakeMapReq: invalid DurKeep: %d, min: %d", mmr.DurKeep, minKeepDuration)
 		return NatEnoParameter
 	}
 	if mmr.DurRefresh != time.Duration(0) {
 		if !(mmr.DurRefresh >= mmr.DurKeep - maxRefreshDelta &&
 			mmr.DurRefresh <= mmr.DurKeep - minRefreshDelta) {
-			natLog.Debug("checkMakeMapReq: invalid [keep, refesh] pair: [%d,%d]", mmr.DurKeep, mmr.DurRefresh)
+			p2plog.Debug("checkMakeMapReq: invalid [keep, refesh] pair: [%d,%d]", mmr.DurKeep, mmr.DurRefresh)
 			return NatEnoParameter
 		}
 	} else {
@@ -670,7 +673,7 @@ func (natMgr *NatManager)startRefreshTimer(inst *NatMapInstance) NatEno {
 	// notice: we start an "Absolute" timer after map made than a "Cycle" timer
 	if inst.tidRefresh != sch.SchInvalidTid {
 		if eno := natMgr.sdl.SchKillTimer(natMgr.ptnMe, inst.tidRefresh); eno != sch.SchEnoNone {
-			natLog.Debug("startRefreshTimer: SchKillTimer failed, tid: %d, eno: %d", inst.tidRefresh, eno)
+			p2plog.Debug("startRefreshTimer: SchKillTimer failed, tid: %d, eno: %d", inst.tidRefresh, eno)
 			return NatEnoScheduler
 		}
 	}
@@ -683,7 +686,7 @@ func (natMgr *NatManager)startRefreshTimer(inst *NatMapInstance) NatEno {
 	}
 	eno, tid := natMgr.sdl.SchSetTimer(natMgr.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		natLog.Debug("startRefreshTimer: SchSetTimer failed, eno: %d", eno)
+		p2plog.Debug("startRefreshTimer: SchSetTimer failed, eno: %d", eno)
 		inst.tidRefresh = sch.SchInvalidTid
 		return NatEnoScheduler
 	}
