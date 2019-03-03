@@ -613,7 +613,7 @@ func (yeShMgr *YeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 		Target:		key,
 		Msg:		nil,
 		ForWhat:	dht.MID_FINDNODE,
-		Seq:		time.Now().Unix(),
+		Seq:		dht.GetQuerySeqNo(),
 	}
 
 	msg := sch.SchMessage{}

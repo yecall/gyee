@@ -159,6 +159,7 @@ var targetCase = "testCase17"
 // switch for playing go-monitors, related commands:
 // >> go tool pprof http://localhost:6060/debug/pprof/heap
 // >> curl localhost:6060/goroutines
+// see comments in function startGoProfile for more pls.
 //
 const goMonitors = true
 
@@ -167,8 +168,8 @@ const goMonitors = true
 //
 func main() {
 	if goMonitors {
-		startGoMemoryMonitor()
-		startGoRoutineMonitor()
+		startGoProfile()
+		startGoRoutinesMonitor()
 	}
 	for _, tc := range testCaseTable {
 		if tc.name == targetCase {
@@ -179,13 +180,24 @@ func main() {
 	log.Debug("main: target case not found: %s", targetCase)
 }
 
-func startGoMemoryMonitor() {
+func startGoProfile() {
+	// profile all, such as memory, cpu, ... example client commands like:
+	//	http://localhost:6060/debug/pprof/heap
+	//	http://localhost:6060/debug/pprof/profile
+	//	http://localhost:6060/debug/pprof/trace
+	//	http://localhost:6060/debug/pprof/cmdline
+	//	http://localhost:6060/debug/pprof/goroutine
+	//	http://localhost:6060debug/pprof/symbol
+	//	...
+	// please query the web for more. and notice that "localhost:6060" is
+	// shown just as an example.
 	go func() {
-		http.ListenAndServe("127.0.0.1:6060", nil)
+		http.ListenAndServe("localhost:6060", nil)
 	}()
 }
 
-func startGoRoutineMonitor() {
+func startGoRoutinesMonitor() {
+	// call runtime interface to get routine number when requested by http
 	go func() {
 		http.HandleFunc("/goroutines", func(w http.ResponseWriter, r *http.Request) {
 			num := strconv.FormatInt(int64(runtime.NumGoroutine()), 10)

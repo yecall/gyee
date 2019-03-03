@@ -31,6 +31,7 @@ import (
 	config	"github.com/yeeco/gyee/p2p/config"
 	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"sync"
 )
 
 
@@ -55,15 +56,15 @@ func (log qryMgrLogger)Debug(fmt string, args ... interface{}) {
 // Constants
 //
 const (
-	QryMgrName = sch.DhtQryMgrName		// query manage name registered in shceduler
-	qryMgrMaxPendings = 64				// max pendings can be held in the list
-	qryMgrMaxActInsts = 8				// max concurrent actived instances for one query
-	qryMgrQryExpired = time.Second * 60	// duration to get expired for a query
-	qryMgrQryMaxWidth = 64				// not the true "width", the max number of peers queryied
-	qryMgrQryMaxDepth = 8				// the max depth for a query
-	qryInstExpired = time.Second * 16	// duration to get expired for a query instance
-	natMapKeepTime = time.Minute * 20	// NAT map keep time
-	natMapRefreshTime = natMapKeepTime - time.Minute * 5 // NAT map refresh time
+	QryMgrName = sch.DhtQryMgrName			// query manage name registered in shceduler
+	qryMgrMaxPendings = 64					// max pendings can be held in the list
+	qryMgrMaxActInsts = 8					// max concurrent actived instances for one query
+	qryMgrQryExpired = time.Second * 60		// duration to get expired for a query
+	qryMgrQryMaxWidth = 64					// not the true "width", the max number of peers queryied
+	qryMgrQryMaxDepth = 8					// the max depth for a query
+	qryInstExpired = time.Second * 16		// duration to get expired for a query instance
+	natMapKeepTime = nat.MinKeepDuration	// NAT map keep time
+	natMapRefreshTime = nat.MinKeepDuration - nat.MinRefreshDelta // NAT map refresh time
 )
 
 //
@@ -1409,3 +1410,12 @@ func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
 	return DhtEnoNone
 }
 
+//
+// get unique sequence number all query
+//
+var qrySeqLock sync.Mutex
+func GetQuerySeqNo() int64 {
+	qrySeqLock.Lock()
+	defer qrySeqLock.Unlock()
+	return time.Now().UnixNano()
+}

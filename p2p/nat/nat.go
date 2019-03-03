@@ -94,9 +94,9 @@ type natConfig struct {
 // refresh the mapping before it's expired
 //
 const (
-	minKeepDuration = time.Minute * 20
-	minRefreshDelta = time.Minute * 5
-	maxRefreshDelta = time.Minute * 10
+	MinKeepDuration = time.Minute * 20
+	MinRefreshDelta = time.Minute * 5
+	MaxRefreshDelta = time.Minute * 10
 )
 
 //
@@ -653,18 +653,18 @@ func (natMgr *NatManager)checkMakeMapReq(mmr *sch.MsgNatMgrMakeMapReq) NatEno {
 		p2plog.Debug("checkMakeMapReq: invalid protocol: %s", mmr.Proto)
 		return NatEnoParameter
 	}
-	if mmr.DurKeep < minKeepDuration {
-		p2plog.Debug("checkMakeMapReq: invalid DurKeep: %d, min: %d", mmr.DurKeep, minKeepDuration)
+	if mmr.DurKeep < MinKeepDuration {
+		p2plog.Debug("checkMakeMapReq: invalid DurKeep: %d, min: %d", mmr.DurKeep, MinKeepDuration)
 		return NatEnoParameter
 	}
 	if mmr.DurRefresh != time.Duration(0) {
-		if !(mmr.DurRefresh >= mmr.DurKeep - maxRefreshDelta &&
-			mmr.DurRefresh <= mmr.DurKeep - minRefreshDelta) {
+		if !(mmr.DurRefresh >= mmr.DurKeep - MaxRefreshDelta &&
+			mmr.DurRefresh <= mmr.DurKeep - MinRefreshDelta) {
 			p2plog.Debug("checkMakeMapReq: invalid [keep, refesh] pair: [%d,%d]", mmr.DurKeep, mmr.DurRefresh)
 			return NatEnoParameter
 		}
 	} else {
-		mmr.DurRefresh = mmr.DurKeep - minRefreshDelta
+		mmr.DurRefresh = mmr.DurKeep - MinRefreshDelta
 	}
 	return NatEnoNone
 }

@@ -441,7 +441,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 		Target:		k,
 		Msg:		msg,
 		ForWhat:	MID_PUTVALUE,
-		Seq:		time.Now().UnixNano(),
+		Seq:		GetQuerySeqNo(),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -480,7 +480,7 @@ func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno 
 		Target:		k,
 		Msg:		msg,
 		ForWhat:	MID_GETVALUE_REQ,
-		Seq:		time.Now().UnixNano(),
+		Seq:		GetQuerySeqNo(),
 	}
 
 	schMsg := sch.SchMessage{}

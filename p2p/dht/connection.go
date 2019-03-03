@@ -486,6 +486,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		// put inbound instance to map and remove the temp map for it, but before
 		// doing this, duplicated cases must be check.
 		//
+		ci = msg.Inst.(*ConInst)
 		cid := conInstIdentity {
 			nid: msg.Peer.ID,
 			dir: msg.Dir,
@@ -493,12 +494,10 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		_, dup1 := conMgr.ciTab[cid]
 		_, dup2 := conMgr.instInClosing[cid]
 		if dup1 || dup2 {
-
 			schMsg := new(sch.SchMessage)
 			conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 			return conMgr.sdl.SchSendMessage(schMsg)
 		}
-		ci = msg.Inst.(*ConInst)
 		conMgr.ciTab[cid] = ci
 		delete(conMgr.ibInstTemp, ci.name)
 

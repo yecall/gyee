@@ -346,7 +346,7 @@ func (rutMgr *RutMgr)bootstarpTimerHandler() sch.SchErrno {
 			Target:		*key,
 			Msg:		nil,
 			ForWhat:	MID_FINDNODE,
-			Seq:		time.Now().UnixNano(),
+			Seq:		GetQuerySeqNo(),
 		}
 
 		rutMgr.bsTargets[*key] = target
@@ -427,7 +427,7 @@ func (rutMgr *RutMgr)queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 			Target:  *key,
 			Msg:     nil,
 			ForWhat: MID_FINDNODE,
-			Seq:     time.Now().UnixNano(),
+			Seq:     GetQuerySeqNo(),
 		}
 
 		rutMgr.bsTargets[*key] = target
@@ -437,7 +437,6 @@ func (rutMgr *RutMgr)queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sch
 	}
 
 	rutMgr.showRoute("bootstrap-round-completed")
-
 	return sch.SchEnoNone
 }
 

@@ -295,7 +295,7 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 		Target:		k,
 		Msg:		msg,
 		ForWhat:	MID_PUTPROVIDER,
-		Seq:		time.Now().UnixNano(),
+		Seq:		GetQuerySeqNo(),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -356,7 +356,7 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 		Target:		dsk,
 		Msg:		nil,
 		ForWhat:	MID_GETPROVIDER_REQ,
-		Seq:		time.Now().UnixNano(),
+		Seq:		GetQuerySeqNo(),
 	}
 
 	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
