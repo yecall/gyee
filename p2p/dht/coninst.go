@@ -1213,7 +1213,7 @@ func (conInst *ConInst)txProc() {
 		for {
 			select {
 			case <-conInst.dtmDone:
-				goto _dtmScanLoop
+				break _dtmScanLoop
 			case <-ticker.C:
 				conInst.txDtm.scan()
 			}
