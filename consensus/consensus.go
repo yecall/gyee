@@ -34,15 +34,20 @@ type Engine interface {
 	Start() error
 	Stop() error
 
+	// engine event output channel
+	ChanEventSend() <-chan []byte
+	ChanEventReq() <-chan common.Hash
+
 	// engine output channel
-	Output() chan *Output
+	Output() <-chan *Output
 
 	// send event raw bytes to engine
 	SendEvent([]byte)
+	SendParentEvent([]byte)
 
 	// send tx hash to engine
 	SendTx(common.Hash)
 
 	// inform engine txs has been sealed in block
-	OnTxSealed([]common.Hash)
+	OnTxSealed(uint64, []common.Hash)
 }

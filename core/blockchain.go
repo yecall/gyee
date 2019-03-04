@@ -237,7 +237,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		for _, tx := range b.transactions {
 			txs = append(txs, *tx.Hash())
 		}
-		engine.OnTxSealed(txs)
+		engine.OnTxSealed(b.Number(), txs)
 	}
 
 	return nil

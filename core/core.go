@@ -46,6 +46,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/consensus"
@@ -69,7 +70,7 @@ type Core struct {
 	node           INode
 	config         *config.Config
 	engine         consensus.Engine
-	engineOutputCh chan *consensus.Output
+	engineOutputCh <-chan *consensus.Output
 	storage        persistent.Storage
 	blockChain     *BlockChain
 	blockPool      *BlockPool
@@ -215,8 +216,10 @@ func (c *Core) loop() {
 	log.Info("Core loop...")
 	for {
 		var (
-			outputChan = c.engineOutputCh
-			msgChan    chan p2p.Message
+			chanEventSend = c.engine.ChanEventSend()
+			chanEventReq  = c.engine.ChanEventReq()
+			outputChan    = c.engineOutputCh
+			msgChan       chan p2p.Message
 		)
 
 		if c.subscriber != nil {
@@ -227,6 +230,26 @@ func (c *Core) loop() {
 		case <-c.quitCh:
 			log.Info("Core loop end.")
 			return
+		case event := <-chanEventSend:
+			log.Info("engine send event")
+			err := c.node.P2pService().BroadcastMessage(p2p.Message{
+				MsgType: p2p.MessageTypeEvent,
+				From:    c.node.NodeID(),
+				Data:    event,
+			})
+			if err != nil {
+				log.Warn("engine send event failed", "err", err)
+			}
+		case req := <-chanEventReq:
+			log.Info("engine req event", "hash", req)
+			go func(hash common.Hash) {
+				data, err := c.node.P2pService().DhtGetValue(hash[:])
+				if err != nil {
+					log.Warn("engine req event failed", "hash", hash, "err", err)
+				} else {
+					c.engine.SendParentEvent(data)
+				}
+			}(req)
 		case output := <-outputChan:
 			log.Info("core receive engine output", "output", output)
 			// TODO: build block

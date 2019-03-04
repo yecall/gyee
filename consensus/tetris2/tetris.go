@@ -41,6 +41,11 @@ type SyncRequest struct {
 	time  time.Time
 }
 
+type SealEvent struct {
+	height uint64
+	txs    []common.Hash
+}
+
 type Tetris struct {
 	core   ICore
 	signer crypto.Signer
@@ -58,6 +63,7 @@ type Tetris struct {
 	EventCh       chan []byte
 	ParentEventCh chan []byte
 	TxsCh         chan common.Hash
+	SealCh        chan *SealEvent
 
 	//Output Channel
 	OutputCh       chan *consensus.Output
@@ -105,6 +111,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		EventCh:       make(chan []byte, 10),
 		ParentEventCh: make(chan []byte, 10),
 		TxsCh:         make(chan common.Hash, 2000),
+		SealCh:        make(chan *SealEvent, 100),
 
 		OutputCh:       make(chan *consensus.Output, 10),
 		SendEventCh:    make(chan []byte, 10),
@@ -176,7 +183,21 @@ func (t *Tetris) Stop() error {
 	return nil
 }
 
-func (t *Tetris) Output() chan *consensus.Output {
+func (t *Tetris) ChanEventSend() <-chan []byte {
+	if t == nil {
+		return nil
+	}
+	return t.SendEventCh
+}
+
+func (t *Tetris) ChanEventReq() <-chan common.Hash {
+	if t == nil {
+		return nil
+	}
+	return t.RequestEventCh
+}
+
+func (t *Tetris) Output() <-chan *consensus.Output {
 	return t.OutputCh
 }
 
@@ -184,13 +205,19 @@ func (t *Tetris) SendEvent(event []byte) {
 	t.EventCh <- event
 }
 
+func (t *Tetris) SendParentEvent(event []byte) {
+	t.ParentEventCh <- event
+}
+
 func (t *Tetris) SendTx(hash common.Hash) {
 	t.TxsCh <- hash
 }
 
-func (t *Tetris) OnTxSealed(txs []common.Hash) {
-	// clean up cache for txs
-	// TODO:
+func (t *Tetris) OnTxSealed(height uint64, txs []common.Hash) {
+	t.SealCh <- &SealEvent{
+		height: height,
+		txs:    txs,
+	}
 }
 
 func (t *Tetris) loop() {
@@ -229,6 +256,9 @@ func (t *Tetris) loop() {
 		case tx := <-t.TxsCh:
 			t.Metrics.AddTrafficIn(uint64(len(tx)))
 			t.receiveTx(tx)
+
+		case seal := <-t.SealCh:
+			t.receiveSeal(seal)
 
 		case time := <-t.ticker.C:
 			t.receiveTicker(time)
@@ -303,7 +333,8 @@ func (t *Tetris) sendHeartbeat() {
 
 func (t *Tetris) receiveTicker(ttime time.Time) {
 	if ttime.Sub(t.lastSendTime) > 1*time.Second {
-		t.sendHeartbeat()
+		//t.sendHeartbeat()
+		t.sendEvent()
 	}
 }
 
@@ -321,15 +352,19 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
 
-		if len(t.txsAccepted) > t.params.maxTxPerEvent {
-			ok, _ := t.MajorityBeatTime()
-			if ok {
-				t.sendEvent()
-			} else {
-				t.txsAccepted = t.txsAccepted[10:]
-			}
+		//if len(t.txsAccepted) > t.params.maxTxPerEvent {
+		ok, _ := t.MajorityBeatTime()
+		if ok {
+			t.sendEvent()
+		} else {
+			t.txsAccepted = t.txsAccepted[10:]
 		}
+		//}
 	}
+}
+
+func (t *Tetris) receiveSeal(event *SealEvent) {
+	// TODO:
 }
 
 func (t *Tetris) checkEvent(event *Event) bool {
