@@ -232,7 +232,6 @@ func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 // Stop-request event handler
 //
 func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
-
 	if lsnMgr.status == lmsNull || lsnMgr.status == lmsStopped {
 		lsnLog.Debug("stopReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
@@ -247,7 +246,6 @@ func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
 	lsnMgr.listener = nil
 	lsnMgr.status = lmsStopped
 	lsnMgr.dispStaus()
-
 	return sch.SchEnoNone
 }
 
@@ -255,15 +253,12 @@ func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
 // Pause-request event handler
 //
 func (lsnMgr *LsnMgr)pauseReq() sch.SchErrno {
-
 	if lsnMgr.status != lmsWorking {
 		lsnLog.Debug("pauseReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
 	}
-
 	lsnMgr.status = lmsPaused
 	lsnMgr.dispStaus()
-
 	return sch.SchEnoNone
 }
 
@@ -271,7 +266,6 @@ func (lsnMgr *LsnMgr)pauseReq() sch.SchErrno {
 // Resume-request event handler
 //
 func (lsnMgr *LsnMgr)resumeReq() sch.SchErrno {
-
 	if lsnMgr.status != lmsPaused {
 		lsnLog.Debug("resumeReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
@@ -284,7 +278,6 @@ func (lsnMgr *LsnMgr)resumeReq() sch.SchErrno {
 
 	lsnMgr.status = lmsWorking
 	lsnMgr.dispStaus()
-
 	return sch.SchEnoNone
 }
 
@@ -393,9 +386,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 // Setup net lsitener
 //
 func (lsnMgr *LsnMgr)setupListener() DhtErrno {
-
 	var err error
-
 	network := lsnMgr.config.network
 	ip := lsnMgr.config.ip.String()
 	port := lsnMgr.config.port
@@ -409,11 +400,9 @@ func (lsnMgr *LsnMgr)setupListener() DhtErrno {
 	}
 
 	lsnMgr.listenAddr = lsnMgr.listener.Addr().(*net.TCPAddr)
-
 	lsnLog.Debug("setupListener: "+
 		"task inited ok, listening address: %s",
 		lsnMgr.listenAddr.String())
-
 	return DhtEnoNone
 }
 
@@ -442,7 +431,6 @@ func (lsnMgr *LsnMgr)driveMore() DhtErrno {
 // Froce to get out from accept call
 //
 func (lsnMgr *LsnMgr) ForceAcceptOut() DhtErrno {
-
 	lsnMgr.lock.Lock()
 	defer lsnMgr.lock.Unlock()
 
@@ -459,6 +447,5 @@ func (lsnMgr *LsnMgr) ForceAcceptOut() DhtErrno {
 	lsnMgr.listener.Close()
 	lsnMgr.listener = nil
 	lsnMgr.status = lmsNull
-
 	return DhtEnoNone
 }

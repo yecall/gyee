@@ -1294,7 +1294,6 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 
 func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 	// cleanup
-	var schMsg = sch.SchMessage{}
 	var cfm = msg.(*MsgCloseCfm)
 	if eno := peMgr.peMgrKillInst(cfm.ptn, cfm.peNode, cfm.dir, PKI_FOR_CLOSE_CFM); eno != PeMgrEnoNone {
 		peerLog.Debug("peMgrConnCloseCfm: peMgrKillInst, failed, eno: %d", eno)
@@ -1307,31 +1306,40 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		Dir:		cfm.dir,
 	}
 	if peMgr.ptnShell != nil {
+		schMsg := new(sch.SchMessage)
 		ind2Sh := sch.MsgShellPeerCloseCfm{
 			Result: int(cfm.result),
 			Dir: cfm.dir,
 			Snid: cfm.snid,
 			PeerId: cfm.peNode.ID,
 		}
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerCloseCfm, &ind2Sh)
-		peMgr.sdl.SchSendMessage(&schMsg)
+		peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerCloseCfm, &ind2Sh)
+		peMgr.sdl.SchSendMessage(schMsg)
 	} else {
 		peMgr.peMgrIndEnque(&i)
 	}
 
+	peerLog.Debug("peMgrConnCloseCfm: inStartup: %d, pasStatus: %d, peers: %d, nodes: %d, workers: %d",
+		peMgr.inStartup, peMgr.pasStatus, len(peMgr.peers), len(peMgr.nodes), len(peMgr.workers))
+
 	if peMgr.inStartup == peMgrInStartup {
-		// requst to try connect outbound
+
+		peerLog.Debug("peMgrConnCloseCfm: send EvPeOutboundReq")
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
+
 	} else if peMgr.inStartup == peMgrInStoping {
-		// check if all are stopped to enter stopped status
-		if len(peMgr.peers) == 0 || len(peMgr.nodes) == 0 || len(peMgr.workers) == 0 {
+
+		if len(peMgr.peers) == 0 && len(peMgr.nodes) == 0 && len(peMgr.workers) == 0 {
+			peerLog.Debug("peMgrConnCloseCfm: transfer to peMgrInStopped")
 			peMgr.inStartup = peMgrInStopped
 		}
+
 	} else if peMgr.pasStatus == peMgrPubAddrInSwitching  ||
 		peMgr.pasStatus == peMgrPubAddrDelaySwitching {
-		 // swith the public address
-		if len(peMgr.peers) == 0 || len(peMgr.nodes) == 0 || len(peMgr.workers) == 0 {
+
+		if len(peMgr.peers) == 0 && len(peMgr.nodes) == 0 && len(peMgr.workers) == 0 {
+			peerLog.Debug("peMgrConnCloseCfm: calll pubAddrSwitch")
 			peMgr.pubAddrSwitch()
 		}
 	} else {
@@ -1415,6 +1423,9 @@ func (peMgr *PeerManager)natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno 
 }
 
 func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) PeMgrErrno {
+
+	peerLog.Debug("natPubAddrUpdateInd: entered")
+
 	oldNatResult := peMgr.natResult
 	oldIp := peMgr.pubTcpIp
 	oldTcp := peMgr.pubTcpPort
@@ -1423,20 +1434,28 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 		if !peMgr.pubTcpIp.Equal(oldIp) || peMgr.pubTcpPort != oldTcp {
 			if peMgr.pasStatus == pwMgrPubAddrOutofSwitching {
 				if peMgr.reCfgTid != sch.SchInvalidTid {
+					peerLog.Debug("natMapRecovered: enter peMgrPubAddrDelaySwitching")
 					peMgr.pasStatus = peMgrPubAddrDelaySwitching
 				} else {
+					peerLog.Debug("natMapRecovered: enter peMgrPubAddrInSwitching")
 					peMgr.pasStatus = peMgrPubAddrInSwitching
+
+					peerLog.Debug("natMapRecovered: call pubAddrSwitchPrepare")
 					peMgr.pubAddrSwitchPrepare()
+
+					peerLog.Debug("natMapRecovered: call stop")
 					peMgr.stop(PEMGR_STOP4NAT)
 				}
 			}
 		} else if peMgr.inStartup == peMgrInStartup {
+			peerLog.Debug("natMapRecovered: call PeMgrStart")
 			peMgr.PeMgrStart()
 		}
 	}
 
 	natMapLost := func() {
 		if oldNatResult {
+			peerLog.Debug("natMapLost: call stop")
 			peMgr.stop(PEMGR_STOP4NAT)
 		}
 	}
@@ -1444,6 +1463,7 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 	if nat.NatIsStatusOk(msg.Status) {
 		if msg.Proto == nat.NATP_TCP {
 			if !peMgr.natResult {
+				peerLog.Debug("natPubAddrUpdateInd: call natMapRecovered")
 				natMapRecovered()
 			}
 		}
@@ -1453,6 +1473,7 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 		peMgr.pubTcpIp = net.IPv4zero
 		peMgr.pubTcpPort = 0
 		if old {
+			peerLog.Debug("natPubAddrUpdateInd: call natMapLost")
 			natMapLost()
 		}
 	}
@@ -1460,28 +1481,33 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 }
 
 func (peMgr *PeerManager)start() PeMgrErrno {
-	var schMsg = sch.SchMessage{}
+	msg := new(sch.SchMessage)
 	if peMgr.cfg.noAccept == false {
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
-		peMgr.sdl.SchSendMessage(&schMsg)
+		peMgr.sdl.SchMakeMessage(msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
+		peMgr.sdl.SchSendMessage(msg)
+		peerLog.Debug("start: EvPeLsnStartReq sent")
 	}
 
-	var tdOcr = sch.TimerDescription {
+	tdOcr := sch.TimerDescription {
 		Name:	"_pocrTimer",
 		Utid:	sch.PeMinOcrCleanupTimerId,
 		Tmt:	sch.SchTmTypePeriod,
 		Dur:	minDuration4OutboundConnectReq,
 		Extra:	nil,
 	}
-	var eno sch.SchErrno
+	eno := sch.SchEnoNone
 	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
 	if eno != sch.SchEnoNone || peMgr.ocrTid == sch.SchInvalidTid {
 		peerLog.Debug("start: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
+	peerLog.Debug("start: ocrTid start ok")
 
+	msg = new(sch.SchMessage)
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
+	peerLog.Debug("start: EvPeOutboundReq sent")
+
 	return PeMgrEnoNone
 }
 
@@ -1491,6 +1517,7 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 		return PeMgrEnoRecofig
 	}
 
+	peerLog.Debug("stop: kill caTids")
 	for _, tid := range peMgr.caTids {
 		if tid != sch.SchInvalidTid {
 			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
@@ -1502,15 +1529,19 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 		msg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
 		peMgr.sdl.SchSendMessage(&msg)
+		peerLog.Debug("stop: EvPeLsnStopReq sent")
 	}
 
+	peerLog.Debug("stop: randoms cleared")
 	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
 
+	peerLog.Debug("stop: kill ocrTid")
 	if peMgr.ocrTid != sch.SchInvalidTid {
 		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.ocrTid)
 		peMgr.ocrTid = sch.SchInvalidTid
 	}
 
+	peerLog.Debug("stop: kill tidFindNode")
 	for _, tid := range peMgr.tidFindNode {
 		if tid != sch.SchInvalidTid {
 			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
@@ -1520,7 +1551,11 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 
 	// try to close all peer instances: need to check the state of the instance to
 	// be closed.
+	peerLog.Debug("stop: try to kill all peer instances")
 	for ptn, pi := range peMgr.peers {
+
+		peerLog.Debug("stop: peer, snid: %x, dir: %d, ip: %s", pi.snid, pi.dir, pi.node.IP.String())
+
 		node := pi.node
 		snid := pi.snid
 		dir := pi.dir
@@ -1528,10 +1563,11 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 			Id:  pi.node.ID,
 			Dir: dir,
 		}
+
+		// check to ask shell manager to close the peer
 		if piOfSubnet, ok := peMgr.nodes[snid]; ok && piOfSubnet != nil {
 			if _, ok := piOfSubnet[idex]; ok {
 				if pi.state >= peInstStateHandshook {
-					// let shell manager know
 					ind := sch.MsgShellPeerAskToCloseInd{
 						Snid:   snid,
 						PeerId: idex.Id,
@@ -1541,11 +1577,13 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 					msg := sch.SchMessage{}
 					peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
 					peMgr.sdl.SchSendMessage(&msg)
+					peerLog.Debug("stop: EvShellPeerAskToCloseInd sent, snid: %x, ip: %s, dir: %d",
+						snid, pi.node.IP.String(), pi.dir)
 					continue
 				}
 			}
 		}
-		// kill directly
+		// else kill directly
 		req := sch.MsgPeCloseReq {
 			Ptn: ptn,
 			Snid: snid,
@@ -1556,8 +1594,11 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 		msg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
 		peMgr.sdl.SchSendMessage(&msg)
+		peerLog.Debug("stop: EvPeCloseReq sent, snid: %x, ip: %s, dir: %d",
+			snid, pi.node.IP.String(), pi.dir)
 	}
 
+	peerLog.Debug("stop: transfer to peMgrInStoping")
 	peMgr.inStartup = peMgrInStoping
 	return PeMgrEnoNone
 }
@@ -1598,6 +1639,8 @@ func (peMgr *PeerManager)pubAddrSwitchPrepare() PeMgrErrno {
 					snid: pi.snid,
 					node: pi.node,
 				}
+				peerLog.Debug("pubAddrSwitchPrepare: peer backup, name, snid: %x, ip: %s",
+					pi.name, pi.snid, pi.node.IP.String())
 				peMgr.pasBackup = append(peMgr.pasBackup, item)
 			}
 		}
@@ -1606,8 +1649,11 @@ func (peMgr *PeerManager)pubAddrSwitchPrepare() PeMgrErrno {
 }
 
 func (peMgr *PeerManager)pubAddrSwitch() PeMgrErrno {
+	peerLog.Debug("pubAddrSwitch: transfer to peMgrInStartup and pwMgrPubAddrOutofSwitching")
 	peMgr.inStartup = peMgrInStartup
 	peMgr.pasStatus = pwMgrPubAddrOutofSwitching
+
+	peerLog.Debug("pubAddrSwitch: restore peers in bakup list")
 	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
 	for _, item := range peMgr.pasBackup {
 		snid := item.snid
@@ -1615,7 +1661,13 @@ func (peMgr *PeerManager)pubAddrSwitch() PeMgrErrno {
 			peMgr.randoms[snid] = make([]*config.Node, 0)
 		}
 		peMgr.randoms[snid] = append(peMgr.randoms[snid], &item.node)
+		peerLog.Debug("pubAddrSwitch: backup one, snid: %x, ip: %s",
+			item.snid, item.node.IP.String())
 	}
+
+	peerLog.Debug("pubAddrSwitch: switch to new ip: %s, port: %d",
+		peMgr.pubTcpIp.String(), peMgr.pubTcpPort)
+
 	peMgr.cfg.ip = peMgr.pubTcpIp
 	peMgr.cfg.port = uint16(peMgr.pubTcpPort)
 	peMgr.cfg.udp = uint16(peMgr.pubTcpPort)
@@ -1628,6 +1680,8 @@ func (peMgr *PeerManager)pubAddrSwitch() PeMgrErrno {
 		}
 		peMgr.cfg.subNetNodeList[k] = n
 	}
+
+	peerLog.Debug("pubAddrSwitch: call start")
 	return peMgr.start()
 }
 
@@ -1735,11 +1789,11 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 }
 
 const (
-	PKI_FOR_NONE			= "None"
-	PKI_FOR_CLOSE_CFM		= "peMgrConnCloseCfm"
-	PKI_FOR_CLOSE_IND		= "peMgrConnCloseInd"
-	PKI_FOR_BOUNDOUT_FAILED	= "peMgrConnOutRsp"
-	PKI_FOR_RECONFIG		= "reConfig"
+	PKI_FOR_NONE				= "none"
+	PKI_FOR_CLOSE_CFM			= "peMgrConnCloseCfm"
+	PKI_FOR_CLOSE_IND			= "peMgrConnCloseInd"
+	PKI_FOR_BOUNDOUT_FAILED		= "peMgrConnOutRsp"
+	PKI_FOR_RECONFIG			= "reConfig"
 	PKI_FOR_HANDSHAKE_FAILED	= "hsFailed"
 	PKI_FOR_TOOMUCH_WORKERS		= "maxWorks"
 	PKI_FOR_TOOMUCH_OUTBOUNDS	= "maxOutbounds"
@@ -1801,16 +1855,12 @@ func (peMgr *PeerManager)peMgrKillInst(ptn interface{}, node *config.Node, dir i
 	}
 
 	peMgr.updateStaticStatus(snid, idEx, peerIdle)
-
-	// resume accepter if necessary
 	if peMgr.cfg.noAccept == false &&
 		peMgr.ibpTotalNum < peMgr.cfg.ibpNumTotal {
 		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	}
-
-	// Stop instance task
 	peInst.state = peInstStateKilled
 	peMgr.sdl.SchStopTask(ptn)
 

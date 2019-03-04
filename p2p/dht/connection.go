@@ -34,6 +34,7 @@ import (
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	"github.com/libp2p/go-testutil/ci"
 )
 
 
@@ -926,6 +927,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	conMgr.sdl.SchSendMessage(schMsg)
 
 	if conMgr.pasStatus == pasInSwitching && len(conMgr.ciTab) == 0 {
+		connLog.Debug("instStatusInd: in pasInSwitching, number of instance: %d", len(conMgr.ciTab))
 		if eno := conMgr.natMapSwitchEnd(); eno != DhtEnoNone {
 			connLog.Debug("instStatusInd: natMapSwitchEnd failed, eno: %d", eno)
 			return sch.SchEnoUserTask
@@ -1458,18 +1460,24 @@ func (conMgr *ConMgr)switch2NatAddr(proto string) DhtErrno {
 // switch to public address from nat manager
 //
 func (conMgr *ConMgr)natMapSwitch() DhtErrno {
+
+	connLog.Debug("natMapSwitch: swithching begin...")
+
 	sdl := conMgr.sdl
 	msg := new(sch.SchMessage)
 	sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchBeg, nil)
 	sdl.SchSendMessage(msg)
+	connLog.Debug("natMapSwitch: EvDhtConMgrPubAddrSwitchBeg sent")
 
 	msg = new(sch.SchMessage)
 	sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrPauseReq, nil)
 	sdl.SchSendMessage(msg)
+	connLog.Debug("natMapSwitch: EvDhtLsnMgrPauseReq sent")
 
 	for cid, ci := range conMgr.ciTab {
 		msg = new(sch.SchMessage)
-		if ci.getStatus() >= CisInKilling {
+		if status := ci.getStatus(); status >= CisInKilling {
+			connLog.Debug("natMapSwitch: need not to kill, inst: %s, status: %d", ci.name, status)
 			continue
 		}
 		req := sch.MsgDhtConInstCloseReq {
@@ -1478,14 +1486,18 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 		}
 		sdl.SchMakeMessage(msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
 		sdl.SchSendMessage(msg)
+		connLog.Debug("natMapSwitch: EvDhtConInstCloseReq sent, inst: %s", ci.name)
 	}
 
 	po := sch.SchMessage{}
 	for _, ci := range conMgr.ibInstTemp {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
+		connLog.Debug("natMapSwitch: EvSchPoweroff sent, inst: %s", ci.name)
 	}
+	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 
+	connLog.Debug("natMapSwitch: transfer to pasInSwitching")
 	conMgr.pasStatus = pasInSwitching
 	conMgr.mfilter = conMgr.msgFilter
 	return DhtEnoNone
@@ -1495,6 +1507,7 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 // post public address switching proc
 //
 func (conMgr *ConMgr)natMapSwitchEnd() DhtErrno {
+	connLog.Debug("natMapSwitchEnd: entered")
 	conMgr.pasStatus = pasInNull
 	conMgr.instCache.Purge()
 	conMgr.txQueTab = make(map[conInstIdentity]*list.List, 0)
@@ -1505,10 +1518,12 @@ func (conMgr *ConMgr)natMapSwitchEnd() DhtErrno {
 	msg := new(sch.SchMessage)
 	conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrResumeReq, nil)
 	conMgr.sdl.SchSendMessage(msg)
+	connLog.Debug("natMapSwitchEnd: EvDhtLsnMgrResumeReq sent")
 
 	msg = new(sch.SchMessage)
 	conMgr.sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchEnd, nil)
 	conMgr.sdl.SchSendMessage(msg)
+	connLog.Debug("natMapSwitchEnd: EvDhtConMgrPubAddrSwitchEnd sent")
 
 	return DhtEnoNone
 }

@@ -982,14 +982,16 @@ func (ngbMgr *NeighborManager)getSubNodeId(snid config.SubNetworkID) *config.Nod
 func (ngbMgr *NeighborManager)natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchInd) NgbMgrErrno {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
-	powerOff := sch.SchMessage {
-		Id:		sch.EvSchPoweroff,
-		Body:	nil,
-	}
+	ngbLog.Debug("natPubAddrSwitchInd: entered")
 	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, ngbInst := range ngbMgr.ngbMap {
+		powerOff := sch.SchMessage {
+			Id:		sch.EvSchPoweroff,
+			Body:	nil,
+		}
 		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
 		ngbMgr.sdl.SchSendMessage(&powerOff)
+		ngbLog.Debug("natPubAddrSwitchInd: EvSchPoweroff sent, inst: %s", ngbInst.name)
 	}
 	ngbMgr.cfg.IP = msg.PubIp
 	ngbMgr.cfg.UDP = uint16(msg.PubPort)

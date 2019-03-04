@@ -1705,9 +1705,9 @@ func (sdl *scheduler)schGetTaskNodeByName(name string) (SchErrno, *schTaskNode) 
 func (sdl *scheduler)schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 
 	//
-	// Notice: this function should be called inside a task to kill itself, so it
-	// could not to poll the "stopped" signal, for this signal is fired by itself,
-	// to do this will result in a deadlock.
+	// Notice: this function "should" be called inside a task to kill itself, so
+	// do not poll the "stopped" signal, for this signal is fired by itself, this
+	// will result in a deadlock.
 	//
 
 	if ptn == nil {
@@ -1737,7 +1737,6 @@ func (sdl *scheduler)schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 	// "stopped" signal here, since we need our task to try the "done" we fired
 	// above, there the "stopped" would be fired, but no one would care it.
 	//
-
 	return SchEnoNone
 }
 

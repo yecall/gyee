@@ -256,7 +256,6 @@ type TableManager struct {
 	// Notice: currently Ethereum's database interface is introduced
 	//see file nodedb.go for details please.
 	//
-
 	nodeDb			*nodeDB				// node database object pointer
 
 	//
@@ -268,7 +267,6 @@ type TableManager struct {
 	// sub network table managers in subNetMgrList, and sending messages for
 	// them when necessary.
 	//
-
 	networkType		int								// network type
 	snid			SubNetworkID					// sub network identity
 	subNetMgrList	map[SubNetworkID]*TableManager	// sub network manager
@@ -276,7 +274,6 @@ type TableManager struct {
 	//
 	// public address from nat manager
 	//
-
 	natUdpResult	bool				// result about nap mapping for udp
 	pubUdpIp		net.IP				// public ip from nat to be announced for udp
 	pubUdpPort		int					// public port form nat to be announced for udp
@@ -1088,11 +1085,13 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 	// check to start or stop auto-refreshing when updated
 	if tabMgr.natUdpResult {
 		if !tabMgr.pubUdpIp.Equal(oldUdpIp) || oldUdpPort != tabMgr.pubUdpPort {
+			tabLog.Debug("tabMgrNatPubAddrUpdateInd: call pubAddrSwitchPrepare")
 			if eno := tabMgr.pubAddrSwitchPrepare(); eno != TabMgrEnoNone {
 				tabLog.Debug("tabMgrNatPubAddrUpdateInd: pubAddrSwitchPrepare failed, eno: %d", eno)
 				return eno
 			}
 		}
+		tabLog.Debug("tabMgrNatPubAddrUpdateInd: call switch2NatAddr")
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
 			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
@@ -1101,11 +1100,13 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 			for _, mgr := range tabMgr.subNetMgrList {
 				// notice: here we start refreshing with the local node identity, so, peer would update to our
 				// new address with this identity(to overlap the old one), it can try to connect us also.
+				tabLog.Debug("tabMgrNatPubAddrUpdateInd: call startSubnetRefresh, snid: %x", mgr.snid)
 				mgr.startSubnetRefresh(&mgr.cfg.local.ID)
 			}
 		}
 	} else if old {
 		for _, mgr := range tabMgr.subNetMgrList {
+			tabLog.Debug("tabMgrNatPubAddrUpdateInd: call stopSubnetRefresh, snid: %x", mgr.snid)
 			mgr.stopSubnetRefresh()
 		}
 	}
@@ -2613,6 +2614,7 @@ func (tabMgr *TableManager)switch2NatAddr(proto string) TabMgrErrno {
 
 func (tabMgr *TableManager)pubAddrSwitchPrepare() TabMgrErrno {
 	for snid, mgr := range tabMgr.subNetMgrList {
+		tabLog.Debug("pubAddrSwitchPrepare: call subnetPubAddrSwitchPrepare, snid: %x", snid)
 		if eno := mgr.subnetPubAddrSwitchPrepare(); eno != TabMgrEnoNone {
 			tabLog.Debug("pubAddrSwitchPrepare: failed, subnet: %x", snid)
 			return eno
@@ -2627,10 +2629,12 @@ func (tabMgr *TableManager)pubAddrSwitchPrepare() TabMgrErrno {
 	msg := new(sch.SchMessage)
 	tabMgr.sdl.SchMakeMessage(msg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNatPubAddrSwitchInd, &ind)
 	tabMgr.sdl.SchSendMessage(msg)
+	tabLog.Debug("pubAddrSwitchPrepare: EvNatPubAddrSwitchInd sent")
 	return TabMgrEnoNone
 }
 
 func (tabMgr *TableManager)subnetPubAddrSwitchPrepare() TabMgrErrno {
+	tabLog.Debug("subnetPubAddrSwitchPrepare: delete arfTid, snid: %x", tabMgr.snid)
 	if tabMgr.arfTid != sch.SchInvalidTid {
 		tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, tabMgr.arfTid)
 		tabMgr.arfTid = sch.SchInvalidTid
@@ -2638,12 +2642,14 @@ func (tabMgr *TableManager)subnetPubAddrSwitchPrepare() TabMgrErrno {
 	tabMgr.queryPending = make([]*queryPendingEntry, 0)
 	tabMgr.boundPending = make([]*Node, 0)
 	for _, icb := range tabMgr.queryIcb {
+		tabLog.Debug("subnetPubAddrSwitchPrepare: call tabDeleteActiveQueryInst, snid: %x", tabMgr.snid)
 		if eno := tabMgr.tabDeleteActiveQueryInst(icb); eno != TabMgrEnoNone {
 			tabLog.Debug("subnetPubAddrSwitchPrepare: tabDeleteActiveQueryInst failed, eno: %d", eno)
 			return eno
 		}
 	}
 	for _, icb := range tabMgr.boundIcb {
+		tabLog.Debug("subnetPubAddrSwitchPrepare: call tabDeleteActiveBoundInst, snid: %x", tabMgr.snid)
 		if eno := tabMgr.tabDeleteActiveBoundInst(icb); eno != TabMgrEnoNone {
 			tabLog.Debug("subnetPubAddrSwitchPrepare: tabDeleteActiveBoundInst failed, eno: %d", eno)
 			return eno
