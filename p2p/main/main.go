@@ -28,6 +28,7 @@ import (
 	"time"
 	"fmt"
 	"os"
+	"syscall"
 	"bytes"
 	"strconv"
 	"runtime"
@@ -209,7 +210,7 @@ func startGoRoutinesMonitor() {
 
 func waitInterrupt() {
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt)
+	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigc)
 	<-sigc
 }
@@ -501,13 +502,13 @@ func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep
 }
 
 func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subscriber, subBh yep2p.Subscriber) {
+	yeShMgr.Stop()
 	close(subEv.MsgChan)
 	yeShMgr.UnRegister(&subEv)
 	close(subTx.MsgChan)
 	yeShMgr.UnRegister(&subTx)
 	close(subBh.MsgChan)
 	yeShMgr.UnRegister(&subBh)
-	yeShMgr.Stop()
 }
 
 func yeChainStopEx(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subscriber, subBh yep2p.Subscriber, done chan bool) {
@@ -984,16 +985,16 @@ func testCase17(tc *testCase) {
 	go subFunc(subTx, "tx")
 	go subFunc(subBh, "bh")
 
+	done := make(chan bool)
 	if false {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
 	} else if true {
-		done := make(chan bool)
 		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
 		waitInterrupt()
 		yeChainStopEx(yeShMgr, subEv, subTx, subBh, done)
 	} else {
-		time.Sleep(time.Second * 10)
-		yeChainProc(yeShMgr, ev, tx, bh, bk)
+		go yeChainProc(yeShMgr, ev, tx, bh, bk)
+		time.Sleep(time.Second * 60)
 		yeChainStop(yeShMgr, subEv, subTx, subBh)
 	}
 }
