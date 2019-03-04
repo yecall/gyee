@@ -967,17 +967,8 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 	err := false
 
 	if ci := conMgr.instInClosing[cid]; ci != nil {
-
 		found = true
 		delete(conMgr.instInClosing, cid)
-
-		if conMgr.pasStatus == pasInSwitching && len(conMgr.instInClosing) == 0 {
-			connLog.Debug("instCloseRsp: call natMapSwitchEnd")
-			if eno := conMgr.natMapSwitchEnd(); eno != DhtEnoNone {
-				connLog.Debug("instCloseRsp: natMapSwitchEnd failed, eno: %d", eno)
-				err = true
-			}
-		}
 
 		connLog.Debug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
 		if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
@@ -999,6 +990,7 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 		connLog.Debug("instCloseRsp: seems some errors")
 		return sch.SchEnoUserTask
 	}
+
 	return sch.SchEnoNone
 }
 
@@ -1462,28 +1454,14 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	sdl.SchSendMessage(msg)
 	connLog.Debug("natMapSwitch: EvDhtLsnMgrPauseReq sent")
 
-	numCloseReq := 0
-	for cid, ci := range conMgr.ciTab {
-		msg = new(sch.SchMessage)
-		if status := ci.getStatus(); status >= CisInKilling {
-			connLog.Debug("natMapSwitch: need not to kill, inst: %s, status: %d", ci.name, status)
-			continue
-		}
-
-		conMgr.instInClosing[cid] = ci
-		delete(conMgr.ciTab, cid)
-
-		req := sch.MsgDhtConInstCloseReq {
-			Peer:	&cid.nid,
-			Why:	sch.EvNatMgrPubAddrUpdateInd,
-		}
-		sdl.SchMakeMessage(msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
-		sdl.SchSendMessage(msg)
-		numCloseReq++
-		connLog.Debug("natMapSwitch: EvDhtConInstCloseReq sent, inst: %s", ci.name)
-	}
-
 	po := sch.SchMessage{}
+	for _, ci := range conMgr.ciTab {
+		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		conMgr.sdl.SchSendMessage(&po)
+		connLog.Debug("natMapSwitch: EvSchPoweroff sent, inst: %s", ci.name)
+	}
+	conMgr.ciTab = make(map[conInstIdentity]*ConInst, 0)
+
 	for _, ci := range conMgr.ibInstTemp {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
@@ -1491,17 +1469,10 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	}
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 
-	connLog.Debug("natMapSwitch: numCloseReq: %d", numCloseReq)
-	if numCloseReq == 0 {
-		connLog.Debug("instStatusInd: call natMapSwitchEnd")
-		if eno := conMgr.natMapSwitchEnd(); eno != DhtEnoNone {
-			connLog.Debug("instStatusInd: natMapSwitchEnd failed, eno: %d", eno)
-			return eno
-		}
-	} else {
-		connLog.Debug("natMapSwitch: transfer to pasInSwitching")
-		conMgr.pasStatus = pasInSwitching
-		conMgr.mfilter = conMgr.msgFilter
+	connLog.Debug("natMapSwitch: call natMapSwitchEnd")
+	if eno := conMgr.natMapSwitchEnd(); eno != DhtEnoNone {
+		connLog.Debug("natMapSwitch: natMapSwitchEnd failed, eno: %d", eno)
+		return eno
 	}
 
 	return DhtEnoNone
