@@ -1465,6 +1465,8 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 
 	if nat.NatIsStatusOk(msg.Status) {
 		if msg.Proto == nat.NATP_TCP {
+			peMgr.pubTcpIp = msg.PubIp
+			peMgr.pubTcpPort = msg.PubPort
 			if !oldNatResult {
 				peerLog.Debug("natPubAddrUpdateInd: call natMapRecovered")
 				natMapRecovered()

@@ -1362,7 +1362,7 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
 				connLog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
 			}
-			if status := ci.getStatus(); status < CisOutOfService {
+			if status := ci.getStatus(); status <= CisOutOfService {
 				connLog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
 
 				conMgr.instInClosing[cid] = ci
