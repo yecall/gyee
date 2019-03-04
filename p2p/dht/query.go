@@ -967,6 +967,7 @@ func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 	qryMgr.pubTcpIp = ind.PubIp
 	qryMgr.pubTcpPort = ind.PubPort
 	if !oldResult || !ind.PubIp.Equal(qryMgr.pubTcpIp) || ind.PubPort != qryMgr.pubTcpPort {
+		qryLog.Debug("natPubAddrUpdateInd: call natMapSwitch")
 		if eno := qryMgr.natMapSwitch(); eno != DhtEnoNone {
 			qryLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
 			return sch.SchEnoUserTask
@@ -1388,6 +1389,7 @@ func (qryMgr *QryMgr)switch2NatAddr(proto string) DhtErrno {
 // start nat map switching procedure
 //
 func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
+	qryLog.Debug("natMapSwitch: entered")
 	for k, qcb := range qryMgr.qcbTab {
 		fw := qcb.forWhat
 		ind := sch.MsgDhtQryMgrQueryResultInd{
@@ -1403,15 +1405,23 @@ func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
 			qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 			qryMgr.sdl.SchSendMessage(&msg)
 		}
+		qryLog.Debug("natMapSwitch: EvDhtQryMgrQueryResultInd sent")
+
 		if eno := qryMgr.qryMgrDelQcb(delQcb4PubAddrSwitch, k); eno != DhtEnoNone {
 			qryLog.Debug("natMapSwitch: qryMgrDelQcb failed, eno: %d", eno)
 			return eno
 		}
+		qryLog.Debug("natMapSwitch: qcb deleted, key: %x", k)
 	}
+
+	qryLog.Debug("natMapSwitch: call switch2NatAddr")
 	qryMgr.switch2NatAddr(nat.NATP_TCP)
+
 	msg := new(sch.SchMessage)
 	qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnDhtMgr, sch.EvDhtQryMgrPubAddrSwitchInd, nil)
 	qryMgr.sdl.SchSendMessage(msg)
+	qryLog.Debug("natMapSwitch: EvDhtQryMgrPubAddrSwitchInd sent")
+
 	return DhtEnoNone
 }
 
