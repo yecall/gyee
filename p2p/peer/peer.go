@@ -1324,9 +1324,10 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 	if peMgr.inStartup == peMgrInStartup {
 
+		schMsg := new(sch.SchMessage)
 		peerLog.Debug("peMgrConnCloseCfm: send EvPeOutboundReq")
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
-		peMgr.sdl.SchSendMessage(&schMsg)
+		peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
+		peMgr.sdl.SchSendMessage(schMsg)
 
 	} else if peMgr.inStartup == peMgrInStoping {
 
@@ -1504,8 +1505,8 @@ func (peMgr *PeerManager)start() PeMgrErrno {
 	peerLog.Debug("start: ocrTid start ok")
 
 	msg = new(sch.SchMessage)
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
-	peMgr.sdl.SchSendMessage(&schMsg)
+	peMgr.sdl.SchMakeMessage(msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
+	peMgr.sdl.SchSendMessage(msg)
 	peerLog.Debug("start: EvPeOutboundReq sent")
 
 	return PeMgrEnoNone

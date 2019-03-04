@@ -34,7 +34,6 @@ import (
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	nat		"github.com/yeeco/gyee/p2p/nat"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"github.com/libp2p/go-testutil/ci"
 )
 
 
