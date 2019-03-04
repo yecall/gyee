@@ -1248,10 +1248,9 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	var snid = req.Snid
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
 
-	if why, ok := req.Why.(string); ok {
-		peerLog.Debug("peMgrCloseReq: why: %s, snid: %x, dir: %d, ip: %s, port: %d",
-			why, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
-	}
+	why, _ := req.Why.(string)
+	peerLog.Debug("peMgrCloseReq: why: %s, snid: %x, dir: %d, ip: %s, port: %d",
+		why, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
 
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {

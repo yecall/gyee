@@ -962,19 +962,16 @@ func (conInst *ConInst)statusReport() DhtErrno {
 	// status of a connection instance to apply the "peer" information indicated by
 	// the following message.
 	//
-
 	msg := sch.SchMessage{}
 	ind := sch.MsgDhtConInstStatusInd {
 		Peer:   &conInst.hsInfo.peer.ID,
 		Dir:    int(conInst.dir),
 		Status: int(conInst.getStatus()),
 	}
-
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstStatusInd, &ind)
 	if conInst.sdl.SchSendMessage(&msg) != sch.SchEnoNone {
 		return DhtEnoScheduler
 	}
-
 	return DhtEnoNone
 }
 
@@ -1768,6 +1765,7 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 		}
 	}
 	if txPkg.responsed != nil {
+		txPkg.responsed<-true
 		close(txPkg.responsed)
 	}
 	return DhtEnoNone, txPkg
@@ -1777,20 +1775,15 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 // Install callback for rx data with protocol identity PID_EXT
 //
 func (conInst *ConInst)InstallRxDataCallback(cbf ConInstRxDataCallback) DhtErrno {
-
 	conInst.cbRxLock.Lock()
 	defer conInst.cbRxLock.Unlock()
-
 	if conInst.cbfRxData != nil {
 		ciLog.Debug("InstallRxDataCallback: old callback will be overlapped")
 	}
-
 	if cbf == nil {
 		ciLog.Debug("InstallRxDataCallback: nil callback will be set")
 	}
-
 	conInst.cbfRxData = cbf
-
 	return DhtEnoNone
 }
 
