@@ -423,7 +423,7 @@ func (ngbMgr *NeighborManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) Ngb
 	for _, d := range del {
 		for idx, id := range ngbMgr.cfg.SubNetIdList {
 			if id == d {
-				if idx != len(ngbMgr.cfg.SubNetIdList) {
+				if idx != len(ngbMgr.cfg.SubNetIdList) - 1 {
 					ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList[0:idx], ngbMgr.cfg.SubNetIdList[idx+1:]...)
 				} else {
 					ngbMgr.cfg.SubNetIdList = ngbMgr.cfg.SubNetIdList[0:idx]
@@ -614,7 +614,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 			if idx != len(nodes) - 1 {
 				nodes = append(nodes[:idx], nodes[idx+1:]...)
 			} else {
-				nodes = nodes[0:len(nodes)-1]
+				nodes = nodes[0:idx]
 			}
 			break
 		}

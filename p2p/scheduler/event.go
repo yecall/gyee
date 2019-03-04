@@ -343,6 +343,7 @@ const (
 	PEC_FOR_TXERROR			= "SendPackage"
 	PEC_FOR_RECONFIG		= "Reconfig"
 	PEC_FOR_RECONFIG_REQ	= "ReconfigReq"
+	PEC_FOR_BEASKEDTO		= "EvShellPeerAskToCloseInd"
 )
 type MsgPeCloseReq struct {
 	Ptn		interface{}				// pointer to peer instance task if not nil

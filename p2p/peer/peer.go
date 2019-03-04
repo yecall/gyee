@@ -128,12 +128,12 @@ const (
 	durDcvFindNodeTimer = time.Second * 2			// duration to wait for find node response from discover task,
 													// should be (findNodeExpiration + delta).
 
-	durStaticRetryTimer = time.Second * 4			// duration to check and retry connect to static peers
+	durStaticRetryTimer = time.Second * 2			// duration to check and retry connect to static peers
 
 	maxIndicationQueueSize = 512					// max indication queue size
 
 	minDuration4FindNodeReq = time.Second * 2			// min duration to send find-node-request again
-	minDuration4OutboundConnectReq = time.Second * 2	// min duration to try oubound connect for a specific
+	minDuration4OutboundConnectReq = time.Second * 1	// min duration to try oubound connect for a specific
 														// sub-network and peer
 
 	conflictAccessDelayLower = 500						// conflict delay lower bounder in time.Millisecond
@@ -830,7 +830,11 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		idx := rand.Intn(cdNum)
 		n := candidates[idx]
 		idEx.Id = n.ID
-		candidates = append(candidates[:idx], candidates[idx+1:]...)
+		if idx != len(candidates) - 1 {
+			candidates = append(candidates[:idx], candidates[idx+1:]...)
+		} else {
+			candidates = candidates[0:idx]
+		}
 
 		if eno := peMgr.peMgrCreateOutboundInst(&snid, n); eno != PeMgrEnoNone {
 			if _, static := peMgr.staticsStatus[idEx]; static {
@@ -2549,19 +2553,6 @@ func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
 	if pi.ppCnt++; pi.ppCnt > PeInstMaxPingpongCnt {
 		pi.ppEno = PeMgrEnoPingpongTh
 		why := sch.PEC_FOR_PINGPONG
-		/* get a simple "why"
-		i := P2pIndConnStatusPara {
-			Ptn:		pi.ptnMe,
-			PeerInfo:	&Handshake {
-				Snid:		pi.snid,
-				NodeId:		pi.node.ID,
-				ProtoNum:	pi.protoNum,
-				Protocols:	pi.protocols,
-			},
-			Status		:	PeMgrEnoPingpongTh,
-			Flag		:	false,
-			Description	:	"piPingpongTimerHandler: threshold reached",
-		}*/
 		req := sch.MsgPeCloseReq {
 			Ptn: pi.ptnMe,
 			Snid: pi.snid,
@@ -2569,19 +2560,15 @@ func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
 			Dir: pi.dir,
 			Why: why,
 		}
-
 		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 		pi.sdl.SchSendMessage(&msg)
 		return pi.ppEno
 	}
-
 	pr := MsgPingpongReq {
 		seq: uint64(time.Now().UnixNano()),
 	}
-
 	pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPePingpongReq, &pr)
 	pi.sdl.SchSendMessage(&msg)
-
 	return PeMgrEnoNone
 }
 
@@ -2800,20 +2787,6 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 
 		pi.txEno = eno
 		why := sch.PEC_FOR_TXERROR
-		/* get a simple "why"
-		hs := Handshake{
-			Snid:      pi.snid,
-			NodeId:    pi.node.ID,
-			ProtoNum:  pi.protoNum,
-			Protocols: pi.protocols,
-		}
-		i := P2pIndConnStatusPara{
-			Ptn:         pi.ptnMe,
-			PeerInfo:    &hs,
-			Status:      int(eno),
-			Flag:        false,
-			Description: "piTx: SendPackage failed",
-		}*/
 		req := sch.MsgPeCloseReq{
 			Ptn:  pi.ptnMe,
 			Snid: pi.snid,
@@ -2973,20 +2946,6 @@ _rxLoop:
 			peerLog.Debug("piRx: error, snid: %x, ip: %s", pi.snid, pi.node.IP.String())
 			why := sch.PEC_FOR_RXERROR
 			pi.rxEno = eno
-			/* get a simple "why"
-			hs := Handshake {
-				Snid:		pi.snid,
-				NodeId:		pi.node.ID,
-				ProtoNum:	pi.protoNum,
-				Protocols:	pi.protocols,
-			}
-			why := P2pIndConnStatusPara{
-				Ptn:		pi.ptnMe,
-				PeerInfo:	&hs,
-				Status:		int(eno),
-				Flag:		false,
-				Description:"piRx: RecvPackage failed",
-			}*/
 			req := sch.MsgPeCloseReq {
 				Ptn: pi.ptnMe,
 				Snid: pi.snid,
@@ -3121,18 +3080,14 @@ func (pi *PeerInstance)piP2pPingProc(ping *Pingpong) PeMgrErrno {
 		Seq:	ping.Seq,
 		Extra:	nil,
 	}
-
 	pi.ppCnt = 0
 	upkg := new(P2pPackage)
-
 	if eno := upkg.pong(pi, &pong, false); eno != PeMgrEnoNone {
 		peerLog.Debug("piP2pPingProc: pong failed, eno: %d, pi: %s",
 			eno, fmt.Sprintf("%+v", *pi))
 		return eno
 	}
-
 	pi.ppChan<-upkg
-
 	return PeMgrEnoNone
 }
 
@@ -3162,6 +3117,7 @@ func (peMgr *PeerManager)updateStaticStatus(snid SubNetworkID, idEx PeerIdEx, st
 		}
 	}
 }
+
 func (peMgr *PeerManager)dynamicSubNetIdExist(snid *SubNetworkID) bool {
 	peMgr.lock.Lock()
 	defer peMgr.lock.Unlock()

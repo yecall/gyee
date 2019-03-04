@@ -455,7 +455,7 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	for _, snid := range SnidDel {
 		for idx := 0; idx < len(thisCfg.localSnid); idx++ {
 			if thisCfg.localSnid[idx] == snid {
-				if idx != len(thisCfg.localSnid) {
+				if idx != len(thisCfg.localSnid) - 1 {
 					thisCfg.localSnid = append(thisCfg.localSnid[0:idx], thisCfg.localSnid[idx+1:]...)
 				} else {
 					thisCfg.localSnid = thisCfg.localSnid[0:idx]

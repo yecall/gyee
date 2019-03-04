@@ -2164,7 +2164,7 @@ func (tabMgr *TableManager)tabDeleteActiveQueryInst(inst *instCtrlBlock) TabMgrE
 				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
 				inst.tid = sch.SchInvalidTid
 			}
-			if idx != len(tabMgr.queryIcb) {
+			if idx != len(tabMgr.queryIcb) - 1 {
 				tabMgr.queryIcb = append(tabMgr.queryIcb[0:idx], tabMgr.queryIcb[idx+1:]...)
 			} else {
 				tabMgr.queryIcb = tabMgr.queryIcb[0:idx]
@@ -2189,27 +2189,37 @@ func (tabMgr *TableManager)tabActiveQueryInst() TabMgrErrno {
 		p := tabMgr.queryPending[0]
 		var nodes = []*Node{p.node}
 		if p.node.ID == tabMgr.cfg.local.ID {
-			tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
+			if len(tabMgr.queryPending) > 1 {
+				tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
+			} else {
+				tabMgr.queryPending = make([]*queryPendingEntry, 0)
+			}
 			continue
 		}
 
+		dup := false
 		for _, qi := range tabMgr.queryIcb {
 			if qi.req.(*um.FindNode).To.NodeId == p.node.ID {
-				tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
-				continue
+				if len(tabMgr.queryPending) > 1 {
+					tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
+				} else {
+					tabMgr.queryPending = make([]*queryPendingEntry, 0)
+				}
+				dup = true
+				break
 			}
 		}
 
-		if len(tabMgr.queryPending) <= 0 {
-			break
-		}
-
-		// Do query we can
+		if dup {continue}
 		if eno := tabMgr.tabQuery(p.target, nodes); eno != TabMgrEnoNone {
 			tabLog.Debug("tabActiveQueryInst: tabQuery failed, eno: %d", eno)
 			return eno
 		}
-		tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
+		if len(tabMgr.queryPending) > 1 {
+			tabMgr.queryPending = append(tabMgr.queryPending[:0], tabMgr.queryPending[1:]...)
+		} else {
+			tabMgr.queryPending = make([]*queryPendingEntry, 0)
+		}
 	}
 
 	return TabMgrEnoNone
@@ -2222,7 +2232,7 @@ func (tabMgr *TableManager)tabDeleteActiveBoundInst(inst *instCtrlBlock) TabMgrE
 				tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
 				inst.tid = sch.SchInvalidTid
 			}
-			if idx != len(tabMgr.boundIcb) {
+			if idx != len(tabMgr.boundIcb) - 1 {
 				tabMgr.boundIcb = append(tabMgr.boundIcb[0:idx], tabMgr.boundIcb[idx+1:]...)
 			} else {
 				tabMgr.boundIcb = tabMgr.boundIcb[0:idx]
@@ -2270,14 +2280,22 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 	for ; len(tabMgr.boundPending) > 0 && len(tabMgr.boundIcb) < TabInstBondingMax; {
 		var pn = tabMgr.boundPending[0]
 		if pn.ID == tabMgr.cfg.local.ID {
-			tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
+			if len(tabMgr.boundPending) > 1 {
+				tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
+			} else {
+				tabMgr.boundPending = make([]*Node, 0)
+			}
 			continue
 		}
 
 		dup = false
 		for _, bi := range tabMgr.boundIcb {
 			if bi.req.(*um.Ping).To.NodeId == pn.ID {
-				tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
+				if len(tabMgr.boundPending) > 1 {
+					tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
+				} else {
+					tabMgr.boundPending = make([]*Node, 0)
+				}
 				dup = true
 				break
 			}
@@ -2286,7 +2304,11 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 		if dup { continue }
 
 		if tabMgr.tabShouldBound(NodeID(pn.ID)) == false {
-			tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
+			if len(tabMgr.boundPending) > 1 {
+				tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:]...)
+			} else {
+				tabMgr.boundPending = make([]*Node, 0)
+			}
 			// This neighbor is likely to be successfully connected to, see function
 			// tabShouldBound for more about this pls. We report this to the discover
 			// directly here and then continue.
@@ -2352,8 +2374,11 @@ func (tabMgr *TableManager)tabActiveBoundInst() TabMgrErrno {
 
 		tabMgr.sdl.SchSendMessage(&schMsg)
 		tabMgr.tabStartTimer(icb, sch.TabPingpongTimerId, pingpongExpiration)
-
-		tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:] ...)
+		if len(tabMgr.boundPending) > 1 {
+			tabMgr.boundPending = append(tabMgr.boundPending[:0], tabMgr.boundPending[1:] ...)
+		} else {
+			tabMgr.boundPending = make([]*Node, 0)
+		}
 		tabMgr.boundIcb = append(tabMgr.boundIcb, icb)
 	}
 

@@ -474,10 +474,10 @@ func (natMgr *NatManager)getPubAddrReq(msg *sch.SchMessage) sch.SchErrno {
 	} else {
 		inst = natMgr.instTab[id]
 		ip, s = natMgr.nat.getPublicIpAddr()
-		inst.pubIp = append(inst.pubIp[0:], ip...)
+		inst.pubIp = ip
 		inst.status = s
 		eno = NatEnoNone
-		pubIp = append(pubIp[0:], inst.pubIp...)
+		pubIp = inst.pubIp
 		pubPort = inst.pubPort
 	}
 
@@ -527,7 +527,7 @@ func (natMgr *NatManager)setupNatInterface() NatEno {
 								natMgr.nat = nil
 							} else {
 								natMgr.cfg.natType = NATT_PMP
-								natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], gwIp...)
+								natMgr.cfg.gwIp = gwIp
 								break
 							}
 						}
@@ -603,7 +603,7 @@ func (natMgr *NatManager)reconfig(dcvReq *sch.MsgNatMgrDiscoverReq) NatEno {
 	natMgr.stop()
 	natMgr.cfg.natType = dcvReq.NatType
 	if dcvReq.NatType == NATT_PMP {
-		natMgr.cfg.gwIp = append(natMgr.cfg.gwIp[0:], dcvReq.GwIp...)
+		natMgr.cfg.gwIp = dcvReq.GwIp
 	}
 	return natMgr.setupNatInterface()
 }

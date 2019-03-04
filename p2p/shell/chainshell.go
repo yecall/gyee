@@ -340,10 +340,10 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 		p2plog.Debug("peerAskToCloseInd: not found")
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		p2plog.Debug("peerAskToCloseInd : status mismatched, current status: %d", peerInst.status)
+		p2plog.Debug("peerAskToCloseInd: status mismatched, current status: %d", peerInst.status)
 		return sch.SchEnoMismatched
 	} else {
-		p2plog.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager, peer info: %+v", *peerInst.hsInfo)
+		p2plog.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager")
 		req := sch.MsgPeCloseReq {
 			Ptn: nil,
 			Snid: peerId.snid,
@@ -351,7 +351,7 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 				ID: peerId.nodeId,
 			},
 			Dir: peerId.dir,
-			Why: "beAsckedFor",
+			Why: sch.PEC_FOR_BEASKEDTO,
 		}
 		msg := sch.SchMessage{}
 		shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnPeMgr, sch.EvPeCloseReq, &req)
