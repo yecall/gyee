@@ -45,7 +45,7 @@ type yesLogger struct {
 }
 
 var yesLog = yesLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log yesLogger)Debug(fmt string, args ... interface{}) {
@@ -781,9 +781,6 @@ func (yeShMgr *YeShellManager)dhtCsProc() {
 
 		case dht.CisInService:
 			yesLog.Debug("dhtCsProc: CisInService, peer: %x", *csi.Peer)
-
-		case dht.CisInKilling:
-			yesLog.Debug("dhtCsProc: CisInKilling, peer: %x", *csi.Peer)
 
 		case dht.CisOutOfService:
 			yesLog.Debug("dhtCsProc: CisOutOfService, peer: %x", *csi.Peer)

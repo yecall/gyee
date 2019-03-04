@@ -46,7 +46,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -1454,6 +1454,8 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 		}
 	}
 
+	natMapChanged := natMapRecovered
+
 	natMapLost := func() {
 		if oldNatResult {
 			peerLog.Debug("natMapLost: call stop")
@@ -1463,17 +1465,19 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 
 	if nat.NatIsStatusOk(msg.Status) {
 		if msg.Proto == nat.NATP_TCP {
-			if !peMgr.natResult {
+			if !oldNatResult {
 				peerLog.Debug("natPubAddrUpdateInd: call natMapRecovered")
 				natMapRecovered()
+			} else if !msg.PubIp.Equal(oldIp) || oldTcp != msg.PubPort {
+				peerLog.Debug("natPubAddrUpdateInd: call natMapChanged")
+				natMapChanged()
 			}
 		}
 	} else if msg.Proto == nat.NATP_TCP {
-		old := peMgr.natResult
 		peMgr.natResult = false
 		peMgr.pubTcpIp = net.IPv4zero
 		peMgr.pubTcpPort = 0
-		if old {
+		if oldNatResult {
 			peerLog.Debug("natPubAddrUpdateInd: call natMapLost")
 			natMapLost()
 		}
@@ -1785,7 +1789,6 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peInst.ptnMe, sch.EvPeConnOutReq, nil)
 	peMgr.sdl.SchSendMessage(&schMsg)
-
 	return PeMgrEnoNone
 }
 

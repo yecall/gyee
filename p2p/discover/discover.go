@@ -35,7 +35,7 @@ type dcvLogger struct {
 }
 
 var dcvLog = dcvLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log dcvLogger)Debug(fmt string, args ... interface{}) {

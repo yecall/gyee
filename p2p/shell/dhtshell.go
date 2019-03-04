@@ -34,7 +34,7 @@ type dhtShellLogger struct {
 }
 
 var dhtLog = dhtShellLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log dhtShellLogger)Debug(fmt string, args ... interface{}) {
@@ -278,9 +278,6 @@ func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 
 	case dht.CisInService:
 		dhtLog.Debug("dhtTestConInstStatusInd: CisInService")
-
-	case dht.CisInKilling:
-		dhtLog.Debug("dhtTestConInstStatusInd: CisInKilling")
 
 	case dht.CisOutOfService:
 		dhtLog.Debug("dhtTestConInstStatusInd: CisOutOfService")

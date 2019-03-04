@@ -43,7 +43,7 @@ type coninstLogger struct {
 }
 
 var ciLog = coninstLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log coninstLogger)Debug(fmt string, args ... interface{}) {
@@ -137,7 +137,6 @@ const (
 	CisHandshaked					// handshaked
 	CisInService					// in service
 	CisOutOfService					// out of service but is not closed
-	CisInKilling					// in killing
 	CisClosed						// closed
 )
 

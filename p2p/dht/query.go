@@ -43,7 +43,7 @@ type qryMgrLogger struct {
 }
 
 var qryLog = qryMgrLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log qryMgrLogger)Debug(fmt string, args ... interface{}) {

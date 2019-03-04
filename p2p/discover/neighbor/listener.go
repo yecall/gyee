@@ -43,7 +43,7 @@ type lsnMgrLogger struct {
 }
 
 var lsnLog = lsnMgrLogger  {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log lsnMgrLogger)Debug(fmt string, args ... interface{}) {

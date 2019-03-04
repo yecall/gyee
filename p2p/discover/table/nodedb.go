@@ -47,7 +47,7 @@ type ndbLogger struct {
 }
 
 var ndbLog = ndbLogger {
-	debug__:	true,
+	debug__:	false,
 }
 
 func (log ndbLogger)Debug(fmt string, args ... interface{}) {
