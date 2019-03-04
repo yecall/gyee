@@ -42,7 +42,7 @@ type dsLogger struct {
 }
 
 var dsLog = dsLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log dsLogger)Debug(fmt string, args ... interface{}) {

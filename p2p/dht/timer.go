@@ -36,7 +36,7 @@ type tmMgrLogger struct {
 }
 
 var tmLog = tmMgrLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log tmMgrLogger)Debug(fmt string, args ... interface{}) {

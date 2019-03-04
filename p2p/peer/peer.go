@@ -46,7 +46,7 @@ type peerLogger struct {
 }
 
 var peerLog = peerLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
@@ -1319,16 +1319,20 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		peMgr.peMgrIndEnque(&i)
 	}
 
-	// more
 	if peMgr.inStartup == peMgrInStartup {
+		// requst to try connect outbound
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	} else if peMgr.inStartup == peMgrInStoping {
+		// check if all are stopped to enter stopped status
 		if len(peMgr.peers) == 0 || len(peMgr.nodes) == 0 || len(peMgr.workers) == 0 {
 			peMgr.inStartup = peMgrInStopped
-			if peMgr.pasStatus == peMgrPubAddrInSwitching {
-				peMgr.pubAddrSwitch()
-			}
+		}
+	} else if peMgr.pasStatus == peMgrPubAddrInSwitching  ||
+		peMgr.pasStatus == peMgrPubAddrDelaySwitching {
+		 // swith the public address
+		if len(peMgr.peers) == 0 || len(peMgr.nodes) == 0 || len(peMgr.workers) == 0 {
+			peMgr.pubAddrSwitch()
 		}
 	} else {
 		peerLog.Debug("peMgrConnCloseCfm")
@@ -1437,9 +1441,11 @@ func (peMgr *PeerManager)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd)
 		}
 	}
 
-	if nat.NatIsStatusOk(msg.Status) && msg.Proto == nat.NATP_TCP {
-		if !peMgr.natResult {
-			natMapRecovered()
+	if nat.NatIsStatusOk(msg.Status) {
+		if msg.Proto == nat.NATP_TCP {
+			if !peMgr.natResult {
+				natMapRecovered()
+			}
 		}
 	} else if msg.Proto == nat.NATP_TCP {
 		old := peMgr.natResult
@@ -1494,11 +1500,12 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 
 	if peMgr.cfg.noAccept == false {
 		msg := sch.SchMessage{}
-		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
+		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
 		peMgr.sdl.SchSendMessage(&msg)
 	}
 
 	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
+
 	if peMgr.ocrTid != sch.SchInvalidTid {
 		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.ocrTid)
 		peMgr.ocrTid = sch.SchInvalidTid
@@ -1512,7 +1519,7 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 	peMgr.tidFindNode = make(map[SubNetworkID]int, 0)
 
 	// try to close all peer instances: need to check the state of the instance to
-	// take action.
+	// be closed.
 	for ptn, pi := range peMgr.peers {
 		node := pi.node
 		snid := pi.snid

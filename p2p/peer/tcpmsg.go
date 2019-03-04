@@ -41,7 +41,7 @@ type tcpmsgLogger struct {
 }
 
 var tcpmsgLog = tcpmsgLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log tcpmsgLogger)Debug(fmt string, args ... interface{}) {

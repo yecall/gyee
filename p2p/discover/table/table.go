@@ -50,7 +50,7 @@ type tabLogger struct {
 }
 
 var tabLog = tabLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log tabLogger)Debug(fmt string, args ... interface{}) {
@@ -1077,9 +1077,9 @@ func (tabMgr *TableManager)tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUp
 			tabMgr.pubTcpIp = net.IPv4zero
 			tabMgr.pubTcpPort = 0
 		}
-		schMsg := sch.SchMessage{}
-		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrPubAddrUpdateInd, msg)
-		tabMgr.sdl.SchSendMessage(&schMsg)
+		schMsg := new(sch.SchMessage)
+		tabMgr.sdl.SchMakeMessage(schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrPubAddrUpdateInd, msg)
+		tabMgr.sdl.SchSendMessage(schMsg)
 	} else {
 		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
@@ -2624,9 +2624,9 @@ func (tabMgr *TableManager)pubAddrSwitchPrepare() TabMgrErrno {
 		PubIp: tabMgr.pubUdpIp,
 		PubPort: tabMgr.pubUdpPort,
 	}
-	msg := sch.SchMessage{}
-	tabMgr.sdl.SchMakeMessage(&msg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNatPubAddrSwitchInd, &ind)
-	tabMgr.sdl.SchSendMessage(&msg)
+	msg := new(sch.SchMessage)
+	tabMgr.sdl.SchMakeMessage(msg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNatPubAddrSwitchInd, &ind)
+	tabMgr.sdl.SchSendMessage(msg)
 	return TabMgrEnoNone
 }
 

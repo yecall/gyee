@@ -43,7 +43,7 @@ type qryMgrLogger struct {
 }
 
 var qryLog = qryMgrLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log qryMgrLogger)Debug(fmt string, args ... interface{}) {
@@ -263,7 +263,7 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 		eno = qryMgr.natMakeMapRsp(msg)
 
 	case sch.EvNatMgrPubAddrUpdateInd:
-		eno = qryMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
+		eno = qryMgr.natPubAddrUpdateInd(msg)
 
 	default:
 		qryLog.Debug("qryMgrProc: unknown event: %d", msg.Id)
@@ -941,27 +941,32 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 //
 // public address changed indication
 //
-func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sch.SchErrno {
+func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatPubAddrUpdateInd for more please. to query manager,
 	// when status from nat is bad, nothing to do but just backup the status.
-	proto := strings.ToLower(msg.Proto)
+	_, ptrConMgr := qryMgr.sdl.SchGetUserTaskNode(ConMgrName)
+	qryMgr.sdl.SchSetRecver(msg, ptrConMgr)
+	qryMgr.sdl.SchSendMessage(msg)
+
+	ind := msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd)
+	proto := strings.ToLower(ind.Proto)
 	if proto != nat.NATP_TCP {
 		qryLog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
 		return sch.SchEnoParameter
 	}
 
 	oldResult := qryMgr.natTcpResult
-	if qryMgr.natTcpResult = nat.NatIsStatusOk(msg.Status); !qryMgr.natTcpResult {
+	if qryMgr.natTcpResult = nat.NatIsStatusOk(ind.Status); !qryMgr.natTcpResult {
 		qryLog.Debug("natPubAddrUpdateInd: result bad")
 		return sch.SchEnoNone
 	}
 
 	qryLog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
-		msg.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
+		ind.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, ind.PubIp.String(), ind.PubPort)
 
-	qryMgr.pubTcpIp = msg.PubIp
-	qryMgr.pubTcpPort = msg.PubPort
-	if !oldResult || !msg.PubIp.Equal(qryMgr.pubTcpIp) || msg.PubPort != qryMgr.pubTcpPort {
+	qryMgr.pubTcpIp = ind.PubIp
+	qryMgr.pubTcpPort = ind.PubPort
+	if !oldResult || !ind.PubIp.Equal(qryMgr.pubTcpIp) || ind.PubPort != qryMgr.pubTcpPort {
 		if eno := qryMgr.natMapSwitch(); eno != DhtEnoNone {
 			qryLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
 			return sch.SchEnoUserTask
@@ -1050,13 +1055,13 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	}
 
 	if qcb.rutNtfFlag == true {
-		var schMsg = sch.SchMessage{}
-		var req = sch.MsgDhtRutMgrStopNofiyReq {
+		msg := new(sch.SchMessage)
+		req := sch.MsgDhtRutMgrStopNofiyReq {
 			Task:	qryMgr.ptnMe,
 			Target:	qcb.target,
 		}
-		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
-		qryMgr.sdl.SchSendMessage(&schMsg)
+		qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
+		qryMgr.sdl.SchSendMessage(msg)
 	}
 
 	delete(qryMgr.qcbTab, target)

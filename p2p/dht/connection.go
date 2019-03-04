@@ -45,7 +45,7 @@ type connLogger struct {
 }
 
 var connLog = connLogger {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {
@@ -1459,7 +1459,6 @@ func (conMgr *ConMgr)switch2NatAddr(proto string) DhtErrno {
 //
 func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	sdl := conMgr.sdl
-
 	msg := new(sch.SchMessage)
 	sdl.SchMakeMessage(msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchBeg, nil)
 	sdl.SchSendMessage(msg)
@@ -1469,25 +1468,16 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	sdl.SchSendMessage(msg)
 
 	for cid, ci := range conMgr.ciTab {
+		msg = new(sch.SchMessage)
 		if ci.getStatus() >= CisInKilling {
 			continue
 		}
-		ci.updateStatus(CisInKilling)
-		ind := sch.MsgDhtConInstStatusInd {
-			Peer: &cid.nid,
-			Dir: int(ci.dir),
-			Status: CisInKilling,
-		}
-		schMsg := sch.SchMessage{}
-		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, &ind)
-		sdl.SchSendMessage(&schMsg)
-
 		req := sch.MsgDhtConInstCloseReq {
 			Peer:	&cid.nid,
 			Why:	sch.EvNatMgrPubAddrUpdateInd,
 		}
-		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
-		sdl.SchSendMessage(&schMsg)
+		sdl.SchMakeMessage(msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
+		sdl.SchSendMessage(msg)
 	}
 
 	po := sch.SchMessage{}
@@ -1547,9 +1537,6 @@ func (conMgr *ConMgr)msgFilter(msg *sch.SchMessage) DhtErrno {
 var chConMgrReady chan bool
 func ConMgrReady() bool {
 	r, ok := <-chConMgrReady
-	if !ok {
-		return false
-	}
-	return r
+	return r && ok
 }
 

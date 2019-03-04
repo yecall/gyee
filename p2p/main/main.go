@@ -409,6 +409,10 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 }
 
 func yeChainProcEx(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep2p.Message, bk yep2p.Message, done chan bool) {
+	if yeShMgr == nil {
+		return
+	}
+
 	go func() {
 		cnt := 0
 		for {
@@ -989,7 +993,7 @@ func testCase17(tc *testCase) {
 	if false {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
 	} else if true {
-		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
+		//yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
 		waitInterrupt()
 		yeChainStopEx(yeShMgr, subEv, subTx, subBh, done)
 	} else {

@@ -40,7 +40,7 @@ type protoLogger struct {
 }
 
 var protoLog = protoLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log protoLogger)Debug(fmt string, args ... interface{}) {

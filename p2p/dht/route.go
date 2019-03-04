@@ -43,7 +43,7 @@ type rutMgrLogger struct {
 }
 
 var rutLog = rutMgrLogger  {
-	debug__:	false,
+	debug__:	true,
 }
 
 func (log rutMgrLogger)Debug(fmt string, args ... interface{}) {
