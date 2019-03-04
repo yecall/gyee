@@ -153,6 +153,7 @@ type NatMapInstance struct {
 // nat manager
 //
 const NatMgrName = sch.NatMgrName
+const debugPubAddrSwitch = true
 
 type NatManager struct {
 	sdl			*sch.Scheduler						// pointer to scheduler
@@ -197,6 +198,8 @@ func (natMgr *NatManager)natMgrProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = natMgr.removeMapReq(msg)
 	case sch.EvNatMgrGetPublicAddrReq:
 		eno = natMgr.getPubAddrReq(msg)
+	case sch.EvNatDebugTimer:
+		eno = natMgr.debugTimer()
 	default:
 		p2plog.Debug("natMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -251,6 +254,21 @@ func (natMgr *NatManager)poweron(ptn interface{}) sch.SchErrno {
 		if natMgr.ptnDhtMgr != nil {
 			natMgr.sdl.SchMakeMessage(&msg2Dht, natMgr.ptnMe, natMgr.ptnDhtMgr, sch.EvNatMgrReadyInd, &ind)
 			natMgr.sdl.SchSendMessage(&msg2Dht)
+		}
+	}
+
+	if debugPubAddrSwitch {
+		td := sch.TimerDescription {
+			Name:	"natDebugTimer",
+			Utid:	sch.NatMgrDebugTimerId,
+			Tmt:	sch.SchTmTypeAbsolute,
+			Dur:	time.Second * 60,
+			Extra:	nil,
+		}
+		eno, _ := natMgr.sdl.SchSetTimer(natMgr.ptnMe, &td)
+		if eno != sch.SchEnoNone {
+			p2plog.Debug("startRefreshTimer: SchSetTimer NatMgrDebugTimerId failed, eno: %d", eno)
+			return sch.SchEnoUserTask
 		}
 	}
 
@@ -700,4 +718,24 @@ func NatIsResultOk(eno int) bool {
 
 func NatIsStatusOk(status int) bool {
 	return status == NatEnoNone.Errno()
+}
+
+func (natMgr *NatManager)debugTimer() sch.SchErrno {
+	// for debug only: this timer event would be fired only once since we set a
+	// "ABS" timer when nat manager is powered on.
+	ip := config.P2pGetLocalIpAddr()
+	for _, inst := range natMgr.instTab {
+		ind := sch.MsgNatMgrPubAddrUpdateInd{
+			Status: NatEnoNone.Errno(),
+			Proto: inst.id.proto,
+			FromPort: inst.id.fromPort,
+			PubIp: ip,
+			PubPort: inst.pubPort,
+		}
+		p2plog.Debug("debugTimer: send to %s with ind: %v", natMgr.sdl.SchGetTaskName(inst.owner), ind)
+		msg := new(sch.SchMessage)
+		natMgr.sdl.SchMakeMessage(msg, natMgr.ptnMe, inst.owner, sch.EvNatMgrPubAddrUpdateInd, &ind)
+		natMgr.sdl.SchSendMessage(msg)
+	}
+	return sch.SchEnoNone
 }

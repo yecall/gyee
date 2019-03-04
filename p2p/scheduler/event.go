@@ -882,9 +882,11 @@ type MsgDhtShEventInd struct {
 // NAT manager event
 //
 const NatMgrRefreshTimerId	= 0
+const NatMgrDebugTimerId	= 1
 const (
 	EvNatMgrBase				= 2900
 	EvNatRefreshTimer			= EvTimerBase + NatMgrRefreshTimerId
+	EvNatDebugTimer				= EvTimerBase + NatMgrDebugTimerId
 	EvNatMgrDiscoverReq			= EvNatMgrBase + 1
 	EvNatMgrDiscoverRsp			= EvNatMgrBase + 2
 	EvNatMgrMakeMapReq			= EvNatMgrBase + 3
