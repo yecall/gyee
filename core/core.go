@@ -40,6 +40,7 @@ package core
 
 */
 import (
+	"crypto/sha256"
 	"errors"
 	"io/ioutil"
 	"path/filepath"
@@ -67,20 +68,21 @@ var (
 )
 
 type Core struct {
-	node           INode
-	config         *config.Config
-	engine         consensus.Engine
-	engineOutputCh <-chan *consensus.Output
-	storage        persistent.Storage
-	blockChain     *BlockChain
-	blockPool      *BlockPool
-	txPool         *TransactionPool
-	yvm            yvm.YVM
-	subscriber     *p2p.Subscriber
+	node       INode
+	config     *config.Config
+	engine     consensus.Engine
+	storage    persistent.Storage
+	blockChain *BlockChain
+	blockPool  *BlockPool
+	txPool     *TransactionPool
+	yvm        yvm.YVM
+	subscriber *p2p.Subscriber
+	subsChan   chan p2p.Message
 
 	// miner
-	keystore *keystore.Keystore
-	minerKey []byte
+	keystore  *keystore.Keystore
+	minerKey  []byte
+	minerAddr string
 
 	lock    sync.RWMutex
 	running bool
@@ -130,7 +132,7 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 		return nil, err
 	}
 	if conf.Chain.Mine {
-		if err := core.loadCoinbaseKey(); err != nil {
+		if err := core.prepareCoinbase(); err != nil {
 			return nil, err
 		}
 	}
@@ -154,14 +156,11 @@ func (c *Core) Start() error {
 	if c.config.Chain.Mine {
 		members := c.blockChain.GetValidators()
 		blockHeight := c.blockChain.CurrentBlockHeight()
-		mid := c.node.NodeID()
-		// TODO: vid?mid?
-		tetris, err := tetris2.NewTetris(c, mid, members, blockHeight)
+		tetris, err := tetris2.NewTetris(c, c.minerAddr, members, blockHeight)
 		if err != nil {
 			return err
 		}
 		c.engine = tetris
-		c.engineOutputCh = tetris.Output()
 		if err := c.engine.Start(); err != nil {
 			return err
 		}
@@ -169,6 +168,7 @@ func (c *Core) Start() error {
 		c.subscriber = p2p.NewSubscriber(c, make(chan p2p.Message), p2p.MessageTypeEvent)
 		p2p := c.node.P2pService()
 		p2p.Register(c.subscriber)
+		c.subsChan = c.subscriber.MsgChan
 	}
 
 	go c.loop()
@@ -218,21 +218,21 @@ func (c *Core) loop() {
 		var (
 			chanEventSend = c.engine.ChanEventSend()
 			chanEventReq  = c.engine.ChanEventReq()
-			outputChan    = c.engineOutputCh
-			msgChan       chan p2p.Message
+			outputChan    = c.engine.Output()
 		)
-
-		if c.subscriber != nil {
-			msgChan = c.subscriber.MsgChan
-		}
 
 		select {
 		case <-c.quitCh:
 			log.Info("Core loop end.")
 			return
 		case event := <-chanEventSend:
-			log.Info("engine send event")
-			err := c.node.P2pService().BroadcastMessage(p2p.Message{
+			log.Trace("engine send event")
+			h := sha256.Sum256(event)
+			err := c.node.P2pService().DhtSetValue(h[:], event)
+			if err != nil {
+				log.Warn("engine send event to dht failed", "err", err)
+			}
+			err = c.node.P2pService().BroadcastMessage(p2p.Message{
 				MsgType: p2p.MessageTypeEvent,
 				From:    c.node.NodeID(),
 				Data:    event,
@@ -241,7 +241,7 @@ func (c *Core) loop() {
 				log.Warn("engine send event failed", "err", err)
 			}
 		case req := <-chanEventReq:
-			log.Info("engine req event", "hash", req)
+			log.Trace("engine req event", "hash", req)
 			go func(hash common.Hash) {
 				data, err := c.node.P2pService().DhtGetValue(hash[:])
 				if err != nil {
@@ -253,8 +253,8 @@ func (c *Core) loop() {
 		case output := <-outputChan:
 			log.Info("core receive engine output", "output", output)
 			// TODO: build block
-		case msg := <-msgChan:
-			log.Info("core receive ", msg.MsgType, " ", msg.From)
+		case msg := <-c.subsChan:
+			log.Trace("core receive ", msg.MsgType, " ", msg.From)
 			switch msg.MsgType {
 			case p2p.MessageTypeEvent:
 				c.engine.SendEvent(msg.Data)
@@ -296,6 +296,22 @@ func (c *Core) loadCoinbaseKey() error {
 		return err
 	}
 	c.minerKey = key
+	return nil
+}
+
+func (c *Core) prepareCoinbase() error {
+	if err := c.loadCoinbaseKey(); err != nil {
+		return err
+	}
+	pub, err := secp256k1.GetPublicKey(c.minerKey)
+	if err != nil {
+		return err
+	}
+	addr, err := address.NewAddressFromPublicKey(pub)
+	if err != nil {
+		return err
+	}
+	c.minerAddr = addr.String()
 	return nil
 }
 

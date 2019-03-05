@@ -73,6 +73,6 @@ func (s *Signer) RecoverPublicKey(data []byte, signature *crypto.Signature) (pub
 }
 
 func (s *Signer) Verify(publicKey []byte, data []byte, signature *crypto.Signature) bool {
-	ret := VerifySignature(publicKey, data, signature.Signature)
+	ret := VerifySignature(publicKey, data, signature.Signature[:64])
 	return ret
 }

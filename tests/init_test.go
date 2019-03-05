@@ -56,7 +56,7 @@ func TestInit(t *testing.T) {
 		}
 		nodes = append(nodes, n)
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(30 * time.Second)
 	for _, n := range nodes {
 		_ = n.Stop()
 	}

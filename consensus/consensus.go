@@ -18,6 +18,8 @@
 package consensus
 
 import (
+	"fmt"
+
 	"github.com/yeeco/gyee/common"
 )
 
@@ -50,4 +52,8 @@ type Engine interface {
 
 	// inform engine txs has been sealed in block
 	OnTxSealed(uint64, []common.Hash)
+}
+
+func (o Output) String() string {
+	return fmt.Sprintf("Output@%d[%d txs|%s]", o.H, len(o.Txs), o.Output)
 }

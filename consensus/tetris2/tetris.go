@@ -198,6 +198,9 @@ func (t *Tetris) ChanEventReq() <-chan common.Hash {
 }
 
 func (t *Tetris) Output() <-chan *consensus.Output {
+	if t == nil {
+		return nil
+	}
 	return t.OutputCh
 }
 
