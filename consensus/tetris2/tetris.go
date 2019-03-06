@@ -28,10 +28,15 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/consensus"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
+)
+
+const (
+	VidStrStart = address.AddressContentIndex * 2
 )
 
 var HASH0 = [common.HashLength]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -913,7 +918,7 @@ func (t *Tetris) consensusComputing() {
 	txc := make([]common.Hash, 0)
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
-			cs = append(cs, w.vid[2:4])
+			cs = append(cs, w.vid[VidStrStart:VidStrStart+3])
 			for _, tx := range w.Body.Tx {
 				if t.txsCommitted.Contains(tx) {
 					continue

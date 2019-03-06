@@ -60,7 +60,6 @@ type BlockChain struct {
 	chainmu sync.RWMutex
 
 	stopped int32          // state
-	quitCh  chan struct{}  // loop stop notifier
 	wg      sync.WaitGroup // sub routine wait group
 }
 
@@ -85,7 +84,6 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage, engine consensus
 		storage: storage,
 		stateDB: GetStateDB(storage),
 		engine:  engine,
-		quitCh:  make(chan struct{}),
 	}
 
 	bc.genesis = bc.GetBlockByNumber(0)
@@ -104,7 +102,6 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage, engine consensus
 		return nil, err
 	}
 
-	go bc.loop()
 	return bc, nil
 }
 
@@ -173,7 +170,6 @@ func (bc *BlockChain) Stop() {
 	}
 	log.Info("BlockChain Stop...")
 
-	close(bc.quitCh)
 	bc.wg.Wait()
 
 	// flush caches to storage
@@ -330,20 +326,6 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, txs Transactions) *Block {
 
 func (bc *BlockChain) LastBlock() *Block {
 	return bc.lastBlock.Load().(*Block)
-}
-
-func (bc *BlockChain) loop() {
-	log.Info("BlockChain loop...")
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
-	for {
-		select {
-		case <-bc.quitCh:
-			log.Info("BlockChain loop end.")
-			return
-		}
-	}
 }
 
 func (bc *BlockChain) CurrentBlockHeight() uint64 {
