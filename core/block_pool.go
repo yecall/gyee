@@ -137,38 +137,6 @@ func (bp *BlockPool) processBlock(blk *Block) {
 	}
 }
 
-/*
-check if block header is valid and belongs to chain
- */
-func (bc *BlockChain) verifyHeader(h *BlockHeader) error {
-	if ChainID(h.ChainID) != bc.chainID {
-		return ErrBlockChainID
-	}
-	currentHeight := bc.CurrentBlockHeight()
-	height := h.Number
-	if height < currentHeight-TooFarBlocks || height > currentHeight+TooFarBlocks {
-		return ErrBlockTooFarForChain
-		// ignore too far block
-	}
-	// TODO: check if header exists
-	return nil
-}
-
-/*
-check if block is valid and belongs to chain
- */
-func (bc *BlockChain) verifyBlock(b *Block) error {
-	// verify block header
-	if err := bc.verifyHeader(b.header); err != nil {
-		return err
-	}
-	// verify block body matches header
-	if err := b.VerifyBody(); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (bp *BlockPool) markBadPeer(msg p2p.Message) {
 	// TODO: inform bad peed msg.From to p2p module
 }

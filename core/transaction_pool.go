@@ -181,16 +181,6 @@ func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
 	}
 }
 
-/*
-check if tx is valid and belongs to chain
- */
-func (bc *BlockChain) verifyTx(tx *Transaction) error {
-	if ChainID(tx.chainID) != bc.chainID {
-		return ErrTxChainID
-	}
-	return nil
-}
-
 func (tp *TransactionPool) markBadPeer(msg p2p.Message) {
 	// TODO: inform bad peed msg.From to p2p module
 }

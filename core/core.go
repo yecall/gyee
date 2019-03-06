@@ -68,13 +68,16 @@ var (
 )
 
 type Core struct {
-	node       INode
-	config     *config.Config
-	engine     consensus.Engine
-	storage    persistent.Storage
-	blockChain *BlockChain
-	blockPool  *BlockPool
-	txPool     *TransactionPool
+	node    INode
+	config  *config.Config
+	engine  consensus.Engine
+	storage persistent.Storage
+
+	blockChain   *BlockChain
+	blockPool    *BlockPool
+	txPool       *TransactionPool
+	blockBuilder *BlockBuilder
+
 	yvm        yvm.YVM
 	subscriber *p2p.Subscriber
 	subsChan   chan p2p.Message
@@ -135,6 +138,10 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 		if err := core.prepareCoinbase(); err != nil {
 			return nil, err
 		}
+		core.blockBuilder, err = NewBlockBuilder(core.blockChain)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return core, nil
@@ -189,6 +196,10 @@ func (c *Core) Stop() error {
 	// unsubscribe from p2p net
 	c.node.P2pService().UnRegister(c.subscriber)
 
+	if bb := c.blockBuilder; bb != nil {
+		bb.Stop()
+	}
+
 	// stop tx pool and wait
 	c.txPool.Stop()
 
@@ -227,32 +238,13 @@ func (c *Core) loop() {
 			return
 		case event := <-chanEventSend:
 			log.Trace("engine send event")
-			h := sha256.Sum256(event)
-			err := c.node.P2pService().DhtSetValue(h[:], event)
-			if err != nil {
-				log.Warn("engine send event to dht failed", "err", err)
-			}
-			err = c.node.P2pService().BroadcastMessage(p2p.Message{
-				MsgType: p2p.MessageTypeEvent,
-				From:    c.node.NodeID(),
-				Data:    event,
-			})
-			if err != nil {
-				log.Warn("engine send event failed", "err", err)
-			}
+			c.handleEngineEventSend(event)
 		case req := <-chanEventReq:
 			log.Trace("engine req event", "hash", req)
-			go func(hash common.Hash) {
-				data, err := c.node.P2pService().DhtGetValue(hash[:])
-				if err != nil {
-					log.Warn("engine req event failed", "hash", hash, "err", err)
-				} else {
-					c.engine.SendParentEvent(data)
-				}
-			}(req)
+			c.handleEngineEventReq(req)
 		case output := <-outputChan:
 			log.Info("core receive engine output", "output", output)
-			// TODO: build block
+			c.handleEngineOutput(output)
 		case msg := <-c.subsChan:
 			log.Trace("core receive ", msg.MsgType, " ", msg.From)
 			switch msg.MsgType {
@@ -264,6 +256,63 @@ func (c *Core) loop() {
 		}
 
 	}
+}
+
+func (c *Core) handleEngineEventSend(event []byte) {
+	h := sha256.Sum256(event)
+	err := c.node.P2pService().DhtSetValue(h[:], event)
+	if err != nil {
+		log.Warn("engine send event to dht failed", "err", err)
+	}
+	err = c.node.P2pService().BroadcastMessage(p2p.Message{
+		MsgType: p2p.MessageTypeEvent,
+		From:    c.node.NodeID(),
+		Data:    event,
+	})
+	if err != nil {
+		log.Warn("engine send event failed", "err", err)
+	}
+}
+
+func (c *Core) handleEngineEventReq(req common.Hash) {
+	go func(hash common.Hash) {
+		data, err := c.node.P2pService().DhtGetValue(hash[:])
+		if err != nil {
+			log.Warn("engine req event failed", "hash", hash, "err", err)
+		} else {
+			c.engine.SendParentEvent(data)
+		}
+	}(req)
+}
+
+func (c *Core) handleEngineOutput(o *consensus.Output) {
+	currentHeight := c.blockChain.CurrentBlockHeight()
+	if currentHeight >= o.H {
+		log.Warn("engine height lower than blockchain", "engineH", o.H, "chainH", currentHeight)
+		// TODO: block already in chain, check if output matches with block
+		return
+	}
+	if currentHeight+TooFarBlocks < o.H {
+		log.Warn("engine height too high", "engineH", o.H, "chainH", currentHeight)
+		// TODO: block chain too far behind, should reSync
+	}
+	go func(o *consensus.Output) {
+		txs := make(Transactions, 0, len(o.Txs))
+		for _, hash := range o.Txs {
+			enc, err := c.node.P2pService().DhtGetValue(hash[:])
+			if err != nil {
+				log.Error("failed to get tx", "hash", hash, "err", err)
+				return
+			}
+			tx := &Transaction{}
+			if err := tx.Decode(enc); err != nil {
+				log.Error("failed to decode tx", "hash", hash, "err", err)
+				return
+			}
+			txs = append(txs, tx)
+		}
+		c.blockBuilder.AddSealRequest(o.H, txs)
+	}(o)
 }
 
 func (c *Core) loadCoinbaseKey() error {
