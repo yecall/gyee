@@ -270,6 +270,8 @@ func NewPeerMgr() *PeerManager {
 			addList:	make(map[config.SubNetworkID]interface{}, 0),
 		},
 		reCfgTid:		sch.SchInvalidTid,
+		inStartup:		peMgrInNull,
+		pasStatus:		pwMgrPubAddrOutofSwitching,
 	}
 	peMgr.tep = peMgr.peerMgrProc
 	return &peMgr
@@ -554,7 +556,7 @@ func (peMgr *PeerManager)ocrTimestampCleanup() {
 
 func (peMgr *PeerManager)peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	if (peMgr.inStartup != peMgrInStartup || !peMgr.natResult) {
-		peerLog.Debug("peMgrDcvFindNodeRsp: not ready, inStartup: %t, natResult: %t",
+		peerLog.Debug("peMgrDcvFindNodeRsp: not ready, inStartup: %d, natResult: %t",
 			peMgr.inStartup, peMgr.natResult)
 		return PeMgrEnoNone
 	}
@@ -723,9 +725,9 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.ptnMe = ptnInst
 
 	// Send handshake request to the instance created aboved
-	var schMsg = sch.SchMessage{}
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peInst.ptnMe, sch.EvPeHandshakeReq, nil)
-	peMgr.sdl.SchSendMessage(&schMsg)
+	schMsg := new(sch.SchMessage)
+	peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peInst.ptnMe, sch.EvPeHandshakeReq, nil)
+	peMgr.sdl.SchSendMessage(schMsg)
 	peMgr.peers[peInst.ptnMe] = peInst
 
 	// Pause inbound peer accepter if necessary
@@ -733,8 +735,9 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		if !peMgr.cfg.noAccept {
 			// we stop accepter simply, a duration of delay should be apply before pausing it,
 			// this should be improved later.
-			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
-			peMgr.sdl.SchSendMessage(&schMsg)
+			schMsg = new(sch.SchMessage)
+			peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
+			peMgr.sdl.SchSendMessage(schMsg)
 		}
 	}
 
@@ -746,37 +749,28 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 		peerLog.Debug("PeerManager: no outbound for noDial or boostrapNode: %t, %t")
 		return PeMgrEnoNone
 	}
-
 	// if sub network identity is not specified, try to start all
 	var snid *SubNetworkID
-
 	if msg != nil { snid = msg.(*SubNetworkID) }
-
 	if snid == nil {
-
 		if eno := peMgr.peMgrStaticSubNetOutbound(); eno != PeMgrEnoNone {
 			peerLog.Debug("peMgrOutboundReq: peMgrStaticSubNetOutbound failed, eno: %d", eno)
 			return eno
 		}
-
 		if peMgr.cfg.networkType != config.P2pNetworkTypeStatic {
-
 			for _, id := range peMgr.cfg.subNetIdList {
-
 				if eno := peMgr.peMgrDynamicSubNetOutbound(&id); eno != PeMgrEnoNone {
 					peerLog.Debug("peMgrOutboundReq: peMgrDynamicSubNetOutbound failed, eno: %d", eno)
 					return eno
 				}
 			}
 		}
-
 	} else if peMgr.cfg.networkType == config.P2pNetworkTypeStatic &&
-		*snid == peMgr.cfg.staticSubNetId {
 
+		*snid == peMgr.cfg.staticSubNetId {
 		return peMgr.peMgrStaticSubNetOutbound()
 
 	} else if peMgr.cfg.networkType == config.P2pNetworkTypeDynamic {
-
 		if peMgr.dynamicSubNetIdExist(snid) == true {
 
 			return peMgr.peMgrDynamicSubNetOutbound(snid)
@@ -786,7 +780,6 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 			return peMgr.peMgrStaticSubNetOutbound()
 		}
 	}
-
 	return PeMgrEnoNotfound
 }
 
@@ -794,12 +787,10 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 	if len(peMgr.cfg.staticNodes) == 0 {
 		return PeMgrEnoNone
 	}
-
 	snid := peMgr.cfg.staticSubNetId
 	if peMgr.wrkNum[snid] >= peMgr.cfg.staticMaxPeers {
 		return PeMgrEnoNone
 	}
-
 	if peMgr.obpNum[snid] >= peMgr.cfg.staticMaxOutbounds {
 		return PeMgrEnoNone
 	}
@@ -810,7 +801,6 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		Id:		config.NodeID{},
 		Dir:	PeInstDirOutbound,
 	}
-
 	for _, n := range peMgr.cfg.staticNodes {
 		idEx.Id = n.ID
 		_, dup := peMgr.nodes[snid][idEx]
@@ -820,13 +810,10 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 		}
 	}
 
-	// Create outbound instances for candidates if any.
 	var failed = 0
 	var ok = 0
 	idEx = PeerIdEx{Id:config.NodeID{}, Dir:PeInstDirOutbound}
-
 	for cdNum := len(candidates); cdNum > 0; cdNum-- {
-
 		idx := rand.Intn(cdNum)
 		n := candidates[idx]
 		idEx.Id = n.ID
@@ -846,13 +833,11 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 
 		peMgr.staticsStatus[idEx] = peerConnectOutInited
 		ok++
-
 		if peMgr.obpNum[snid] >= peMgr.cfg.staticMaxOutbounds {
 			break
 		}
 	}
 
-	// If outbounds are not enough, ask discoverer for more
 	if peMgr.obpNum[snid] < peMgr.cfg.staticMaxOutbounds {
 		if eno := peMgr.peMgrAsk4More(&snid); eno != PeMgrEnoNone {
 			return eno
@@ -875,20 +860,15 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	var idEx PeerIdEx
 
 	for _, n := range peMgr.randoms[*snid] {
-
 		idEx.Id = n.ID
 		idEx.Dir = PeInstDirOutbound
-
 		if _, ok := peMgr.nodes[*snid][idEx]; !ok {
-
 			idEx.Dir = PeInstDirInbound
-
 			if _, ok := peMgr.nodes[*snid][idEx]; !ok {
 				candidates = append(candidates, n)
 			}
 		}
 	}
-
 	peMgr.randoms[*snid] = make([]*config.Node, 0)
 
 	// Create outbound instances for candidates if any
@@ -897,25 +877,19 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	maxOutbound := peMgr.cfg.subNetMaxOutbounds[*snid]
 
 	for _, n := range candidates {
-
 		if tmPeers, exist := peMgr.tmLastOCR[*snid]; exist {
-
 			if t, ok := tmPeers[n.ID]; ok {
 				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
 					peerLog.Debug("peMgrDynamicSubNetOutbound: too early, snid: %x, peer-ip: %x", *snid, n.IP.String())
 					continue
 				}
 			}
-
 			tmPeers[n.ID] = time.Now()
-
 		} else {
-
 			tmPeers := make(map[PeerId]time.Time, 0)
 			tmPeers[n.ID] = time.Now()
 			peMgr.tmLastOCR[*snid] = tmPeers
 		}
-
 		if eno := peMgr.peMgrCreateOutboundInst(snid, n); eno != PeMgrEnoNone {
 			failed++
 			continue
@@ -927,13 +901,11 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 		}
 	}
 
-	// If outbounds are not enough, ask discover to find more
 	if peMgr.obpNum[*snid] < maxOutbound {
 		if eno := peMgr.peMgrAsk4More(snid); eno != PeMgrEnoNone {
 			return eno
 		}
 	}
-
 	return PeMgrEnoNone
 }
 
@@ -1007,11 +979,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	// Check result, if failed, kill the instance
 	idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:rsp.dir}
-
 	if rsp.result != PeMgrEnoNone {
 
 		peerLog.Debug("peMgrHandshakeRsp: failed, result: %d", rsp.result)
-
 		peMgr.updateStaticStatus(rsp.snid, idEx, peerKilling)
 		kip := kiParameters {
 			ptn: rsp.ptn,
@@ -1020,13 +990,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			dir: inst.dir,
 		}
 		peMgr.peMgrKillInst(&kip, PKI_FOR_HANDSHAKE_FAILED)
-
 		if inst.dir == PeInstDirOutbound {
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
 			peMgr.sdl.SchSendMessage(&schMsg)
 		}
-
 		return PeMgrEnoNone
 	}
 
@@ -1074,7 +1042,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			node: &inst.node,
 			dir: inst.dir,
 		}
-		peMgr.peMgrKillInst(&kip, PKI_FOR_HANDSHAKE_FAILED)
+		peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_WORKERS)
 		return PeMgrEnoResource
 	}
 
@@ -1089,7 +1057,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			node: &inst.node,
 			dir: inst.dir,
 		}
-		peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_DUPLICATED)
+		peMgr.peMgrKillInst(&kip, PKI_FOR_IB2W_DUPLICATED)
 		return PeMgrEnoDuplicated
 	}
 
@@ -1105,22 +1073,17 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			node: &inst.node,
 			dir: inst.dir,
 		}
-		peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_WORKERS)
-		schMsg := sch.SchMessage{}
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
-		peMgr.sdl.SchSendMessage(&schMsg)
-
+		peMgr.peMgrKillInst(&kip, PKI_FOR_OB2W_DUPLICATED)
+		schMsg := new(sch.SchMessage)
+		peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
+		peMgr.sdl.SchSendMessage(schMsg)
 		return PeMgrEnoDuplicated
 	}
 
 	if inst.dir == PeInstDirInbound {
-
 		if peMgr.isStaticSubNetId(snid) {
-
 			peMgr.workers[snid][idEx] = inst
-
 		} else {
-
 			if peMgr.ibpNum[snid] >= maxInbound {
 
 				peerLog.Debug("peMgrHandshakeRsp: too much inbound workers, snid: %x, ibpNum: %d",
@@ -1152,9 +1115,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 					node: &inst.node,
 					dir: inst.dir,
 				}
-				peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_DUPLICATED)
+				peMgr.peMgrKillInst(&kip, PKI_FOR_IB2OB_DUPLICATED)
 				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
-
 				return PeMgrEnoDuplicated
 			}
 		}
@@ -1166,9 +1128,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	} else if inst.dir == PeInstDirOutbound {
 
 		if peMgr.isStaticSubNetId(snid) {
-
 			peMgr.workers[snid][idEx] = inst
-
 		} else {
 
 			if peMgr.obpNum[snid] >= maxOutbound {
@@ -1202,12 +1162,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 					node: &inst.node,
 					dir: inst.dir,
 				}
-				peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_DUPLICATED)
+				peMgr.peMgrKillInst(&kip, PKI_FOR_OB2IB_DUPLICATED)
 				peMgr.peMgrConflictAccessProtect(rsp.snid, rsp.peNode, rsp.dir)
 				schMsg := sch.SchMessage{}
 				peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &inst.snid)
 				peMgr.sdl.SchSendMessage(&schMsg)
-
 				return PeMgrEnoDuplicated
 			}
 
@@ -1312,7 +1271,6 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	// since the shell might access to the peer (we had tell it with EvShellPeerActiveInd),
 	// instead we should inform the shell task, so it should send us EvPeCloseReq, and then
 	// we can send EvPeCloseReq to the peer instance.
-	var schMsg = sch.SchMessage{}
 	var req = msg.Body.(*sch.MsgPeCloseReq)
 	var snid = req.Snid
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
@@ -1342,8 +1300,9 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 				Dir: idEx.Dir,
 				Why: req.Why,
 			}
-			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
-			peMgr.sdl.SchSendMessage(&schMsg)
+			schMsg := new(sch.SchMessage)
+			peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
+			peMgr.sdl.SchSendMessage(schMsg)
 			return PeMgrEnoNone
 		}
 	}
@@ -1351,9 +1310,9 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
 	req.Node = inst.node
 	req.Ptn = inst.ptnMe
-	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
-	peMgr.sdl.SchSendMessage(&schMsg)
-
+	schMsg := new(sch.SchMessage)
+	peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
+	peMgr.sdl.SchSendMessage(schMsg)
 	return PeMgrEnoNone
 }
 
@@ -1389,9 +1348,6 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		peMgr.peMgrIndEnque(&i)
 	}
 
-	peerLog.Debug("peMgrConnCloseCfm: inStartup: %d, pasStatus: %d, peers: %d, nodes: %d, workers: %d",
-		peMgr.inStartup, peMgr.pasStatus, len(peMgr.peers), len(peMgr.nodes), len(peMgr.workers))
-
 	if peMgr.inStartup == peMgrInStartup {
 
 		schMsg := new(sch.SchMessage)
@@ -1401,20 +1357,25 @@ func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 	} else if peMgr.inStartup == peMgrInStoping {
 
-		if len(peMgr.peers) == 0 && len(peMgr.nodes) == 0 && len(peMgr.workers) == 0 {
-			peerLog.Debug("peMgrConnCloseCfm: transfer to peMgrInStopped")
-			peMgr.inStartup = peMgrInStopped
+		if peMgr.isNoneOfInstances() {
+
+			if peMgr.pasStatus == peMgrPubAddrInSwitching  ||
+				peMgr.pasStatus == peMgrPubAddrDelaySwitching {
+
+				peerLog.Debug("peMgrConnCloseCfm: calll pubAddrSwitch")
+				peMgr.pubAddrSwitch()
+
+			} else {
+
+				peerLog.Debug("peMgrConnCloseCfm: transfer to peMgrInStopped")
+				peMgr.inStartup = peMgrInStopped
+			}
 		}
 
-	} else if peMgr.pasStatus == peMgrPubAddrInSwitching  ||
-		peMgr.pasStatus == peMgrPubAddrDelaySwitching {
+	} else if peMgr.inStartup == peMgrInStopped {
 
-		if len(peMgr.peers) == 0 && len(peMgr.nodes) == 0 && len(peMgr.workers) == 0 {
-			peerLog.Debug("peMgrConnCloseCfm: calll pubAddrSwitch")
-			peMgr.pubAddrSwitch()
-		}
-	} else {
-		peerLog.Debug("peMgrConnCloseCfm")
+		peerLog.Debug("peMgrConnCloseCfm: confirmed while in peMgrInStopped")
+		return PeMgrEnoMismatched
 	}
 
 	return PeMgrEnoNone
@@ -1473,7 +1434,6 @@ func (peMgr *PeerManager)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) PeMgrErrno {
 			peMgr.sdl.SchSendMessage(&schMsg)
 		}
 	}
-
 	return PeMgrEnoNone
 }
 
@@ -1767,6 +1727,20 @@ func (peMgr *PeerManager)pubAddrSwitch() PeMgrErrno {
 	return peMgr.start()
 }
 
+func (peMgr *PeerManager)isNoneOfInstances() bool {
+	for _, piOfSubnet := range peMgr.workers {
+		if piOfSubnet != nil && len(piOfSubnet) > 0 {
+			return false
+		}
+	}
+	for _, piOfSubnet := range peMgr.nodes {
+		if piOfSubnet != nil && len(piOfSubnet) > 0 {
+			return false
+		}
+	}
+	return peMgr.peers == nil || len(peMgr.peers) == 0
+}
+
 func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
 	var inst *PeerInstance = nil
 	var idEx = PeerIdEx{}
@@ -1879,7 +1853,10 @@ const (
 	PKI_FOR_TOOMUCH_WORKERS		= "maxWorks"
 	PKI_FOR_TOOMUCH_OUTBOUNDS	= "maxOutbounds"
 	PKI_FOR_TOOMUCH_INBOUNDS	= "maxInbounds"
-	PKI_FOR_TOOMUCH_DUPLICATED	= "maxInbounds"
+	PKI_FOR_IB2W_DUPLICATED		= "inBoundDup2Worker"
+	PKI_FOR_OB2W_DUPLICATED		= "outBoundDup2Worker"
+	PKI_FOR_IB2OB_DUPLICATED	= "inBoundDup2OutBound"
+	PKI_FOR_OB2IB_DUPLICATED	= "outBoundDup2InBound"
 	PKI_FOR_WITHOUT_INST_CFM	= "noInstCfm"
 )
 

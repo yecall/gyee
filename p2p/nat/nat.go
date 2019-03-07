@@ -153,7 +153,7 @@ type NatMapInstance struct {
 // nat manager
 //
 const NatMgrName = sch.NatMgrName
-const debugPubAddrSwitch = true
+const debugPubAddrSwitch = false
 
 type NatManager struct {
 	sdl			*sch.Scheduler						// pointer to scheduler

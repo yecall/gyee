@@ -1379,7 +1379,6 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 		return TabMgrEnoNotFound
 	}
 	mgr := tabMgr.subNetMgrList[*snid]
-
 	mgr.refreshing = len(mgr.queryIcb) >= TabInstQueringMax
 	if mgr.refreshing == true {
 		tabLog.Debug("tabRefresh: already in refreshing")
@@ -1398,7 +1397,6 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 	}
 	target[config.NodeIDBytes - 2] = snid[0]
 	target[config.NodeIDBytes - 1] = snid[1]
-
 	if nodes = mgr.tabClosest(Closest4Querying, target, -1, TabInstQPendingMax); len(nodes) == 0 {
 
 		tabLog.Debug("tabRefresh: snid: %x, seems all buckets are empty, " +
@@ -1432,14 +1430,12 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 				seedsBackup = append(seedsBackup, dbn)
 			}
 		}
-
 		nodes = append(nodes, mgr.cfg.bootstrapNodes...)
 		nodes = append(nodes, seedsBackup...)
 		if len(nodes) == 0 {
 			tabLog.Debug("tabRefresh: we can't do refreshing without any seeds")
 			return TabMgrEnoResource
 		}
-
 		if len(nodes) > TabInstQPendingMax {
 			tabLog.Debug("tabRefresh: too much seeds, truncated: %d", len(nodes) - TabInstQPendingMax)
 			nodes = nodes[:TabInstQPendingMax]
@@ -1450,7 +1446,6 @@ func (tabMgr *TableManager)tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrErr
 		tabLog.Debug("tabRefresh: tabQuery failed, eno: %d", eno)
 		return eno
 	}
-
 	mgr.refreshing = true
 	return TabMgrEnoNone
 }
@@ -1935,6 +1930,16 @@ func (tabMgr *TableManager)tabStartTimer(inst *instCtrlBlock, tmt int, dur time.
 
 	var eno sch.SchErrno
 	var tid int
+
+	if tmt == sch.TabRefreshTimerId {
+		if tabMgr.arfTid != sch.SchInvalidTid {
+			tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, tabMgr.arfTid)
+			tabMgr.arfTid = sch.SchInvalidTid
+		}
+	} else if inst.tid != sch.SchInvalidTid {
+		tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, inst.tid)
+		inst.tid = sch.SchInvalidTid
+	}
 
 	if eno, tid = tabMgr.sdl.SchSetTimer(tabMgr.ptnMe, &td); eno != sch.SchEnoNone {
 		tabLog.Debug("tabStartTimer: SchSetTimer failed, eno: %d", eno)

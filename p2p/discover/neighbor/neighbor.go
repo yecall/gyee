@@ -989,9 +989,9 @@ func (ngbMgr *NeighborManager)natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchIn
 	ngbLog.Debug("natPubAddrSwitchInd: entered")
 	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, ngbInst := range ngbMgr.ngbMap {
-		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
-		ngbMgr.sdl.SchSendMessage(&powerOff)
-		ngbLog.Debug("natPubAddrSwitchInd: EvSchPoweroff sent, inst: %s", ngbInst.name)
+		ngbLog.Debug("natPubAddrSwitchInd: kill inst: %s", ngbInst.name)
+		ngbMgr.sdl.SchTaskDone(ngbInst.ptn, sch.SchEnoKilled)
+		delete(ngbMgr.ngbMap, ngbInst.name)
 	}
 	ngbMgr.cfg.IP = msg.PubIp
 	ngbMgr.cfg.UDP = uint16(msg.PubPort)
