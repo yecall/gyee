@@ -96,6 +96,7 @@ type ConInst struct {
 	dir				ConInstDir					// connection instance directory
 	hsInfo			conInstHandshakeInfo		// handshake information
 	txWaitRsp		map[txPkgId]*conInstTxPkg	// packages had been sent but waiting for response from peer
+	lockWaitRsp		sync.Mutex					// lock to sync txWaitRsp
 	txChan			chan interface{}			// tx pendings signal
 	txDone			chan int					// tx-task done signal
 	rxDone			chan int					// rx-task done signal
@@ -244,6 +245,9 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 
 	case sch.EvDhtConInstHandshakeReq:
 		eno = conInst.handshakeReq(msg.Body.(*sch.MsgDhtConInstHandshakeReq))
+
+	case sch.EvDhtConInstStartupReq:
+		eno = conInst.startUpReq()
 
 	case sch.EvDhtConInstCloseReq:
 		eno = conInst.closeReq(msg.Body.(*sch.MsgDhtConInstCloseReq))
@@ -428,6 +432,20 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	rsp.Peer = &conInst.hsInfo.peer
 	rsp.HsInfo = &conInst.hsInfo
 	return rsp2ConMgr()
+}
+
+//
+// service startup
+//
+func (conInst *ConInst)startUpReq() sch.SchErrno {
+	ciLog.Debug("startUpReq: ok, try to start tx and rx for connection instance, "+
+		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+	conInst.updateStatus(CisInService)
+	conInst.statusReport()
+	conInst.txTaskStart()
+	conInst.rxTaskStart()
+	return sch.SchEnoNone
 }
 
 //
@@ -742,12 +760,13 @@ func (conInst *ConInst)txTimerHandler(userData interface{}) error {
 		}
 	}
 
+	conInst.lockWaitRsp.Lock()
 	if txPkg.responsed != nil {
 		close(txPkg.responsed)
 	}
-
 	pkgId := txPkgId{txSeq:txPkg.waitSeq}
 	delete(conInst.txWaitRsp, pkgId)
+	conInst.lockWaitRsp.Unlock()
 	return sch.SchEnoNone
 }
 
@@ -1741,12 +1760,19 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 // Check if pending packages sent is responsed by peeer
 //
 func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
+	conInst.lockWaitRsp.Lock()
 	pkgId := txPkgId{txSeq:seq}
 	txPkg, ok := conInst.txWaitRsp[pkgId]
 	if !ok {
 		connLog.Debug("checkTxWaitResponse: not found, mid: %d, seq: %d", mid, seq)
+		conInst.lockWaitRsp.Unlock()
 		return DhtEnoNotFound, nil
 	}
+	if txPkg.responsed != nil {
+		txPkg.responsed<-true
+		close(txPkg.responsed)
+	}
+	conInst.lockWaitRsp.Unlock()
 
 	ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 	conInst.txDtm.delTimer(txPkg.txTid)
@@ -1763,10 +1789,7 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 			conInst.sdl.SchSendMessage(&schMsg)
 		}
 	}
-	if txPkg.responsed != nil {
-		txPkg.responsed<-true
-		close(txPkg.responsed)
-	}
+
 	return DhtEnoNone, txPkg
 }
 

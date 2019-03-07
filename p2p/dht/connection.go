@@ -558,10 +558,14 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 			msg.Dur,
 		},
 	}
-
 	schMsg := new(sch.SchMessage)
 	conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
-	return conMgr.sdl.SchSendMessage(schMsg)
+	conMgr.sdl.SchSendMessage(schMsg)
+
+	schMsg = new(sch.SchMessage)
+	conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstStartupReq, nil)
+	conMgr.sdl.SchSendMessage(schMsg)
+	return sch.SchEnoNone
 }
 
 //

@@ -535,6 +535,7 @@ const (
 	EvDhtConInstGetValRsp		= EvDhtConInstBase + 8
 	EvDhtConInstNeighbors		= EvDhtConInstBase + 9
 	EvDhtConInstTxInd			= EvDhtConInstBase + 10
+	EvDhtConInstStartupReq		= EvDhtConInstBase + 11
 )
 
 // EvDhtConInstHandshakeReq
