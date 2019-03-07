@@ -1115,14 +1115,12 @@ func (rutMgr *RutMgr)update(bn *rutMgrBucketNode, dist int) DhtErrno {
 	if dist == tail {
 
 		if  bucket.Len() > rt.bucketSize {
-
 			rutMgr.split(bucket, tail)
 		}
 
 	} else {
 
 		if bucket.Len() > rt.bucketSize {
-
 			bucket.Remove(bucket.Back())
 		}
 	}
