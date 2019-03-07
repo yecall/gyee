@@ -1772,6 +1772,7 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 		txPkg.responsed<-true
 		close(txPkg.responsed)
 	}
+	delete(conInst.txWaitRsp, pkgId)
 	conInst.lockWaitRsp.Unlock()
 
 	ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
