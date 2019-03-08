@@ -40,9 +40,10 @@ type BlockBuilder struct {
 
 func NewBlockBuilder(chain *BlockChain) (*BlockBuilder, error) {
 	bb := &BlockBuilder{
-		chain:    chain,
-		sealChan: make(chan *sealRequest),
-		quitCh:   make(chan struct{}),
+		chain:      chain,
+		requestMap: make(map[uint64]*sealRequest),
+		sealChan:   make(chan *sealRequest),
+		quitCh:     make(chan struct{}),
 	}
 	go bb.loop()
 	return bb, nil

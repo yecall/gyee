@@ -31,10 +31,18 @@ import (
 	"github.com/yeeco/gyee/node"
 )
 
-const numNodes = int(16)
-
 // build up a chain with random created validators
 func TestInit(t *testing.T) {
+	doTest(t, 16, 30*time.Second, nil)
+}
+
+func TestInitWithTx(t *testing.T) {
+	doTest(t, 16, 60 * time.Second, func(nodes []*node.Node) {
+		// TODO:
+	})
+}
+
+func doTest(t *testing.T, numNodes int, duration time.Duration, coroutine func([]*node.Node)) {
 	tmpDir, err := ioutil.TempDir("", "yee-test-")
 	if err != nil {
 		t.Fatalf("TempDir() %v", err)
@@ -56,7 +64,10 @@ func TestInit(t *testing.T) {
 		}
 		nodes = append(nodes, n)
 	}
-	time.Sleep(30 * time.Second)
+	if coroutine != nil {
+		go coroutine(nodes)
+	}
+	time.Sleep(duration)
 	for _, n := range nodes {
 		_ = n.Stop()
 	}
@@ -105,8 +116,7 @@ func dftConfig() *config.Config {
 			ChainID: 1,
 			Mine:    true,
 		},
-		Rpc: &config.RpcConfig{
-		},
+		Rpc: &config.RpcConfig{},
 	}
 
 	return cfg
