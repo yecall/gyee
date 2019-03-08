@@ -409,25 +409,6 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.updateStatus(CisHandshaked)
 	conInst.statusReport()
 
-	//
-	// service startup
-	//
-
-	ciLog.Debug("handshakeReq: ok, try to start tx and rx for connection instance, " +
-		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
-
-	conInst.updateStatus(CisInService)
-	conInst.statusReport()
-
-	conInst.txTaskStart()
-	conInst.rxTaskStart()
-
-	//
-	// don't tell the connection manager too early since it would try to send data on the
-	// instance.
-	//
-
 	rsp.Eno = DhtEnoNone.GetEno()
 	rsp.Peer = &conInst.hsInfo.peer
 	rsp.HsInfo = &conInst.hsInfo
