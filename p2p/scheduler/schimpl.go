@@ -312,16 +312,10 @@ drainLoop2:
 	}
 
 	//
-	// see function:
-	//
-	// 	schTaskDone
-	//	schStopTask
-	//
-	// for more pls
+	// see function: schTaskDone, schStopTask... for more pls
 	//
 
 taskDone:
-
 	ptn.task.stopped<-true
 
 	//
@@ -356,7 +350,7 @@ taskDone:
 	}
 
 	//
-	// remove user task resources in the task scope
+	// remove user task resources
 	//
 
 	schLog.Debug("schCommonTask: post done process, sdl: %s, task: %s",

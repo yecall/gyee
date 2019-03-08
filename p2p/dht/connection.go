@@ -711,7 +711,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 //
 func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
-	connLog.Debug("closeReq: inst: %s, id: %x, dir: %d", msg.Task, msg.Peer.ID, msg.Dir)
+	p2plog.Debug("closeReq: inst: %s, id: %x, dir: %d", msg.Task, msg.Peer.ID, msg.Dir)
 
 	cid := conInstIdentity {
 		nid:	msg.Peer.ID,
@@ -727,7 +727,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno{
 		if sender == nil {
-			connLog.Debug("closeReq: rsp2Sender: nil sender")
+			p2plog.Debug("closeReq: rsp2Sender: nil sender")
 			return sch.SchEnoMismatched
 		}
 		rsp := sch.MsgDhtConMgrCloseRsp {
@@ -740,7 +740,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	}
 
 	req2Inst := func(inst *ConInst) sch.SchErrno {
-		connLog.Debug("closeReq: req2Inst: inst: %s", inst.name)
+		p2plog.Debug("closeReq: req2Inst: inst: %s", inst.name)
 		conMgr.instInClosing[cid] = inst
 		delete(conMgr.ciTab, cid)
 		req := sch.MsgDhtConInstCloseReq {
@@ -760,7 +760,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		if ci != nil {
 			found = true
 			if status := ci.getStatus(); status > CisOutOfService {
-				connLog.Debug("closeReq: mismatched, status: %d", status)
+				p2plog.Debug("closeReq: mismatched, status: %d", status)
 				dup = true
 			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
@@ -768,7 +768,7 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		}
 	}
 
-	connLog.Debug("closeReq: found: %t, err: %t, dup: %t", found, err, dup)
+	p2plog.Debug("closeReq: found: %t, err: %t, dup: %t", found, err, dup)
 
 	if !found {
 		return rsp2Sender(DhtEnoNotFound)
@@ -1022,7 +1022,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 		if ci != nil {
 			found = true
 			if status := ci.getStatus(); status > CisOutOfService {
-				connLog.Debug("rutPeerRemoveInd: mismatched, status: %d", status)
+				p2plog.Debug("rutPeerRemoveInd: mismatched, status: %d", status)
 				dup = true
 			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
@@ -1031,15 +1031,15 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	}
 
 	if !found {
-		connLog.Debug("rutPeerRemoveInd: not found, id: %x", msg.Peer)
+		p2plog.Debug("rutPeerRemoveInd: not found, id: %x", msg.Peer)
 		return sch.SchEnoNotFound
 	}
 	if dup {
-		connLog.Debug("rutPeerRemoveInd: kill more than once")
+		p2plog.Debug("rutPeerRemoveInd: kill more than once")
 		return sch.SchEnoDuplicated
 	}
 	if err {
-		connLog.Debug("rutPeerRemoveInd: seems some errors")
+		p2plog.Debug("rutPeerRemoveInd: seems some errors")
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -1311,9 +1311,6 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 				connLog.Debug("instClosedInd: rutUpdate failed, eno: %d", eno)
 				err = true
 			}
-
-			delete(conMgr.ciTab, cid)
-
 			key := instLruKey{
 				peer: ci.hsInfo.peer.ID,
 				dir: ci.dir,
@@ -1361,13 +1358,13 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 	for _, ci := range cis {
 		if ci != nil {
 			if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-				connLog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
+				p2plog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
 			}
 
 			if status := ci.getStatus(); status > CisOutOfService {
-				connLog.Debug("instOutOfServiceInd: mismatched, status: %d", status)
+				p2plog.Debug("instOutOfServiceInd: mismatched, status: %d", status)
 			}else {
-				connLog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
+				p2plog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
 				conMgr.instInClosing[cid] = ci
 				delete(conMgr.ciTab, cid)
 				req := sch.MsgDhtConInstCloseReq{
@@ -1382,14 +1379,6 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 	}
 
 	return sch.SchEnoNone
-}
-
-//
-// instance tx timeout
-//
-func (conMgr *ConMgr)instTxTimeoutInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
-	connLog.Debug("instTxTimeoutInd: peer: %x, dir: %d, status: %d", *msg.Peer, msg.Dir, msg.Status)
-	return conMgr.instOutOfServiceInd(msg)
 }
 
 //

@@ -430,16 +430,16 @@ func (conInst *ConInst)startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	status := conInst.getStatus()
 	if status < CisHandshaked || status >= CisClosed {
-		ciLog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
+		p2plog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
 		return sch.SchEnoMismatched
 	}
 
 	if *msg.Peer != conInst.hsInfo.peer.ID {
-		ciLog.Debug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
+		p2plog.Debug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	ciLog.Debug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
+	p2plog.Debug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
 
 	conInst.cleanUp(DhtEnoNone.GetEno())
 	conInst.updateStatus(CisClosed)
@@ -453,7 +453,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstCloseRsp, &rsp)
 	conInst.sdl.SchSendMessage(&schMsg)
 
-	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
+	return conInst.sdl.SchTaskDone(conInst.name, sch.SchEnoKilled)
 }
 
 //
