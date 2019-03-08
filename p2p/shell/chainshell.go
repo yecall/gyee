@@ -240,8 +240,8 @@ func (shMgr *ShellManager)peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchE
 	shMgr.peerActived[peerId] = &peerInst
 	shMgr.peerLock.Unlock()
 
-	p2plog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
-		peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
+	p2plog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d",
+		peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
 
 	approc := func() {
 		for {
@@ -309,7 +309,8 @@ func (shMgr *ShellManager)peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchErr
 		p2plog.Debug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
-		p2plog.Debug("peerCloseCfm: peer info: %+v", *peerInst.hsInfo)
+		hsInfo := peerInst.hsInfo
+		p2plog.Debug("peerCloseCfm: snid: %x, dir: %d, ip: %s", hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String())
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
 	}
@@ -327,9 +328,6 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 	defer shMgr.peerLock.Unlock()
 
 	why, _ := ind.Why.(string)
-	p2plog.Debug("peerAskToCloseInd: why: %s, snid: %x, dir: %d, peer: %x",
-		why, ind.Snid, ind.Dir, ind.PeerId)
-
 	peerId := shellPeerID {
 		snid: ind.Snid,
 		nodeId: ind.PeerId,
@@ -337,13 +335,17 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 	}
 
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		p2plog.Debug("peerAskToCloseInd: not found")
+		p2plog.Debug("peerAskToCloseInd: not found, snid: %x, dir: %d, id: %x",
+			ind.Snid, ind.Dir, ind.PeerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		p2plog.Debug("peerAskToCloseInd: status mismatched, current status: %d", peerInst.status)
+		p2plog.Debug("peerAskToCloseInd: status mismatched, snid: %x, dir: %d, current status: %d, id: %x",
+			ind.Snid, ind.Dir, ind.PeerId, peerInst.status, ind.PeerId)
 		return sch.SchEnoMismatched
 	} else {
-		p2plog.Debug("peerAskToCloseInd: send EvPeCloseReq to peer manager")
+		peerInfo := peerInst.hsInfo
+		p2plog.Debug("peerAskToCloseInd: why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
+			why, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
 		req := sch.MsgPeCloseReq {
 			Ptn: nil,
 			Snid: peerId.snid,

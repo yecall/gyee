@@ -780,8 +780,8 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		if ci != nil {
 			found = true
 			if status := ci.getStatus(); status > CisOutOfService {
+				connLog.Debug("closeReq: mismatched, status: %d", status)
 				dup = true
-				panic("closeReq: impossible")
 			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
 			}
@@ -1035,9 +1035,9 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	for _, ci := range cis {
 		if ci != nil {
 			found = true
-			if ci.getStatus() > CisOutOfService {
+			if status := ci.getStatus(); status > CisOutOfService {
+				connLog.Debug("rutPeerRemoveInd: mismatched, status: %d", status)
 				dup = true
-				panic("rutPeerRemoveInd: impossible")
 			} else if req2Inst(ci) != sch.SchEnoNone {
 				err = true
 			}
@@ -1378,8 +1378,8 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 				connLog.Debug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
 			}
 
-			if status := ci.getStatus(); status != CisOutOfService {
-				panic("instOutOfServiceInd: impossible")
+			if status := ci.getStatus(); status > CisOutOfService {
+				connLog.Debug("instOutOfServiceInd: mismatched, status: %d", status)
 			}else {
 				connLog.Debug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
 				conMgr.instInClosing[cid] = ci
