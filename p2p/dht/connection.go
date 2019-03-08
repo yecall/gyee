@@ -119,7 +119,6 @@ type ConMgr struct {
 	pubTcpPort		int								// public port
 	pasStatus		int								// public addr switching status
 	tidMonitor		int								// monitor timer identity
-	bakReq2Conn		map[string]interface{}			// connection request backup map, k: task name, v: message
 	instInClosing	map[conInstIdentity]*ConInst	// instance in closing waiting for response from instance
 }
 
@@ -136,7 +135,6 @@ func NewConMgr() *ConMgr {
 		pubTcpIp:		net.IPv4zero,
 		pubTcpPort:		0,
 		tidMonitor:		sch.SchInvalidTid,
-		bakReq2Conn:	make(map[string]interface{}, 0),
 		instInClosing:	make(map[conInstIdentity]*ConInst, 0),
 	}
 	conMgr.tep = conMgr.conMgrProc
@@ -374,7 +372,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				conMgr.sdl.SchSendMessage(schMsg)
 			}
 		}
-		for name, req := range conMgr.bakReq2Conn {
+		for name, req := range ci.bakReq2Conn {
 			if eno, ptn := conMgr.sdl.SchGetUserTaskNode(name);
 				eno == sch.SchEnoNone && ptn == req.(*sch.MsgDhtConMgrConnectReq).Task {
 				rsp := sch.MsgDhtConMgrConnectRsp{
@@ -386,21 +384,25 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				conMgr.sdl.SchSendMessage(schMsg)
 			}
 		}
-		conMgr.bakReq2Conn = make(map[string]interface{}, 0)
+		ci.bakReq2Conn = make(map[string]interface{}, 0)
 		return sch.SchEnoNone
 	}
 
+	cid := conInstIdentity{
+		nid: msg.Peer.ID,
+		dir: ConInstDir(msg.Dir),
+	}
+	ci = msg.Inst.(*ConInst)
+	if ci == nil {
+		connLog.Debug("handshakeRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
+	if conMgr.instInClosing[cid] != nil {
+		connLog.Debug("handshakeRsp: in closing, inst: %s", ci.name)
+		return sch.SchEnoNone
+	}
 
 	if msg.Eno != DhtEnoNone.GetEno() {
-
-		//
-		// if it's a blind outbound, the request sender should be responsed here. at this
-		// moment here, the ci.ptnSrcTsk should be the pointer to the sender task node.
-		//
-		if ci = msg.Inst.(*ConInst); ci == nil {
-			connLog.Debug("handshakeRsp: nil connection instance")
-			return sch.SchEnoInternal
-		}
 
 		connLog.Debug("handshakeRsp: handshake failed, inst: %s", ci.name)
 
@@ -409,16 +411,13 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		// we just remove outbound instance from the map table(for outbounds). notice that
 		// inbound instance still not be mapped into ciTab and no tx data should be pending.
 		//
+		rsp2Tasks4Outbound(ci, msg, DhtErrno(msg.Eno))
+
 		if ci.dir == ConInstDirInbound {
 
 			delete(conMgr.ibInstTemp, ci.name)
 
 		} else if msg.Dir == ConInstDirOutbound {
-
-			cid := conInstIdentity{
-				nid: msg.Peer.ID,
-				dir: ConInstDirOutbound,
-			}
 
 			delete(conMgr.ciTab, cid)
 
@@ -428,11 +427,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				}
 				delete(conMgr.txQueTab, cid)
 			}
-
-			//
-			// connect-response to source task
-			//
-			rsp2Tasks4Outbound(ci, msg, DhtErrno(msg.Eno))
 
 			//
 			// update route manager
@@ -464,10 +458,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	connLog.Debug("handshakeRsp: ok responsed, msg: %+v", *msg)
 
-	cid := conInstIdentity{
-		nid: msg.Peer.ID,
-		dir: ConInstDir(msg.Dir),
-	}
 	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
 
 		connLog.Debug("handshakeRsp: invalid direction, dht: %s, dir: %d", msg.Dir)
@@ -479,11 +469,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		// put inbound instance to map and remove the temp map for it, but before
 		// doing this, duplicated cases must be check.
 		//
-		ci = msg.Inst.(*ConInst)
-		cid := conInstIdentity {
-			nid: msg.Peer.ID,
-			dir: msg.Dir,
-		}
 		_, dup1 := conMgr.ciTab[cid]
 		_, dup2 := conMgr.instInClosing[cid]
 		if dup1 || dup2 {
@@ -494,17 +479,9 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		conMgr.ciTab[cid] = ci
 		delete(conMgr.ibInstTemp, ci.name)
 
-	} else {
-
-		if ci = conMgr.lookupOutboundConInst(&msg.Peer.ID); ci == nil {
-			connLog.Debug("handshakeRsp: not found, id: %x", msg.Peer.ID)
-			return sch.SchEnoUserTask
-		}
-
-		//
-		// connect-response to source task
-		//
-		rsp2Tasks4Outbound(ci, msg, DhtEnoNone)
+	} else if inst := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != inst {
+		connLog.Debug("handshakeRsp: not found, id: %x", msg.Peer.ID)
+		return sch.SchEnoUserTask
 	}
 
 	//
@@ -578,7 +555,10 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		}
 	}
 
-	return sch.SchEnoNone
+	//
+	// response to tasks waiting
+	//
+	return rsp2Tasks4Outbound(ci, msg, DhtEnoNone)
 }
 
 //
@@ -635,15 +615,15 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		return sdl.SchSendMessage(&msg)
 	}
 
-	backupConnectRequest := func(msg *sch.MsgDhtConMgrConnectReq) DhtErrno {
+	backupConnectRequest := func(ci *ConInst, msg *sch.MsgDhtConMgrConnectReq) DhtErrno {
 		task := conMgr.sdl.SchGetTaskName(msg.Task)
 		if len(task) == 0 {
 			return DhtEnoScheduler
 		}
-		if _, dup := conMgr.bakReq2Conn[task]; dup {
+		if _, dup := ci.bakReq2Conn[task]; dup {
 			return DhtEnoDuplicated
 		}
-		conMgr.bakReq2Conn[task] = msg
+		ci.bakReq2Conn[task] = msg
 		return DhtEnoNone
 	}
 
@@ -651,10 +631,10 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		status := ci.getStatus()
 		if status == CisHandshaked || status == CisInService {
 			return rsp2Sender(DhtErrno(DhtEnoDuplicated))
-		} else if status == CisOutOfService || status == CisClosed {
+		} else if status == CisOutOfService || status == CisClosed || status == CisNull {
 			return rsp2Sender(DhtErrno(DhtEnoResource))
-		} else if eno := backupConnectRequest(msg); eno != DhtEnoNone {
-			return rsp2Sender(DhtEnoPending)
+		} else if eno := backupConnectRequest(ci, msg); eno != DhtEnoNone {
+			return rsp2Sender(DhtEnoResource)
 		}
 		return sch.SchEnoNone
 	}
@@ -859,6 +839,12 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		}
 		return sch.SchEnoNone
 	}
+
+	//
+	// if come here, more than one EvDhtConMgrConnectRsp event might be sent to
+	// query instance. the manager backup the package first and then try to build
+	// the connection: this seems no sense, we would remove this feature later.
+	//
 
 	connLog.Debug("sendReq: instance not found, tell connection manager to build it ...")
 

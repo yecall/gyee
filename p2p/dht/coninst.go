@@ -110,6 +110,7 @@ type ConInst struct {
 	dtmDone			chan bool					// signal DTM to done
 	txDtm			*DiffTimerManager			// difference timer manager for response waiting
 	txTmCycle		int							// wait peer response timer cycle in ticks
+	bakReq2Conn		map[string]interface{}		// connection request backup map, k: task name, v: message
 }
 
 //
@@ -208,6 +209,7 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		rxPkgCnt:			0,
 		dtmDone:			make(chan bool, 1),
 		txDtm:				NewDiffTimerManager(ciTxDtmTick, nil),
+		bakReq2Conn:		make(map[string]interface{}, 0),
 	}
 	conInst.tep = conInst.conInstProc
 	return &conInst

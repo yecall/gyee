@@ -342,6 +342,10 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	icb := qryInst.icb
 	sdl := icb.sdl
+	if icb.status != qisWaitConnect {
+		qiLog.Debug("connectRsp: mismatched, current status: %d", icb.status)
+		return sch.SchEnoMismatched
+	}
 
 	schMsg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstStatusInd {
