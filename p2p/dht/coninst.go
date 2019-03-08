@@ -207,6 +207,9 @@ func newConInst(postFixed string, isBlind bool) *ConInst {
 		isBlind:			isBlind,
 		txPkgCnt:			0,
 		rxPkgCnt:			0,
+		txDone:				nil,
+		rxDone:				nil,
+		con:				nil,
 		dtmDone:			make(chan bool, 1),
 		txDtm:				NewDiffTimerManager(ciTxDtmTick, nil),
 		bakReq2Conn:		make(map[string]interface{}, 0),
@@ -428,8 +431,7 @@ func (conInst *ConInst)startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno
 // Instance-close-request handler
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
-	status := conInst.getStatus()
-	if status < CisHandshaked || status >= CisClosed {
+	if status := conInst.getStatus(); status >= CisClosed {
 		p2plog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
 		return sch.SchEnoMismatched
 	}

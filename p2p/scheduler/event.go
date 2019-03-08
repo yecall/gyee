@@ -428,6 +428,7 @@ type MsgDhtBlindConnectRsp struct {
 	Eno		int						// result code
 	Peer	*config.Node			// peer to be connected
 	Ptn		interface{}				// pointer to connection instance task
+	Dir		int						// direction
 }
 
 //

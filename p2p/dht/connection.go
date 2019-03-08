@@ -27,7 +27,6 @@ import (
 	"io"
 	"sync"
 	"strings"
-	"container/list"
 	lru		"github.com/hashicorp/golang-lru"
 	ggio	"github.com/gogo/protobuf/io"
 	config	"github.com/yeeco/gyee/p2p/config"
@@ -112,7 +111,6 @@ type ConMgr struct {
 	lockInstTab		sync.Mutex						// lock for connection instance table
 	ciTab			map[conInstIdentity]*ConInst	// connection instance table
 	ciSeq			int64							// connection instance sequence number
-	txQueTab		map[conInstIdentity]*list.List	// outbound data pending queue
 	ibInstTemp		map[string]*ConInst				// temp map for inbound instances
 	natTcpResult	bool							// nat make map result
 	pubTcpIp		net.IP							// public ip address
@@ -130,7 +128,6 @@ func NewConMgr() *ConMgr {
 		name:			ConMgrName,
 		ciTab:			make(map[conInstIdentity]*ConInst, 0),
 		ciSeq:			0,
-		txQueTab:		make(map[conInstIdentity]*list.List, 0),
 		ibInstTemp: 	make(map[string]*ConInst, 0),
 		pubTcpIp:		net.IPv4zero,
 		pubTcpPort:		0,
@@ -346,11 +343,13 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 	// for inbound connection instances, we still not map them into "conMgr.ciTab",
 	// we need to do this if handshake-ok reported, since we can obtain the peer
-	// information in this case here.
+	// information in this case here. notice that: msg.Peer might be nil if it's an
+	// inbound instance.
 	//
 
-	var ci *ConInst = nil
-	rsp2Tasks4Outbound := func(ci *ConInst, msg *sch.MsgDhtConInstHandshakeRsp, dhtEno DhtErrno) sch.SchErrno {
+	var ci = msg.Inst.(*ConInst)
+
+	rsp2TasksPending := func(ci *ConInst, msg *sch.MsgDhtConInstHandshakeRsp, dhtEno DhtErrno) sch.SchErrno {
 		eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
 		if eno == sch.SchEnoNone && ptn != nil && ptn == ci.ptnSrcTsk {
 			if ci.isBlind {
@@ -358,6 +357,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 					Eno:  dhtEno.GetEno(),
 					Ptn:  ci.ptnMe,
 					Peer: msg.Peer,
+					Dir: ci.dir,
 				}
 				schMsg := new(sch.SchMessage)
 				conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtBlindConnectRsp, &rsp)
@@ -366,6 +366,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				rsp := sch.MsgDhtConMgrConnectRsp{
 					Eno:  dhtEno.GetEno(),
 					Peer: msg.Peer,
+					Dir: ci.dir,
 				}
 				schMsg := new(sch.SchMessage)
 				conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnSrcTsk, sch.EvDhtConMgrConnectRsp, &rsp)
@@ -378,6 +379,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				rsp := sch.MsgDhtConMgrConnectRsp{
 					Eno:  dhtEno.GetEno(),
 					Peer: msg.Peer,
+					Dir: ci.dir,
 				}
 				schMsg := new(sch.SchMessage)
 				conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ptn, sch.EvDhtConMgrConnectRsp, &rsp)
@@ -385,20 +387,6 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 			}
 		}
 		ci.bakReq2Conn = make(map[string]interface{}, 0)
-		return sch.SchEnoNone
-	}
-
-	cid := conInstIdentity{
-		nid: msg.Peer.ID,
-		dir: ConInstDir(msg.Dir),
-	}
-	ci = msg.Inst.(*ConInst)
-	if ci == nil {
-		connLog.Debug("handshakeRsp: invalid parameter")
-		return sch.SchEnoParameter
-	}
-	if conMgr.instInClosing[cid] != nil {
-		connLog.Debug("handshakeRsp: in closing, inst: %s", ci.name)
 		return sch.SchEnoNone
 	}
 
@@ -411,7 +399,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		// we just remove outbound instance from the map table(for outbounds). notice that
 		// inbound instance still not be mapped into ciTab and no tx data should be pending.
 		//
-		rsp2Tasks4Outbound(ci, msg, DhtErrno(msg.Eno))
+		rsp2TasksPending(ci, msg, DhtErrno(msg.Eno))
 
 		if ci.dir == ConInstDirInbound {
 
@@ -419,14 +407,12 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 		} else if msg.Dir == ConInstDirOutbound {
 
-			delete(conMgr.ciTab, cid)
-
-			if li, ok := conMgr.txQueTab[cid]; ok {
-				for li.Len() > 0 {
-					li.Remove(li.Front())
-				}
-				delete(conMgr.txQueTab, cid)
+			cid := conInstIdentity {
+				nid: msg.Peer.ID,
+				dir: ConInstDir(msg.Dir),
 			}
+
+			delete(conMgr.ciTab, cid)
 
 			//
 			// update route manager
@@ -448,15 +434,25 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		}
 
 		//
-		// power off the connection instance: do not apply ci.sdl.SchTaskDone() directly
-		// since cleaning work is needed for releasing the instance.
+		// done the instance task
 		//
-		schMsg := new(sch.SchMessage)
-		conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
-		return conMgr.sdl.SchSendMessage(schMsg)
+		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 	}
 
 	connLog.Debug("handshakeRsp: ok responsed, msg: %+v", *msg)
+
+	cid := conInstIdentity {
+		nid: msg.Peer.ID,
+		dir: ConInstDir(msg.Dir),
+	}
+	if ci == nil {
+		connLog.Debug("handshakeRsp: invalid parameter")
+		return sch.SchEnoParameter
+	}
+	if conMgr.instInClosing[cid] != nil {
+		connLog.Debug("handshakeRsp: in closing, inst: %s", ci.name)
+		return sch.SchEnoNone
+	}
 
 	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
 
@@ -514,6 +510,9 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 	conMgr.sdl.SchSendMessage(schMsg)
 
+	//
+	// startup the instance at last
+	//
 	schMsg = new(sch.SchMessage)
 	req := sch.MsgDhtConInstStartupReq {
 		EnoCh: make(chan int, 0),
@@ -525,40 +524,10 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	} else if eno != DhtEnoNone.GetEno() {
 		panic("handshakeRsp: would not happen in current implement")
 	} else {
-
 		close(req.EnoCh)
-
-		//
-		// submit the pending packages for outbound instance if any
-		//
-		if li, ok := conMgr.txQueTab[cid]; ok {
-			for li.Len() > 0 {
-				el := li.Front()
-				tx := el.Value.(*sch.MsgDhtConMgrSendReq)
-				pkg := conInstTxPkg {
-					task:		tx.Task,
-					responsed:	nil,
-					waitMid:	-1,
-					waitSeq:	-1,
-					submitTime:	time.Now(),
-					payload:	tx.Data,
-				}
-				if tx.WaitRsp == true {
-					pkg.responsed = make(chan bool, 1)
-					pkg.waitMid = tx.WaitMid
-					pkg.waitSeq = int64(tx.WaitSeq)
-				}
-				ci.txPutPending(&pkg)
-				li.Remove(el)
-			}
-			delete(conMgr.txQueTab, cid)
-		}
 	}
 
-	//
-	// response to tasks waiting
-	//
-	return rsp2Tasks4Outbound(ci, msg, DhtEnoNone)
+	return rsp2TasksPending(ci, msg, DhtEnoNone)
 }
 
 //
@@ -586,31 +555,37 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	var rspNormal = sch.MsgDhtConMgrConnectRsp {
 		Eno:	DhtEnoNone.GetEno(),
 		Peer:	msg.Peer,
+		Dir:	ConInstDirUnknown,
 	}
 	var rspBlind = sch.MsgDhtBlindConnectRsp {
 		Eno:	DhtEnoNone.GetEno(),
 		Peer:	msg.Peer,
 		Ptn:	nil,
+		Dir:	ConInstDirUnknown,
 	}
 	var rsp interface{}
 	var rspEvent int
 	var ptrEno *int
+	var ptrDir *int
 	var sender = msg.Task
 	var sdl = conMgr.sdl
 
 	if msg.IsBlind {
 		rsp = &rspBlind
 		ptrEno = &rspBlind.Eno
+		ptrDir = &rspBlind.Dir
 		rspEvent = sch.EvDhtBlindConnectRsp
 	} else {
 		rsp = &rspNormal
 		ptrEno = &rspNormal.Eno
+		ptrDir = &rspNormal.Dir
 		rspEvent = sch.EvDhtConMgrConnectRsp
 	}
 
-	rsp2Sender := func(eno DhtErrno) sch.SchErrno {
+	rsp2Sender := func(eno DhtErrno, dir int) sch.SchErrno {
 		msg := sch.SchMessage{}
 		*ptrEno = int(eno)
+		*ptrDir = dir
 		sdl.SchMakeMessage(&msg, conMgr.ptnMe, sender, rspEvent, rsp)
 		return sdl.SchSendMessage(&msg)
 	}
@@ -629,12 +604,12 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	dupConnProc := func (ci *ConInst) sch.SchErrno {
 		status := ci.getStatus()
-		if status == CisHandshaked || status == CisInService {
-			return rsp2Sender(DhtErrno(DhtEnoDuplicated))
+		if status == CisInService {
+			return rsp2Sender(DhtErrno(DhtEnoDuplicated), ci.dir)
 		} else if status == CisOutOfService || status == CisClosed || status == CisNull {
-			return rsp2Sender(DhtErrno(DhtEnoResource))
+			return rsp2Sender(DhtErrno(DhtEnoResource), ci.dir)
 		} else if eno := backupConnectRequest(ci, msg); eno != DhtEnoNone {
-			return rsp2Sender(DhtEnoResource)
+			return rsp2Sender(DhtEnoResource, ci.dir)
 		}
 		return sch.SchEnoNone
 	}
@@ -654,7 +629,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	if yes, ci := isInstInClosing(); yes {
 		connLog.Debug("connctReq: in closing, inst: %s", ci.name)
-		return rsp2Sender(DhtErrno(DhtEnoResource))
+		return rsp2Sender(DhtErrno(DhtEnoResource), ci.dir)
 	} else if ci := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != nil {
 		connLog.Debug("connctReq: outbound duplicated, inst: %s", ci.name)
 		return  dupConnProc(ci)
@@ -666,7 +641,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
 	if eno := conMgr.setupConInst(ci, sender, msg.Peer, nil); eno != DhtEnoNone {
 		connLog.Debug("connctReq: setupConInst failed, eno: %d", eno)
-		return rsp2Sender(eno)
+		return rsp2Sender(eno, ci.dir)
 	}
 	conMgr.ciSeq++
 	td := sch.SchTaskDescription {
@@ -681,7 +656,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
 		connLog.Debug("connctReq: SchCreateTask failed, eno: %d", eno)
-		return rsp2Sender(DhtErrno(DhtEnoScheduler))
+		return rsp2Sender(DhtErrno(DhtEnoScheduler), ci.dir)
 	}
 
 	connLog.Debug("connctReq: instance created, inst: %s, ip: %s", ci.name, msg.Peer.IP.String())
@@ -811,63 +786,35 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		connLog.Debug("sendReq: inbound instance selected")
 	}
 
-	if ci != nil {
-		connLog.Debug("sendReq: connection instance found: %+v", *ci)
-		if curStat := ci.getStatus(); curStat != CisInService {
-			connLog.Debug("sendReq: can't send in status: %d", curStat)
-			return sch.SchEnoUserTask
-		}
-		key := instLruKey {
-			peer: ci.hsInfo.peer.ID,
-			dir: ci.dir,
-		}
-		conMgr.instCache.Add(&key, ci)
-		pkg := conInstTxPkg{
-			task:       msg.Task,
-			responsed:  nil,
-			submitTime: time.Now(),
-			payload:    msg.Data,
-		}
-		if msg.WaitRsp == true {
-			pkg.responsed = make(chan bool, 1)
-			pkg.waitMid = msg.WaitMid
-			pkg.waitSeq = msg.WaitSeq
-		}
-		if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
-			connLog.Debug("sendReq: txPutPending failed, eno: %d", eno)
-			return sch.SchEnoUserTask
-		}
-		return sch.SchEnoNone
+	if ci == nil {
+		connLog.Debug("sendReq: not found, peer id: %x", msg.Peer.ID)
+		return sch.SchEnoResource
 	}
 
-	//
-	// if come here, more than one EvDhtConMgrConnectRsp event might be sent to
-	// query instance. the manager backup the package first and then try to build
-	// the connection: this seems no sense, we would remove this feature later.
-	//
-
-	connLog.Debug("sendReq: instance not found, tell connection manager to build it ...")
-
-	schMsg := new(sch.SchMessage)
-	req := sch.MsgDhtConMgrConnectReq {
-		Task:		msg.Task,
-		Peer:		msg.Peer,
-		IsBlind:	false,
+	connLog.Debug("sendReq: connection instance found: %+v", *ci)
+	if curStat := ci.getStatus(); curStat != CisInService {
+		connLog.Debug("sendReq: can't send in status: %d", curStat)
+		return sch.SchEnoResource
 	}
-	conMgr.sdl.SchMakeMessage(schMsg, msg.Task, conMgr.ptnMe, sch.EvDhtConMgrConnectReq, &req)
-	conMgr.sdl.SchSendMessage(schMsg)
-
-	cid := conInstIdentity {
-		nid: msg.Peer.ID,
-		dir: ConInstDirOutbound,
+	key := instLruKey {
+		peer: ci.hsInfo.peer.ID,
+		dir: ci.dir,
 	}
-	li, ok := conMgr.txQueTab[cid]
-	if ok {
-		li.PushBack(msg)
-	} else {
-		li = list.New()
-		conMgr.txQueTab[cid] = li
-		li.PushBack(msg)
+	conMgr.instCache.Add(&key, ci)
+	pkg := conInstTxPkg{
+		task:       msg.Task,
+		responsed:  nil,
+		submitTime: time.Now(),
+		payload:    msg.Data,
+	}
+	if msg.WaitRsp == true {
+		pkg.responsed = make(chan bool, 1)
+		pkg.waitMid = msg.WaitMid
+		pkg.waitSeq = msg.WaitSeq
+	}
+	if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
+		connLog.Debug("sendReq: txPutPending failed, eno: %d", eno)
+		return sch.SchEnoUserTask
 	}
 
 	return sch.SchEnoNone
@@ -1470,7 +1417,6 @@ func (conMgr *ConMgr)natMapSwitchEnd() DhtErrno {
 	connLog.Debug("natMapSwitchEnd: enter pasInNull")
 	conMgr.pasStatus = pasInNull
 	conMgr.instCache.Purge()
-	conMgr.txQueTab = make(map[conInstIdentity]*list.List, 0)
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 	conMgr.switch2NatAddr(nat.NATP_TCP)
 

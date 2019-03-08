@@ -993,7 +993,7 @@ func testCase17(tc *testCase) {
 	if false {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
 	} else if true {
-		//yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
+		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
 		waitInterrupt()
 		yeChainStopEx(yeShMgr, subEv, subTx, subBh, done)
 	} else {
