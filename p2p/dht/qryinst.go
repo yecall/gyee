@@ -34,15 +34,23 @@ import (
 // debug
 //
 type qiMgrLogger struct {
-	debug__		bool
+	debug__			bool
+	debugForce__	bool
 }
 
 var qiLog = qiMgrLogger  {
-	debug__:	false,
+	debug__:		false,
+	debugForce__:	false,
 }
 
 func (log qiMgrLogger)Debug(fmt string, args ... interface{}) {
 	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+func (log qiMgrLogger)ForceDebug(fmt string, args ... interface{}) {
+	if log.debugForce__ {
 		p2plog.Debug(fmt, args ...)
 	}
 }
@@ -204,12 +212,13 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 	msg := sch.SchMessage{}
 	req := sch.MsgDhtConMgrConnectReq{
 		Task:		icb.ptnInst,
+		Name:		icb.name,
 		Peer:		&icb.to,
 		IsBlind:	false,
 	}
 
-	qiLog.Debug("startReq: ask connection manager for peer, inst: %s, ForWhat: %d, to: %+v",
-		icb.name, icb.qryReq.ForWhat, *req.Peer)
+	qiLog.ForceDebug("startReq: ask connection manager for peer, inst: %s, ForWhat: %d",
+		icb.name, icb.qryReq.ForWhat)
 
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
 	icb.sdl.SchSendMessage(&msg)
@@ -288,13 +297,18 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	// should check if the connection had been established and route talbe updated, if ture,
 	// then do not care this request, else it should close the connection and free all
 	// resources had been allocated to the connection instance.
+	// notice0:
+	// do not send EvDhtConMgrCloseReq when the instance is in qisWaitResponse status, this
+	// case, we do not know the "dir" about the connection instance, since we had never got
+	// a "connect-response"(so the timer expired). if it's really want to kill the connection
+	// instance, the "dir" should be set to "outbound", a "inbound" direction is impossible.
 	//
 
-	if icb.status == qisWaitConnect || icb.status == qisWaitResponse {
+	if icb.status == qisWaitResponse {
 		req := sch.MsgDhtConMgrCloseReq{
-			Task:	icb.sdl.SchGetTaskName(icb.ptnInst),
-			Peer:	&icb.to,
-			Dir:	icb.dir,
+			Task: icb.sdl.SchGetTaskName(icb.ptnInst),
+			Peer: &icb.to,
+			Dir:  icb.dir,
 		}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
 		sdl.SchSendMessage(&schMsg)
@@ -337,13 +351,15 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 //
 func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno {
 
-	qiLog.Debug("connectRsp: ForWhat: %d, eno: %d, peer: %+v",
-		qryInst.icb.qryReq.ForWhat, msg.Eno, *msg.Peer)
-
 	icb := qryInst.icb
 	sdl := icb.sdl
+
+	qiLog.ForceDebug("connectRsp: inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+		icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
+
 	if icb.status != qisWaitConnect {
-		qiLog.Debug("connectRsp: mismatched, current status: %d", icb.status)
+		qiLog.ForceDebug("connectRsp: mismatched, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+			icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 		return sch.SchEnoMismatched
 	}
 
@@ -367,9 +383,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	if msg.Eno != DhtEnoNone.GetEno() && msg.Eno != DhtEnoDuplicated.GetEno() {
 
-		qiLog.Debug("connectRsp:" +
-			"connect failed, ForWhat: %d, eno: %d, peer: %+V",
-			icb.qryReq.ForWhat, msg.Eno, *msg.Peer)
+		qiLog.ForceDebug("connectRsp: connect failed, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+			icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
 		ind.Status = qisDone
 		icb.status = qisDone
@@ -390,8 +405,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	eno, pkg := qryInst.setupQryPkg()
 	if eno != DhtEnoNone {
 
-		qiLog.Debug("connectRsp: setupQryPkg failed, ForWhat: %d, eno: %d",
-			icb.qryReq.ForWhat, eno)
+		qiLog.ForceDebug("connectRsp: setupQryPkg failed, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+			icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
 		ind.Status = qisDone
 		icb.status = qisDone
@@ -401,9 +416,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		return sch.SchEnoUserTask
 	}
 
-	qiLog.Debug("connectRsp: setupQryPkg ok, " +
-		"inst: %s, ForWhat: %d, icb.qryReq: %+v",
-		icb.name, icb.qryReq.ForWhat, *icb.qryReq)
+	qiLog.ForceDebug("connectRsp: setupQryPkg ok, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+		icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
 	sendReq.Task = icb.ptnInst
 	sendReq.Peer = &icb.to
@@ -488,7 +502,8 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 
 	schEno, tid := sdl.SchSetTimer(icb.ptnInst, &td)
 	if schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		qiLog.Debug("connectRsp: SchSetTimer failed, eno: %d, tid: %d", eno, tid)
+		qiLog.ForceDebug("connectRsp: SchSetTimer failed, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+			icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 		return schEno
 	}
 

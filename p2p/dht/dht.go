@@ -64,7 +64,6 @@ const (
 	DhtEnoDuplicated			// something duplicated
 	DhtEnoMismatched			// status mismatched
 	DhtEnoResource				// no more resource
-	DhtEnoPending				// pending for connection
 	DhtEnoRoute					// route errors
 	DhtEnoTimeout				// timeout
 	DhtEnoInternal				// internal logical errors
@@ -289,6 +288,7 @@ func (dhtMgr *DhtMgr)blindConnectReq(msg *sch.MsgDhtBlindConnectReq) sch.SchErrn
 	//
 	req := sch.MsgDhtConMgrConnectReq {
 		Task:		dhtMgr.ptnMe,
+		Name:		DhtMgrName,
 		Peer:		msg.Peer,
 		IsBlind:	true,
 	}

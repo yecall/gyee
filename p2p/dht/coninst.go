@@ -39,15 +39,23 @@ import (
 // debug
 //
 type coninstLogger struct {
-	debug__		bool
+	debug__			bool
+	debugForce__	bool
 }
 
 var ciLog = coninstLogger {
-	debug__:	false,
+	debug__:		false,
+	debugForce__:	false,
 }
 
 func (log coninstLogger)Debug(fmt string, args ... interface{}) {
 	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+func (log coninstLogger)ForceDebug(fmt string, args ... interface{}) {
+	if log.debugForce__ {
 		p2plog.Debug(fmt, args ...)
 	}
 }
@@ -432,16 +440,16 @@ func (conInst *ConInst)startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	if status := conInst.getStatus(); status >= CisClosed {
-		p2plog.Debug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
+		ciLog.ForceDebug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
 		return sch.SchEnoMismatched
 	}
 
 	if *msg.Peer != conInst.hsInfo.peer.ID {
-		p2plog.Debug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
+		ciLog.ForceDebug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	p2plog.Debug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
+	ciLog.ForceDebug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
 
 	conInst.cleanUp(DhtEnoNone.GetEno())
 	conInst.updateStatus(CisClosed)

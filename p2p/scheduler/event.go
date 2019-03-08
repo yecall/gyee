@@ -475,7 +475,8 @@ const (
 
 // EvDhtConMgrConnectReq
 type MsgDhtConMgrConnectReq struct {
-	Task		interface{}				// pointer to task node
+	Task		interface{}				// pointer to owner task node
+	Name		string					// owner task name
 	Peer		*config.Node			// peer to be connected
 	IsBlind		bool					// is blind
 }
