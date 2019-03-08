@@ -453,7 +453,7 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstCloseRsp, &rsp)
 	conInst.sdl.SchSendMessage(&schMsg)
 
-	return conInst.sdl.SchTaskDone(conInst.name, sch.SchEnoKilled)
+	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
 }
 
 //
