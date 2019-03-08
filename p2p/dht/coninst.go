@@ -1189,10 +1189,6 @@ func (conInst *ConInst)txProc() {
 		}
 	}()
 
-	// socket in BLOCKED mode
-	conInst.con.SetDeadline(time.Time{})
-
-	// break loop for error from underlying or done
 	errUnderlying := false
 	isDone := false
 
@@ -1252,6 +1248,12 @@ _txLoop:
 				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
 				goto _checkDone
 			}
+		}
+
+		if err := conInst.con.SetDeadline(time.Time{}); err != nil {
+			ciLog.Debug("txProc: SetDeadline failed, inst: %s, err: %s", conInst.name, err.Error())
+			errUnderlying = true
+			break _txLoop
 		}
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
@@ -1337,7 +1339,6 @@ func (conInst *ConInst)rxProc() {
 	// longlong loop in a blocked mode
 	//
 
-	conInst.con.SetDeadline(time.Time{})
 	errUnderlying := false
 	isDone := false
 
@@ -1349,7 +1350,17 @@ _rxLoop:
 		pbPkg := new(pb.DhtPackage)
 		pkg := new(DhtPackage)
 
+		if err := conInst.con.SetDeadline(time.Time{}); err != nil {
+			ciLog.Debug("rxProc: SetDeadline failed, inst: %s, err: %s", conInst.name, err.Error())
+			errUnderlying = true
+			break _rxLoop
+		}
+
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
+			/*if oe, ok := err.(*net.OpError); ok && oe.Temporary() {
+				tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
+				return PeMgrEnoNetTemporary
+			} else*/
 			if err.Error() == io.EOF.Error() {
 				ciLog.Debug("rxProc: temporary err: %s", err.Error())
 				goto _checkDone

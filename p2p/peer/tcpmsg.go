@@ -581,10 +581,15 @@ func (upkg *P2pPackage)SendPackage(inst *PeerInstance) PeMgrErrno {
 	*pbPkg.PayloadLength = uint32(upkg.PayloadLength)
 	pbPkg.Payload = append(pbPkg.Payload, upkg.Payload...)
 
+	err := (error)(nil)
 	if inst.ato != time.Duration(0) {
-		inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		err = inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
 	} else {
-		inst.conn.SetWriteDeadline(time.Time{})
+		err = inst.conn.SetWriteDeadline(time.Time{})
+	}
+	if err != nil {
+		tcpmsgLog.Debug("SendPackage: SetWriteDeadline failed, err: %s", err.Error())
+		return PeMgrEnoOs
 	}
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
@@ -602,18 +607,24 @@ func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 		tcpmsgLog.Debug("RecvPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
+	err := (error)(nil)
 	if inst.ato != time.Duration(0) {
-		inst.conn.SetReadDeadline(time.Now().Add(inst.ato))
+		err = inst.conn.SetReadDeadline(time.Now().Add(inst.ato))
 	} else {
-		inst.conn.SetReadDeadline(time.Time{})
+		err = inst.conn.SetReadDeadline(time.Time{})
+	}
+	if err != nil {
+		tcpmsgLog.Debug("RecvPackage: SetReadDeadline failed, err: %s", err.Error())
+		return PeMgrEnoOs
 	}
 
 	pkg := new(pb.P2PPackage)
 	if err := inst.ior.ReadMsg(pkg); err != nil {
-		if oe, ok := err.(*net.OpError); ok && oe.Temporary() {
+		/*if oe, ok := err.(*net.OpError); ok && oe.Temporary() {
 			tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
 			return PeMgrEnoNetTemporary
-		} else if err.Error() == io.EOF.Error(){
+		} else*/
+		if err.Error() == io.EOF.Error(){
 			tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
 			return PeMgrEnoNetTemporary
 		}
