@@ -247,7 +247,7 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 		eno = conInst.handshakeReq(msg.Body.(*sch.MsgDhtConInstHandshakeReq))
 
 	case sch.EvDhtConInstStartupReq:
-		eno = conInst.startUpReq()
+		eno = conInst.startUpReq(msg.Body.(*sch.MsgDhtConInstStartupReq))
 
 	case sch.EvDhtConInstCloseReq:
 		eno = conInst.closeReq(msg.Body.(*sch.MsgDhtConInstCloseReq))
@@ -437,7 +437,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 //
 // service startup
 //
-func (conInst *ConInst)startUpReq() sch.SchErrno {
+func (conInst *ConInst)startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno {
 	ciLog.Debug("startUpReq: ok, try to start tx and rx for connection instance, "+
 		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
@@ -445,6 +445,7 @@ func (conInst *ConInst)startUpReq() sch.SchErrno {
 	conInst.statusReport()
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
+	msg.EnoCh<-DhtEnoNone.GetEno()
 	return sch.SchEnoNone
 }
 
@@ -847,11 +848,12 @@ func (conInst *ConInst)rxTaskStart() DhtErrno {
 func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 
 	if conInst.txDone != nil {
+
 		ciLog.Debug("cleanUp: inst: %s, try to close txChan", conInst.name)
 		close(conInst.txChan)
 
 		if conInst.con != nil {
-			ciLog.Debug("cleanUp: inst: %s, try to close con", conInst.name)
+			ciLog.Debug("txTaskStop: inst: %s, try to close con", conInst.name)
 			conInst.con.Close()
 		}
 
@@ -866,6 +868,12 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 
 		ciLog.Debug("txTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
+
+	} else if conInst.con != nil {
+
+		ciLog.Debug("txTaskStop: inst: %s, try to close con", conInst.name)
+		conInst.con.Close()
+		conInst.con = nil
 	}
 
 	return DhtEnoNone
@@ -894,6 +902,12 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 
 		ciLog.Debug("rxTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
+
+	} else if conInst.con != nil {
+
+		ciLog.Debug("rxTaskStop: inst: %s, try to close con", conInst.name)
+		conInst.con.Close()
+		conInst.con = nil
 	}
 
 	return DhtEnoNone

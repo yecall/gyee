@@ -97,6 +97,7 @@ const (
 	pasInNull	= iota
 	pasInSwitching
 )
+
 type ConMgr struct {
 	sdl				*sch.Scheduler					// pointer to scheduler
 	name			string							// my name
@@ -563,8 +564,19 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	conMgr.sdl.SchSendMessage(schMsg)
 
 	schMsg = new(sch.SchMessage)
-	conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstStartupReq, nil)
+	req := sch.MsgDhtConInstStartupReq {
+		EnoCh: make(chan int, 0),
+	}
+	conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstStartupReq, &req)
 	conMgr.sdl.SchSendMessage(schMsg)
+	if eno, ok := <-req.EnoCh; !ok {
+		panic("handshakeRsp: would not happen in current implement")
+	} else if eno != DhtEnoNone.GetEno() {
+		panic("handshakeRsp: would not happen in current implement")
+	} else {
+		close(req.EnoCh)
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -757,7 +769,8 @@ func (conMgr *ConMgr)closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 			Why:	sch.EvDhtConMgrCloseReq,
 		}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
-		return sdl.SchSendMessage(&schMsg)
+		sdl.SchSendMessage(&schMsg)
+		return sch.SchEnoNone
 	}
 
 	found := false
@@ -807,9 +820,13 @@ func (conMgr *ConMgr)sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		return sch.SchEnoParameter
 	}
 
-	ci := conMgr.lookupOutboundConInst(&msg.Peer.ID)
-	if ci == nil {
-		ci = conMgr.lookupInboundConInst(&msg.Peer.ID)
+	ci := (*ConInst)(nil)
+	cio := conMgr.lookupOutboundConInst(&msg.Peer.ID)
+	cii := conMgr.lookupInboundConInst(&msg.Peer.ID)
+	if cio != nil && conMgr.instInClosing[cio.cid] != nil {
+		ci = cio
+	} else if cii != nil && conMgr.instInClosing[cii.cid] != nil {
+		ci = cii
 	}
 
 	if ci != nil {
@@ -1005,6 +1022,8 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
 	req2Inst := func(inst *ConInst) sch.SchErrno {
+		conMgr.instInClosing[cid] = inst
+		delete(conMgr.ciTab, cid)
 		req := sch.MsgDhtConInstCloseReq{
 			Peer:	&msg.Peer,
 			Why:	sch.EvDhtRutPeerRemovedInd,
@@ -1336,14 +1355,11 @@ func (conMgr *ConMgr)instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 // instance out of service status indication handler
 //
 func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
-
 	cid := conInstIdentity {
 		nid:	*msg.Peer,
 		dir:	ConInstDir(msg.Dir),
 	}
-
 	sdl := conMgr.sdl
-
 	rutUpdate := func(node *config.Node) sch.SchErrno {
 		schMsg := sch.SchMessage{}
 		update := sch.MsgDhtRutMgrUpdateReq {
@@ -1359,7 +1375,6 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 		return sdl.SchSendMessage(&schMsg)
 	}
-
 	cis := conMgr.lookupConInst(&cid)
 	for _, ci := range cis {
 		if ci != nil {

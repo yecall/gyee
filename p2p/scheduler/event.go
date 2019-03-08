@@ -600,6 +600,11 @@ type MsgDhtConInstTxInd struct {
 	WaitSeq		int64				// wait message sequence number
 }
 
+// EvDhtConInstStartupReq
+type MsgDhtConInstStartupReq struct {
+	EnoCh		chan int			// channel for result
+}
+
 //
 // DHT query manager event
 //
