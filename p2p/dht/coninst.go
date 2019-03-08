@@ -96,7 +96,6 @@ type ConInst struct {
 	dir				ConInstDir					// connection instance directory
 	hsInfo			conInstHandshakeInfo		// handshake information
 	txWaitRsp		map[txPkgId]*conInstTxPkg	// packages had been sent but waiting for response from peer
-	lockWaitRsp		sync.Mutex					// lock to sync txWaitRsp
 	txChan			chan interface{}			// tx pendings signal
 	txDone			chan int					// tx-task done signal
 	rxDone			chan int					// rx-task done signal
@@ -257,13 +256,6 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = conInst.rutMgrNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
-
-	case sch.EvDhtConInstTxTimer:
-		err := conInst.txTimerHandler(msg.Body.(*list.Element))
-		if err != nil {
-			return err.(sch.SchErrno)
-		}
-		eno = sch.SchEnoNone
 
 	case sch.EvDhtQryInstProtoMsgInd:
 		eno = conInst.protoMsgInd(msg.Body.(*sch.MsgDhtQryInstProtoMsgInd))
@@ -671,37 +663,8 @@ func (conInst *ConInst)txPutPending(pkg *conInstTxPkg) DhtErrno {
 // Set timer for tx-package which would wait response from peer
 //
 func (conInst *ConInst)txSetPkgTimer(userData interface{}) DhtErrno {
-
-	/*
-	 * the following statements commented implement the "wait peer response" timer
-	 * based on the timer manager provided by scheduler module. but in practice, it's
-	 * suitable for the application, and too much resources consumed. we introduce
-	 * the DTM(difference timer manager, see DiffTimerManager) to play the game.
-	 *
-	if el == nil {
-		ciLog.Debug("setTimer: invalid parameter, inst: %s", conInst.name)
-		return DhtEnoParameter
-	}
-	txPkg, ok := el.Value.(*conInstTxPkg)
-	if !ok {
-		ciLog.Debug("setTimer: invalid parameter, inst: %s", conInst.name)
-		return DhtEnoMismatched
-	}
-	var td = sch.TimerDescription{
-		Name:  fmt.Sprintf("%s%s", conInst.name, "_txTimer"),
-		Utid:  sch.DhtConInstTxTimerId,
-		Tmt:   sch.SchTmTypeAbsolute,
-		Dur:   ciTxTimerDuration,
-		Extra: el,
-	}
-	eno, tid := conInst.sdl.SchSetTimer(conInst.ptnMe, &td)
-	if eno != sch.SchEnoNone {
-		ciLog.Debug("setTimer: invalid parameter, inst: %s, eno: %d", conInst.name, eno)
-		return DhtEnoScheduler
-	}
-	txPkg.txTid = tid
-	return DhtEnoNone
-	*****************/
+	conInst.txDtm.lock.Lock()
+	defer conInst.txDtm.lock.Unlock()
 	if txPkg, ok := userData.(*conInstTxPkg); ok {
 		tid, err := conInst.txDtm.setTimer(userData, conInst.txTmCycle)
 		if tid == nil || err != nil {
@@ -742,13 +705,11 @@ func (conInst *ConInst)txTimerHandler(userData interface{}) error {
 		}
 	}
 
-	conInst.lockWaitRsp.Lock()
 	if txPkg.responsed != nil {
 		close(txPkg.responsed)
 	}
 	pkgId := txPkgId{txSeq:txPkg.waitSeq}
 	delete(conInst.txWaitRsp, pkgId)
-	conInst.lockWaitRsp.Unlock()
 	return sch.SchEnoNone
 }
 
@@ -792,6 +753,8 @@ func (conInst *ConInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 // Set current Tx pending
 //
 func (conInst *ConInst)txSetPending(txPkg *conInstTxPkg) (DhtErrno){
+	conInst.txDtm.lock.Lock()
+	defer conInst.txDtm.lock.Unlock()
 	if txPkg != nil {
 		txPkg.taskName = conInst.sdl.SchGetTaskName(txPkg.task)
 		if len(txPkg.taskName) == 0 {
@@ -899,20 +862,19 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 //
 func (conInst *ConInst)cleanUp(why int) DhtErrno {
 	ciLog.Debug("cleanUp: inst: %s, why: %d", conInst.name, why)
+	conInst.txDtm.lock.Lock()
+	defer conInst.txDtm.lock.Unlock()
+
 	conInst.txTaskStop(why)
 	ciLog.Debug("cleanUp: inst: %s, tx done", conInst.name)
 
 	conInst.rxTaskStop(why)
 	ciLog.Debug("cleanUp: inst: %s, rx done", conInst.name)
 
-	for _, txPkg := range conInst.txWaitRsp {
-		if txPkg.txTid != nil {
-			conInst.txDtm.delTimer(txPkg.txTid)
-		}
-	}
-	conInst.txWaitRsp = make(map[txPkgId]*conInstTxPkg, 0)
 	close(conInst.dtmDone)
 	conInst.txDtm.reset()
+	conInst.txWaitRsp = make(map[txPkgId]*conInstTxPkg, 0)
+
 	return DhtEnoNone
 }
 
@@ -1229,7 +1191,9 @@ func (conInst *ConInst)txProc() {
 			case <-conInst.dtmDone:
 				break _dtmScanLoop
 			case <-ticker.C:
+				conInst.txDtm.lock.Lock()
 				conInst.txDtm.scan()
+				conInst.txDtm.lock.Unlock()
 			}
 		}
 		ticker.Stop()
@@ -1264,12 +1228,15 @@ _txLoop:
 		pbPkg = new(pb.DhtPackage)
 		dhtPkg.ToPbPackage(pbPkg)
 
+		txPkg.txTid = nil
 		if txPkg.responsed != nil {
 			if eno := conInst.txSetPending(txPkg); eno != DhtEnoNone {
 				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
 				goto _checkDone
-			} else {
-				conInst.txSetPkgTimer(txPkg)
+			}
+			if eno := conInst.txSetPkgTimer(txPkg); eno != DhtEnoNone {
+				ciLog.Debug("txProc: txSetPending failed, eno: %d", eno)
+				goto _checkDone
 			}
 		}
 
@@ -1755,12 +1722,13 @@ func (conInst *ConInst)getPong(pong *Pong) DhtErrno {
 // Check if pending packages sent is responsed by peeer
 //
 func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conInstTxPkg) {
-	conInst.lockWaitRsp.Lock()
+	conInst.txDtm.lock.Lock()
+	defer conInst.txDtm.lock.Unlock()
+
 	pkgId := txPkgId{txSeq:seq}
 	txPkg, ok := conInst.txWaitRsp[pkgId]
 	if !ok {
 		connLog.Debug("checkTxWaitResponse: not found, mid: %d, seq: %d", mid, seq)
-		conInst.lockWaitRsp.Unlock()
 		return DhtEnoNotFound, nil
 	}
 	if txPkg.responsed != nil {
@@ -1768,10 +1736,13 @@ func (conInst *ConInst)checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conIn
 		close(txPkg.responsed)
 	}
 	delete(conInst.txWaitRsp, pkgId)
-	conInst.lockWaitRsp.Unlock()
 
 	ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
-	conInst.txDtm.delTimer(txPkg.txTid)
+	if txPkg.responsed != nil && txPkg.txTid != nil {
+		conInst.txDtm.delTimer(txPkg.txTid)
+		txPkg.txTid = nil
+	}
+
 	eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
 	if eno == sch.SchEnoNone && ptn != nil && ptn == txPkg.task {
 		if txPkg.task != nil {
@@ -1869,8 +1840,6 @@ func (dtm *DiffTimerManager)dur2Ticks(d time.Duration) (tv int, err error) {
 }
 
 func (dtm *DiffTimerManager)setTimer(ud interface{}, tv int) (tid interface{}, err error) {
-	dtm.lock.Lock()
-	defer dtm.lock.Unlock()
 	tid = nil
 	err = nil
 	tm := DiffTimer {ud: ud, tv: 0}
@@ -1901,15 +1870,11 @@ func (dtm *DiffTimerManager)setTimer(ud interface{}, tv int) (tid interface{}, e
 }
 
 func (dtm *DiffTimerManager)delTimer(tid interface{}) error {
-	dtm.lock.Lock()
-	defer dtm.lock.Unlock()
 	dtm.tmq.Remove(tid.(*list.Element))
 	return nil
 }
 
 func (dtm *DiffTimerManager)scan() error {
-	dtm.lock.Lock()
-	defer dtm.lock.Unlock()
 	if dtm.tmq.Len() <= 0 {
 		return nil
 	}
@@ -1929,14 +1894,10 @@ func (dtm *DiffTimerManager)scan() error {
 }
 
 func (dtm *DiffTimerManager)size() int {
-	dtm.lock.Lock()
-	defer dtm.lock.Unlock()
 	return dtm.tmq.Len()
 }
 
 func (dtm *DiffTimerManager)reset() {
-	dtm.lock.Lock()
-	defer dtm.lock.Unlock()
 	dtm.tmq = nil
 	dtm.sum = 0
 	dtm.cbf = nil

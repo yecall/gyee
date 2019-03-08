@@ -64,6 +64,7 @@ const (
 	DhtEnoDuplicated			// something duplicated
 	DhtEnoMismatched			// status mismatched
 	DhtEnoResource				// no more resource
+	DhtEnoPending				// pending for connection
 	DhtEnoRoute					// route errors
 	DhtEnoTimeout				// timeout
 	DhtEnoInternal				// internal logical errors
