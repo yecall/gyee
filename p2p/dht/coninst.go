@@ -811,6 +811,7 @@ func (conInst *ConInst)txTaskStop(why int) DhtErrno {
 		if conInst.con != nil {
 			ciLog.Debug("txTaskStop: inst: %s, try to close con", conInst.name)
 			conInst.con.Close()
+			conInst.con = nil
 		}
 
 		ciLog.Debug("txTaskStop: inst: %s, try to signal txDone", conInst.name)
@@ -845,6 +846,7 @@ func (conInst *ConInst)rxTaskStop(why int) DhtErrno {
 		if conInst.con != nil {
 			ciLog.Debug("rxTaskStop: inst: %s, close con", conInst.name)
 			conInst.con.Close()
+			conInst.con = nil
 		}
 
 		ciLog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
@@ -1344,9 +1346,14 @@ _rxLoop:
 	for {
 
 		var msg *DhtMessage = nil
-
 		pbPkg := new(pb.DhtPackage)
+		pkg := new(DhtPackage)
+
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
+			if err.Error() == io.EOF.Error() {
+				ciLog.Debug("rxProc: temporary err: %s", err.Error())
+				goto _checkDone
+			}
 			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _rxLoop
@@ -1356,9 +1363,7 @@ _rxLoop:
 			ciLog.Debug("rxProc: inst: %s, rxPkgCnt: %d", conInst.name, conInst.rxPkgCnt)
 		}
 
-		pkg := new(DhtPackage)
 		pkg.FromPbPackage(pbPkg)
-
 		if pb.ProtocolId(pkg.Pid) == PID_EXT {
 			conInst.cbRxLock.Lock()
 			if conInst.cbfRxData != nil {

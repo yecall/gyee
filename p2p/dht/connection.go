@@ -1414,13 +1414,13 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	sdl.SchSendMessage(msg)
 	connLog.Debug("natMapSwitch: EvDhtLsnMgrPauseReq sent")
 
+	conMgr.instInClosing = make(map[conInstIdentity]*ConInst, 0)
+
 	po := sch.SchMessage{}
 	for _, ci := range conMgr.ciTab {
-		if status := ci.getStatus(); status < CisOutOfService {
-			conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
-			conMgr.sdl.SchSendMessage(&po)
-			connLog.Debug("natMapSwitch: EvSchPoweroff sent, inst: %s", ci.name)
-		}
+		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		conMgr.sdl.SchSendMessage(&po)
+		connLog.Debug("natMapSwitch: EvSchPoweroff sent, inst: %s", ci.name)
 	}
 	conMgr.ciTab = make(map[conInstIdentity]*ConInst, 0)
 

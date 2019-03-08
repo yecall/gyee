@@ -63,6 +63,7 @@ const (
 	PeMgrEnoConfig
 	PeMgrEnoResource
 	PeMgrEnoOs
+	PeMgrEnoNetTemporary
 	PeMgrEnoMessage
 	PeMgrEnoDuplicated
 	PeMgrEnoNotfound
@@ -3068,35 +3069,39 @@ _rxLoop:
 		// try reading the peer
 		upkg := new(P2pPackage)
 		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
+			if eno != PeMgrEnoNetTemporary {
+				// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
+				// and we will be done then;
+				// 2) it is possible that, while we are blocked here in reading and the connection
+				// is closed for some reasons(for example the user close the peer), in this case,
+				// we would get an error;
 
-			// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
-			// and we will be done then;
-			// 2) it is possible that, while we are blocked here in reading and the connection
-			// is closed for some reasons(for example the user close the peer), in this case,
-			// we would get an error;
+				peerLog.Debug("piRx: error, snid: %x, ip: %s", pi.snid, pi.node.IP.String())
+				why := sch.PEC_FOR_RXERROR
+				pi.rxEno = eno
+				req := sch.MsgPeCloseReq{
+					Ptn:  pi.ptnMe,
+					Snid: pi.snid,
+					Node: pi.node,
+					Dir:  pi.dir,
+					Why:  why,
+				}
 
-			peerLog.Debug("piRx: error, snid: %x, ip: %s", pi.snid, pi.node.IP.String())
-			why := sch.PEC_FOR_RXERROR
-			pi.rxEno = eno
-			req := sch.MsgPeCloseReq {
-				Ptn: pi.ptnMe,
-				Snid: pi.snid,
-				Node: pi.node,
-				Dir: pi.dir,
-				Why: why,
+				// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
+				// this instance, BUT at this moment, the message queue of peer manager might
+				// be FULL, so the instance would be blocked while sending; AND the peer manager
+				// might had fired pi.txDone and been blocked by pi.txExit. panic is called
+				// for such a overload system, see scheduler please.
+
+				msg := sch.SchMessage{}
+				pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
+				pi.sdl.SchSendMessage(&msg)
+
+				peerLog.Debug("piRx: failed, EvPeCloseReq sent. snid: %x, dir: %d, peer-ip: %s",
+					pi.snid, pi.dir, pi.node.IP.String())
 			}
 
-			// Here we try to send EvPeCloseReq event to peer manager to ask for cleaning
-			// this instance, BUT at this moment, the message queue of peer manager might
-			// be FULL, so the instance would be blocked while sending; AND the peer manager
-			// might had fired pi.txDone and been blocked by pi.txExit. panic is called
-			// for such a overload system, see scheduler please.
-
-			msg := sch.SchMessage{}
-			pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
-			pi.sdl.SchSendMessage(&msg)
-
-			peerLog.Debug("piRx: failed, EvPeCloseReq sent. snid: %x, dir: %d, peer-ip: %s",
+			peerLog.Debug("piRx: PeMgrEnoNetTemporary, snid: %x, dir: %d, peer-ip: %s",
 				pi.snid, pi.dir, pi.node.IP.String())
 
 			continue

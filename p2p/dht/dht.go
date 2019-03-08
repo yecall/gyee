@@ -611,14 +611,6 @@ func (dhtMgr *DhtMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 // NAT public address update indication handler
 //
 func (dhtMgr *DhtMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
-	dhtMgr.sdl.SchSetRecver(msg, dhtMgr.ptnQryMgr)
-	dhtMgr.sdl.SchSendMessage(msg)
-	msg2 := *msg
-	dhtMgr.sdl.SchSetRecver(&msg2, dhtMgr.ptnConMgr)
-	dhtMgr.sdl.SchSendMessage(&msg2)
-	msg3 := *msg
-	dhtMgr.sdl.SchSetRecver(&msg3, dhtMgr.ptnShMgr)
-	dhtMgr.sdl.SchSendMessage(&msg3)
 	return sch.SchEnoNone
 }
 
