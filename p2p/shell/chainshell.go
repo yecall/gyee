@@ -343,12 +343,12 @@ func (shMgr *ShellManager)peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) 
 	}
 
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		chainLog.ForceDebug("peerAskToCloseInd: not found, snid: %x, dir: %d, id: %x",
-			ind.Snid, ind.Dir, ind.PeerId)
+		chainLog.ForceDebug("peerAskToCloseInd: not found, why: %s, snid: %x, dir: %d, id: %x",
+			why, ind.Snid, ind.Dir, ind.PeerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		chainLog.ForceDebug("peerAskToCloseInd: status mismatched, snid: %x, dir: %d, status: %d, id: %x",
-			ind.Snid, ind.Dir, peerInst.status, ind.PeerId)
+		chainLog.ForceDebug("peerAskToCloseInd: status mismatched, why: %s, snid: %x, dir: %d, status: %d, id: %x",
+			why, ind.Snid, ind.Dir, peerInst.status, ind.PeerId)
 		return sch.SchEnoMismatched
 	} else {
 		peerInfo := peerInst.hsInfo
