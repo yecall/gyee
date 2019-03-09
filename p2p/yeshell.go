@@ -92,8 +92,11 @@ type SingleSubnetDescriptor = sch.SingleSubnetDescriptor			// single subnet desc
 
 type yesKey = config.DsKey											// key type
 
+var yesInStopping = errors.New("yesmgr: in stopping")
+
 type YeShellManager struct {
 	name				string									// unique name of the shell manager
+	inStopping			bool									// in stopping procedure
 	chainInst			*sch.Scheduler							// chain scheduler pointer
 	ptnChainShell		interface{}								// chain shell manager task node pointer
 	ptChainShMgr		*p2psh.ShellManager						// chain shell manager object
@@ -278,6 +281,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	var eno sch.SchErrno
 	yeShMgr := YeShellManager{
 		name: yesCfg.Name,
+		inStopping: false,
 		putValKey: make([]byte, 0),
 	}
 
@@ -310,6 +314,8 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 func (yeShMgr *YeShellManager)Start() error {
 	var eno sch.SchErrno
 	var ok bool
+
+	yeShMgr.inStopping = false
 
 	if eno = p2psh.P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
 		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
@@ -381,6 +387,7 @@ func (yeShMgr *YeShellManager)Start() error {
 
 func (yeShMgr *YeShellManager)Stop() {
 	yesLog.Debug("Stop: close deduplication ticker")
+	yeShMgr.inStopping = true
 	close(yeShMgr.ddtChan)
 
 	stopCh := make(chan bool, 1)
@@ -402,11 +409,13 @@ func (yeShMgr *YeShellManager)Stop() {
 }
 
 func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
+	if yeShMgr.inStopping {
+		return yesInStopping
+	}
 	if reCfg == nil {
 		yesLog.Debug("Reconfig: invalid parameter")
 		return errors.New("nil reconfigurate command")
 	}
-
 	if reCfg.SubnetMaskBits <= 0 || reCfg.SubnetMaskBits > MaxSubNetMaskBits {
 		yesLog.Debug("Reconfig: invalid mask bits: %d", reCfg.SubnetMaskBits)
 		return errors.New(fmt.Sprintf("invalid mask bits: %d", reCfg.SubnetMaskBits))
@@ -476,6 +485,9 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 func (yeShMgr *YeShellManager)BroadcastMessage(message Message) error {
 	// Notice: the function is not supported in fact, see handler function
 	// in each case please.
+	if yeShMgr.inStopping {
+		return yesInStopping
+	}
 	var err error = nil
 	switch message.MsgType {
 	case MessageTypeTx:
@@ -493,6 +505,9 @@ func (yeShMgr *YeShellManager)BroadcastMessage(message Message) error {
 }
 
 func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
+	if yeShMgr.inStopping {
+		return yesInStopping
+	}
 	var err error = nil
 	switch message.MsgType {
 	case MessageTypeTx:
@@ -510,12 +525,18 @@ func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
 }
 
 func (yeShMgr *YeShellManager)Register(subscriber *Subscriber) {
+	if yeShMgr.inStopping {
+		return
+	}
 	t := subscriber.MsgType
 	m, _ := yeShMgr.subscribers.LoadOrStore(t, new(sync.Map))
 	m.(*sync.Map).Store(subscriber, true)
 }
 
 func (yeShMgr *YeShellManager)UnRegister(subscriber *Subscriber) {
+	if yeShMgr.inStopping {
+		return
+	}
 	t := subscriber.MsgType
 	m, _ := yeShMgr.subscribers.Load(t)
 	if m == nil {
@@ -525,6 +546,10 @@ func (yeShMgr *YeShellManager)UnRegister(subscriber *Subscriber) {
 }
 
 func (yeShMgr *YeShellManager)DhtGetValue(key []byte) ([]byte, error) {
+	if yeShMgr.inStopping {
+		return nil, yesInStopping
+	}
+
 	if len(key) != yesKeyBytes {
 		yesLog.Debug("DhtGetValue: invalid key: %x", key)
 		return nil, sch.SchEnoParameter
@@ -558,6 +583,10 @@ func (yeShMgr *YeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 }
 
 func (yeShMgr *YeShellManager)DhtSetValue(key []byte, value []byte) error {
+	if yeShMgr.inStopping {
+		return yesInStopping
+	}
+
 	if len(key) != yesKeyBytes || len(value) == 0 {
 		yesLog.Debug("DhtSetValue: invalid (key, value) pair, key: %x, length of value: %d", key, len(value))
 		return sch.SchEnoParameter
