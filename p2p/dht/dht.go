@@ -23,7 +23,6 @@ package dht
 import (
 	"fmt"
 	"sync"
-	config	"github.com/yeeco/gyee/p2p/config"
 	sch		"github.com/yeeco/gyee/p2p/scheduler"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
 )
@@ -674,47 +673,6 @@ func (dhtMgr *DhtMgr)InstallEventCallback(cbf DhtCallback) DhtErrno {
 //
 func (dhtMgr *DhtMgr)GetScheduler() *sch.Scheduler {
 	return dhtMgr.sdl
-}
-
-//
-// install rx data callback
-//
-func (dhtMgr *DhtMgr)InstallRxDataCallback(cbf ConInstRxDataCallback, peer *config.NodeID, dir ConInstDir) DhtErrno {
-
-	//
-	// this function exported for user to install callback for data received by connection
-	// instance. to do this, one should check connection instance status in his callback
-	// for event sch.EvDhtConInstStatusInd, for example, when "CisConnected" is reported.
-	//
-
-	conMgr, ok := dhtMgr.sdl.SchGetTaskObject(ConMgrName).(*ConMgr)
-	if !ok {
-		dhtLog.Debug("InstallRxDataCallback: connection manager not found")
-		return DhtEnoMismatched
-	}
-
-	cid := conInstIdentity {
-		nid:	*peer,
-		dir:	dir,
-	}
-	cis := conMgr.lookupConInst(&cid)
-	if len(cis) == 0 {
-		dhtLog.Debug("InstallRxDataCallback: none of instances found")
-		return DhtEnoNotFound
-	}
-
-	for idx, ci := range cis {
-		if ci != nil {
-			if eno := ci.InstallRxDataCallback(cbf); eno != DhtEnoNone {
-				dhtLog.Debug("InstallRxDataCallback: "+
-					"failed, idx: %d, eno: %d, name: %s",
-					idx, eno, ci.name)
-				return eno
-			}
-		}
-	}
-
-	return DhtEnoNone
 }
 
 //

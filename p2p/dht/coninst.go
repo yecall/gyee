@@ -1361,10 +1361,10 @@ _rxLoop:
 				tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
 				return PeMgrEnoNetTemporary
 			} else*/
-			if err.Error() == io.EOF.Error() {
+			/*if err.Error() == io.EOF.Error() {
 				ciLog.Debug("rxProc: temporary err: %s", err.Error())
 				goto _checkDone
-			}
+			}*/
 			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _rxLoop

@@ -189,6 +189,9 @@ func startGoProfile() {
 	//	http://localhost:6060/debug/pprof/cmdline
 	//	http://localhost:6060/debug/pprof/goroutine
 	//	http://localhost:6060debug/pprof/symbol
+	//	go tool pprof http://localhost:6060/debug/pprof/profile
+	//	go tool pprof http://localhost:6060/debug/pprof/heap
+	//	go tool pprof http://localhost:6060/debug/pprof/block
 	//	...
 	// please query the web for more. and notice that "localhost:6060" is
 	// shown just as an example.

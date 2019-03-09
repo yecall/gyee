@@ -624,10 +624,10 @@ func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 			tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
 			return PeMgrEnoNetTemporary
 		} else*/
-		if err.Error() == io.EOF.Error(){
+		/*if err.Error() == io.EOF.Error(){
 			tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
 			return PeMgrEnoNetTemporary
-		}
+		}*/
 		tcpmsgLog.Debug("RecvPackage: ReadMsg failed, err: %s", err.Error())
 		return PeMgrEnoOs
 	}
