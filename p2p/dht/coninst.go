@@ -1357,14 +1357,6 @@ _rxLoop:
 		}
 
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-			/*if oe, ok := err.(*net.OpError); ok && oe.Temporary() {
-				tcpmsgLog.Debug("RecvPackage: temporary err: %s", err.Error())
-				return PeMgrEnoNetTemporary
-			} else*/
-			/*if err.Error() == io.EOF.Error() {
-				ciLog.Debug("rxProc: temporary err: %s", err.Error())
-				goto _checkDone
-			}*/
 			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 			errUnderlying = true
 			break _rxLoop

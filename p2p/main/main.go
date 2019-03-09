@@ -973,9 +973,9 @@ func testCase17(tc *testCase) {
 	yesCfg.BootstrapNode = false
 	yesCfg.SubNetMaskBits = 4
 
-	//yesCfg.NatType = config.NATT_NONE
+	yesCfg.NatType = config.NATT_NONE
 	//yesCfg.NatType = config.NATT_PMP
-	yesCfg.NatType = config.NATT_UPNP
+	//yesCfg.NatType = config.NATT_UPNP
 	//yesCfg.NatType = config.NATT_ANY
 
 	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
