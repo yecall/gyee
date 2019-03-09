@@ -947,8 +947,10 @@ func (tabMgr *TableManager)tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrE
 	if msg.NatType == config.NATT_NONE {
 		tabMgr.pubTcpIp = tabMgr.cfg.local.IP
 		tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
+		tabMgr.natTcpResult = true
 		tabMgr.pubUdpIp = tabMgr.cfg.local.IP
 		tabMgr.pubUdpPort = int(tabMgr.cfg.local.UDP)
+		tabMgr.natUdpResult = true
 	} else {
 		schMsg := sch.SchMessage{}
 		reqUdp := sch.MsgNatMgrMakeMapReq{
