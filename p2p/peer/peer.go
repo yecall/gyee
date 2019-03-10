@@ -1332,13 +1332,19 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 func (peMgr *PeerManager)peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 	cfm, _ := msg.(*MsgCloseCfm)
 	kip := kiParameters {
+		name: cfm.name,
 		ptn: cfm.ptn,
 		state: cfm.state,
 		node: cfm.peNode,
 		dir: cfm.dir,
 	}
+
+	peerLog.ForceDebug("peMgrConnCloseCfm: inst: %s, snid: %x, dir: %d, state: %d",
+		cfm.name, cfm.snid, cfm.dir, cfm.state)
+
 	if eno := peMgr.peMgrKillInst(&kip, PKI_FOR_CLOSE_CFM); eno != PeMgrEnoNone {
-		peerLog.Debug("peMgrConnCloseCfm: peMgrKillInst, failed, eno: %d", eno)
+		peerLog.ForceDebug("peMgrConnCloseCfm: peMgrKillInst failed, inst: %s, snid: %x, dir: %d, state: %d",
+			cfm.name, cfm.snid, cfm.dir, cfm.state)
 		return PeMgrEnoScheduler
 	}
 	i := P2pIndPeerClosedPara {
@@ -1881,6 +1887,7 @@ const (
 )
 
 type kiParameters struct {
+	name	string					// instance name
 	ptn		interface{}				// pointer to task instance node of sender
 	state	peerInstState			// instance state while it's terminated
 	node 	*config.Node			// target node
@@ -1889,22 +1896,21 @@ type kiParameters struct {
 
 func (peMgr *PeerManager)peMgrKillInst(kip *kiParameters, why interface{}) PeMgrErrno {
 	ptn := kip.ptn
-	node := kip.node
 	dir := kip.dir
 	state := kip.state
 	why = why.(string)
 
-	peerLog.Debug("peMgrKillInst: task: %s, state: %d, why: %s",
-		peMgr.sdl.SchGetTaskName(ptn), state, why)
+	peerLog.ForceDebug("peMgrKillInst: inst: %s, dir: %d, state: %d, why: %s",
+		kip.name, kip.dir, kip.state, why)
 
 	peInst := peMgr.peers[ptn]
 	if peInst == nil {
-		peerLog.Debug("peMgrKillInst: instance not found, node: %x", node.ID)
+		peerLog.ForceDebug("peMgrKillInst: instance not found, inst: %s", kip.name)
 		return PeMgrEnoNotfound
 	}
 
 	if peInst.dir != dir {
-		peerLog.Debug("peMgrKillInst: invalid parameters")
+		peerLog.ForceDebug("peMgrKillInst: invalid parameters, inst: %s", kip.name)
 		return PeMgrEnoParameter
 	}
 
@@ -2414,6 +2420,7 @@ type MsgCloseCfm struct {
 	snid	config.SubNetworkID		// sub network identity
 	peNode 	*config.Node			// target node
 	ptn		interface{}				// pointer to task instance node of sender
+	name	string					// instance name
 	state	peerInstState			// instance state while it's terminated
 }
 

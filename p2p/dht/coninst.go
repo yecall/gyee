@@ -461,6 +461,9 @@ func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	conInst.updateStatus(CisClosed)
 	conInst.statusReport()
 
+	ciLog.ForceDebug("closeReq: send EvDhtConInstCloseRsp, inst: %s, dir: %d, why: %d, status: %d, peer: %x",
+		conInst.name, conInst.dir, msg.Why, conInst.getStatus(), conInst.hsInfo.peer.ID)
+
 	schMsg := sch.SchMessage{}
 	rsp := sch.MsgDhtConInstCloseRsp{
 		Peer:	&conInst.hsInfo.peer.ID,

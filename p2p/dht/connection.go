@@ -907,19 +907,19 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 		nid:	*msg.Peer,
 		dir:	ConInstDir(msg.Dir),
 	}
-	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
 	rsp2Sender := func(eno DhtErrno, peer *config.Node, task interface{}) sch.SchErrno{
+		schMsg := new(sch.SchMessage)
 		rsp := sch.MsgDhtConMgrCloseRsp{
 			Eno:	int(eno),
 			Peer:	peer,
 			Dir:	msg.Dir,
 		}
-		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, task, sch.EvDhtConMgrCloseRsp, &rsp)
-		return sdl.SchSendMessage(&schMsg)
+		sdl.SchMakeMessage(schMsg, conMgr.ptnMe, task, sch.EvDhtConMgrCloseRsp, &rsp)
+		return sdl.SchSendMessage(schMsg)
 	}
-
 	rutUpdate := func(node *config.Node) sch.SchErrno {
+		schMsg := new(sch.SchMessage)
 		update := sch.MsgDhtRutMgrUpdateReq {
 			Why:	rutMgrUpdate4Closed,
 			Eno:	DhtEnoNone.GetEno(),
@@ -930,35 +930,37 @@ func (conMgr *ConMgr)instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno {
 				-1,
 			},
 		}
-		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
-		return sdl.SchSendMessage(&schMsg)
+		sdl.SchMakeMessage(schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
+		return sdl.SchSendMessage(schMsg)
 	}
+
+	connLog.ForceDebug("instCloseRsp: cid: %+v", cid)
 
 	found := false
 	err := false
 
 	if ci := conMgr.instInClosing[cid]; ci != nil {
+
+		connLog.ForceDebug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
+
 		found = true
 		delete(conMgr.instInClosing, cid)
-
-		connLog.Debug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
 		if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
 			connLog.Debug("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
 			err = true
 		}
-
 		if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-			connLog.Debug("instCloseRsp: isnt: %s, rutUpdate failed, eno: %d", ci.name, eno)
+			connLog.Debug("instCloseRsp: inst: %s, rutUpdate failed, eno: %d", ci.name, eno)
 			err = true
 		}
 	}
 
 	if !found {
-		connLog.Debug("instCloseRsp: none is found, id: %x", msg.Peer)
+		connLog.ForceDebug("instCloseRsp: not found")
 		return sch.SchEnoNotFound
 	}
 	if err {
-		connLog.Debug("instCloseRsp: seems some errors")
+		connLog.ForceDebug("instCloseRsp: seems some errors")
 		return sch.SchEnoUserTask
 	}
 
