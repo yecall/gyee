@@ -613,7 +613,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	rsp2Sender := func(eno DhtErrno, dir int) sch.SchErrno {
-		connLog.ForceDebug("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
+		connLog.Debug("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
 		msg := sch.SchMessage{}
 		*ptrEno = int(eno)
 		*ptrDir = dir
