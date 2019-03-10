@@ -1644,7 +1644,7 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 		// else kill directly since these instances are not reported to other
 		// modules at all.
 
-		peerLog.Debug("stop: send EvPeCloseReq, inst: %s, snid: %x, ip: %s, dir: %d",
+		peerLog.ForceDebug("stop: send EvPeCloseReq, inst: %s, snid: %x, ip: %s, dir: %d",
 			pi.name, snid, pi.node.IP.String(), pi.dir)
 
 		req := sch.MsgPeCloseReq {
@@ -2013,6 +2013,10 @@ func (peMgr *PeerManager)reconfigTimerHandler() PeMgrErrno {
 		why := sch.PEC_FOR_RECONFIG
 		msg := sch.SchMessage{}
 		for _, peerInst := range wks {
+
+			peerLog.ForceDebug("reconfigTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
+				peerInst.name, peerInst.snid, peerInst.dir, peerInst.node.IP.String())
+
 			req := sch.MsgPeCloseReq {
 				Ptn:	peerInst.ptnMe,
 				Snid:	peerInst.snid,
@@ -2109,7 +2113,7 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 				break
 			}
 
-			peerLog.Debug("shellReconfigReq: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+			peerLog.ForceDebug("shellReconfigReq: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
 				peerInst.name, peerInst.snid, peerInst.dir, peerInst.node.IP.String())
 
 			why := sch.PEC_FOR_RECONFIG_REQ
@@ -2683,7 +2687,7 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 
 	if err := pi.conn.SetDeadline(time.Time{}); err != nil {
 
-		peerLog.Debug("piEstablishedInd: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+		peerLog.ForceDebug("piEstablishedInd: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
 			pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		why := sch.PEC_FOR_SETDEADLINE
