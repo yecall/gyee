@@ -42,15 +42,23 @@ import (
 // debug
 //
 type peerLogger struct {
-	debug__		bool
+	debug__			bool
+	debugForce__	bool
 }
 
 var peerLog = peerLogger {
-	debug__:	false,
+	debug__:		false,
+	debugForce__:	true,
 }
 
 func (log peerLogger)Debug(fmt string, args ... interface{}) {
 	if log.debug__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
+func (log peerLogger)ForceDebug(fmt string, args ... interface{}) {
+	if log.debugForce__ {
 		p2plog.Debug(fmt, args ...)
 	}
 }
@@ -509,24 +517,22 @@ func (peMgr *PeerManager)PeMgrStart() PeMgrErrno {
 
 func (peMgr *PeerManager)peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	peerLog.Debug("peMgrPoweroff: task will be done, name: %s", sch.PeerMgrName)
-
 	powerOff := sch.SchMessage {
 		Id:		sch.EvSchPoweroff,
 		Body:	nil,
 	}
-
 	peMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, peerInst := range peMgr.peers {
-		peerLog.Debug("peMgrPoweroff: inst: %s", peMgr.sdl.SchGetTaskName(peerInst.ptnMe))
+		peerLog.ForceDebug("peMgrPoweroff: send EvSchPoweroff to inst: %s, dir: %d, state: %d",
+			peerInst.name, peerInst.dir, peerInst.state)
 		peMgr.sdl.SchSetRecver(&powerOff, peerInst.ptnMe)
 		peMgr.sdl.SchSendMessage(&powerOff)
 	}
-
 	close(peMgr.indChan)
 	if peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+		peerLog.ForceDebug("peMgrPoweroff: SchTaskDone faled")
 		return PeMgrEnoScheduler
 	}
-
 	return PeMgrEnoNone
 }
 
@@ -703,7 +709,6 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peInst.rxDone		= make(chan PeMgrErrno)
 	peInst.rxtxRuning	= false
 
-	// Create peer instance task
 	peMgr.ibInstSeq++
 	peInst.name = peInst.name + fmt.Sprintf("_inbound_%s",
 		fmt.Sprintf("%d_", peMgr.ibInstSeq) + peInst.raddr.String())
@@ -717,6 +722,9 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		DieCb:		nil,
 		UserDa:		peInst,
 	}
+
+	peerLog.ForceDebug("peMgrLsnConnAcceptedInd: inst: %s, peer-ip: %s",
+		peInst.name, peInst.raddr.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
 	eno != sch.SchEnoNone || ptnInst == nil {
@@ -750,7 +758,7 @@ func (peMgr *PeerManager)peMgrOutboundReq(msg interface{}) PeMgrErrno {
 		peerLog.Debug("PeerManager: no outbound for noDial or boostrapNode: %t, %t")
 		return PeMgrEnoNone
 	}
-	// if sub network identity is not specified, try to start all
+	// if sub network identity is not specified, means all are wanted
 	var snid *SubNetworkID
 	if msg != nil { snid = msg.(*SubNetworkID) }
 	if snid == nil {
@@ -1778,8 +1786,6 @@ func (peMgr *PeerManager)peMgrDataReq(msg interface{}) PeMgrErrno {
 
 func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node *config.Node) PeMgrErrno {
 
-	peerLog.Debug("peMgrCreateOutboundInst: snid: %x, peer-ip: %s", *snid, node.IP.String())
-
 	var eno = sch.SchEnoNone
 	var ptnInst interface{} = nil
 	var peInst = new(PeerInstance)
@@ -1825,6 +1831,9 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 		DieCb:		nil,
 		UserDa:		peInst,
 	}
+
+	peerLog.ForceDebug("peMgrCreateOutboundInst: inst: %s, snid: %x, peer-ip: %s",
+		peInst.name, *snid, node.IP.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
 	eno != sch.SchEnoNone || ptnInst == nil {
@@ -2456,17 +2465,16 @@ func (pi *PeerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 
 func (pi *PeerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
 	if pi.state == peInstStateKilling {
-		peerLog.Debug("piPoweroff: already in killing, done at once, name: %s",
+		peerLog.ForceDebug("piPoweroff: already in killing, done at once, name: %s",
 			pi.sdl.SchGetTaskName(pi.ptnMe))
 
 		if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 			return PeMgrEnoScheduler
 		}
-
 		return PeMgrEnoNone
 	}
-	peerLog.Debug("piPoweroff: task will be done, name: %s, state: %d",
-		pi.sdl.SchGetTaskName(pi.ptnMe), pi.state)
+	peerLog.ForceDebug("piPoweroff: task will be done, name: %s, dir: %d, state: %d",
+		pi.sdl.SchGetTaskName(pi.ptnMe), pi.dir, pi.state)
 
 	pi.stopRxTx()
 
@@ -2492,7 +2500,8 @@ func (pi *PeerInstance)piConnOutReq(_ interface{}) PeMgrErrno {
 		eno PeMgrErrno = PeMgrEnoNone
 	)
 
-	peerLog.Debug("piConnOutReq: try to dial target: %s", addr.String())
+	peerLog.ForceDebug("piConnOutReq: outbound inst: %s, snid: %x, try to dial target: %s",
+		pi.name, pi.snid, addr.String())
 
 	pi.dialer.Timeout = pi.cto
 	if conn, err = pi.dialer.Dial("tcp", addr.String()); err != nil {
@@ -2530,6 +2539,8 @@ func (pi *PeerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 		peerLog.Debug("piHandshakeReq: invalid instance")
 		return PeMgrEnoParameter
 	}
+
+	peerLog.ForceDebug("piHandshakeReq: inst: %s, dir: %d", pi.name, pi.dir)
 
 	if pi.state != peInstStateConnected && pi.state != peInstStateAccepted {
 		peerLog.Debug("piHandshakeReq: instance mismatched")
@@ -2604,9 +2615,12 @@ func (pi *PeerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 
 func (pi *PeerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 	if pi.state == peInstStateKilling {
-		peerLog.Debug("piCloseReq: already in killing, task: %s", pi.sdl.SchGetTaskName(pi.ptnMe))
+		peerLog.ForceDebug("piCloseReq: already in killing, inst: %s, dir: %d, state: %d",
+			pi.name, pi.dir, pi.state)
 		return PeMgrEnoDuplicated
 	}
+
+	peerLog.ForceDebug("piCloseReq: inst: %s, dir: %d, state: %d", pi.name, pi.dir, pi.state)
 
 	pi.state = peInstStateKilling
 	node := pi.node

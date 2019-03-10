@@ -46,7 +46,7 @@ type connLogger struct {
 
 var connLog = connLogger {
 	debug__:		false,
-	debugForce__:	false,
+	debugForce__:	true,
 }
 
 func (log connLogger)Debug(fmt string, args ... interface{}) {
@@ -272,17 +272,21 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
 
-	connLog.Debug("poweroff: task will be done ...")
+	connLog.ForceDebug("poweroff: task will be done ...")
 
 	po := sch.SchMessage{}
 	close(chConMgrReady)
 
 	for _, ci := range conMgr.ciTab {
+		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
+			ci.name, ci.dir, ci.status)
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
 
 	for _, ci := range conMgr.ibInstTemp {
+		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
+			ci.name, ci.dir, ci.status)
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
@@ -306,7 +310,7 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	sdl := conMgr.sdl
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), false)
 	if dhtEno := conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil, msg); dhtEno != DhtEnoNone {
-		connLog.Debug("acceptInd: setupConInst failed, eno: %d", dhtEno)
+		connLog.ForceDebug("acceptInd: setupConInst failed, eno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 	conMgr.ciSeq++
@@ -321,9 +325,11 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 		UserDa:		nil,
 	}
 
+	connLog.ForceDebug("acceptInd: inbound inst: %s, peer-ip: %s", msg.Con.RemoteAddr().String())
+
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		connLog.Debug("acceptInd: SchCreateTask failed, eno: %d", eno)
+		connLog.ForceDebug("acceptInd: SchCreateTask failed, eno: %d", eno)
 		return eno
 	}
 
@@ -381,7 +387,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 			schMsg := new(sch.SchMessage)
 			conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnSrcTsk, ev, rsp)
 			conMgr.sdl.SchSendMessage(schMsg)
-			connLog.ForceDebug("rsp2TasksPending: ev: %d, inst: %s, dir: %d, srcTaskName: %s",
+			connLog.Debug("rsp2TasksPending: ev: %d, inst: %s, dir: %d, srcTaskName: %s",
 				ev, ci.name, ci.dir, ci.srcTaskName)
 		}
 		for name, req := range ci.bakReq2Conn {
@@ -408,7 +414,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 				schMsg := new(sch.SchMessage)
 				conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ptn, ev, rsp)
 				conMgr.sdl.SchSendMessage(schMsg)
-				connLog.ForceDebug("rsp2TasksPending: ev: %d, inst: %s, dir: %d, srcTaskName: %s, name: %s",
+				connLog.Debug("rsp2TasksPending: ev: %d, inst: %s, dir: %d, srcTaskName: %s, name: %s",
 					ev, ci.name, ci.dir, ci.srcTaskName, name)
 			}
 		}
@@ -629,7 +635,7 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	dupConnProc := func (ci *ConInst) sch.SchErrno {
 		status := ci.getStatus()
-		connLog.ForceDebug("dupConnProc: inst: %s, dir: %d, status: %d, owner: %s", ci.name, ci.dir, status, msg.Name)
+		connLog.Debug("dupConnProc: inst: %s, dir: %d, status: %d, owner: %s", ci.name, ci.dir, status, msg.Name)
 		if status == CisInService {
 			return rsp2Sender(DhtErrno(DhtEnoDuplicated), ci.dir)
 		} else if status == CisOutOfService || status == CisClosed {
@@ -654,13 +660,13 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	if yes, ci := isInstInClosing(); yes {
-		connLog.ForceDebug("connctReq: in closing, inst: %s , owner: %s", ci.name, msg.Name)
+		connLog.Debug("connctReq: in closing, inst: %s , owner: %s", ci.name, msg.Name)
 		return rsp2Sender(DhtErrno(DhtEnoResource), ci.dir)
 	} else if ci := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != nil {
-		connLog.ForceDebug("connctReq: outbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
+		connLog.Debug("connctReq: outbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
 		return  dupConnProc(ci)
 	} else if ci := conMgr.lookupInboundConInst(&msg.Peer.ID); ci != nil {
-		connLog.ForceDebug("connctReq: inbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
+		connLog.Debug("connctReq: inbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
 		return  dupConnProc(ci)
 	}
 
@@ -682,11 +688,11 @@ func (conMgr *ConMgr)connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		connLog.Debug("connctReq: SchCreateTask failed, eno: %d", eno)
+		connLog.ForceDebug("connctReq: SchCreateTask failed, eno: %d", eno)
 		return rsp2Sender(DhtErrno(DhtEnoScheduler), ci.dir)
 	}
 
-	connLog.ForceDebug("connctReq: instance created, inst: %s, dir: %d, owner: %s, ip: %s",
+	connLog.ForceDebug("connctReq: outbound instance, inst: %s, dir: %d, owner: %s, ip: %s",
 		ci.name, ci.dir, msg.Name, msg.Peer.IP.String())
 
 	ci.ptnMe = ptn

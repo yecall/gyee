@@ -45,7 +45,7 @@ type coninstLogger struct {
 
 var ciLog = coninstLogger {
 	debug__:		false,
-	debugForce__:	false,
+	debugForce__:	true,
 }
 
 func (log coninstLogger)Debug(fmt string, args ... interface{}) {
@@ -286,9 +286,11 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 //
 func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 	if conInst.ptnMe != ptn {
-		ciLog.Debug("poweron: task mismatched")
+		ciLog.ForceDebug("poweron: inst: %s, dir: %d, task mismatched", conInst.name, conInst.dir)
 		return sch.SchEnoMismatched
 	}
+
+	ciLog.ForceDebug("poweron: inst: %s, dir: %d", conInst.name, conInst.dir)
 
 	conInst.txDtm.setCallback(conInst.txTimerHandler)
 	conInst.txTmCycle, _ = conInst.txDtm.dur2Ticks(ciTxTimerDuration)
@@ -316,7 +318,7 @@ func (conInst *ConInst)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (conInst *ConInst)poweroff(ptn interface{}) sch.SchErrno {
-	ciLog.Debug("poweroff: inst: %s, task will be done ...", conInst.name)
+	ciLog.ForceDebug("poweroff: inst: %s, dir: %d, task will be done ...", conInst.name, conInst.dir)
 	conInst.cleanUp(DhtEnoScheduler.GetEno())
 	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
 }
@@ -330,6 +332,8 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	// if handshake failed, the instance task should done itself, and send handshake
 	// response message to connection manager task.
 	//
+
+	connLog.ForceDebug("handshakeReq: inst: %s, dir: %d", conInst.name, conInst.dir)
 
 	rsp := sch.MsgDhtConInstHandshakeRsp {
 		Eno:	DhtEnoUnknown.GetEno(),
@@ -440,16 +444,18 @@ func (conInst *ConInst)startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno
 //
 func (conInst *ConInst)closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	if status := conInst.getStatus(); status >= CisClosed {
-		ciLog.ForceDebug("closeReq: inst: %s, status mismatched, status: %d", conInst.name, status)
+		ciLog.ForceDebug("closeReq: inst: %s, dir: %d, why: %d, status mismatched: %d",
+			conInst.name, conInst.dir, msg.Why, status)
 		return sch.SchEnoMismatched
 	}
+
+	ciLog.ForceDebug("closeReq: inst: %s, dir: %d, why: %d, status: %d",
+		conInst.name, conInst.dir, msg.Why, conInst.getStatus())
 
 	if *msg.Peer != conInst.hsInfo.peer.ID {
 		ciLog.ForceDebug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
 		return sch.SchEnoMismatched
 	}
-
-	ciLog.ForceDebug("closeReq: inst: %s, connection will be closed, why: %d", conInst.name, msg.Why)
 
 	conInst.cleanUp(DhtEnoNone.GetEno())
 	conInst.updateStatus(CisClosed)
