@@ -428,14 +428,20 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 // service startup
 //
 func (conInst *ConInst)startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno {
-	ciLog.Debug("startUpReq: ok, try to start tx and rx for connection instance, "+
+	ciLog.ForceDebug("startUpReq: enter, start rx/tx and confrim peMgr, "+
 		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 	conInst.updateStatus(CisInService)
 	conInst.statusReport()
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
 	msg.EnoCh<-DhtEnoNone.GetEno()
+
+	ciLog.ForceDebug("startUpReq: ok, exit, " +
+		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 	return sch.SchEnoNone
 }
 

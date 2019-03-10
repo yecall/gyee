@@ -960,13 +960,12 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	var lived bool
 
 	if inst, lived = peMgr.peers[rsp.ptn]; inst == nil || !lived {
-		peerLog.Debug("peMgrHandshakeRsp: instance not found, rsp: %s", fmt.Sprintf("%+v", *rsp))
+		peerLog.ForceDebug("peMgrHandshakeRsp: instance not found, rsp: %+v", *rsp)
 		return PeMgrEnoNotfound
 	}
 
 	if inst.snid != rsp.snid || inst.dir != rsp.dir {
-		peerLog.Debug("peMgrHandshakeRsp: response mismatched with instance, rsp: %s",
-			fmt.Sprintf("%+v", *rsp))
+		peerLog.ForceDebug("peMgrHandshakeRsp: mismatched with instance, rsp: %+v", *rsp)
 		return PeMgrEnoParameter
 	}
 
@@ -975,7 +974,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	if _, ok := peMgr.reCfg.delList[rsp.snid]; ok {
-		peerLog.Debug("peMgrHandshakeRsp: kill instance for reconfiguration, snid: %x", rsp.snid)
+		peerLog.ForceDebug("peMgrHandshakeRsp: kill for reconfiguration, inst: %s, snid: %x, dir: %d",
+			inst.name, inst.snid, inst.dir)
 		kip := kiParameters {
 			ptn: rsp.ptn,
 			state: inst.state,
@@ -990,7 +990,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	idEx := PeerIdEx{Id:rsp.peNode.ID, Dir:rsp.dir}
 	if rsp.result != PeMgrEnoNone {
 
-		peerLog.Debug("peMgrHandshakeRsp: failed, result: %d", rsp.result)
+		peerLog.ForceDebug("peMgrHandshakeRsp: failed, inst: %s, snid: %x, dir: %d, result: %d",
+			inst.name, inst.snid, inst.dir, rsp.result)
+
 		peMgr.updateStaticStatus(rsp.snid, idEx, peerKilling)
 		kip := kiParameters {
 			ptn: rsp.ptn,
@@ -1014,7 +1016,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	var maxInbound = 0
 	var maxOutbound = 0
 	var maxPeers = 0
-	snid := rsp.snid
+	var snid = rsp.snid
 
 	if peMgr.cfg.networkType == config.P2pNetworkTypeStatic &&
 		peMgr.staticSubNetIdExist(&snid) == true {
@@ -1041,8 +1043,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if peMgr.wrkNum[snid] >= maxPeers {
 
-		peerLog.Debug("peMgrHandshakeRsp: too much workers, snid: %x, wrkNum: %d",
-			snid, peMgr.wrkNum[snid])
+		peerLog.ForceDebug("peMgrHandshakeRsp: too much workers, inst: %s, snid: %x, dir: %d, result: %d",
+			inst.name, inst.snid, inst.dir)
 
 		peMgr.updateStaticStatus(snid, idEx, peerKilling)
 		kip := kiParameters {
@@ -1058,8 +1060,10 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	idEx.Dir = PeInstDirInbound
 	if _, dup := peMgr.workers[snid][idEx]; dup {
 
-		peerLog.Debug("peMgrHandshakeRsp: duplicate inbound worker, snid: %x, peer-ip: %s",
-			snid, rsp.peNode.IP.String())
+		peerLog.ForceDebug("peMgrHandshakeRsp: inbound duplicated to worker, " +
+			"inst: %s, snid: %x, dir: %d, result: %d",
+			inst.name, inst.snid, inst.dir)
+
 		kip := kiParameters {
 			ptn: rsp.ptn,
 			state: inst.state,
@@ -1073,8 +1077,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	idEx.Dir = PeInstDirOutbound
 	if _, dup := peMgr.workers[snid][idEx]; dup {
 
-		peerLog.Debug("peMgrHandshakeRsp: duplicate outbound worker, snid: %x, peer-ip: %s",
-			snid, rsp.peNode.IP.String())
+		peerLog.ForceDebug("peMgrHandshakeRsp: outbound duplicated to worker, " +
+			"inst: %s, snid: %x, dir: %d, result: %d",
+			inst.name, inst.snid, inst.dir)
 
 		kip := kiParameters {
 			ptn: rsp.ptn,
@@ -1095,8 +1100,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		} else {
 			if peMgr.ibpNum[snid] >= maxInbound {
 
-				peerLog.Debug("peMgrHandshakeRsp: too much inbound workers, snid: %x, ibpNum: %d",
-					snid, peMgr.ibpNum[snid])
+				peerLog.ForceDebug("peMgrHandshakeRsp: inbound, too much workers, " +
+					"inst: %s, snid: %x, dir: %d, result: %d",
+					inst.name, inst.snid, inst.dir)
 
 				kip := kiParameters {
 					ptn: rsp.ptn,
@@ -1115,8 +1121,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				// but the peer might kill another, then two connections are lost, we need a
 				// protection for this.
 
-				peerLog.Debug("peMgrHandshakeRsp: inbound conflicts to outbound, snid: %x, peer-ip: %s",
-					snid, rsp.peNode.IP.String())
+				peerLog.ForceDebug("peMgrHandshakeRsp: inbound conflicts to outbound, " +
+					"inst: %s, snid: %x, dir: %d, result: %d",
+					inst.name, inst.snid, inst.dir)
 
 				kip := kiParameters {
 					ptn: rsp.ptn,
@@ -1142,8 +1149,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 			if peMgr.obpNum[snid] >= maxOutbound {
 
-				peerLog.Debug("peMgrHandshakeRsp: too much outbound workers, snid: %x, obpNum: %d",
-					snid, peMgr.obpNum[snid])
+				peerLog.ForceDebug("peMgrHandshakeRsp: outbound, too much workers, " +
+					"inst: %s, snid: %x, dir: %d, result: %d",
+					inst.name, inst.snid, inst.dir)
 
 				kip := kiParameters {
 					ptn: rsp.ptn,
@@ -1162,8 +1170,9 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				// but the peer might kill another, then two connections are lost, we need a
 				// protection for this.
 
-				peerLog.Debug("peMgrHandshakeRsp: outbound conflicts to inbound, snid: %x, peer-ip: %s",
-					snid, rsp.peNode.IP.String())
+				peerLog.ForceDebug("peMgrHandshakeRsp: outbound conflicts to inbound, " +
+					"inst: %s, snid: %x, dir: %d, result: %d",
+					inst.name, inst.snid, inst.dir)
 
 				kip := kiParameters {
 					ptn: rsp.ptn,
@@ -1192,8 +1201,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if eno, ok := <-cfmCh; eno != PeMgrEnoNone || !ok {
 
-		peerLog.Debug("peMgrHandshakeRsp: instance deal with EvPeEstablishedInd failed, snid: %x, eno: %d, peer-ip: %s",
-			snid, eno, rsp.peNode.IP.String())
+		peerLog.ForceDebug("peMgrHandshakeRsp: confirm failed, " +
+			"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
+			inst.name, inst.snid, inst.dir, inst.state, eno)
+
+		if ok { close(cfmCh) }
 
 		kip := kiParameters {
 			ptn: rsp.ptn,
@@ -1201,10 +1213,11 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			node: &inst.node,
 			dir: inst.dir,
 		}
-		peMgr.peMgrKillInst(&kip, PKI_FOR_WITHOUT_INST_CFM)
+		peMgr.peMgrKillInst(&kip, PKI_FOR_FAILED_INST_CFM)
 		return PeMgrErrno(eno)
 	}
 
+	close(cfmCh)
 	inst.state = peInstStateActivated
 	peMgr.wrkNum[snid]++
 
@@ -1229,14 +1242,16 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 
 		if tabEno != tab.TabMgrEnoNone {
-			peerLog.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, eno: %d, snid: %x, node: %s",
-				tabEno, snid, fmt.Sprintf("%+v", *rsp.peNode))
+			peerLog.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, " +
+				"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
+				inst.name, inst.snid, inst.dir, inst.state, tabEno)
 		}
 
 		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
-			peerLog.Debug("peMgrHandshakeRsp: TabUpdateNode failed, eno: %d, snid: %x, node: %s",
-				tabEno, snid, fmt.Sprintf("%+v", *rsp.peNode))
+			peerLog.Debug("peMgrHandshakeRsp: TabUpdateNode failed, " +
+				"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
+				inst.name, inst.snid, inst.dir, inst.state, tabEno)
 		}
 	}
 
@@ -1283,19 +1298,16 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	var req = msg.Body.(*sch.MsgPeCloseReq)
 	var snid = req.Snid
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
-
 	why, _ := req.Why.(string)
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {
 		peerLog.ForceDebug("peMgrCloseReq: worker not found")
 		return PeMgrEnoNotfound
 	}
-
-	if inst.state == peInstStateKilling {
-		peerLog.Debug("peMgrCloseReq: worker already in killing")
+	if inst.state < peInstStateNull {
+		peerLog.Debug("peMgrCloseReq: already in killing or killed, state: %d", inst.state)
 		return PeMgrEnoDuplicated
 	}
-
 	if ptnSender := peMgr.sdl.SchGetSender(msg); ptnSender != peMgr.ptnShell {
 		// req.Ptn is nil, means the sender is peMgr.ptnShell, so need not to
 		// send EvShellPeerAskToCloseInd to it again.
@@ -1318,7 +1330,7 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	}
 
 	peerLog.ForceDebug("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
-		why, inst.name, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
+		why, inst.name, inst.snid, inst.dir, inst.node.IP.String(), inst.node.TCP)
 
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
 	req.Node = inst.node
@@ -1883,7 +1895,7 @@ const (
 	PKI_FOR_OB2W_DUPLICATED		= "outBoundDup2Worker"
 	PKI_FOR_IB2OB_DUPLICATED	= "inBoundDup2OutBound"
 	PKI_FOR_OB2IB_DUPLICATED	= "outBoundDup2InBound"
-	PKI_FOR_WITHOUT_INST_CFM	= "noInstCfm"
+	PKI_FOR_FAILED_INST_CFM		= "instCfmFailed"
 )
 
 type kiParameters struct {
@@ -2489,24 +2501,24 @@ func (pi *PeerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 }
 
 func (pi *PeerInstance)piPoweroff(ptn interface{}) PeMgrErrno {
-	if pi.state == peInstStateKilling {
-		peerLog.ForceDebug("piPoweroff: already in killing, done at once, name: %s",
-			pi.sdl.SchGetTaskName(pi.ptnMe))
 
+	if pi.state < peInstStateNull {
+		peerLog.ForceDebug("piPoweroff: already in killing or killed, inst: %s, snid: %x, dir: %d, state: %d",
+			pi.name, pi.snid, pi.dir, pi.state)
 		if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 			return PeMgrEnoScheduler
 		}
 		return PeMgrEnoNone
 	}
-	peerLog.ForceDebug("piPoweroff: task will be done, name: %s, dir: %d, state: %d",
-		pi.sdl.SchGetTaskName(pi.ptnMe), pi.dir, pi.state)
+
+	peerLog.ForceDebug("piPoweroff: task will be done, inst: %s, snid: %x, dir: %d, state: %d",
+		pi.name, pi.snid, pi.dir, pi.state)
 
 	pi.stopRxTx()
 
 	if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
-
 	return PeMgrEnoNone
 }
 
@@ -2639,13 +2651,14 @@ func (pi *PeerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
 }
 
 func (pi *PeerInstance)piCloseReq(_ interface{}) PeMgrErrno {
-	if pi.state == peInstStateKilling {
-		peerLog.ForceDebug("piCloseReq: already in killing, inst: %s, dir: %d, state: %d",
-			pi.name, pi.dir, pi.state)
+	if pi.state < peInstStateNull {
+		peerLog.ForceDebug("piCloseReq: already in killing, inst: %s, snid: %x, dir: %d, state: %d",
+			pi.name, pi.snid, pi.dir, pi.state)
 		return PeMgrEnoDuplicated
 	}
 
-	peerLog.ForceDebug("piCloseReq: inst: %s, dir: %d, state: %d", pi.name, pi.dir, pi.state)
+	peerLog.ForceDebug("piCloseReq: inst: %s, snid: %x, dir: %d, state: %d",
+		pi.name, pi.snid, pi.dir, pi.state)
 
 	pi.state = peInstStateKilling
 	node := pi.node
@@ -2679,6 +2692,9 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 		Dur:   PeInstPingpongCycle,
 		Extra: nil,
 	}
+
+	peerLog.ForceDebug("piEstablishedInd: enter, inst: %s, snid: %x, dir: %d, state: %d",
+		pi.name, pi.snid, pi.dir, pi.state)
 
 	if schEno, tid = pi.sdl.SchSetTimer(pi.ptnMe, &tmDesc);
 		schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
@@ -2719,6 +2735,9 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 
 	pi.rxtxRuning = true
 	cfmCh<-PeMgrEnoNone
+
+	peerLog.ForceDebug("piEstablishedInd: exit, inst: %s, snid: %x, dir: %d, state: %d",
+		pi.name, pi.snid, pi.dir, pi.state)
 
 	return PeMgrEnoNone
 }
@@ -2949,12 +2968,6 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 	defer func() {
 		if err := recover(); err != nil {
 			peerLog.Debug("piTx: exception raised, wait done...")
-			for {
-				if _, ok := <-pi.txChan; !ok {
-					peerLog.Debug("piTx: done")
-					return
-				}
-			}
 		}
 	}()
 
@@ -2994,7 +3007,6 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 	)
 
 _txLoop:
-
 	for {
 
 		isPP	= false
@@ -3039,16 +3051,19 @@ _txLoop:
 		} else if isData {
 
 			if !okData {
+				peerLog.ForceDebug("piTx: done, inst: %s, snid: %x, dir: %d",
+					pi.name, pi.snid, pi.dir)
 				break _txLoop
 			}
 
 			if upkg == nil {
-				peerLog.Debug("piTx: nil package")
+				peerLog.Debug("piTx: nil package, inst: %s, snid: %x, dir: %d",
+					pi.name, pi.snid, pi.dir)
 				continue
 			}
 
 			if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
-				time.Sleep(time.Millisecond * 10)
+				time.Sleep(time.Millisecond * 100)
 				continue
 			}
 
@@ -3067,12 +3082,12 @@ _txLoop:
 		}
 
 		if pi.txSeq & 0x3ff == 0 {
-			peerLog.Debug("piTx: txSeq: %d, txOkCnt: %d, txFailedCnt: %d, sent. snid: %x, dir: %d, peer: %x",
-				pi.txSeq, pi.txOkCnt, pi.txFailedCnt, pi.snid, pi.dir, pi.node.ID)
+			peerLog.Debug("piTx: inst: %s, snid: %x, dir: %d, txSeq: %d, txOkCnt: %d, txFailedCnt: %d",
+				pi.name, pi.snid, pi.dir, pi.txSeq, pi.txOkCnt, pi.txFailedCnt)
 		}
 	}
 
-	peerLog.Debug("piTx: exit, snid: %x, dir: %d, peer: %x", pi.snid, pi.dir, pi.node.ID)
+	peerLog.ForceDebug("piTx: exit, inst: %s, snid: %x, dir: %d", pi.name, pi.snid, pi.dir)
 	return PeMgrEnoNone
 }
 
@@ -3085,8 +3100,6 @@ func piRx(pi *PeerInstance) PeMgrErrno {
 	defer func() {
 		if err := recover(); err != nil {
 			peerLog.Debug("piRx: exception raised, wait done...")
-			<-pi.rxDone
-			close(pi.rxDone)
 		}
 	}()
 
@@ -3094,37 +3107,41 @@ func piRx(pi *PeerInstance) PeMgrErrno {
 	var ok = true
 
 _rxLoop:
-
 	for {
-
 		select {
 		case done, ok = <-pi.rxDone:
-			peerLog.Debug("piRx: pi: %s, done with: %d", pi.name, done)
+			peerLog.ForceDebug("piRx: done, inst: %s, snid: %x, dir: %d, done with: %d",
+				pi.name, pi.snid, pi.dir, done)
 			if ok {
 				close(pi.rxDone)
 			}
 			break _rxLoop
-
 		default:
 		}
 
 		// if in errors, sleep then continue to check done
 		if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
-			time.Sleep(time.Microsecond * 10)
+			time.Sleep(time.Microsecond * 100)
 			continue
 		}
 
 		// try reading the peer
 		upkg := new(P2pPackage)
 		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
-			if eno != PeMgrEnoNetTemporary {
+
+			if eno == PeMgrEnoNetTemporary {
+
+				peerLog.ForceDebug("piRx: PeMgrEnoNetTemporary, inst: %s, snid: %x, dir: %d, ip: %s",
+					pi.name, pi.snid, pi.dir, pi.node.IP.String())
+
+			} else {
 				// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
 				// and we will be done then;
 				// 2) it is possible that, while we are blocked here in reading and the connection
 				// is closed for some reasons(for example the user close the peer), in this case,
 				// we would get an error;
 
-				peerLog.ForceDebug("piRx: error, send EvPeCloseReq to inst: %s, snid: %x, dir: %d, ip: %s",
+				peerLog.ForceDebug("piRx: error, send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
 					pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 				why := sch.PEC_FOR_RXERROR
@@ -3148,9 +3165,6 @@ _rxLoop:
 				pi.sdl.SchSendMessage(&msg)
 			}
 
-			peerLog.ForceDebug("piRx: PeMgrEnoNetTemporary, inst: %s, snid: %x, dir: %d, ip: %s",
-				pi.name, pi.snid, pi.dir, pi.node.IP.String())
-
 			continue
 		}
 
@@ -3166,12 +3180,12 @@ _rxLoop:
 
 			if len(pi.rxChan) >= cap(pi.rxChan) {
 
-				peerLog.Debug("piRx: rx queue full, snid: %x, dir: %d, pi: %s, peer: %x",
-					pi.snid, pi.dir, pi.name, pi.node.ID)
+				peerLog.Debug("piRx: queue full, inst: %s, snid: %x, dir: %d",
+					pi.name, pi.snid, pi.dir)
 
 				if pi.rxDiscard += 1; pi.rxDiscard & 0x1f == 0 {
-					peerLog.Debug("piRx: snid: %x, dir: %d, pi: %s, rxDiscard: %d",
-						pi.snid, pi.dir, pi.name, pi.rxDiscard)
+					peerLog.Debug("piRx: inst: %s, snid: %x, dir: %d, rxDiscard: %d",
+						pi.name, pi.snid, pi.dir, pi.rxDiscard)
 				}
 
 			} else {
@@ -3199,16 +3213,17 @@ _rxLoop:
 				pi.rxChan <- &pkgCb
 
 				if pi.rxOkCnt += 1; pi.rxOkCnt & 0x3ff == 0 {
-					peerLog.Debug("piRx: rxOkCnt: %d, snid: %x, dir: %d, pi: %s",
-						pi.rxOkCnt, pi.snid, pi.dir, pi.name)
+					peerLog.Debug("piRx: inst: %s, snid: %x, dir: %d, rxOkCnt: %d",
+						pi.name, pi.snid, pi.dir, pi.rxOkCnt)
 				}
 			}
 		} else {
-			peerLog.Debug("piRx: package discarded for unknown pid: pi: %s, %d", pi.name, upkg.Pid)
+			peerLog.Debug("piRx: discarded, inst: %s, snid: %x, dir: %d,  pid: %d",
+				pi.name, pi.snid, pi.dir, upkg.Pid)
 		}
 	}
 
-	peerLog.Debug("piRx: exit, snid: %x, dir: %d, peer: %x", pi.snid, pi.dir, pi.node.ID)
+	peerLog.ForceDebug("piRx: exit, inst: %s, snid: %x, dir: %d", pi.name, pi.snid, pi.dir)
 	return done
 }
 

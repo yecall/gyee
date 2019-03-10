@@ -517,7 +517,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 	// update the route manager
 	//
-	connLog.Debug("handshakeRsp: all ok, try to update route manager, " +
+	connLog.ForceDebug("handshakeRsp: all ok, update router and send EvDhtConInstStartupReq, " +
 		"inst: %s, dir: %d, local: %s, remote: %s",
 		ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
@@ -551,6 +551,10 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	} else {
 		close(req.EnoCh)
 	}
+
+	connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confrimed ok, " +
+		"inst: %s, dir: %d, local: %s, remote: %s",
+		ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
 	return rsp2TasksPending(ci, msg, DhtEnoNone)
 }
