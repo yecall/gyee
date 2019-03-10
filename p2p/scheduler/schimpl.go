@@ -26,9 +26,9 @@ import (
 	"strings"
 	"runtime"
 	"fmt"
+	"sync"
 	config	"github.com/yeeco/gyee/p2p/config"
 	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	"sync"
 )
 
 
@@ -36,11 +36,13 @@ import (
 // debug
 //
 type schLogger struct {
-	debug__		bool
+	debug__			bool
+	debugForce__	bool
 }
 
 var schLog = schLogger  {
-	debug__:	false,
+	debug__:		false,
+	debugForce__:	true,
 }
 
 func (log schLogger)Debug(fmt string, args ... interface{}) {
@@ -48,6 +50,13 @@ func (log schLogger)Debug(fmt string, args ... interface{}) {
 		p2plog.Debug(fmt, args ...)
 	}
 }
+
+func (log schLogger)ForceDebug(fmt string, args ... interface{}) {
+	if log.debugForce__ {
+		p2plog.Debug(fmt, args ...)
+	}
+}
+
 
 //
 // Pseudo task node for external module to send event
@@ -1427,7 +1436,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 
 		if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
 
-			schLog.Debug("schSendMsg: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
+			schLog.ForceDebug("schSendMsg: mailbox full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
 			target.discardMessages += 1
 
 			if target.discardMessages & (0x1f) == 0 {
