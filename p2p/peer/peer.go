@@ -1285,12 +1285,9 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	var idEx = PeerIdEx{Id: req.Node.ID, Dir: req.Dir}
 
 	why, _ := req.Why.(string)
-	peerLog.Debug("peMgrCloseReq: why: %s, snid: %x, dir: %d, ip: %s, port: %d",
-		why, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
-
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {
-		peerLog.Debug("peMgrCloseReq: worker not found")
+		peerLog.ForceDebug("peMgrCloseReq: worker not found")
 		return PeMgrEnoNotfound
 	}
 
@@ -1309,12 +1306,19 @@ func (peMgr *PeerManager)peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 				Dir: idEx.Dir,
 				Why: req.Why,
 			}
+
+			peerLog.ForceDebug("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
+				why, inst.name, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
+
 			schMsg := new(sch.SchMessage)
 			peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
 			peMgr.sdl.SchSendMessage(schMsg)
 			return PeMgrEnoNone
 		}
 	}
+
+	peerLog.ForceDebug("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
+		why, inst.name, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
 
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
 	req.Node = inst.node
@@ -1605,7 +1609,8 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 	peerLog.Debug("stop: try to kill all peer instances")
 	for ptn, pi := range peMgr.peers {
 
-		peerLog.Debug("stop: peer, snid: %x, dir: %d, ip: %s", pi.snid, pi.dir, pi.node.IP.String())
+		peerLog.Debug("stop: peer, inst: %s, snid: %x, dir: %d, ip: %s",
+			pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		node := pi.node
 		snid := pi.snid
@@ -1619,6 +1624,10 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 		if piOfSubnet, ok := peMgr.nodes[snid]; ok && piOfSubnet != nil {
 			if _, ok := piOfSubnet[idex]; ok {
 				if pi.state >= peInstStateHandshook {
+
+					peerLog.Debug("stop: send EvShellPeerAskToCloseInd, inst: %s, snid: %x, ip: %s, dir: %d",
+						pi.name, snid, pi.node.IP.String(), pi.dir)
+
 					ind := sch.MsgShellPeerAskToCloseInd{
 						Snid:   snid,
 						PeerId: idex.Id,
@@ -1628,13 +1637,16 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 					msg := sch.SchMessage{}
 					peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerAskToCloseInd, &ind)
 					peMgr.sdl.SchSendMessage(&msg)
-					peerLog.Debug("stop: EvShellPeerAskToCloseInd sent, snid: %x, ip: %s, dir: %d",
-						snid, pi.node.IP.String(), pi.dir)
 					continue
 				}
 			}
 		}
-		// else kill directly
+		// else kill directly since these instances are not reported to other
+		// modules at all.
+
+		peerLog.Debug("stop: send EvPeCloseReq, inst: %s, snid: %x, ip: %s, dir: %d",
+			pi.name, snid, pi.node.IP.String(), pi.dir)
+
 		req := sch.MsgPeCloseReq {
 			Ptn: ptn,
 			Snid: snid,
@@ -1645,8 +1657,6 @@ func (peMgr *PeerManager)stop(why interface{}) PeMgrErrno {
 		msg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, req.Ptn, sch.EvPeCloseReq, &req)
 		peMgr.sdl.SchSendMessage(&msg)
-		peerLog.Debug("stop: EvPeCloseReq sent, snid: %x, ip: %s, dir: %d",
-			snid, pi.node.IP.String(), pi.dir)
 	}
 
 	peerLog.Debug("stop: transfer to peMgrInStoping")
@@ -2098,6 +2108,10 @@ func (peMgr *PeerManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrErr
 			if count++; count >= wkNum / 2 {
 				break
 			}
+
+			peerLog.Debug("shellReconfigReq: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+				peerInst.name, peerInst.snid, peerInst.dir, peerInst.node.IP.String())
+
 			why := sch.PEC_FOR_RECONFIG_REQ
 			req := sch.MsgPeCloseReq {
 				Ptn:	peerInst.ptnMe,
@@ -2668,7 +2682,10 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 	pi.ppEno = PeMgrEnoNone
 
 	if err := pi.conn.SetDeadline(time.Time{}); err != nil {
-		peerLog.Debug("piEstablishedInd: SetDeadline failed, error: %s", err.Error())
+
+		peerLog.Debug("piEstablishedInd: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+			pi.name, pi.snid, pi.dir, pi.node.IP.String())
+
 		why := sch.PEC_FOR_SETDEADLINE
 		msg := sch.SchMessage{}
 		req := sch.MsgPeCloseReq{
@@ -2698,6 +2715,10 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
 	msg := sch.SchMessage{}
 	if pi.ppCnt++; pi.ppCnt > PeInstMaxPingpongCnt {
+
+		peerLog.ForceDebug("piPingpongTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+			pi.name, pi.snid, pi.dir, pi.node.IP.String())
+
 		pi.ppEno = PeMgrEnoPingpongTh
 		why := sch.PEC_FOR_PINGPONG
 		req := sch.MsgPeCloseReq {
@@ -2891,6 +2912,8 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	idExList := []PeerIdEx{idExOut, idExIn}
 	why := sch.PEC_FOR_COMMAND
 	for _, idEx := range idExList {
+		peerLog.ForceDebug("ClosePeer: why: %d, snid: %x, dir: %d, id: %x",
+			why, *snid, idEx.Dir, idEx.Id)
 		var req = sch.MsgPeCloseReq{
 			Ptn: nil,
 			Snid: *snid,
@@ -2900,9 +2923,9 @@ func (peMgr *PeerManager)ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 			Dir: idEx.Dir,
 			Why: why,
 		}
-		var schMsg= sch.SchMessage{}
-		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
-		peMgr.sdl.SchSendMessage(&schMsg)
+		msg := new(sch.SchMessage)
+		peMgr.sdl.SchMakeMessage(msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
+		peMgr.sdl.SchSendMessage(msg)
 	}
 	return PeMgrEnoNone
 }
@@ -2932,6 +2955,9 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		// might had fired pi.txDone and been blocked by pi.txExit. panic is called
 		// for such a overload system, see scheduler please.
 
+		peerLog.ForceDebug("piTx: ask4Close, send EvPeCloseReq. inst: %s snid: %x, dir: %d, peer-ip: %s",
+			pi.name, pi.snid, pi.dir, pi.node.IP.String())
+
 		pi.txEno = eno
 		why := sch.PEC_FOR_TXERROR
 		req := sch.MsgPeCloseReq{
@@ -2945,9 +2971,6 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		msg := sch.SchMessage{}
 		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 		pi.sdl.SchSendMessage(&msg)
-
-		peerLog.Debug("piTx: failed, EvPeCloseReq sent. snid: %x, dir: %d, peer-ip: %s",
-			pi.snid, pi.dir, pi.node.IP.String())
 	}
 
 	var (
@@ -3090,7 +3113,9 @@ _rxLoop:
 				// is closed for some reasons(for example the user close the peer), in this case,
 				// we would get an error;
 
-				peerLog.Debug("piRx: error, snid: %x, ip: %s", pi.snid, pi.node.IP.String())
+				peerLog.ForceDebug("piRx: error, send EvPeCloseReq to inst: %s, snid: %x, dir: %d, ip: %s",
+					pi.name, pi.snid, pi.dir, pi.node.IP.String())
+
 				why := sch.PEC_FOR_RXERROR
 				pi.rxEno = eno
 				req := sch.MsgPeCloseReq{
@@ -3110,13 +3135,10 @@ _rxLoop:
 				msg := sch.SchMessage{}
 				pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 				pi.sdl.SchSendMessage(&msg)
-
-				peerLog.Debug("piRx: failed, EvPeCloseReq sent. snid: %x, dir: %d, peer-ip: %s",
-					pi.snid, pi.dir, pi.node.IP.String())
 			}
 
-			peerLog.Debug("piRx: PeMgrEnoNetTemporary, snid: %x, dir: %d, peer-ip: %s",
-				pi.snid, pi.dir, pi.node.IP.String())
+			peerLog.ForceDebug("piRx: PeMgrEnoNetTemporary, inst: %s, snid: %x, dir: %d, ip: %s",
+				pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 			continue
 		}

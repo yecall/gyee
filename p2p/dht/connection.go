@@ -271,28 +271,23 @@ func (conMgr *ConMgr)poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (conMgr *ConMgr)poweroff(ptn interface{}) sch.SchErrno {
-
 	connLog.ForceDebug("poweroff: task will be done ...")
 
 	po := sch.SchMessage{}
 	close(chConMgrReady)
-
 	for _, ci := range conMgr.ciTab {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
 			ci.name, ci.dir, ci.status)
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
-
 	for _, ci := range conMgr.ibInstTemp {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
 			ci.name, ci.dir, ci.status)
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
-
 	conMgr.sdl.SchTaskDone(conMgr.ptnMe, sch.SchEnoKilled)
-
 	return sch.SchEnoNone
 }
 
@@ -981,6 +976,7 @@ func (conMgr *ConMgr)rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.SchE
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
 	req2Inst := func(inst *ConInst) sch.SchErrno {
+		connLog.ForceDebug("rutPeerRemoveInd: req2Inst: inst: %s, dir: %d", inst.name, inst.dir)
 		cid.dir = inst.dir
 		conMgr.instInClosing[cid] = inst
 		delete(conMgr.ciTab, cid)
@@ -1323,7 +1319,8 @@ func (conMgr *ConMgr)instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.Sc
 				if status := ci.getStatus(); status > CisOutOfService {
 					connLog.ForceDebug("instOutOfServiceInd: mismatched, status: %d", status)
 				} else {
-					connLog.ForceDebug("instOutOfServiceInd: inst: %s, current satus: %d", ci.name, status);
+					connLog.ForceDebug("instOutOfServiceInd: inst: %s, dir: %d, current satus: %d",
+						ci.name, ci.dir, status);
 					cid.dir = ci.dir
 					conMgr.instInClosing[cid] = ci
 					delete(conMgr.ciTab, cid)
@@ -1404,14 +1401,14 @@ func (conMgr *ConMgr)natMapSwitch() DhtErrno {
 	for _, ci := range conMgr.ciTab {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
-		connLog.Debug("natMapSwitch: EvSchPoweroff sent, inst: %s", ci.name)
+		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, inst: %s, dir: %d", ci.name, ci.dir)
 	}
 	conMgr.ciTab = make(map[conInstIdentity]*ConInst, 0)
 
 	for _, ci := range conMgr.ibInstTemp {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
-		connLog.Debug("natMapSwitch: EvSchPoweroff sent, inst: %s", ci.name)
+		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, inst: %s, dir: %d", ci.name, ci.dir)
 	}
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 
