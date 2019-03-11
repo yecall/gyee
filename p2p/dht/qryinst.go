@@ -298,13 +298,15 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	// then do not care this request, else it should close the connection and free all
 	// resources had been allocated to the connection instance.
 	// notice0:
-	// do not send EvDhtConMgrCloseReq when the instance is in qisWaitResponse status, this
+	// do not send EvDhtConMgrCloseReq when the instance is in qisWaitConnect status, this
 	// case, we do not know the "dir" about the connection instance, since we had never got
 	// a "connect-response"(so the timer expired). if it's really want to kill the connection
 	// instance, the "dir" should be set to "outbound", a "inbound" direction is impossible.
 	//
 
 	if icb.status == qisWaitResponse {
+		qiLog.ForceDebug("icbTimerHandler: send EvDhtConMgrCloseReq, inst: %s, dir: %d",
+			icb.name, icb.dir)
 		req := sch.MsgDhtConMgrCloseReq{
 			Task: icb.sdl.SchGetTaskName(icb.ptnInst),
 			Peer: &icb.to,

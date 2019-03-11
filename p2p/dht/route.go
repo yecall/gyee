@@ -572,7 +572,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 			hash:  *hash,
 			dist:  dist,
 			fails: 0,
-			pcs:   int(conInstStatus2PCS(CisHandshaked)),
+			pcs:   int(conInstStatus2PCS(CisHandshook)),
 		}
 
 		rutMgr.update(&bn, dist)
@@ -592,7 +592,7 @@ func (rutMgr *RutMgr)updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		rt := &rutMgr.rutTab
 		for idx, n := range req.Seens {
-			pcs := conInstStatus2PCS(CisHandshaked)
+			pcs := conInstStatus2PCS(CisHandshook)
 			doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
 			rutMgr.showRoute("rutMgrUpdate4Handshake.DhtEnoNone")
 		}

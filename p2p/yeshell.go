@@ -805,8 +805,8 @@ func (yeShMgr *YeShellManager)dhtCsProc() {
 		case dht.CisInHandshaking:
 			yesLog.Debug("dhtCsProc: CisInHandshaking, peer: %x", *csi.Peer)
 
-		case dht.CisHandshaked:
-			yesLog.Debug("dhtCsProc: CisHandshaked, peer: %x", *csi.Peer)
+		case dht.CisHandshook:
+			yesLog.Debug("dhtCsProc: CisHandshook, peer: %x", *csi.Peer)
 
 		case dht.CisInService:
 			yesLog.Debug("dhtCsProc: CisInService, peer: %x", *csi.Peer)

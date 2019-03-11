@@ -143,7 +143,7 @@ const (
 	CisConnected					// connected
 	CisAccepted						// accepted
 	CisInHandshaking				// handshaking
-	CisHandshaked					// handshaked
+	CisHandshook					// handshook
 	CisInService					// in service
 	CisOutOfService					// out of service but is not closed
 	CisClosed						// closed
@@ -238,12 +238,7 @@ func (conInst *ConInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 //
 func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if ptn == nil || msg == nil {
-		ciLog.Debug("conInstProc: " +
-			"invalid parameters, ptn: %p, msg: %p",
-			ptn, msg)
-		return sch.SchEnoParameter
-	}
+	ciLog.ForceDebug("conInstProc: inst: %s, msg.Id: %d", conInst.name, msg.Id)
 
 	var eno = sch.SchEnoUnknown
 
@@ -275,8 +270,10 @@ func (conInst *ConInst)conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 
 	default:
 		ciLog.Debug("conInstProc: unknown event: %d", msg.Id)
-		return sch.SchEnoParameter
+		eno = sch.SchEnoParameter
 	}
+
+	ciLog.ForceDebug("conInstProc: get out, inst: %s, msg.Id: %d", conInst.name, msg.Id)
 
 	return eno
 }
@@ -346,25 +343,28 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 
 	rsp2ConMgr := func() sch.SchErrno {
 		if conInst.con != nil {
-			ciLog.Debug("handshakeReq: rsp2ConMgr, "+
-				"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, rsp: %+v",
-				conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), rsp)
+			ciLog.ForceDebug("handshakeReq: rsp2ConMgr, "+
+				"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, en: %d",
+				conInst.name, conInst.dir, conInst.con.LocalAddr().String(),
+					conInst.con.RemoteAddr().String(), rsp.Eno)
 		} else {
-			ciLog.Debug("handshakeReq: rsp2ConMgr, "+
-				"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, rsp: %+v",
-				conInst.name, conInst.dir, "none", "none", rsp)
+			ciLog.ForceDebug("handshakeReq: rsp2ConMgr, "+
+				"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, eno: %d",
+				conInst.name, conInst.dir, "none", "none", rsp.Eno)
 		}
-		schMsg := sch.SchMessage{}
-		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
-		return conInst.sdl.SchSendMessage(&schMsg)
+		schMsg := new(sch.SchMessage)
+		conInst.sdl.SchMakeMessage(schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
+		return conInst.sdl.SchSendMessage(schMsg)
 	}
 
 	//
 	// connect to peer if it's not
 	//
 
-	if conInst.con == nil && conInst.dir == ConInstDirOutbound {
-
+	if conInst.dir == ConInstDirOutbound {
+		if conInst.con != nil {
+			panic("handshakeReq: dirty connection")
+		}
 		conInst.updateStatus(CisConnecting)
 		conInst.statusReport()
 
@@ -378,7 +378,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			return rsp2ConMgr()
 		}
 
-		ciLog.Debug("handshakeReq: connect ok, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		ciLog.ForceDebug("handshakeReq: connect ok, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 		conInst.updateStatus(CisConnected)
@@ -393,6 +393,9 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 	conInst.hsTimeout = msg.DurHs
 	conInst.statusReport()
 
+	ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+
 	if conInst.dir == ConInstDirOutbound {
 		if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
 			peer := conInst.hsInfo.peer
@@ -403,9 +406,7 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.HsInfo = &hsInfo
 			return rsp2ConMgr()
 		}
-	} else {
-		ciLog.Debug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+	} else if conInst.dir == ConInstDirInbound {
 		if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
 			rsp.Eno = int(eno)
 			rsp.Peer = nil
@@ -413,9 +414,13 @@ func (conInst *ConInst)handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.SchE
 			rsp.Inst = conInst
 			return rsp2ConMgr()
 		}
+	} else {
+		ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+		panic("handshakeReq: invalid direction")
 	}
 
-	conInst.updateStatus(CisHandshaked)
+	conInst.updateStatus(CisHandshook)
 	conInst.statusReport()
 
 	rsp.Eno = DhtEnoNone.GetEno()
@@ -630,7 +635,7 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 		CisNull:			pcsConnNo,
 		CisConnected:		pcsConnNo,
 		CisInHandshaking:	pcsConnNo,
-		CisHandshaked:		pcsConnYes,
+		CisHandshook:		pcsConnYes,
 		CisInService:		pcsConnYes,
 		CisClosed:			pcsConnNo,
 	}

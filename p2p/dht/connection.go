@@ -353,11 +353,14 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	//
 	// for inbound connection instances, we still not map them into "conMgr.ciTab",
 	// we need to do this if handshake-ok reported, since we can obtain the peer
-	// information in this case here. notice that: msg.Peer might be nil if it's an
+	// information at that moment. notice that: msg.Peer might be nil if it's an
 	// inbound instance.
 	//
 
 	var ci = msg.Inst.(*ConInst)
+	if ci == nil {
+		panic("handshakeRsp: nil instance reported")
+	}
 
 	rsp2TasksPending := func(ci *ConInst, msg *sch.MsgDhtConInstHandshakeRsp, dhtEno DhtErrno) sch.SchErrno {
 		eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
@@ -420,7 +423,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 
 	if msg.Eno != DhtEnoNone.GetEno() {
 
-		connLog.Debug("handshakeRsp: handshake failed, inst: %s", ci.name)
+		connLog.ForceDebug("handshakeRsp: failed reported, inst: %s, dir: %d", ci.name, ci.dir)
 
 		//
 		// remove temp map for inbound connection instance, and for outbounds,
@@ -467,43 +470,35 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 	}
 
-	connLog.Debug("handshakeRsp: ok responsed, msg: %+v", *msg)
+	connLog.ForceDebug("handshakeRsp: ok reported, inst: %s, dir: %d", ci.name, ci.dir)
 
 	cid := conInstIdentity {
 		nid: msg.Peer.ID,
 		dir: ConInstDir(msg.Dir),
 	}
-	if ci == nil {
-		connLog.Debug("handshakeRsp: invalid parameter")
-		return sch.SchEnoParameter
+	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
+		connLog.Debug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
+		panic("handshakeRsp: invalid direction")
 	}
+
+	if msg.Dir == ConInstDirInbound {
+		delete(conMgr.ibInstTemp, ci.name)
+	}
+
 	if conMgr.instInClosing[cid] != nil {
 		connLog.Debug("handshakeRsp: in closing, inst: %s", ci.name)
 		return sch.SchEnoNone
 	}
 
-	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
-
-		connLog.Debug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
-		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
-
-	} else if msg.Dir == ConInstDirInbound {
-
-		//
-		// put inbound instance to map and remove the temp map for it, but before
-		// doing this, duplicated cases must be check.
-		//
-		delete(conMgr.ibInstTemp, ci.name)
-		_, dup := conMgr.ciTab[cid]
-		if dup {
+	if msg.Dir == ConInstDirInbound {
+		if _, dup := conMgr.ciTab[cid]; dup {
 			connLog.Debug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
 			return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 		}
 		conMgr.ciTab[cid] = ci
-
 	} else if inst := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != inst {
 		connLog.Debug("handshakeRsp: mismatched, inst: %s, dir: %d", ci.name, msg.Dir)
-		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
+		panic("handshakeRsp: internal errors")
 	}
 
 	//
@@ -890,7 +885,7 @@ func (conMgr *ConMgr)instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno
 	case CisConnected:
 	case CisAccepted:
 	case CisInHandshaking:
-	case CisHandshaked:
+	case CisHandshook:
 	case CisInService:
 	default:
 		connLog.Debug("instStatusInd: invalid status: %d", msg.Status)
@@ -1361,6 +1356,8 @@ func (conMgr *ConMgr)onInstEvicted(key interface{}, value interface{}) {
 		connLog.Debug("onInstEvicted: invalid key or value")
 		return
 	}
+	connLog.ForceDebug("onInstEvicted: send EvDhtConMgrCloseReq to myself, inst: %s, dir: %d",
+		ci.name, ci.dir)
 	req := sch.MsgDhtConMgrCloseReq {
 		Task: ConMgrName,
 		Peer: &ci.hsInfo.peer,

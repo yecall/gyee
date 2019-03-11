@@ -2582,30 +2582,32 @@ func (pi *PeerInstance)piHandshakeReq(_ interface{}) PeMgrErrno {
 }
 
 func (pi *PeerInstance)piPingpongReq(msg interface{}) PeMgrErrno {
-	if pi.ppEno != PeMgrEnoNone {
-		peerLog.Debug("piPingpongReq: nothing done, ppEno: %d", pi.ppEno)
+	// notice: here in this function we must check the queue(channel) for pingpong
+	// data to avoid be blocked.
+	if pi.ppEno != PeMgrEnoNone || pi.state != peInstStateActivated {
+		peerLog.Debug("piPingpongReq: discarded, inst: %s, ppEno: %d, state: %d",
+			pi.name, pi.ppEno, pi.state)
 		return PeMgrEnoResource
 	}
-
 	if pi.conn == nil {
-		peerLog.Debug("piPingpongReq: connection had been closed")
+		peerLog.Debug("piPingpongReq: connection had been closed, inst: %s", pi.name)
 		return PeMgrEnoResource
 	}
-
+	if len(pi.ppChan) >= cap(pi.ppChan) {
+		peerLog.ForceDebug("piPingpongReq: queue full, inst: %s, dir: %d", pi.name, pi.dir)
+		return PeMgrEnoResource
+	}
 	pi.ppSeq = msg.(*MsgPingpongReq).seq
 	ping := Pingpong {
 		Seq:	pi.ppSeq,
 		Extra:	nil,
 	}
-
 	upkg := new(P2pPackage)
 	if eno := upkg.ping(pi, &ping, false); eno != PeMgrEnoNone {
-		peerLog.Debug("piPingpongReq: ping failed, eno: %d", eno)
+		peerLog.Debug("piPingpongReq: ping failed, inst: %s, eno: %d", pi.name, eno)
 		return eno
 	}
-
 	pi.ppChan<-upkg
-
 	return PeMgrEnoNone
 }
 
@@ -2641,7 +2643,6 @@ func (pi *PeerInstance)piCloseReq(_ interface{}) PeMgrErrno {
 }
 
 func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
-	cfmCh := *msg.(*chan int)
 	var schEno sch.SchErrno
 	var tid int
 	var tmDesc = sch.TimerDescription {
@@ -2651,6 +2652,7 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 		Dur:   PeInstPingpongCycle,
 		Extra: nil,
 	}
+	cfmCh := *msg.(*chan int)
 
 	peerLog.ForceDebug("piEstablishedInd: enter, inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
@@ -2668,23 +2670,10 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 	pi.ppEno = PeMgrEnoNone
 
 	if err := pi.conn.SetDeadline(time.Time{}); err != nil {
-
-		peerLog.ForceDebug("piEstablishedInd: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+		peerLog.ForceDebug("piEstablishedInd: SetDeadline failed, inst: %s, snid: %x, dir: %d,  ip: %s",
 			pi.name, pi.snid, pi.dir, pi.node.IP.String())
-
-		why := sch.PEC_FOR_SETDEADLINE
-		msg := sch.SchMessage{}
-		req := sch.MsgPeCloseReq{
-			Ptn: pi.ptnMe,
-			Snid: pi.snid,
-			Node: config.Node {
-				ID: pi.node.ID,
-			},
-			Dir: pi.dir,
-			Why: why,
-		}
-		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
-		pi.sdl.SchSendMessage(&msg)
+		pi.sdl.SchKillTimer(pi.ptnMe, pi.ppTid)
+		pi.ppTid = sch.SchInvalidTid
 		cfmCh<-PeMgrEnoOs
 		return PeMgrEnoOs
 	}
@@ -2703,7 +2692,7 @@ func (pi *PeerInstance)piEstablishedInd(msg interface{}) PeMgrErrno {
 }
 
 func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
-	msg := sch.SchMessage{}
+	msg := new(sch.SchMessage)
 	if pi.ppCnt++; pi.ppCnt > PeInstMaxPingpongCnt {
 
 		peerLog.ForceDebug("piPingpongTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
@@ -2718,15 +2707,16 @@ func (pi *PeerInstance)piPingpongTimerHandler() PeMgrErrno {
 			Dir: pi.dir,
 			Why: why,
 		}
-		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
-		pi.sdl.SchSendMessage(&msg)
+		pi.sdl.SchMakeMessage(msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
+		pi.sdl.SchSendMessage(msg)
 		return pi.ppEno
 	}
 	pr := MsgPingpongReq {
 		seq: uint64(time.Now().UnixNano()),
 	}
-	pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPePingpongReq, &pr)
-	pi.sdl.SchSendMessage(&msg)
+	msg = new(sch.SchMessage)
+	pi.sdl.SchMakeMessage(msg, pi.ptnMe, pi.ptnMe, sch.EvPePingpongReq, &pr)
+	pi.sdl.SchSendMessage(msg)
 	return PeMgrEnoNone
 }
 
@@ -3230,6 +3220,22 @@ func (pi *PeerInstance)piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 }
 
 func (pi *PeerInstance)piP2pPingProc(ping *Pingpong) PeMgrErrno {
+	// notice: check the queue(channel) for pingpong data to avoid be blocked
+	// while sending. this function is running in piRx context, so if it is
+	// blocked here, means that piRx is blocked.
+	if pi.ppEno != PeMgrEnoNone || pi.state != peInstStateActivated {
+		peerLog.Debug("piP2pPingProc: discarded, inst: %s, ppEno: %d, state: %d",
+			pi.name, pi.ppEno, pi.state)
+		return PeMgrEnoResource
+	}
+	if pi.conn == nil {
+		peerLog.Debug("piP2pPingProc: connection had been closed, inst: %s", pi.name)
+		return PeMgrEnoResource
+	}
+	if len(pi.ppChan) >= cap(pi.ppChan) {
+		peerLog.ForceDebug("piP2pPingProc: queue full, inst: %s, dir: %d", pi.name, pi.dir)
+		return PeMgrEnoResource
+	}
 	pong := Pingpong {
 		Seq:	ping.Seq,
 		Extra:	nil,

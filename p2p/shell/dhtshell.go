@@ -273,8 +273,8 @@ func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 	case dht.CisInHandshaking:
 		dhtLog.Debug("dhtTestConInstStatusInd: CisInHandshaking")
 
-	case dht.CisHandshaked:
-		dhtLog.Debug("dhtTestConInstStatusInd: CisHandshaked")
+	case dht.CisHandshook:
+		dhtLog.Debug("dhtTestConInstStatusInd: CisHandshook")
 
 	case dht.CisInService:
 		dhtLog.Debug("dhtTestConInstStatusInd: CisInService")
