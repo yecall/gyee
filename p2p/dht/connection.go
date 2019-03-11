@@ -320,7 +320,8 @@ func (conMgr *ConMgr)acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 		UserDa:		nil,
 	}
 
-	connLog.ForceDebug("acceptInd: inbound inst: %s, peer-ip: %s", msg.Con.RemoteAddr().String())
+	connLog.ForceDebug("acceptInd: inbound inst: %s, peer: %s",
+		ci.name, msg.Con.RemoteAddr().String())
 
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {

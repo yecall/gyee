@@ -1423,6 +1423,7 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	// should remove the pointer(if then have)to a task will be done.
 	//
 
+	source := msg.sender.task
 	target := &msg.recver.task
 	target.lock.Lock()
 	defer target.lock.Unlock()
@@ -1430,15 +1431,17 @@ func (sdl *scheduler)schSendMsg(msg *schMessage) (eno SchErrno) {
 	msg2MailBox := func(msg *schMessage) SchErrno {
 		if target.mailbox.que == nil {
 			// not found, target had been killed
-			schLog.ForceDebug("schSendMsg: mailbox empty, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
+			schLog.ForceDebug("schSendMsg: mailbox empty, sdl: %s, src: %s, ev: %d",
+				sdl.p2pCfg.CfgName, source.name, msg.Id)
 			return SchEnoInternal
 		}
 
 		if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
 
-			schLog.ForceDebug("schSendMsg: mailbox full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, target.name)
-			target.discardMessages += 1
+			schLog.ForceDebug("schSendMsg: mailbox full, sdl: %s, src: %s, dst: %s, ev: %d",
+				sdl.p2pCfg.CfgName, source.name, target.name, msg.Id)
 
+			target.discardMessages += 1
 			if target.discardMessages & (0x1f) == 0 {
 				p2plog.Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
 					sdl.p2pCfg.CfgName, target.name, target.discardMessages)

@@ -729,7 +729,7 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		UserDa:		peInst,
 	}
 
-	peerLog.ForceDebug("peMgrLsnConnAcceptedInd: inst: %s, peer-ip: %s",
+	peerLog.ForceDebug("peMgrLsnConnAcceptedInd: inst: %s, peer: %s",
 		peInst.name, peInst.raddr.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
@@ -738,18 +738,18 @@ func (peMgr *PeerManager)peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		return PeMgrEnoScheduler
 	}
 	peInst.ptnMe = ptnInst
+	peMgr.peers[peInst.ptnMe] = peInst
 
 	// Send handshake request to the instance created aboved
 	schMsg := new(sch.SchMessage)
 	peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peInst.ptnMe, sch.EvPeHandshakeReq, nil)
 	peMgr.sdl.SchSendMessage(schMsg)
-	peMgr.peers[peInst.ptnMe] = peInst
 
-	// Pause inbound peer accepter if necessary
+	// Pause inbound peer accepter if necessary:
+	// we stop accepter simply, a duration of delay should be apply before pausing,
+	// this should be improved later.
 	if peMgr.ibpTotalNum++; peMgr.ibpTotalNum >= peMgr.cfg.ibpNumTotal {
 		if !peMgr.cfg.noAccept {
-			// we stop accepter simply, a duration of delay should be apply before pausing it,
-			// this should be improved later.
 			schMsg = new(sch.SchMessage)
 			peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
 			peMgr.sdl.SchSendMessage(schMsg)
@@ -864,16 +864,14 @@ func (peMgr *PeerManager)peMgrStaticSubNetOutbound() PeMgrErrno {
 
 func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErrno {
 	if peMgr.wrkNum[*snid] >= peMgr.cfg.subNetMaxPeers[*snid] {
-		return PeMgrEnoNone
+		return PeMgrEnoResource
 	}
-
 	if peMgr.obpNum[*snid] >= peMgr.cfg.subNetMaxOutbounds[*snid] {
-		return PeMgrEnoNone
+		return PeMgrEnoResource
 	}
 
 	var candidates = make([]*config.Node, 0)
 	var idEx PeerIdEx
-
 	for _, n := range peMgr.randoms[*snid] {
 		idEx.Id = n.ID
 		idEx.Dir = PeInstDirOutbound
@@ -886,16 +884,17 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 	}
 	peMgr.randoms[*snid] = make([]*config.Node, 0)
 
-	// Create outbound instances for candidates if any
+	// Create outbound instances for candidates if any,
+	// check OCR timer also.
 	var failed = 0
 	var ok = 0
 	maxOutbound := peMgr.cfg.subNetMaxOutbounds[*snid]
-
 	for _, n := range candidates {
 		if tmPeers, exist := peMgr.tmLastOCR[*snid]; exist {
 			if t, ok := tmPeers[n.ID]; ok {
 				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
-					peerLog.Debug("peMgrDynamicSubNetOutbound: too early, snid: %x, peer-ip: %x", *snid, n.IP.String())
+					peerLog.Debug("peMgrDynamicSubNetOutbound: too early, " +
+						"snid: %x, peer: %x", *snid, n.IP.String())
 					continue
 				}
 			}
@@ -909,7 +908,6 @@ func (peMgr *PeerManager)peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrErr
 			failed++
 			continue
 		}
-
 		ok++
 		if peMgr.obpNum[*snid] >= maxOutbound {
 			break
@@ -1016,8 +1014,8 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	// identity of peer to determine if it's duplicated to an outbound instance, which is an
 	// instance connect from local to outside.
 
-	if rsp.peNode == nil {
-		// must not be nil since handshake ok
+	if rsp.peNode == nil || rsp.snid != inst.snid {
+		// must not fulfil since handshake ok
 		panic("peMgrHandshakeRsp: internal errors")
 	}
 
@@ -1090,7 +1088,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	idExTemp.Dir = PeInstDirOutbound
 	if _, dup := peMgr.workers[snid][idExTemp]; dup {
 		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to outbound worker, " +
-			"inst: %s, snid: %x, dir: %d, result: %d",
+			"inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_OBW_DUPLICATED)
 		return PeMgrEnoDuplicated
@@ -1773,7 +1771,7 @@ func (peMgr *PeerManager)peMgrCreateOutboundInst(snid *config.SubNetworkID, node
 		UserDa:		peInst,
 	}
 
-	peerLog.ForceDebug("peMgrCreateOutboundInst: inst: %s, snid: %x, peer-ip: %s",
+	peerLog.ForceDebug("peMgrCreateOutboundInst: inst: %s, snid: %x, peer: %s",
 		peInst.name, *snid, node.IP.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc);
@@ -1838,6 +1836,8 @@ func (peMgr *PeerManager)peMgrKillInst(kip *kiParameters, why interface{}) PeMgr
 		kip.name, kip.dir, kip.state, why)
 
 	if why == PKI_FOR_FAILED_INST_CFM {
+		// notice: in current implement, this kind of "why" must not come out,
+		// see function peMgrHandshakeRsp and piEstablishedInd for details pls.
 		panic("peMgrKillInst: impossible")
 	}
 
@@ -1888,15 +1888,20 @@ func (peMgr *PeerManager)peMgrKillInst(kip *kiParameters, why interface{}) PeMgr
 			peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
 			panic("peMgrKillInst: internal errors")
 		}
+		snid := peInst.snid
+		idEx := PeerIdEx{Id: peInst.node.ID, Dir: peInst.dir}
 		if why != PKI_FOR_HANDSHAKE_FAILED {
-			snid := peInst.snid
-			idEx := PeerIdEx{Id: peInst.node.ID, Dir: peInst.dir}
-			if _, exist := peMgr.nodes[snid][idEx]; exist {
-				delete(peMgr.nodes[snid], idEx)
-			}
 			if peMgr.ibpNum[snid]--; peMgr.ibpNum[snid] < 0 {
 				peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
 				panic("peMgrKillInst: internal errors")
+			}
+		}
+		if why == PKI_FOR_CLOSE_CFM || why == PKI_FOR_RECONFIG {
+			// notice: see function peMgrHandshakeRsp and some related functions for
+			// details pls. in current implement, only these two "why" for which we
+			// need to clean the peMgr.nodes.
+			if _, exist := peMgr.nodes[snid][idEx]; exist {
+				delete(peMgr.nodes[snid], idEx)
 			}
 		}
 	} else {
@@ -1961,7 +1966,7 @@ func (peMgr *PeerManager)peMgrCatHandler(msg interface{}) PeMgrErrno {
 	}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvDcvFindNodeRsp, &r)
 	peMgr.sdl.SchSendMessage(&schMsg)
-	peerLog.Debug("peMgrCatHandler: EvDcvFindNodeRsp sent, peer-ip: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
+	peerLog.Debug("peMgrCatHandler: EvDcvFindNodeRsp sent, peer: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
 	return PeMgrEnoNone
 }
 
@@ -2759,11 +2764,11 @@ func (pi *PeerInstance)piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 		return eno
 	}
 
-	peerLog.Debug("piHandshakeInbound: snid: %x, peer-ip: %s, hs: %+v",
+	peerLog.Debug("piHandshakeInbound: snid: %x, peer: %s, hs: %+v",
 		hs.Snid, hs.IP.String(), *hs)
 
 	if pi.checkHandshakeInfo(hs) != true {
-		peerLog.Debug("piHandshakeInbound: checkHandshakeInfo failed, snid: %x, peer-ip: %s, hs: %+v",
+		peerLog.Debug("piHandshakeInbound: checkHandshakeInfo failed, snid: %x, peer: %s, hs: %+v",
 			hs.Snid, hs.IP.String(), *hs)
 		return PeMgrEnoNotfound
 	}
@@ -2826,7 +2831,7 @@ func (pi *PeerInstance)piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 
 	// check handshake
 	if pi.checkHandshakeInfo(hs) != true {
-		peerLog.Debug("piHandshakeOutbound: checkHandshakeInfo failed, snid: %x, peer-ip: %s, hs: %+v",
+		peerLog.Debug("piHandshakeOutbound: checkHandshakeInfo failed, snid: %x, peer: %s, hs: %+v",
 			hs.Snid, hs.IP.String(), *hs)
 		return PeMgrEnoNotfound
 	}
@@ -2929,7 +2934,7 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		// might had fired pi.txDone and been blocked by pi.txExit. panic is called
 		// for such a overload system, see scheduler please.
 
-		peerLog.ForceDebug("piTx: ask4Close, send EvPeCloseReq. inst: %s snid: %x, dir: %d, peer-ip: %s",
+		peerLog.ForceDebug("piTx: ask4Close, send EvPeCloseReq. inst: %s snid: %x, dir: %d, peer: %s",
 			pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		pi.txEno = eno
