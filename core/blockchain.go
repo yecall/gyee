@@ -332,6 +332,15 @@ func (bc *BlockChain) CurrentBlockHeight() uint64 {
 	return bc.LastBlock().Number()
 }
 
+func (bc *BlockChain) State() (state.AccountTrie, error) {
+	root := bc.LastBlock().StateRoot()
+	return bc.StateAt(root)
+}
+
+func (bc *BlockChain) StateAt(root common.Hash) (state.AccountTrie, error) {
+	return state.NewAccountTrie(root, bc.stateDB)
+}
+
 func (bc *BlockChain) GetValidators() []string {
 	b := bc.LastBlock()
 	return b.consensusTrie.GetValidators()

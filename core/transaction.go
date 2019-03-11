@@ -26,19 +26,21 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
+	"github.com/yeeco/gyee/crypto"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
 
 type Transaction struct {
-	chainID uint32
-	nonce   uint64
-	to      *common.Address
-	amount  *big.Int
+	chainID   uint32
+	nonce     uint64
+	from      *common.Address
+	to        *common.Address
+	amount    *big.Int
+	signature *crypto.Signature
 
 	// caches
-	from *common.Address
 	hash *common.Hash
 	raw  []byte
 }
@@ -83,6 +85,15 @@ func (t *Transaction) Amount() *big.Int {
 	return t.amount
 }
 
+func (t *Transaction) Sign(signer crypto.Signer) error {
+	sig, err := signer.Sign(t.Hash()[:])
+	if err != nil {
+		return err
+	}
+	t.signature = sig
+	return nil
+}
+
 func (t *Transaction) Hash() *common.Hash {
 	if t.hash == nil {
 		enc, err := t.Encode()
@@ -99,6 +110,11 @@ func (t *Transaction) ToProto() (*corepb.Transaction, error) {
 	pbTx := &corepb.Transaction{
 		ChainID: t.chainID,
 		Nonce:   t.nonce,
+	}
+	if t.from != nil {
+		if t.signature == nil || !t.signature.Algorithm.AddressInferrable() {
+			pbTx.From = common.CopyBytes(t.from[:])
+		}
 	}
 	if t.to != nil {
 		pbTx.Recipient = common.CopyBytes(t.to[:])
@@ -120,6 +136,10 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 	// copy value
 	t.chainID = pbt.ChainID
 	t.nonce = pbt.Nonce
+	if pbt.From != nil {
+		t.from = new(common.Address)
+		t.from.SetBytes(pbt.From)
+	}
 	if pbt.Recipient != nil {
 		t.to = new(common.Address)
 		t.to.SetBytes(pbt.Recipient)

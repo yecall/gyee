@@ -85,7 +85,7 @@ type Core struct {
 	// miner
 	keystore  *keystore.Keystore
 	minerKey  []byte
-	minerAddr string
+	minerAddr *address.Address
 
 	lock    sync.RWMutex
 	running bool
@@ -163,7 +163,7 @@ func (c *Core) Start() error {
 	if c.config.Chain.Mine {
 		members := c.blockChain.GetValidators()
 		blockHeight := c.blockChain.CurrentBlockHeight()
-		tetris, err := tetris2.NewTetris(c, c.minerAddr, members, blockHeight)
+		tetris, err := tetris2.NewTetris(c, c.minerAddr.String(), members, blockHeight)
 		if err != nil {
 			return err
 		}
@@ -356,12 +356,19 @@ func (c *Core) prepareCoinbase() error {
 	if err != nil {
 		return err
 	}
-	addr, err := address.NewAddressFromPublicKey(pub)
+	c.minerAddr, err = address.NewAddressFromPublicKey(pub)
 	if err != nil {
 		return err
 	}
-	c.minerAddr = addr.String()
 	return nil
+}
+
+func (c *Core) Chain() *BlockChain {
+	return c.blockChain
+}
+
+func (c *Core) MinerAddr() *address.Address {
+	return c.minerAddr.Copy()
 }
 
 // implements of interface

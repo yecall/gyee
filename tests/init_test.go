@@ -19,17 +19,22 @@ package tests
 
 import (
 	"io/ioutil"
+	"math/big"
 	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/node"
 )
+
+const testChainID = uint32(1)
 
 // build up a chain with random created validators
 func TestInit(t *testing.T) {
@@ -37,12 +42,47 @@ func TestInit(t *testing.T) {
 }
 
 func TestInitWithTx(t *testing.T) {
-	doTest(t, 16, 60 * time.Second, func(nodes []*node.Node) {
+	numNodes := uint(16)
+	doTest(t, numNodes, 60*time.Second, func(nodes []*node.Node) {
+		addrs := make([]common.Address, numNodes)
+		signers := make([]crypto.Signer, numNodes)
+		for i, n := range nodes {
+			addrs[i] = *n.Core().MinerAddr().CommonAddress()
+			signers[i] = n.Core().GetSigner()
+		}
+		for {
+			for i, fn := range nodes {
+				for j := range nodes {
+					if j == i {
+						continue
+					}
+					// transfer f => t
+					state, err := fn.Core().Chain().State()
+					if err != nil {
+						t.Errorf("get state failed: %v", err)
+						continue
+					}
+					fAddr := addrs[i]
+					fAccount := state.GetAccount(fAddr, false)
+					if fAccount == nil {
+						t.Errorf("missing account %v", fAddr)
+						continue
+					}
+					tAddr := &addrs[j]
+					tx := core.NewTransaction(testChainID, fAccount.Nonce(), tAddr, big.NewInt(100))
+					if err := tx.Sign(signers[i]); err != nil {
+						t.Errorf("sign failed %v", err)
+						continue
+					}
+				}
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
 		// TODO:
 	})
 }
 
-func doTest(t *testing.T, numNodes int, duration time.Duration, coroutine func([]*node.Node)) {
+func doTest(t *testing.T, numNodes uint, duration time.Duration, coroutine func([]*node.Node)) {
 	tmpDir, err := ioutil.TempDir("", "yee-test-")
 	if err != nil {
 		t.Fatalf("TempDir() %v", err)
@@ -73,9 +113,9 @@ func doTest(t *testing.T, numNodes int, duration time.Duration, coroutine func([
 	}
 }
 
-func genKeys(count int) [][]byte {
+func genKeys(count uint) [][]byte {
 	ret := make([][]byte, 0, count)
-	for i := int(0); i < count; i++ {
+	for i := uint(0); i < count; i++ {
 		key := secp256k1.NewPrivateKey()
 		ret = append(ret, key)
 	}
@@ -85,7 +125,7 @@ func genKeys(count int) [][]byte {
 func genGenesis(t *testing.T, keys [][]byte) *core.Genesis {
 	count := len(keys)
 	genesis := &core.Genesis{
-		ChainID:     1,
+		ChainID:     core.ChainID(testChainID),
 		InitYeeDist: make([]core.InitYeeDist, 0, count),
 	}
 	validators := make([]string, 0, count)
@@ -113,7 +153,7 @@ func genGenesis(t *testing.T, keys [][]byte) *core.Genesis {
 func dftConfig() *config.Config {
 	cfg := &config.Config{
 		Chain: &config.ChainConfig{
-			ChainID: 1,
+			ChainID: testChainID,
 			Mine:    true,
 		},
 		Rpc: &config.RpcConfig{},

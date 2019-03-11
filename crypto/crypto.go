@@ -47,3 +47,12 @@ type Signer interface {
 
 	Verify(publicKey []byte, data []byte, signature *Signature) bool
 }
+
+func (a Algorithm) AddressInferrable() bool {
+	switch a {
+	case ALG_SECP256K1:
+		return true
+	default:
+		return false
+	}
+}

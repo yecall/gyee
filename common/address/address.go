@@ -105,6 +105,14 @@ func (a *Address) CommonAddress() *common.Address {
 	return ret
 }
 
+func (a Address) Copy() *Address {
+	addr := &Address{
+		Raw: make([]byte, AddressLength),
+	}
+	copy(addr.Raw, a.Raw)
+	return addr
+}
+
 // AddressParse parse address string.
 func AddressParse(s string) (*Address, error) {
 	if len(s) != AddressStringLength {

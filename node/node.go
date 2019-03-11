@@ -253,6 +253,10 @@ func (n *Node) AccountManager() *accounts.AccountManager {
 	return n.accountManager
 }
 
+func (n *Node) Core() *core.Core {
+	return n.core
+}
+
 func (n *Node) P2pService() p2p.Service {
 	return n.p2p
 }
