@@ -2405,7 +2405,7 @@ func (pi *PeerInstance)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) 
 
 func (pi *PeerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	peerLog.Debug("peerInstProc: name: %s, msg.Id: %d", pi.name, msg.Id)
+	peerLog.ForceDebug("peerInstProc: inst: %s, msg.Id: %d", pi.name, msg.Id)
 
 	var eno PeMgrErrno
 
@@ -2442,7 +2442,7 @@ func (pi *PeerInstance)peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = PeMgrEnoParameter
 	}
 
-	peerLog.Debug("peerInstProc: get out, name: %s, msg.Id: %d", pi.name, msg.Id)
+	peerLog.ForceDebug("peerInstProc: get out, inst: %s, msg.Id: %d", pi.name, msg.Id)
 
 	if eno != PeMgrEnoNone {
 		return sch.SchEnoUserTask
