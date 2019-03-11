@@ -363,10 +363,13 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	}
 
 	rsp2TasksPending := func(ci *ConInst, msg *sch.MsgDhtConInstHandshakeRsp, dhtEno DhtErrno) sch.SchErrno {
-		eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName)
 		rsp := (interface{})(nil)
 		ev := sch.EvDhtConMgrConnectRsp
-		if eno == sch.SchEnoNone && ptn != nil && ptn == ci.ptnSrcTsk {
+		if eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName);
+		eno != sch.SchEnoNone || ptn == nil || ptn != ci.ptnSrcTsk {
+			ciLog.ForceDebug("handshakeRsp: source task not found, inst: %s, dir: %d, src: %s",
+				ci.name, ci.dir, ci.srcTaskName)
+		} else {
 			if ci.isBlind {
 				rsp = &sch.MsgDhtBlindConnectRsp{
 					Eno:  dhtEno.GetEno(),
@@ -382,12 +385,11 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 					Dir: ci.dir,
 				}
 			}
-
+			connLog.ForceDebug("rsp2TasksPending: inst: %s, dir: %d, src: %s, ev: %d, ",
+				ci.name, ci.dir, ci.srcTaskName, ev)
 			schMsg := new(sch.SchMessage)
 			conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnSrcTsk, ev, rsp)
 			conMgr.sdl.SchSendMessage(schMsg)
-			connLog.Debug("rsp2TasksPending: ev: %d, inst: %s, dir: %d, srcTaskName: %s",
-				ev, ci.name, ci.dir, ci.srcTaskName)
 		}
 		for name, req := range ci.bakReq2Conn {
 			if eno, ptn := conMgr.sdl.SchGetUserTaskNode(name);
@@ -410,11 +412,11 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 						Dir:  ci.dir,
 					}
 				}
+				connLog.ForceDebug("rsp2TasksPending: inst: %s, dir: %d, src: %s, name: %s, ev: %d, ",
+					ci.name, ci.dir, ci.srcTaskName, name, ev)
 				schMsg := new(sch.SchMessage)
 				conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ptn, ev, rsp)
 				conMgr.sdl.SchSendMessage(schMsg)
-				connLog.Debug("rsp2TasksPending: ev: %d, inst: %s, dir: %d, srcTaskName: %s, name: %s",
-					ev, ci.name, ci.dir, ci.srcTaskName, name)
 			}
 		}
 		ci.bakReq2Conn = make(map[string]interface{}, 0)
@@ -477,7 +479,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		dir: ConInstDir(msg.Dir),
 	}
 	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
-		connLog.Debug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
+		connLog.ForceDebug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
 		panic("handshakeRsp: invalid direction")
 	}
 
@@ -486,13 +488,14 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 	}
 
 	if conMgr.instInClosing[cid] != nil {
-		connLog.Debug("handshakeRsp: in closing, inst: %s", ci.name)
+		connLog.ForceDebug("handshakeRsp: in closing, inst: %s, dir: %d", ci.name, ci.dir)
 		return sch.SchEnoNone
 	}
 
 	if msg.Dir == ConInstDirInbound {
-		if _, dup := conMgr.ciTab[cid]; dup {
-			connLog.Debug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
+		if duped, dup := conMgr.ciTab[cid]; dup {
+			connLog.ForceDebug("handshakeRsp: duplicated, inst: %s, dir: %d, duped: %s, dupdir: %d",
+				ci.name, msg.Dir, duped.name, duped.dir)
 			return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 		}
 		conMgr.ciTab[cid] = ci
@@ -548,7 +551,7 @@ func (conMgr *ConMgr)handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchErr
 		close(req.EnoCh)
 	}
 
-	connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confrimed ok, " +
+	connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confirmed ok, " +
 		"inst: %s, dir: %d, local: %s, remote: %s",
 		ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
@@ -1356,7 +1359,7 @@ func (conMgr *ConMgr)onInstEvicted(key interface{}, value interface{}) {
 		connLog.Debug("onInstEvicted: invalid key or value")
 		return
 	}
-	connLog.ForceDebug("onInstEvicted: send EvDhtConMgrCloseReq to myself, inst: %s, dir: %d",
+	connLog.ForceDebug("onInstEvicted: send EvDhtConMgrCloseReq, inst: %s, dir: %d",
 		ci.name, ci.dir)
 	req := sch.MsgDhtConMgrCloseReq {
 		Task: ConMgrName,

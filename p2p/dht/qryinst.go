@@ -263,7 +263,6 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 // instance timer handler
 //
 func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
-
 	if msg == nil {
 		qiLog.Debug("icbTimerHandler: invalid parameter")
 		return sch.SchEnoParameter
@@ -344,7 +343,6 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	sdl.SchSendMessage(&schMsg)
 	sdl.SchTaskDone(icb.ptnInst, sch.SchEnoTimeout)
-
 	return sch.SchEnoNone
 }
 
