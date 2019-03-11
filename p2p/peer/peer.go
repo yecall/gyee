@@ -985,7 +985,7 @@ func (peMgr *PeerManager)peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	if rsp.result != PeMgrEnoNone {
-		if !(rsp.peNode == nil && rsp.snid == config.AnySubNet) {
+		if rsp.dir == PeInstDirInbound && !(rsp.peNode == nil && rsp.snid == config.AnySubNet) {
 			// rsp.peNode must be nil, since the handshake procedure failed, see event
 			// EvPeHandshakeReq handler for details pls.
 			panic("peMgrHandshakeRsp: internal errors")
