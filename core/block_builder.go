@@ -98,6 +98,7 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 		}
 		currBlock := bb.chain.GetBlockByNumber(currHeight)
 		nextBlock := bb.chain.BuildNextBlock(currBlock, req.txs)
+		log.Info("block sealed", "hash", nextBlock.Hash())
 		if err := bb.chain.AddBlock(nextBlock); err != nil {
 			log.Warn("failed to seal block", "err", err)
 			break

@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,31 +44,42 @@ func TestInit(t *testing.T) {
 
 func TestInitWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 60*time.Second, func(nodes []*node.Node) {
+	doTest(t, numNodes, 60*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+		wg.Add(1)
+		defer wg.Done()
+
 		addrs := make([]common.Address, numNodes)
 		signers := make([]crypto.Signer, numNodes)
 		for i, n := range nodes {
 			addrs[i] = *n.Core().MinerAddr().CommonAddress()
 			signers[i] = n.Core().GetSigner()
 		}
+		ticker := time.NewTicker(500 * time.Millisecond)
 		for {
+			select {
+			case <-quitCh:
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				// send txs
+			}
 			for i, fn := range nodes {
+				state, err := fn.Core().Chain().State()
+				if err != nil {
+					t.Errorf("get state failed: %v", err)
+					continue
+				}
+				fAddr := addrs[i]
+				fAccount := state.GetAccount(fAddr, false)
+				if fAccount == nil {
+					t.Errorf("missing account %v", fAddr)
+					continue
+				}
 				for j := range nodes {
 					if j == i {
 						continue
 					}
 					// transfer f => t
-					state, err := fn.Core().Chain().State()
-					if err != nil {
-						t.Errorf("get state failed: %v", err)
-						continue
-					}
-					fAddr := addrs[i]
-					fAccount := state.GetAccount(fAddr, false)
-					if fAccount == nil {
-						t.Errorf("missing account %v", fAddr)
-						continue
-					}
 					tAddr := &addrs[j]
 					tx := core.NewTransaction(testChainID, fAccount.Nonce(), tAddr, big.NewInt(100))
 					if err := tx.Sign(signers[i]); err != nil {
@@ -76,13 +88,16 @@ func TestInitWithTx(t *testing.T) {
 					}
 				}
 			}
-			time.Sleep(500 * time.Millisecond)
 		}
-		// TODO:
 	})
 }
 
-func doTest(t *testing.T, numNodes uint, duration time.Duration, coroutine func([]*node.Node)) {
+func doTest(t *testing.T, numNodes uint, duration time.Duration,
+	coroutine func(chan struct{}, sync.WaitGroup, []*node.Node)) {
+	var (
+		quitCh = make(chan struct{})
+		wg     sync.WaitGroup
+	)
 	tmpDir, err := ioutil.TempDir("", "yee-test-")
 	if err != nil {
 		t.Fatalf("TempDir() %v", err)
@@ -105,9 +120,11 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration, coroutine func(
 		nodes = append(nodes, n)
 	}
 	if coroutine != nil {
-		go coroutine(nodes)
+		go coroutine(quitCh, wg, nodes)
 	}
 	time.Sleep(duration)
+	close(quitCh)
+	wg.Wait()
 	for _, n := range nodes {
 		_ = n.Stop()
 	}
