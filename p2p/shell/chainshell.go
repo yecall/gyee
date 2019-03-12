@@ -397,9 +397,7 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 	}
 
 	switch req.MsgType {
-
 	case sch.MSBR_MT_EV, sch.MSBR_MT_TX, sch.MSBR_MT_BLKH:
-
 		if shMgr.deDup {
 			key := config.DsKey{}
 			copy(key[0:], req.Key)
@@ -425,7 +423,6 @@ func (shMgr *ShellManager)broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErr
 				}
 			}
 		}
-
 	default:
 		chainLog.Debug("broadcastReq: invalid message type: %d", req.MsgType)
 		return sch.SchEnoParameter

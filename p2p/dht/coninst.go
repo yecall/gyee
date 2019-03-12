@@ -45,7 +45,7 @@ type coninstLogger struct {
 
 var ciLog = coninstLogger {
 	debug__:		false,
-	debugForce__:	true,
+	debugForce__:	false,
 }
 
 func (log coninstLogger)Debug(fmt string, args ... interface{}) {
