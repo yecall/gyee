@@ -21,10 +21,12 @@
 package core
 
 import (
+	"errors"
 	"math/big"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/crypto"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
@@ -32,15 +34,22 @@ import (
 	"github.com/yeeco/gyee/persistent"
 )
 
+var (
+	ErrNoSignature       = errors.New("no signature with tx")
+	ErrNoSigner          = errors.New("no signer found")
+	ErrSignatureMismatch = errors.New("signature mismatch")
+	ErrTxFromMismatch    = errors.New("tx sender mismatch")
+)
+
 type Transaction struct {
 	chainID   uint32
 	nonce     uint64
-	from      *common.Address
 	to        *common.Address
 	amount    *big.Int
 	signature *crypto.Signature
 
 	// caches
+	from *common.Address
 	hash *common.Hash
 	raw  []byte
 }
@@ -96,7 +105,7 @@ func (t *Transaction) Sign(signer crypto.Signer) error {
 
 func (t *Transaction) Hash() *common.Hash {
 	if t.hash == nil {
-		enc, err := t.Encode()
+		enc, err := t.encode(true)
 		if err != nil {
 			log.Crit("wrong tx hash")
 		}
@@ -111,16 +120,17 @@ func (t *Transaction) ToProto() (*corepb.Transaction, error) {
 		ChainID: t.chainID,
 		Nonce:   t.nonce,
 	}
-	if t.from != nil {
-		if t.signature == nil || !t.signature.Algorithm.AddressInferrable() {
-			pbTx.From = common.CopyBytes(t.from[:])
-		}
-	}
 	if t.to != nil {
 		pbTx.Recipient = common.CopyBytes(t.to[:])
 	}
 	if t.amount != nil {
 		pbTx.Amount = t.amount.Bytes()
+	}
+	if t.signature != nil {
+		pbTx.Signature = &corepb.Signature{
+			SigAlgorithm: uint32(t.signature.Algorithm),
+			Signature:    t.signature.Signature,
+		}
 	}
 	return pbTx, nil
 }
@@ -136,10 +146,6 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 	// copy value
 	t.chainID = pbt.ChainID
 	t.nonce = pbt.Nonce
-	if pbt.From != nil {
-		t.from = new(common.Address)
-		t.from.SetBytes(pbt.From)
-	}
 	if pbt.Recipient != nil {
 		t.to = new(common.Address)
 		t.to.SetBytes(pbt.Recipient)
@@ -148,16 +154,59 @@ func (t *Transaction) FromProto(msg proto.Message) error {
 	if pbt.Amount != nil {
 		t.amount.SetBytes(pbt.Amount)
 	}
+	if pbt.Signature != nil {
+		t.signature = &crypto.Signature{
+			Algorithm: crypto.Algorithm(pbt.Signature.SigAlgorithm),
+			Signature: pbt.Signature.Signature,
+		}
+	}
 
 	return nil
 }
 
 func (t *Transaction) Encode() ([]byte, error) {
+	return t.encode(false)
+}
+
+func (t *Transaction) encode(withoutSig bool) ([]byte, error) {
 	pb, err := t.ToProto()
 	if err != nil {
 		return nil, err
 	}
+	if withoutSig {
+		pb.Signature = nil
+	}
 	return proto.Marshal(pb)
+}
+
+func (t *Transaction) VerifySig() error {
+	if t.signature == nil {
+		return ErrNoSignature
+	}
+	signer := getSigner(t.signature.Algorithm)
+	if signer == nil {
+		return ErrNoSigner
+	}
+	txHash := t.Hash()[:]
+	pubkey, err := signer.RecoverPublicKey(txHash, t.signature)
+	if err != nil {
+		return err
+	}
+	if !signer.Verify(pubkey, txHash, t.signature) {
+		return ErrSignatureMismatch
+	}
+	addr, err := address.NewAddressFromPublicKey(pubkey)
+	if err != nil {
+		return err
+	}
+	if t.from == nil {
+		t.from = addr.CommonAddress()
+	} else {
+		if *t.from != *addr.CommonAddress() {
+			return ErrTxFromMismatch
+		}
+	}
+	return nil
 }
 
 func (t *Transaction) Decode(enc []byte) error {

@@ -35,7 +35,6 @@ import (
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
-	"github.com/yeeco/gyee/utils/logging"
 )
 
 const TooFarTx = 128
@@ -60,7 +59,7 @@ type TransactionPool struct {
 }
 
 func NewTransactionPool(core *Core) (*TransactionPool, error) {
-	logging.Logger.Info("Create New TransactionPool")
+	log.Info("Create New TransactionPool")
 	bp := &TransactionPool{
 		core:        core,
 		reqPool:     make(map[common.Hash]struct{}),
@@ -73,7 +72,7 @@ func NewTransactionPool(core *Core) (*TransactionPool, error) {
 func (tp *TransactionPool) Start() {
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
-	logging.Logger.Info("TransactionPool Start...")
+	log.Info("TransactionPool Start...")
 
 	tp.subscriber = p2p.NewSubscriber(tp, make(chan p2p.Message), p2p.MessageTypeTx)
 	tp.core.node.P2pService().Register(tp.subscriber)
@@ -84,7 +83,7 @@ func (tp *TransactionPool) Start() {
 func (tp *TransactionPool) Stop() {
 	tp.lock.Lock()
 	defer tp.lock.Unlock()
-	logging.Logger.Info("TransactionPool Stop...")
+	log.Info("TransactionPool Stop...")
 
 	tp.core.node.P2pService().UnRegister(tp.subscriber)
 
@@ -93,17 +92,17 @@ func (tp *TransactionPool) Stop() {
 }
 
 func (tp *TransactionPool) loop() {
-	logging.Logger.Info("TransactionPool loop...")
+	log.Info("TransactionPool loop...")
 	tp.wg.Add(1)
 	defer tp.wg.Done()
 
 	for {
 		select {
 		case <-tp.quitCh:
-			logging.Logger.Info("TransactionPool loop end.")
+			log.Info("TransactionPool loop end.")
 			return
 		case msg := <-tp.subscriber.MsgChan:
-			logging.Logger.Info("tx pool receive ", msg.MsgType, " ", msg.From)
+			//log.Info("tx pool receive ", msg.MsgType, " ", msg.From)
 			tp.processMsg(msg)
 		}
 	}
@@ -125,8 +124,13 @@ func (tp *TransactionPool) processMsg(msg p2p.Message) {
 
 func (tp *TransactionPool) processTx(tx *Transaction) {
 	// validate tx integrity
-	if err := tp.core.blockChain.verifyTx(tx); err != nil || tx.from == nil {
+	if err := tp.core.blockChain.verifyTx(tx); err != nil {
 		log.Warn("processTx() verify fails", "err", err, "tx", tx)
+		// TODO: mark bad peer?
+		return
+	}
+	if err := tx.VerifySig(); err != nil {
+		log.Warn("tx sig verify failed", "err", err)
 		// TODO: mark bad peer?
 		return
 	}
@@ -171,11 +175,17 @@ func (tp *TransactionPool) processTx(tx *Transaction) {
 }
 
 func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
+	data, err := tx.Encode()
+	if err != nil {
+		log.Error("TxBroadcast encode", "err", err)
+		return
+	}
 	msg := p2p.Message{
 		MsgType: p2p.MessageTypeTx,
 		From:    "node1",
+		Data:    data,
 	}
-	err := tp.core.node.P2pService().BroadcastMessage(msg)
+	err = tp.core.node.P2pService().BroadcastMessage(msg)
 	if err != nil {
 		log.Error("TxBroadcast", "err", err)
 	}

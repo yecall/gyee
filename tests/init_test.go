@@ -32,7 +32,9 @@ import (
 	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/secp256k1"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
+	"github.com/yeeco/gyee/p2p"
 )
 
 const testChainID = uint32(1)
@@ -54,18 +56,19 @@ func TestInitWithTx(t *testing.T) {
 			addrs[i] = *n.Core().MinerAddr().CommonAddress()
 			signers[i] = n.Core().GetSigner()
 		}
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(10 * time.Millisecond)
 		for {
-			select {
-			case <-quitCh:
-				ticker.Stop()
-				return
-			case <-ticker.C:
-				// send txs
-			}
 			for i, fn := range nodes {
+				select {
+				case <-quitCh:
+					ticker.Stop()
+					return
+				case <-ticker.C:
+					// send txs
+				}
 				state, err := fn.Core().Chain().State()
 				if err != nil {
+					log.Error("get state failed", "err", err)
 					t.Errorf("get state failed: %v", err)
 					continue
 				}
@@ -75,7 +78,7 @@ func TestInitWithTx(t *testing.T) {
 					t.Errorf("missing account %v", fAddr)
 					continue
 				}
-				for j := range nodes {
+				for j, tn := range nodes {
 					if j == i {
 						continue
 					}
@@ -86,6 +89,17 @@ func TestInitWithTx(t *testing.T) {
 						t.Errorf("sign failed %v", err)
 						continue
 					}
+					data, err := tx.Encode()
+					if err != nil {
+						t.Errorf("encode tx failed %v", err)
+						continue
+					}
+					msg := &p2p.Message{
+						MsgType: p2p.MessageTypeTx,
+						Data:    data,
+					}
+					fn.Core().FakeP2pRecv(msg)
+					tn.Core().FakeP2pRecv(msg)
 				}
 			}
 		}

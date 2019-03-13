@@ -47,14 +47,11 @@ message Transaction {
     // transaction nonce
     uint64 nonce = 2;
 
-    // transaction from, may be omitted if inferable from signature
-    bytes from = 3;
-
     // transaction recipient
-    bytes recipient = 4;
+    bytes recipient = 3;
 
     // transaction amount
-    bytes amount = 5;
+    bytes amount = 4;
 
     // signature with LAST MESSAGE TAG of one byte
     Signature signature = 15;

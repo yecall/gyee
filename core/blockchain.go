@@ -278,6 +278,7 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, txs Transactions) *Block {
 	}
 	// next block number
 	next.header.Number++
+	next.header.ParentHash = parent.Hash()
 
 	// state trie
 	stateTrie, err := state.NewAccountTrie(parent.StateRoot(), bc.stateDB)

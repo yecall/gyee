@@ -371,6 +371,11 @@ func (c *Core) MinerAddr() *address.Address {
 	return c.minerAddr.Copy()
 }
 
+// as if msg was received from p2p module
+func (c *Core) FakeP2pRecv(msg *p2p.Message) {
+	c.txPool.subscriber.MsgChan <- *msg
+}
+
 // implements of interface
 
 //ICORE
@@ -395,4 +400,14 @@ func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {
 		return nil, err
 	}
 	return ad.Raw, nil
+}
+
+func getSigner(algorithm crypto.Algorithm) crypto.Signer {
+	switch algorithm {
+	case crypto.ALG_SECP256K1:
+		return secp256k1.NewSecp256k1Signer()
+	default:
+		log.Warn("wrong crypto algorithm", "algorithm", algorithm)
+		return nil
+	}
 }

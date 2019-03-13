@@ -365,7 +365,7 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		if ok {
 			t.sendEvent()
 		} else {
-			t.txsAccepted = t.txsAccepted[10:]
+			//t.txsAccepted = t.txsAccepted[10:]
 		}
 		//}
 	}
