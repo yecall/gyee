@@ -25,6 +25,7 @@ import (
 
 type sealRequest struct {
 	h   uint64
+	t   uint64
 	txs Transactions
 }
 
@@ -49,7 +50,7 @@ func NewBlockBuilder(chain *BlockChain) (*BlockBuilder, error) {
 	return bb, nil
 }
 
-func (bb *BlockBuilder) AddSealRequest(h uint64, txs Transactions) {
+func (bb *BlockBuilder) AddSealRequest(h, t uint64, txs Transactions) {
 	req := &sealRequest{
 		h:   h,
 		txs: txs,
@@ -97,8 +98,8 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 			log.Crit("wrong request height", "req", req, "chain", bb.chain)
 		}
 		currBlock := bb.chain.GetBlockByNumber(currHeight)
-		nextBlock := bb.chain.BuildNextBlock(currBlock, req.txs)
-		log.Info("block sealed", "hash", nextBlock.Hash())
+		nextBlock := bb.chain.BuildNextBlock(currBlock, req.t, req.txs)
+		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
 		if err := bb.chain.AddBlock(nextBlock); err != nil {
 			log.Warn("failed to seal block", "err", err)
 			break

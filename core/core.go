@@ -46,6 +46,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
@@ -309,9 +310,15 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 				log.Error("failed to decode tx", "hash", hash, "err", err)
 				return
 			}
+			if err := tx.VerifySig(); err != nil {
+				log.Error("failed to verify tx", "hash", hash, "err", err)
+				return
+			}
 			txs = append(txs, tx)
 		}
-		c.blockBuilder.AddSealRequest(o.H, txs)
+		c.blockBuilder.AddSealRequest(o.H,
+			uint64(o.T.UTC().UnixNano()/int64(time.Millisecond/time.Nanosecond)),
+			txs)
 	}(o)
 }
 
@@ -381,8 +388,21 @@ func (c *Core) FakeP2pRecv(msg *p2p.Message) {
 //ICORE
 func (c *Core) GetSigner() crypto.Signer {
 	signer := secp256k1.NewSecp256k1Signer()
-	_ = signer.InitSigner(c.minerKey)
 	return signer
+}
+
+func (c *Core) GetMinerSigner() (crypto.Signer, error) {
+	key, err := c.GetPrivateKeyOfDefaultAccount()
+	if err != nil {
+		log.Warn("failed to get miner key", "err", err)
+		return nil, err
+	}
+	signer := c.GetSigner()
+	if err := signer.InitSigner(key); err != nil {
+		log.Warn("failed to init signer", "err", err)
+		return nil, err
+	}
+	return signer, nil
 }
 
 func (c *Core) GetPrivateKeyOfDefaultAccount() ([]byte, error) {

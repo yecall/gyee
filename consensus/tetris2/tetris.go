@@ -140,13 +140,10 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		Metrics:      NewMetrics(),
 	}
 
-	tetris.signer = core.GetSigner()
-	pk, err := core.GetPrivateKeyOfDefaultAccount()
-	if err != nil {
+	if signer, err := core.GetMinerSigner(); err != nil {
 		return nil, err
-	}
-	if err := tetris.signer.InitSigner(pk); err != nil {
-		return nil, err
+	} else {
+		tetris.signer = signer
 	}
 
 	for _, value := range validatorList {
@@ -360,14 +357,14 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
 
-		//if len(t.txsAccepted) > t.params.maxTxPerEvent {
-		ok, _ := t.MajorityBeatTime()
-		if ok {
-			t.sendEvent()
-		} else {
-			//t.txsAccepted = t.txsAccepted[10:]
+		if len(t.txsAccepted) > t.params.maxTxPerEvent {
+			ok, _ := t.MajorityBeatTime()
+			if ok {
+				t.sendEvent()
+			} else {
+				//t.txsAccepted = t.txsAccepted[10:]
+			}
 		}
-		//}
 	}
 }
 
@@ -684,13 +681,13 @@ func (t *Tetris) prepare() {
 	t.witness = make([][]*Event, 1)
 
 	//test validator quit, this is controlled by consensus output in the future
-	if t.h == 20 {
-		//t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
-		t.validatorRotate([]string{"30393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039"},
-			[]string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
-		//todo: pending txs need clear then member rotate joins
-		t.txsPending = make(map[common.Hash]map[string]uint64)
-	}
+	//if t.h == 20 {
+	//	//t.validatorRotate(nil, []string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
+	//	t.validatorRotate([]string{"30393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039303930393039"},
+	//		[]string{"30373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037303730373037"})
+	//	//todo: pending txs need clear then member rotate joins
+	//	t.txsPending = make(map[common.Hash]map[string]uint64)
+	//}
 
 	t.possibleNewReady = true
 

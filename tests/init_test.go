@@ -32,7 +32,6 @@ import (
 	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/secp256k1"
-	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/p2p"
 )
@@ -52,11 +51,16 @@ func TestInitWithTx(t *testing.T) {
 
 		addrs := make([]common.Address, numNodes)
 		signers := make([]crypto.Signer, numNodes)
+		nonces := make([]uint64, numNodes)
 		for i, n := range nodes {
 			addrs[i] = *n.Core().MinerAddr().CommonAddress()
-			signers[i] = n.Core().GetSigner()
+			if signer, err := n.Core().GetMinerSigner(); err != nil {
+				t.Fatalf("signer failed %v", err)
+			} else {
+				signers[i] = signer
+			}
 		}
-		ticker := time.NewTicker(10 * time.Millisecond)
+		ticker := time.NewTicker(1000 * time.Millisecond)
 		for {
 			for i, fn := range nodes {
 				select {
@@ -66,25 +70,25 @@ func TestInitWithTx(t *testing.T) {
 				case <-ticker.C:
 					// send txs
 				}
-				state, err := fn.Core().Chain().State()
-				if err != nil {
-					log.Error("get state failed", "err", err)
-					t.Errorf("get state failed: %v", err)
-					continue
-				}
-				fAddr := addrs[i]
-				fAccount := state.GetAccount(fAddr, false)
-				if fAccount == nil {
-					t.Errorf("missing account %v", fAddr)
-					continue
-				}
+				//state, err := fn.Core().Chain().State()
+				//if err != nil {
+				//	log.Error("get state failed", "err", err)
+				//	t.Errorf("get state failed: %v", err)
+				//	continue
+				//}
+				//fAddr := addrs[i]
+				//fAccount := state.GetAccount(fAddr, false)
+				//if fAccount == nil {
+				//	t.Errorf("missing account %v", fAddr)
+				//	continue
+				//}
 				for j, tn := range nodes {
 					if j == i {
 						continue
 					}
 					// transfer f => t
 					tAddr := &addrs[j]
-					tx := core.NewTransaction(testChainID, fAccount.Nonce(), tAddr, big.NewInt(100))
+					tx := core.NewTransaction(testChainID, nonces[i], tAddr, big.NewInt(100))
 					if err := tx.Sign(signers[i]); err != nil {
 						t.Errorf("sign failed %v", err)
 						continue
@@ -94,10 +98,12 @@ func TestInitWithTx(t *testing.T) {
 						t.Errorf("encode tx failed %v", err)
 						continue
 					}
+					nonces[i]++
 					msg := &p2p.Message{
 						MsgType: p2p.MessageTypeTx,
 						Data:    data,
 					}
+					_ = fn.P2pService().DhtSetValue(tx.Hash()[:], data)
 					fn.Core().FakeP2pRecv(msg)
 					tn.Core().FakeP2pRecv(msg)
 				}

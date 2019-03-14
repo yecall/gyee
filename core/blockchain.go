@@ -270,7 +270,7 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 /*
 Build Next block from parent block, with transactions
  */
-func (bc *BlockChain) BuildNextBlock(parent *Block, txs Transactions) *Block {
+func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) *Block {
 	next := &Block{
 		header:       CopyHeader(parent.header),
 		body:         new(corepb.BlockBody),
@@ -279,6 +279,7 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, txs Transactions) *Block {
 	// next block number
 	next.header.Number++
 	next.header.ParentHash = parent.Hash()
+	next.header.Time = t
 
 	// state trie
 	stateTrie, err := state.NewAccountTrie(parent.StateRoot(), bc.stateDB)

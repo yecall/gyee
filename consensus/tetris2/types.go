@@ -22,7 +22,7 @@ import (
 )
 
 type ICore interface {
-	GetSigner() crypto.Signer
+	GetMinerSigner() (crypto.Signer, error)
 	GetPrivateKeyOfDefaultAccount() ([]byte, error)
 	AddressFromPublicKey(publicKey []byte) ([]byte, error)
 }
