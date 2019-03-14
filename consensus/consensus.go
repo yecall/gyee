@@ -19,6 +19,7 @@ package consensus
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/yeeco/gyee/common"
 )
@@ -27,6 +28,7 @@ import (
 type Output struct {
 	Txs    []common.Hash
 	H      uint64
+	T      time.Time
 	Output string
 }
 

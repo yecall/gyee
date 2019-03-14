@@ -916,8 +916,12 @@ func (t *Tetris) consensusComputing() {
 
 	cs := make([]string, 0)
 	txc := make([]common.Hash, 0)
+	lastEvent := int64(0)
 	for _, w := range t.witness[0] {
 		if w.committable == 1 {
+			if w.Body.T > lastEvent {
+				lastEvent = w.Body.T
+			}
 			cs = append(cs, w.vid[VidStrStart:VidStrStart+3])
 			for _, tx := range w.Body.Tx {
 				if t.txsCommitted.Contains(tx) {
@@ -959,7 +963,11 @@ func (t *Tetris) consensusComputing() {
 		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
 	}
 
-	o := &consensus.Output{H: t.h + 1, Output: css, Txs: txc}
+	o := &consensus.Output{
+		T:      time.Unix(0, lastEvent),
+		H:      t.h + 1,
+		Output: css,
+		Txs:    txc}
 	t.OutputCh <- o
 	t.h++
 
