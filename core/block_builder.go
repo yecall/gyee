@@ -20,6 +20,8 @@ package core
 import (
 	"sync"
 
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
 )
 
@@ -98,7 +100,13 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 			log.Crit("wrong request height", "req", req, "chain", bb.chain)
 		}
 		currBlock := bb.chain.GetBlockByNumber(currHeight)
-		nextBlock := bb.chain.BuildNextBlock(currBlock, req.t, req.txs)
+		currState, err := bb.chain.StateAt(currBlock.StateRoot())
+		if err != nil {
+			log.Crit("failed to get state of current block", "err", err)
+			break
+		}
+		txs := organizeTxs(currState, req.txs)
+		nextBlock := bb.chain.BuildNextBlock(currBlock, req.t, txs)
 		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
 		if err := bb.chain.AddBlock(nextBlock); err != nil {
 			log.Warn("failed to seal block", "err", err)
@@ -109,8 +117,63 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 		currHeight++
 		var ok bool
 		req, ok = bb.requestMap[currHeight+1]
-		if ! ok {
+		if !ok {
 			break
 		}
 	}
+}
+
+func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
+	if len(txs) < 2 {
+		return txs
+	}
+	var (
+		output   Transactions
+		nonceMap = make(map[common.Address]uint64)
+	)
+	for {
+		txCount := len(txs)
+		var nextRound Transactions
+
+		// sweep txs
+		for _, tx := range txs {
+			if tx.from == nil {
+				// TODO: ignore for now
+				log.Warn("tx ignored due to nil from")
+				continue
+			}
+			from := *tx.from
+			nonce, ok := nonceMap[from]
+			if !ok {
+				account := state.GetAccount(from, false)
+				if account != nil {
+					nonce = account.Nonce()
+				} else {
+					nonce = 0
+				}
+				nonceMap[from] = nonce
+			}
+			switch {
+			case tx.nonce == nonce:
+				output = append(output, tx)
+				nonceMap[from]++
+			case tx.nonce > nonce:
+				nextRound = append(nextRound, tx)
+			default:
+				// TODO: ignore for now
+				log.Warn("tx nonce too low", "nonce", nonce, "tx", tx)
+			}
+		}
+
+		// check if we need another round
+		txs = nextRound
+		if len(txs) == 0 {
+			break
+		}
+		if txCount == len(txs) {
+			log.Warn("engine output nonce not possible", "remain", txs)
+			break
+		}
+	}
+	return output
 }
