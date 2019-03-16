@@ -37,7 +37,7 @@ import (
 	"github.com/yeeco/gyee/p2p"
 )
 
-const TooFarTx = 128
+const TooFarTx = 8192
 
 var (
 	ErrTxChainID = errors.New("transaction chainID mismatch")

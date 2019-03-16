@@ -22,7 +22,9 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
@@ -222,6 +224,16 @@ type Transactions []*Transaction
 func (txs Transactions) Len() int { return len(txs) }
 
 func (txs Transactions) GetEncoded(index int) []byte { return txs[index].raw }
+
+func (txs Transactions) String() string {
+	var sb strings.Builder
+	_, _ = fmt.Fprint(&sb, "[")
+	for _, tx := range txs {
+		_, _ = fmt.Fprint(&sb, tx.Hash(), " ")
+	}
+	_, _ = fmt.Fprint(&sb, "]")
+	return sb.String()
+}
 
 func (txs Transactions) Write(putter persistent.Putter) error {
 	for _, tx := range txs {

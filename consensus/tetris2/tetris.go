@@ -155,7 +155,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 	tetris.params = &Params{
 		f:                 (len(validatorList) - 1) / 3,
 		superMajority:     2*len(validatorList)/3 + 1,
-		maxTxPerEvent:     2000,
+		maxTxPerEvent:     100,
 		minTxPerEvent:     1,
 		maxEventPerEvent:  len(validatorList),
 		minEventPerEvent:  2,
@@ -338,8 +338,8 @@ func (t *Tetris) sendHeartbeat() {
 
 func (t *Tetris) receiveTicker(ttime time.Time) {
 	if ttime.Sub(t.lastSendTime) > 1*time.Second {
-		//t.sendHeartbeat()
-		t.sendEvent()
+		t.sendHeartbeat()
+		//t.sendEvent()
 	}
 }
 

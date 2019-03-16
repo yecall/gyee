@@ -45,7 +45,7 @@ func TestInit(t *testing.T) {
 
 func TestInitWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 90*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+	doTest(t, numNodes, 300*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
 		wg.Add(1)
 		defer wg.Done()
 
@@ -60,8 +60,8 @@ func TestInitWithTx(t *testing.T) {
 				signers[i] = signer
 			}
 		}
-		time.Sleep(60 * time.Second)
-		ticker := time.NewTicker(1000 * time.Millisecond)
+		time.Sleep(30 * time.Second)
+		ticker := time.NewTicker(500 * time.Millisecond)
 		for {
 			for i, fn := range nodes {
 				select {
@@ -105,6 +105,7 @@ func TestInitWithTx(t *testing.T) {
 						Data:    data,
 					}
 					_ = fn.P2pService().DhtSetValue(tx.Hash()[:], data)
+					_ = fn.P2pService().BroadcastMessage(*msg)
 					fn.Core().FakeP2pRecv(msg)
 					tn.Core().FakeP2pRecv(msg)
 				}
