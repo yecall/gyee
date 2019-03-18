@@ -32,6 +32,7 @@ import (
 	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/secp256k1"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/p2p"
 )
@@ -61,7 +62,7 @@ func TestInitWithTx(t *testing.T) {
 			}
 		}
 		time.Sleep(30 * time.Second)
-		ticker := time.NewTicker(500 * time.Millisecond)
+		ticker := time.NewTicker(50 * time.Millisecond)
 		for {
 			for i, fn := range nodes {
 				select {
@@ -147,6 +148,44 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 	time.Sleep(duration)
 	close(quitCh)
 	wg.Wait()
+	// check node chains
+	for height := uint64(0); ; height++ {
+		var (
+			lastBlock *core.Block
+			reached   = int(0)
+			mismatch  = int(0)
+		)
+		for i, n := range nodes {
+			if height > n.Core().Chain().CurrentBlockHeight() {
+				continue
+			}
+			b := n.Core().Chain().GetBlockByNumber(height)
+			if b == nil {
+				log.Error("block not found", "idx", i, "node", n, "height", height)
+				t.Errorf("block not found idx %d height %d", i, height)
+				continue
+			}
+			if lastBlock == nil {
+				lastBlock = b
+				reached ++
+			} else {
+				if lastBlock.Hash() != b.Hash() {
+					log.Error("block mismatch", "idx", i, "height", height)
+					t.Errorf("block mismatch idx %d height %d", i, height)
+					mismatch ++
+				} else {
+					reached ++
+				}
+			}
+		}
+		if lastBlock == nil {
+			// no node reached
+			break
+		}
+		log.Info("chain check", "height", height, "hash", lastBlock.Hash())
+		log.Info("    stats", "reached", reached, "mismatch", mismatch)
+	}
+	// stop nodes
 	for _, n := range nodes {
 		_ = n.Stop()
 	}
