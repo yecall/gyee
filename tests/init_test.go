@@ -72,18 +72,6 @@ func TestInitWithTx(t *testing.T) {
 				case <-ticker.C:
 					// send txs
 				}
-				//state, err := fn.Core().Chain().State()
-				//if err != nil {
-				//	log.Error("get state failed", "err", err)
-				//	t.Errorf("get state failed: %v", err)
-				//	continue
-				//}
-				//fAddr := addrs[i]
-				//fAccount := state.GetAccount(fAddr, false)
-				//if fAccount == nil {
-				//	t.Errorf("missing account %v", fAddr)
-				//	continue
-				//}
 				for j, tn := range nodes {
 					if j == i {
 						continue
@@ -141,6 +129,22 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 			t.Fatalf("node start %v", err)
 		}
 		nodes = append(nodes, n)
+	}
+	const numViewers = 2
+	viewers := make([]*node.Node, 0, numViewers)
+	for i := 0; i < numViewers; i++ {
+		cfg := dftConfig()
+		cfg.NodeDir = filepath.Join(tmpDir, "v"+strconv.Itoa(i))
+		cfg.Chain.Mine = false
+
+		n, err := node.NewNodeWithGenesis(cfg, genesis)
+		if err != nil {
+			t.Fatalf("newNode() %v", err)
+		}
+		if err := n.Start(); err != nil {
+			t.Fatalf("node start %v", err)
+		}
+		viewers = append(viewers, n)
 	}
 	if coroutine != nil {
 		go coroutine(quitCh, wg, nodes)

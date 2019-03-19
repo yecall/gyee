@@ -50,6 +50,8 @@ type BlockPool struct {
 	core       *Core
 	subscriber *p2p.Subscriber
 
+	requestMap map[uint64]*Block
+
 	lock   sync.RWMutex
 	quitCh chan struct{}
 	wg     sync.WaitGroup
@@ -58,8 +60,9 @@ type BlockPool struct {
 func NewBlockPool(core *Core) (*BlockPool, error) {
 	log.Info("Create New BlockPool")
 	bp := &BlockPool{
-		core:   core,
-		quitCh: make(chan struct{}),
+		core:       core,
+		requestMap: make(map[uint64]*Block),
+		quitCh:     make(chan struct{}),
 	}
 	return bp, nil
 }
@@ -97,7 +100,7 @@ func (bp *BlockPool) loop() {
 			log.Info("BlockPool loop end.")
 			return
 		case msg := <-bp.subscriber.MsgChan:
-			log.Info("block pool receive ", msg.MsgType, " ", msg.From)
+			log.Trace("block pool receive ", "type", msg.MsgType, "from", msg.From)
 			bp.processMsg(msg)
 		}
 	}

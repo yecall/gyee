@@ -23,6 +23,7 @@ import (
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
+	"github.com/yeeco/gyee/p2p"
 )
 
 type sealRequest struct {
@@ -32,6 +33,7 @@ type sealRequest struct {
 }
 
 type BlockBuilder struct {
+	core  *Core
 	chain *BlockChain
 
 	requestMap map[uint64]*sealRequest
@@ -41,8 +43,9 @@ type BlockBuilder struct {
 	wg     sync.WaitGroup
 }
 
-func NewBlockBuilder(chain *BlockChain) (*BlockBuilder, error) {
+func NewBlockBuilder(core *Core, chain *BlockChain) (*BlockBuilder, error) {
 	bb := &BlockBuilder{
+		core:       core,
 		chain:      chain,
 		requestMap: make(map[uint64]*sealRequest),
 		sealChan:   make(chan *sealRequest),
@@ -105,14 +108,26 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 			log.Crit("failed to get state of current block", "err", err)
 			break
 		}
+		// engine output not ordered by nonce
 		txs := organizeTxs(currState, req.txs)
+		// build next block
 		nextBlock := bb.chain.BuildNextBlock(currBlock, req.t, txs)
 		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
+		// insert chain
 		if err := bb.chain.AddBlock(nextBlock); err != nil {
 			log.Warn("failed to seal block", "err", err)
 			break
 		}
 		delete(bb.requestMap, currHeight)
+		// broadcast block
+		if encoded, err := nextBlock.ToBytes(); err != nil {
+			log.Warn("failed to encode block", "block", nextBlock, "err", err)
+		} else {
+			_ = bb.core.node.P2pService().BroadcastMessage(p2p.Message{
+				MsgType: p2p.MessageTypeBlock,
+				Data:    encoded,
+			})
+		}
 
 		currHeight++
 		var ok bool

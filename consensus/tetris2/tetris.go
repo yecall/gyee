@@ -186,23 +186,14 @@ func (t *Tetris) Stop() error {
 }
 
 func (t *Tetris) ChanEventSend() <-chan []byte {
-	if t == nil {
-		return nil
-	}
 	return t.SendEventCh
 }
 
 func (t *Tetris) ChanEventReq() <-chan common.Hash {
-	if t == nil {
-		return nil
-	}
 	return t.RequestEventCh
 }
 
 func (t *Tetris) Output() <-chan *consensus.Output {
-	if t == nil {
-		return nil
-	}
 	return t.OutputCh
 }
 

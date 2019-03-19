@@ -171,7 +171,9 @@ func (tp *TransactionPool) processTx(tx *Transaction) {
 	// TODO:
 
 	// send tx to consensus
-	tp.core.engine.SendTx(*tx.Hash())
+	if tp.core.engine != nil {
+		tp.core.engine.SendTx(*tx.Hash())
+	}
 }
 
 func (tp *TransactionPool) TxBroadcast(tx *Transaction) {

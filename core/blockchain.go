@@ -357,7 +357,7 @@ func (bc *BlockChain) verifyHeader(h *BlockHeader) error {
 	}
 	currentHeight := bc.CurrentBlockHeight()
 	height := h.Number
-	if height < currentHeight-TooFarBlocks || height > currentHeight+TooFarBlocks {
+	if height+TooFarBlocks < currentHeight || height > currentHeight+TooFarBlocks {
 		return ErrBlockTooFarForChain
 		// ignore too far block
 	}

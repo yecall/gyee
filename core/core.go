@@ -139,7 +139,7 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 		if err := core.prepareCoinbase(); err != nil {
 			return nil, err
 		}
-		core.blockBuilder, err = NewBlockBuilder(core.blockChain)
+		core.blockBuilder, err = NewBlockBuilder(node, core.blockChain)
 		if err != nil {
 			return nil, err
 		}
@@ -228,10 +228,15 @@ func (c *Core) loop() {
 	log.Info("Core loop...")
 	for {
 		var (
-			chanEventSend = c.engine.ChanEventSend()
-			chanEventReq  = c.engine.ChanEventReq()
-			outputChan    = c.engine.Output()
+			chanEventSend <-chan []byte
+			chanEventReq  <-chan common.Hash
+			outputChan    <-chan *consensus.Output
 		)
+		if c.engine != nil {
+			chanEventSend = c.engine.ChanEventSend()
+			chanEventReq = c.engine.ChanEventReq()
+			outputChan = c.engine.Output()
+		}
 
 		select {
 		case <-c.quitCh:
