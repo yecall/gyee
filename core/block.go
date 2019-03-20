@@ -29,6 +29,7 @@ import (
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
+	"github.com/yeeco/gyee/crypto"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
@@ -166,6 +167,11 @@ func (b *Block) UpdateHeader() error {
 		return err
 	}
 	b.header.TxsRoot = DeriveHash(b.transactions)
+	return nil
+}
+
+func (b *Block) Sign(signer crypto.Signer) error {
+	// TODO:
 	return nil
 }
 

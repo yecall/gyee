@@ -56,6 +56,10 @@ func (ct *consensusTrie) Reset(root common.Hash) error {
 	return nil
 }
 
+func (ct *consensusTrie) Root() common.Hash {
+	return ct.trie.Hash()
+}
+
 func (ct *consensusTrie) Commit() (common.Hash, error) {
 	// TODO: write pending data
 	root, err := ct.trie.Commit(func(leaf []byte, parent common.Hash) error {

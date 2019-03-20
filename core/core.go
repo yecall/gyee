@@ -139,7 +139,7 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 		if err := core.prepareCoinbase(); err != nil {
 			return nil, err
 		}
-		core.blockBuilder, err = NewBlockBuilder(node, core.blockChain)
+		core.blockBuilder, err = NewBlockBuilder(core, core.blockChain)
 		if err != nil {
 			return nil, err
 		}
@@ -386,6 +386,17 @@ func (c *Core) MinerAddr() *address.Address {
 // as if msg was received from p2p module
 func (c *Core) FakeP2pRecv(msg *p2p.Message) {
 	c.txPool.subscriber.MsgChan <- *msg
+}
+
+func (c *Core) signBlock(b *Block) error {
+	if c.engine == nil {
+		log.Crit("not in miner mode")
+	}
+	signer, err := c.GetMinerSigner()
+	if err != nil {
+		return err
+	}
+	return b.Sign(signer)
 }
 
 // implements of interface

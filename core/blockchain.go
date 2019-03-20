@@ -200,9 +200,33 @@ func (bc *BlockChain) storeBlock(b *Block) error {
 
 	if b.stateTrie == nil {
 		var err error
-		b.stateTrie, err = state.NewAccountTrie(b.header.StateRoot, bc.stateDB)
+		b.stateTrie, err = bc.StateAt(b.header.StateRoot)
 		if err != nil {
-			return err
+			// state root not in storage, try replay txs from parent block
+			prevBlk := bc.GetBlockByNumber(b.header.Number - 1)
+			if prevBlk == nil {
+				return err
+			}
+			// get state for prev block
+			stateTrie, err := bc.StateAt(prevBlk.header.StateRoot)
+			if err != nil {
+				return err
+			}
+			// replay txs from prev block
+			_, err = bc.replayTxs(stateTrie, b.transactions)
+			if err != nil {
+				return err
+			}
+			// check state root hash
+			h, err := stateTrie.Commit()
+			if err != nil {
+				return err
+			}
+			if h != b.header.StateRoot {
+				return ErrBlockStateTrieMismatch
+			}
+			// all set
+			b.stateTrie = stateTrie
 		}
 	}
 
@@ -298,8 +322,20 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) 
 	next.consensusTrie = consensusTrie
 
 	// iterate txs for state changes
+	next.transactions, err = bc.replayTxs(next.stateTrie, txs)
+	if err != nil {
+		log.Crit("replayTxs", "err", err)
+	}
+
+	if err := next.UpdateHeader(); err != nil {
+		log.Crit("UpdateHeader for next block failed", "error", err)
+	}
+	return next
+}
+
+func (bc *BlockChain) replayTxs(stateTrie state.AccountTrie, txs Transactions) (Transactions, error) {
+	inBlockTxs := make(Transactions, 0, len(txs))
 	for _, tx := range txs {
-		next.transactions = append(next.transactions, tx)
 		accountFrom := stateTrie.GetAccount(*tx.from, false)
 		if accountFrom == nil {
 			// TODO: mark tx failure
@@ -318,12 +354,10 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) 
 		accountFrom.AddNonce(1)
 		accountFrom.SubBalance(tx.amount)
 		accountTo.AddBalance(tx.amount)
-	}
 
-	if err := next.UpdateHeader(); err != nil {
-		log.Crit("UpdateHeader for next block failed", "error", err)
+		inBlockTxs = append(inBlockTxs, tx)
 	}
-	return next
+	return inBlockTxs, nil
 }
 
 func (bc *BlockChain) LastBlock() *Block {

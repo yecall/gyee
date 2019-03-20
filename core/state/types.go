@@ -51,6 +51,9 @@ type managedTrie interface {
 	// Reset trie to a trie root hash
 	Reset(root common.Hash) error
 
+	// Get trie root without committing
+	Root() common.Hash
+
 	// Commit trie to backing storage
 	Commit() (root common.Hash, err error)
 }

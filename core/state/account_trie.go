@@ -55,6 +55,10 @@ func (at *accountTrie) Reset(root common.Hash) error {
 	return nil
 }
 
+func (at *accountTrie) Root() common.Hash {
+	return at.trie.Hash()
+}
+
 func (at *accountTrie) Commit() (common.Hash, error) {
 	for _, account := range at.accounts {
 		isDirty := account.dirty
