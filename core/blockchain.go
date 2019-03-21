@@ -294,7 +294,7 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 /*
 Build Next block from parent block, with transactions
  */
-func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) *Block {
+func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) (*Block, error) {
 	next := &Block{
 		header:       CopyHeader(parent.header),
 		body:         new(corepb.BlockBody),
@@ -308,16 +308,14 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) 
 	// state trie
 	stateTrie, err := state.NewAccountTrie(parent.StateRoot(), bc.stateDB)
 	if err != nil {
-		log.Crit("NewAccountTrie for next block", "error", err,
-			"parentHash", parent.Hash(), "trieRoot", parent.StateRoot())
+		return nil, err
 	}
 	next.stateTrie = stateTrie
 
 	// consensus trie
 	consensusTrie, err := state.NewConsensusTrie(parent.ConsensusRoot(), bc.stateDB)
 	if err != nil {
-		log.Crit("NewConsensusTrie for next block", "error", err,
-			"parentHash", parent.Hash(), "trieRoot", parent.ConsensusRoot())
+		return nil, err
 	}
 	next.consensusTrie = consensusTrie
 
@@ -327,15 +325,22 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) 
 		log.Crit("replayTxs", "err", err)
 	}
 
-	if err := next.UpdateHeader(); err != nil {
-		log.Crit("UpdateHeader for next block failed", "error", err)
+	if err := next.updateBody(); err != nil {
+		return nil, err
 	}
-	return next
+
+	if err := next.updateHeader(); err != nil {
+		return nil, err
+	}
+	return next, nil
 }
 
 func (bc *BlockChain) replayTxs(stateTrie state.AccountTrie, txs Transactions) (Transactions, error) {
 	inBlockTxs := make(Transactions, 0, len(txs))
 	for _, tx := range txs {
+		if tx.from == nil {
+			continue
+		}
 		accountFrom := stateTrie.GetAccount(*tx.from, false)
 		if accountFrom == nil {
 			// TODO: mark tx failure

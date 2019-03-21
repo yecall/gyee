@@ -155,7 +155,7 @@ func (b *Block) getBody() *corepb.BlockBody {
 Update contents of header to match with block body.
 State Trie should be already operated to match with txs.
  */
-func (b *Block) UpdateHeader() error {
+func (b *Block) updateHeader() error {
 	if b.header == nil {
 		log.Crit("must have header with essential data when sealing", "block", b)
 	}
@@ -167,6 +167,24 @@ func (b *Block) UpdateHeader() error {
 		return err
 	}
 	b.header.TxsRoot = DeriveHash(b.transactions)
+	return nil
+}
+
+func (b *Block) updateBody() error {
+	if len(b.body.RawTransactions) > 0 {
+		return errors.New("updating block body which already contains txs")
+	}
+	// ensure txs encoded in buffer
+	if err := b.transactions.encode(); err != nil {
+		return err
+	}
+	rawTxs := make([][]byte, 0, len(b.transactions))
+	for _, tx := range b.transactions {
+		encoded := make([]byte, len(tx.raw))
+		copy(encoded, tx.raw)
+		rawTxs = append(rawTxs, encoded)
+	}
+	b.body.RawTransactions = rawTxs
 	return nil
 }
 
@@ -182,6 +200,11 @@ func (b *Block) VerifyBody() error {
 	txHash := DeriveHash(b.transactions)
 	if txHash != b.header.TxsRoot {
 		return ErrBlockBodyTxsMismatch
+	}
+	for _, tx := range b.transactions {
+		if err := tx.VerifySig(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

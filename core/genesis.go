@@ -106,7 +106,7 @@ func (g *Genesis) genBlock(stateDB state.Database) (*Block, error) {
 	b := NewBlock(h, nil)
 	b.stateTrie = accountTrie
 	b.consensusTrie = consensusTrie
-	if err := b.UpdateHeader(); err != nil {
+	if err := b.updateHeader(); err != nil {
 		return nil, err
 	}
 	return b, nil

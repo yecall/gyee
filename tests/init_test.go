@@ -50,6 +50,7 @@ func TestInitWithTx(t *testing.T) {
 		wg.Add(1)
 		defer wg.Done()
 
+		totalTxs := int(0)
 		addrs := make([]common.Address, numNodes)
 		signers := make([]crypto.Signer, numNodes)
 		nonces := make([]uint64, numNodes)
@@ -63,12 +64,13 @@ func TestInitWithTx(t *testing.T) {
 		}
 		time.Sleep(30 * time.Second)
 		ticker := time.NewTicker(50 * time.Millisecond)
+	Exit:
 		for {
 			for i, fn := range nodes {
 				select {
 				case <-quitCh:
 					ticker.Stop()
-					return
+					break Exit
 				case <-ticker.C:
 					// send txs
 				}
@@ -97,9 +99,11 @@ func TestInitWithTx(t *testing.T) {
 					_ = fn.P2pService().BroadcastMessage(*msg)
 					fn.Core().FakeP2pRecv(msg)
 					tn.Core().FakeP2pRecv(msg)
+					totalTxs++
 				}
 			}
 		}
+		log.Info("Total txs sent", totalTxs)
 	})
 }
 

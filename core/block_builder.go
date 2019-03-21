@@ -111,7 +111,11 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 		// engine output not ordered by nonce
 		txs := organizeTxs(currState, req.txs)
 		// build next block
-		nextBlock := bb.chain.BuildNextBlock(currBlock, req.t, txs)
+		nextBlock, err := bb.chain.BuildNextBlock(currBlock, req.t, txs)
+		if err != nil {
+			log.Crit("failed to build next block", "parent", currBlock,
+				"err", err)
+		}
 		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
 		// insert chain
 		if err := bb.chain.AddBlock(nextBlock); err != nil {

@@ -235,6 +235,20 @@ func (txs Transactions) String() string {
 	return sb.String()
 }
 
+func (txs Transactions) encode() error {
+	for i := range txs {
+		if txs[i].raw != nil {
+			continue
+		}
+		enc, err := txs[i].Encode()
+		if err != nil {
+			return err
+		}
+		txs[i].raw = enc
+	}
+	return nil
+}
+
 func (txs Transactions) Write(putter persistent.Putter) error {
 	for _, tx := range txs {
 		pb, err := tx.ToProto()
