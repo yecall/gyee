@@ -39,6 +39,8 @@ var (
 	ErrBlockChainNoStorage    = errors.New("core.chain: must provide block chain storage")
 	ErrBlockChainIDMismatch   = errors.New("core.chain: chainID mismatch")
 	ErrBlockStateTrieMismatch = errors.New("core.chain: trie root hash mismatch")
+	ErrBlockParentMissing     = errors.New("core.chain: block parent missing")
+	ErrBlockParentMismatch    = errors.New("core.chain: block parent mismatch")
 )
 
 // BlockChain is a Data Manager that
@@ -246,6 +248,17 @@ func (bc *BlockChain) storeBlock(b *Block) error {
 
 // add a checked block to block chain, as last block
 func (bc *BlockChain) AddBlock(b *Block) error {
+	// check parent block
+	if b.Number() > 0 {
+		pb := bc.GetBlockByNumber(b.Number() - 1)
+		if pb == nil {
+			return ErrBlockParentMissing
+		}
+		if pb.Hash() != b.ParentHash() {
+			return ErrBlockParentMismatch
+		}
+	}
+	// add to storage
 	if err := bc.storeBlock(b); err != nil {
 		return err
 	}

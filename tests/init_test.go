@@ -46,65 +46,71 @@ func TestInit(t *testing.T) {
 
 func TestInitWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 300*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
-		wg.Add(1)
-		defer wg.Done()
-
-		totalTxs := int(0)
-		addrs := make([]common.Address, numNodes)
-		signers := make([]crypto.Signer, numNodes)
-		nonces := make([]uint64, numNodes)
-		for i, n := range nodes {
-			addrs[i] = *n.Core().MinerAddr().CommonAddress()
-			if signer, err := n.Core().GetMinerSigner(); err != nil {
-				t.Fatalf("signer failed %v", err)
-			} else {
-				signers[i] = signer
-			}
-		}
-		time.Sleep(30 * time.Second)
-		ticker := time.NewTicker(50 * time.Millisecond)
-	Exit:
-		for {
-			for i, fn := range nodes {
-				select {
-				case <-quitCh:
-					ticker.Stop()
-					break Exit
-				case <-ticker.C:
-					// send txs
-				}
-				for j, tn := range nodes {
-					if j == i {
-						continue
-					}
-					// transfer f => t
-					tAddr := &addrs[j]
-					tx := core.NewTransaction(testChainID, nonces[i], tAddr, big.NewInt(100))
-					if err := tx.Sign(signers[i]); err != nil {
-						t.Errorf("sign failed %v", err)
-						continue
-					}
-					data, err := tx.Encode()
-					if err != nil {
-						t.Errorf("encode tx failed %v", err)
-						continue
-					}
-					nonces[i]++
-					msg := &p2p.Message{
-						MsgType: p2p.MessageTypeTx,
-						Data:    data,
-					}
-					_ = fn.P2pService().DhtSetValue(tx.Hash()[:], data)
-					_ = fn.P2pService().BroadcastMessage(*msg)
-					fn.Core().FakeP2pRecv(msg)
-					tn.Core().FakeP2pRecv(msg)
-					totalTxs++
-				}
-			}
-		}
-		log.Info("Total txs sent", totalTxs)
+	doTest(t, numNodes, 600*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+		genTestTxs(t, quitCh, wg, nodes, numNodes)
 	})
+}
+
+func genTestTxs(t *testing.T,
+	quitCh chan struct{}, wg sync.WaitGroup,
+	nodes []*node.Node, numNodes uint) {
+	wg.Add(1)
+	defer wg.Done()
+
+	totalTxs := int(0)
+	addrs := make([]common.Address, numNodes)
+	signers := make([]crypto.Signer, numNodes)
+	nonces := make([]uint64, numNodes)
+	for i, n := range nodes {
+		addrs[i] = *n.Core().MinerAddr().CommonAddress()
+		if signer, err := n.Core().GetMinerSigner(); err != nil {
+			t.Fatalf("signer failed %v", err)
+		} else {
+			signers[i] = signer
+		}
+	}
+	time.Sleep(30 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+Exit:
+	for {
+		for i, fn := range nodes {
+			select {
+			case <-quitCh:
+				ticker.Stop()
+				break Exit
+			case <-ticker.C:
+				// send txs
+			}
+			for j, tn := range nodes {
+				if j == i {
+					continue
+				}
+				// transfer f => t
+				tAddr := &addrs[j]
+				tx := core.NewTransaction(testChainID, nonces[i], tAddr, big.NewInt(100))
+				if err := tx.Sign(signers[i]); err != nil {
+					t.Errorf("sign failed %v", err)
+					continue
+				}
+				data, err := tx.Encode()
+				if err != nil {
+					t.Errorf("encode tx failed %v", err)
+					continue
+				}
+				nonces[i]++
+				msg := &p2p.Message{
+					MsgType: p2p.MessageTypeTx,
+					Data:    data,
+				}
+				_ = fn.P2pService().DhtSetValue(tx.Hash()[:], data)
+				_ = fn.P2pService().BroadcastMessage(*msg)
+				fn.Core().FakeP2pRecv(msg)
+				tn.Core().FakeP2pRecv(msg)
+				totalTxs++
+			}
+		}
+	}
+	log.Info("Total txs sent", totalTxs)
 }
 
 func doTest(t *testing.T, numNodes uint, duration time.Duration,

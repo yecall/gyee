@@ -48,6 +48,7 @@ var (
 
 type BlockPool struct {
 	core       *Core
+	chain      *BlockChain
 	subscriber *p2p.Subscriber
 
 	requestMap map[uint64]*Block
@@ -61,6 +62,7 @@ func NewBlockPool(core *Core) (*BlockPool, error) {
 	log.Info("Create New BlockPool")
 	bp := &BlockPool{
 		core:       core,
+		chain:      core.blockChain,
 		requestMap: make(map[uint64]*Block),
 		quitCh:     make(chan struct{}),
 	}
@@ -129,14 +131,39 @@ func (bp *BlockPool) processMsg(msg p2p.Message) {
 }
 
 func (bp *BlockPool) processBlock(blk *Block) {
-	if err := bp.core.blockChain.verifyBlock(blk); err != nil {
+	if err := bp.chain.verifyBlock(blk); err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?
 		return
 	}
-	if err := bp.core.blockChain.AddBlock(blk); err != nil {
-		log.Warn("processBlock() add fail", "err", err)
+	currHeight := bp.chain.CurrentBlockHeight()
+	switch {
+	case blk.Number() <= currHeight:
+		// TODO: refresh block signature
 		return
+	case blk.Number() > currHeight+1:
+		// not next block, record and wait
+		bp.requestMap[blk.Number()] = blk
+		return
+	}
+
+	// blk.Number() == currHeight + 1
+	for {
+		if blk.Number() != currHeight+1 {
+			log.Crit("wrong block height", "blk", blk.Number(), "chain", bp.chain)
+		}
+		if err := bp.core.blockChain.AddBlock(blk); err != nil {
+			log.Warn("processBlock() add fail", "err", err)
+			return
+		}
+		delete(bp.requestMap, blk.Number())
+
+		currHeight++
+		var ok bool
+		blk, ok = bp.requestMap[currHeight+1]
+		if !ok {
+			break
+		}
 	}
 }
 
