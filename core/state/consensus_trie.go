@@ -20,6 +20,7 @@ package state
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/log"
 )
 
@@ -73,6 +74,22 @@ func (ct *consensusTrie) Commit() (common.Hash, error) {
 		return common.EmptyHash, err
 	}
 	return root, nil
+}
+
+func (ct *consensusTrie) GetValidatorAddr() []common.Address {
+	sList := ct.GetValidators()
+	if sList == nil {
+		return nil
+	}
+	result := make([]common.Address, len(sList))
+	for i, str := range sList {
+		addr, err := address.AddressParse(str)
+		if err != nil {
+			log.Crit("failed to parse address", "str", str, "err", err)
+		}
+		result[i] = *addr.CommonAddress()
+	}
+	return result
 }
 
 func (ct *consensusTrie) GetValidators() []string {

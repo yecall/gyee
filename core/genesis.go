@@ -121,6 +121,6 @@ func (g *Genesis) Commit(stateDB state.Database, putter persistent.Putter) (*Blo
 	if err := b.Write(putter); err != nil {
 		return nil, err
 	}
-	putLastBlock(putter, b.Hash())
+	putLastBlock(putter, *b.Hash())
 	return b, nil
 }

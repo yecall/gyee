@@ -131,7 +131,8 @@ func (bp *BlockPool) processMsg(msg p2p.Message) {
 }
 
 func (bp *BlockPool) processBlock(blk *Block) {
-	if err := bp.chain.verifyBlock(blk); err != nil {
+	_, err := bp.chain.verifyBlock(blk)
+	if err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?
 		return

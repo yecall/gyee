@@ -67,6 +67,12 @@ func (h Hash) Equals(b Hash) bool {
 	//return bytes.Compare(h[:], b[:]) == 0
 }
 
+func (h Hash) Copy() *Hash {
+	ret := new(Hash)
+	ret.SetBytes(h[:])
+	return ret
+}
+
 // SetBytes sets the hash to the value of b.
 // If b is larger than len(h), b will be cropped from the left.
 func (h *Hash) SetBytes(b []byte) {

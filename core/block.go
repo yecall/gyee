@@ -21,16 +21,19 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/crypto"
 	sha3 "github.com/yeeco/gyee/crypto/hash"
+	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/persistent"
 )
@@ -136,14 +139,14 @@ func (b *Block) ReceiptsRoot() common.Hash  { return b.header.ReceiptsRoot }
 func (b *Block) Time() uint64  { return b.header.Time }
 func (b *Block) Extra() []byte { return b.header.Extra }
 
-func (b *Block) Hash() common.Hash {
+func (b *Block) Hash() *common.Hash {
 	if hash := b.hash.Load(); hash != nil {
-		return hash.(common.Hash)
+		return hash.(common.Hash).Copy()
 	}
 	bytes, _ := b.header.Hash()
-	hash := common.Hash{}
+	hash := new(common.Hash)
 	hash.SetBytes(bytes)
-	b.hash.Store(hash)
+	b.hash.Store(*hash)
 	return hash
 }
 
@@ -167,7 +170,11 @@ func (b *Block) updateHeader() error {
 		return err
 	}
 	b.header.TxsRoot = DeriveHash(b.transactions)
-	return nil
+	if b.signature != nil {
+		log.Crit("update signed header")
+	}
+	b.signature, err = b.header.toSignedProto()
+	return err
 }
 
 func (b *Block) updateBody() error {
@@ -189,8 +196,43 @@ func (b *Block) updateBody() error {
 }
 
 func (b *Block) Sign(signer crypto.Signer) error {
-	// TODO:
+	sig, err := signer.Sign(b.Hash()[:])
+	if err != nil {
+		return err
+	}
+	for _, s := range b.signature.Signatures {
+		if s.SigAlgorithm == uint32(sig.Algorithm) && bytes.Equal(s.Signature, sig.Signature) {
+			// signature already exists
+			return nil
+		}
+	}
+	pbSig := &corepb.Signature{
+		SigAlgorithm:uint32(sig.Algorithm),
+		Signature:sig.Signature,
+	}
+	b.signature.Signatures = append(b.signature.Signatures, pbSig)
 	return nil
+}
+
+func (b *Block) Signers() (map[common.Address]crypto.Signature, error) {
+	result := make(map[common.Address]crypto.Signature)
+	signer := secp256k1.NewSecp256k1Signer()
+	for _, sig := range b.signature.Signatures {
+		sig := crypto.Signature{
+			Algorithm: crypto.Algorithm(sig.SigAlgorithm),
+			Signature: sig.Signature,
+		}
+		pubkey, err := signer.RecoverPublicKey(b.Hash().Bytes(), &sig)
+		if err != nil {
+			return nil, err
+		}
+		addr, err := address.NewAddressFromPublicKey(pubkey)
+		if err != nil {
+			return nil, err
+		}
+		result[*addr.CommonAddress()] = sig
+	}
+	return result, nil
 }
 
 /*
@@ -210,12 +252,8 @@ func (b *Block) VerifyBody() error {
 }
 
 func (b *Block) ToBytes() ([]byte, error) {
-	pbSignedHeader, err := b.header.toSignedProto()
-	if err != nil {
-		return nil, err
-	}
 	pbBlock := &corepb.Block{
-		Header: pbSignedHeader,
+		Header: b.signature,
 		Body:   b.body,
 	}
 	enc, err := proto.Marshal(pbBlock)

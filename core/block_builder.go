@@ -116,6 +116,9 @@ func (bb *BlockBuilder) handleSealRequest(req *sealRequest) {
 			log.Crit("failed to build next block", "parent", currBlock,
 				"err", err)
 		}
+		if err := bb.core.signBlock(nextBlock); err != nil {
+			log.Crit("failed to sign block", "err", err)
+		}
 		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
 		// insert chain
 		if err := bb.chain.AddBlock(nextBlock); err != nil {

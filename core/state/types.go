@@ -72,8 +72,9 @@ type ConsensusTrie interface {
 	managedTrie
 
 	// Get validator address list
-	GetValidators() []string
+	GetValidatorAddr() []common.Address
 
-	// Set validator address list
+	// Get / Set validator address str list
+	GetValidators() []string
 	SetValidators([]string)
 }
