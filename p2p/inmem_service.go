@@ -37,6 +37,7 @@ type InmemService struct {
 	subscribers      *sync.Map
 	hub              *InmemHub
 	receiveMessageCh chan Message
+	cp               ChainProvider
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -140,6 +141,15 @@ func (is *InmemService) DhtSetValue(key []byte, value []byte) error {
 
 func (is *InmemService) Reconfig(reCfg *RecfgCommand) error {
 	return nil
+}
+
+func (is *InmemService) RegChainProvider(cp ChainProvider) {
+	is.cp = cp
+}
+
+func (is *InmemService) GetChainInfo(kind string, key []byte) ([]byte, error) {
+	// TODO:
+	return nil, nil
 }
 
 //Inmem Hub for all InmemService

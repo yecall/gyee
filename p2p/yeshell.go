@@ -121,6 +121,7 @@ type YeShellManager struct {
 	ddtChan				chan bool								// deduplication ticker channel
 	bsTicker			*time.Ticker							// bootstrap ticker
 	dhtBsChan			chan bool								// bootstrap ticker channel
+	cp ChainProvider
 }
 
 const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity
@@ -619,6 +620,15 @@ func (yeShMgr *YeShellManager)DhtSetValue(key []byte, value []byte) error {
 		return errors.New("DhtSetValue: failed")
 	}
 	return nil
+}
+
+func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
+	yeShMgr.cp = cp
+}
+
+func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, error) {
+	// TODO:
+	return nil, nil
 }
 
 func (yeShMgr *YeShellManager)DhtFindNode(target *config.NodeID, done chan interface{}) error {

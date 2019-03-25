@@ -146,6 +146,14 @@ func (osns *OsnService)DhtSetValue(key []byte, value []byte) error {
 	return osns.yeShMgr.DhtSetValue(key, value)
 }
 
+func (osns *OsnService) RegChainProvider(cp ChainProvider) {
+	osns.yeShMgr.RegChainProvider(cp)
+}
+
+func (osns *OsnService) GetChainInfo(kind string, key []byte) ([]byte, error) {
+	return osns.yeShMgr.GetChainInfo(kind, key)
+}
+
 func (osns *OsnService)GetLocalNode() *config.Node {
 	return osns.yeShMgr.(*YeShellManager).GetLocalNode()
 }

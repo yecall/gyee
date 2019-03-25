@@ -494,4 +494,9 @@ func GetStateDB(storage persistent.Storage) state.Database {
 	return stateDB
 }
 
+func (bc *BlockChain) GetChainData(kind string, key []byte) []byte {
+	// TODO:
+	return nil
+}
+
 //非验证节点，是否需要启txPool?

@@ -37,8 +37,12 @@ osn_service: overlay sub-network
  */
 
 type RecfgCommand struct {
-	Validator		bool		// is validator
-	SubnetMaskBits	int			// mask bits for sub network identity
+	Validator      bool // is validator
+	SubnetMaskBits int  // mask bits for sub network identity
+}
+
+type ChainProvider interface {
+	GetChainData(kind string, key []byte) []byte
 }
 
 type Service interface {
@@ -50,6 +54,12 @@ type Service interface {
 	BroadcastMessageOsn(message Message) error
 	Register(subscriber *Subscriber)
 	UnRegister(subscriber *Subscriber)
-    DhtGetValue(key []byte) ([]byte, error)
-    DhtSetValue(key []byte, value []byte) error
+	DhtGetValue(key []byte) ([]byte, error)
+	DhtSetValue(key []byte, value []byte) error
+
+	// p2p service get chain data from provider
+	RegChainProvider(cp ChainProvider)
+
+	// ask peer for chain info
+	GetChainInfo(kind string, key []byte) ([]byte, error)
 }
