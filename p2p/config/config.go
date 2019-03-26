@@ -94,8 +94,8 @@ func (eno P2pCfgErrno)Error() string {
 
 // Some specific paths
 const (
-	PcfgEnoIpAddrivateKey	= "nodekey"		// Path within the datadir to the node's private key
-	datadirNodeDatabase		= "nodes"		// Path within the datadir to store the node infos
+	KeyFileName	= "nodekey"		// Path within the datadir to the node's private key
+	dirNodeDatabase = "nodes"		// Path within the datadir to store the nodes
 )
 
 // Bootstrap nodes, in a format like: node-identity-hex-string@ip:udp-port:tcp-port
@@ -412,7 +412,7 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 		StaticNodes:			nil,
 		StaticNetId:			ZeroSubNet,
 		NodeDataDir:			DftDatDir,
-		NodeDatabase:			datadirNodeDatabase,
+		NodeDatabase:			dirNodeDatabase,
 		NoNdbHistory:			true,
 		NoDial:					false,
 		NoAccept:				false,
@@ -494,7 +494,7 @@ func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
 		StaticNodes:			nil,
 		StaticNetId:			ZeroSubNet,
 		NodeDataDir:			P2pDefaultDataDir(true),
-		NodeDatabase:			datadirNodeDatabase,
+		NodeDatabase:			dirNodeDatabase,
 		NoNdbHistory:			true,
 		NoDial:					true,
 		NoAccept:				true,
@@ -628,6 +628,9 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 		name = name + "_" + fmt.Sprintf("%d", len(config))
 	}
 	cfg.CfgName = name
+	if len(cfg.Name) == 0 {
+		cfg.Name = cfg.CfgName
+	}
 
 	if _, dup := config[name]; dup {
 		cfgLog.Debug("P2pSetConfig: duplicated configuration name: %s", name)
@@ -771,7 +774,7 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 		return key
 	}
 
-	keyFile := filepath.Join(cfg.NodeDataDir, cfg.Name, PcfgEnoIpAddrivateKey)
+	keyFile := filepath.Join(cfg.NodeDataDir, cfg.Name, KeyFileName)
 	if key, err := LoadECDSA(keyFile); err == nil {
 		cfgLog.Debug("p2pBuildPrivateKey: private key loaded ok from file: %s", keyFile)
 		return key

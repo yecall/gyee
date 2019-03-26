@@ -495,9 +495,9 @@ func (yeShMgr *YeShellManager)BroadcastMessage(message Message) error {
 		err = yeShMgr.broadcastTx(&message)
 	case MessageTypeEvent:
 		err = yeShMgr.broadcastEv(&message)
-	case 	MessageTypeBlockHeader:
+	case MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBh(&message)
-	case 	MessageTypeBlock:
+	case MessageTypeBlock:
 		err = yeShMgr.broadcastBk(&message)
 	default:
 		return errors.New(fmt.Sprintf("BroadcastMessage: invalid type: %v", message.MsgType))

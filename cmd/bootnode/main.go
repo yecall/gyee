@@ -22,75 +22,93 @@ import (
 	"fmt"
 	"flag"
 	"os/signal"
+	"path/filepath"
 	"crypto/ecdsa"
 
 	"github.com/yeeco/gyee/log"
-	p2pcfg	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p"
+	p2pcfg	"github.com/yeeco/gyee/p2p/config"
 )
 
 func main() {
 	var (
-		genKey      = flag.String("genkey", "", "generate node key to file")
+		genKey      = flag.Bool("genkey", false, "generate node key to file")
 		writeNodeID = flag.Bool("writenodeid", false, "write out the node's id and quit")
-		nodeKeyFile = flag.String("nodekey", "", "private key filename")
-
+		nodeDataDir	= flag.String("ndd", "", "node data directory")
+		nodeName	= flag.String("nn", "", "node name")
+		chainIp		= flag.String("cip", "", "chain ip(b1.b2.b3.b4)")
+		dhtIp		= flag.String("dip", "", "dht ip(b1.b2.b3.b4)")
 		nodeKey *ecdsa.PrivateKey
 		err     error
 	)
 	flag.Parse()
 
-	switch {
-	case *genKey != "":
+	if *genKey {
+		if *nodeDataDir == "" || *nodeName == "" {
+			log.Crit("nodeDataDir and nodeName must not be empty","err", err)
+			os.Exit(-1)
+		}
+		kf := filepath.Join(*nodeDataDir, *nodeName, p2pcfg.KeyFileName)
 		nodeKey, err = p2pcfg.GenerateKey()
 		if err != nil {
 			log.Crit("failed to generate nodekey", "err", err)
 		}
-		if err = p2pcfg.SaveECDSA(*genKey, nodeKey); err != nil {
-			log.Crit("failed to save nodekey", "err", err)
+		if err = p2pcfg.SaveECDSA(kf, nodeKey); err != nil {
+			log.Crit("failed to save nodekey","err", err)
+			os.Exit(-1)
 		}
-		return
-	case *nodeKeyFile != "":
-		nodeKey, err = p2pcfg.LoadECDSA(*nodeKeyFile)
-		if err != nil {
-			log.Crit("failed to load nodekey", "err", err)
-		}
-	}
-
-	if nodeKey == nil {
-		log.Crit("nodeKey not provided")
+		os.Exit(0)
 	}
 
 	if *writeNodeID {
+		if *nodeDataDir == "" || *nodeName == "" {
+			log.Crit("nodeDataDir and nodeName must not be empty")
+			os.Exit(-1)
+		}
+		kf := filepath.Join(*nodeDataDir, *nodeName, p2pcfg.KeyFileName)
+		nodeKey, err = p2pcfg.LoadECDSA(kf)
+		if err != nil {
+			log.Crit("failed to load nodekey", "err", err)
+			os.Exit(-1)
+		}
 		nodeID := p2pcfg.P2pPubkey2NodeId(&nodeKey.PublicKey)
 		if nodeID == nil {
 			log.Crit("failed to parse nodeID")
+			os.Exit(-1)
 		}
 		fmt.Printf("%x\n", *nodeID)
 		os.Exit(0)
 	}
 
-	// 除非有特殊的需求，不需要上面的代码通过命令行进行配置，下面即启动了一个 bootstrap node。
-	// 里面的本地节点IP地址和DHT的IP地址要设置一下，否则代码自己去决定的，得到的不一定是正确
-	// 的结果。这两个IP地址可以相同。另bootnode不需要知道自己的外部地址和端口。
+	if (*nodeDataDir != "" && *nodeName == "") || (*nodeDataDir == "" && *nodeName != "") {
+		log.Crit("nodeDataDir and nodeName must all be empty or all be not empty")
+		os.Exit(-1)
+	}
 
 	nodeCfg := p2p.DefaultYeShellConfig
-	nodeCfg.Name				= "bootnode"
+	if *nodeDataDir != "" && *nodeName != "" {
+		nodeCfg.NodeDataDir = *nodeDataDir
+		nodeCfg.Name = *nodeName
+	}
+	if *chainIp != "" {
+		nodeCfg.LocalNodeIp = *chainIp
+	}
+	if *dhtIp != "" {
+		nodeCfg.LocalDhtIp = *dhtIp
+	}
 	nodeCfg.BootstrapNode		= true
 	nodeCfg.Validator			= false
 	nodeCfg.SubNetMaskBits		= 0
 	nodeCfg.NatType				= p2pcfg.NATT_NONE
-	nodeCfg.LocalNodeIp			= "x1.x2.x3.x4"
-	nodeCfg.LocalDhtIp			= "y1.y2.y3.y4"
 	nodeCfg.BootstrapNodes		= make([]string, 0)
 	nodeCfg.DhtBootstrapNodes	= make([]string, 0)
 	bootNode, err := p2p.NewOsnService(&nodeCfg)
 	if err != nil {
 		log.Crit("failed to create bootnode")
-		os.Exit(-1)
+		os.Exit(-2)
 	} else if err := bootNode.Start(); err != nil {
 		log.Crit("failed to start bootnode")
-		os.Exit(-2)
+		os.Exit(-3)
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -98,6 +116,5 @@ func main() {
 	defer signal.Stop(sig)
 	<-sig
 	bootNode.Stop()
-
 	os.Exit(0)
 }
