@@ -122,15 +122,8 @@ func (bc *BlockChain) loadLastBlock() error {
 		return bc.Reset()
 	}
 	var err error
-	if b.stateTrie, err = state.NewAccountTrie(b.StateRoot(), bc.stateDB); err != nil {
-		log.Warn("lastBlock state trie missing",
-			"number", b.Number(), "hash", b.Hash())
-		if err := bc.repair(&b); err != nil {
-			return err
-		}
-	}
-	if b.consensusTrie, err = state.NewConsensusTrie(b.ConsensusRoot(), bc.stateDB); err != nil {
-		log.Warn("lastBlock consensus trie missing",
+	if err = b.prepareTrie(bc.stateDB); err != nil {
+		log.Warn("lastBlock trie missing",
 			"number", b.Number(), "hash", b.Hash())
 		if err := bc.repair(&b); err != nil {
 			return err
@@ -260,6 +253,9 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 			return ErrBlockParentMismatch
 		}
 	}
+	if err := b.prepareTrie(bc.stateDB); err != nil {
+		return err
+	}
 	// add to storage
 	if err := bc.storeBlock(b); err != nil {
 		return err
@@ -299,25 +295,20 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 	if err := rlp.DecodeBytes(signedHeader.Header, header); err != nil {
 		return nil
 	}
-	stateTrie, err := state.NewAccountTrie(header.StateRoot, bc.stateDB)
-	if err != nil {
+	b := &Block{
+		header:    header,
+		signature: signedHeader,
+		body:      body,
+	}
+	if err := b.prepareTrie(bc.stateDB); err != nil {
 		return nil
 	}
-	consensusTrie, err := state.NewConsensusTrie(header.ConsensusRoot, bc.stateDB)
-	if err != nil {
-		return nil
-	}
-	return &Block{
-		header:        header,
-		signature:     signedHeader,
-		body:          body,
-		stateTrie:     stateTrie,
-		consensusTrie: consensusTrie,
-	}
+	return b
 }
 
 // Build Next block from parent block, with transactions
 func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) (*Block, error) {
+	var err error
 	next := &Block{
 		header:       CopyHeader(parent.header),
 		body:         new(corepb.BlockBody),
@@ -328,19 +319,10 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) 
 	next.header.ParentHash = parent.Hash()
 	next.header.Time = t
 
-	// state trie
-	stateTrie, err := state.NewAccountTrie(parent.StateRoot(), bc.stateDB)
-	if err != nil {
+	// block trie
+	if err = next.prepareTrie(bc.stateDB); err != nil {
 		return nil, err
 	}
-	next.stateTrie = stateTrie
-
-	// consensus trie
-	consensusTrie, err := state.NewConsensusTrie(parent.ConsensusRoot(), bc.stateDB)
-	if err != nil {
-		return nil, err
-	}
-	next.consensusTrie = consensusTrie
 
 	// iterate txs for state changes
 	next.transactions, err = bc.replayTxs(next.stateTrie, txs)
@@ -426,19 +408,27 @@ func (bc *BlockChain) verifyHeader(h *BlockHeader) error {
 }
 
 // check block header signature, return matched validator count
-func (bc *BlockChain) verifySignature(b *Block) (map[common.Address]crypto.Signature, error) {
-	prevBlock := bc.GetBlockByNumber(b.Number() - 1)
-	if prevBlock == nil {
-		return nil, ErrBlockParentMissing
+//   signature is check against prev block if param:next is true, or bc.lastBlock if false
+func (bc *BlockChain) verifySignature(b *Block, next bool) (map[common.Address]crypto.Signature, error) {
+	var checkBlock *Block
+	if next {
+		checkBlock = bc.GetBlockByNumber(b.Number() - 1)
+		if checkBlock == nil {
+			return nil, ErrBlockParentMissing
+		}
+	} else {
+		checkBlock = bc.LastBlock()
 	}
+	validatorList := checkBlock.ValidatorAddr()
+	// prepare validator set
+	validators := make(map[common.Address]*struct{})
+	for _, addr := range validatorList {
+		validators[addr] = new(struct{})
+	}
+	// get block signer info
 	signers, err := b.Signers()
 	if err != nil {
 		return nil, err
-	}
-	// prepare validator set
-	validators := make(map[common.Address]*struct{})
-	for _, addr := range prevBlock.consensusTrie.GetValidatorAddr() {
-		validators[addr] = new(struct{})
 	}
 	// count valid signatures
 	var (
@@ -465,7 +455,7 @@ func (bc *BlockChain) verifySignature(b *Block) (map[common.Address]crypto.Signa
 }
 
 // check if block is valid and belongs to chain
-func (bc *BlockChain) verifyBlock(b *Block) (map[common.Address]crypto.Signature, error) {
+func (bc *BlockChain) verifyBlock(b *Block, next bool) (map[common.Address]crypto.Signature, error) {
 	// verify block header
 	if err := bc.verifyHeader(b.header); err != nil {
 		return nil, err
@@ -475,7 +465,7 @@ func (bc *BlockChain) verifyBlock(b *Block) (map[common.Address]crypto.Signature
 		return nil, err
 	}
 	// verify block signature
-	return bc.verifySignature(b)
+	return bc.verifySignature(b, next)
 }
 
 // check if tx is valid and belongs to chain

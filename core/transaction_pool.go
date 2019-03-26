@@ -92,7 +92,7 @@ func (tp *TransactionPool) Stop() {
 }
 
 func (tp *TransactionPool) loop() {
-	log.Info("TransactionPool loop...")
+	log.Trace("TransactionPool loop...")
 	tp.wg.Add(1)
 	defer tp.wg.Done()
 

@@ -140,6 +140,9 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 		}
 		nodes = append(nodes, n)
 	}
+	for i, n := range nodes {
+		log.Info("validator", "index", i, "addr", n.Core().MinerAddr())
+	}
 	const numViewers = 2
 	viewers := make([]*node.Node, 0, numViewers)
 	for i := 0; i < numViewers; i++ {

@@ -110,7 +110,8 @@ type Block struct {
 	// TODO: receipts
 
 	// cache
-	hash atomic.Value
+	hash       atomic.Value
+	validators atomic.Value
 }
 
 func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
@@ -207,8 +208,8 @@ func (b *Block) Sign(signer crypto.Signer) error {
 		}
 	}
 	pbSig := &corepb.Signature{
-		SigAlgorithm:uint32(sig.Algorithm),
-		Signature:sig.Signature,
+		SigAlgorithm: uint32(sig.Algorithm),
+		Signature:    sig.Signature,
 	}
 	b.signature.Signatures = append(b.signature.Signatures, pbSig)
 	return nil
@@ -233,6 +234,33 @@ func (b *Block) Signers() (map[common.Address]crypto.Signature, error) {
 		result[*addr.CommonAddress()] = sig
 	}
 	return result, nil
+}
+
+func (b *Block) prepareTrie(stateDB state.Database) error {
+	if b.stateTrie == nil {
+		stateTrie, err := state.NewAccountTrie(b.header.StateRoot, stateDB)
+		if err != nil {
+			return err
+		}
+		b.stateTrie = stateTrie
+	}
+	if b.consensusTrie == nil {
+		consensusTrie, err := state.NewConsensusTrie(b.header.ConsensusRoot, stateDB)
+		if err != nil {
+			return err
+		}
+		b.consensusTrie = consensusTrie
+	}
+	return nil
+}
+
+func (b *Block) ValidatorAddr() []common.Address {
+	if validators := b.validators.Load(); validators != nil {
+		return validators.([]common.Address)
+	}
+	validators := b.consensusTrie.GetValidatorAddr()
+	b.validators.Store(validators)
+	return validators
 }
 
 /*

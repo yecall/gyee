@@ -92,7 +92,7 @@ func (bp *BlockPool) Stop() {
 }
 
 func (bp *BlockPool) loop() {
-	log.Info("BlockPool loop...")
+	log.Trace("BlockPool loop...")
 	bp.wg.Add(1)
 	defer bp.wg.Done()
 
@@ -131,7 +131,7 @@ func (bp *BlockPool) processMsg(msg p2p.Message) {
 }
 
 func (bp *BlockPool) processBlock(blk *Block) {
-	_, err := bp.chain.verifyBlock(blk)
+	_, err := bp.chain.verifyBlock(blk, false)
 	if err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?

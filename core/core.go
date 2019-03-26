@@ -225,7 +225,7 @@ func (c *Core) Stop() error {
 func (c *Core) loop() {
 	c.wg.Add(1)
 	defer c.wg.Done()
-	log.Info("Core loop...")
+	log.Trace("Core loop...")
 	for {
 		var (
 			chanEventSend <-chan []byte
