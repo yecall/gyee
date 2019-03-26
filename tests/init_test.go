@@ -46,7 +46,7 @@ func TestInit(t *testing.T) {
 
 func TestInitWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 600*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+	doTest(t, numNodes, 300*time.Second, func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
 		genTestTxs(t, quitCh, wg, nodes, numNodes)
 	})
 }

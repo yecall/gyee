@@ -189,7 +189,7 @@ func (bc *BlockChain) Reset() error {
 	if err := genesis.Write(bc.storage); err != nil {
 		return err
 	}
-	putLastBlock(bc.storage, *genesis.Hash())
+	putLastBlock(bc.storage, genesis.Hash())
 	return nil
 }
 
@@ -256,7 +256,7 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 		if pb == nil {
 			return ErrBlockParentMissing
 		}
-		if *pb.Hash() != b.ParentHash() {
+		if pb.Hash() != b.ParentHash() {
 			return ErrBlockParentMismatch
 		}
 	}
@@ -325,7 +325,7 @@ func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) 
 	}
 	// next block number
 	next.header.Number++
-	next.header.ParentHash = *parent.Hash()
+	next.header.ParentHash = parent.Hash()
 	next.header.Time = t
 
 	// state trie

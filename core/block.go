@@ -139,14 +139,14 @@ func (b *Block) ReceiptsRoot() common.Hash  { return b.header.ReceiptsRoot }
 func (b *Block) Time() uint64  { return b.header.Time }
 func (b *Block) Extra() []byte { return b.header.Extra }
 
-func (b *Block) Hash() *common.Hash {
+func (b *Block) Hash() common.Hash {
 	if hash := b.hash.Load(); hash != nil {
-		return hash.(common.Hash).Copy()
+		return hash.(common.Hash)
 	}
 	bytes, _ := b.header.Hash()
-	hash := new(common.Hash)
+	hash := common.Hash{}
 	hash.SetBytes(bytes)
-	b.hash.Store(*hash)
+	b.hash.Store(hash)
 	return hash
 }
 
@@ -196,7 +196,7 @@ func (b *Block) updateBody() error {
 }
 
 func (b *Block) Sign(signer crypto.Signer) error {
-	sig, err := signer.Sign(b.Hash()[:])
+	sig, err := signer.Sign(b.Hash().Copy()[:])
 	if err != nil {
 		return err
 	}

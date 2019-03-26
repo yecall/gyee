@@ -102,7 +102,10 @@ func TestBlockChainGrow(t *testing.T) {
 
 			txs = append(txs, tx)
 		}
-		lastBlock = chain.BuildNextBlock(lastBlock, txs)
+		lastBlock, err = chain.BuildNextBlock(lastBlock, 0, txs)
+		if err != nil {
+			t.Fatalf("BuildNextBlock() %v", err)
+		}
 		if err := chain.AddBlock(lastBlock); err != nil {
 			t.Fatalf("AddBlock() %v", err)
 		}
