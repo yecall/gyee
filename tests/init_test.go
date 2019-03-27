@@ -219,10 +219,7 @@ func genKeys(count uint) [][]byte {
 
 func genGenesis(t *testing.T, keys [][]byte) *core.Genesis {
 	count := len(keys)
-	genesis := &core.Genesis{
-		ChainID:     core.ChainID(testChainID),
-		InitYeeDist: make([]core.InitYeeDist, 0, count),
-	}
+	initDist := make(map[string]*big.Int)
 	validators := make([]string, 0, count)
 	for _, key := range keys {
 		pub, err := secp256k1.GetPublicKey(key)
@@ -235,13 +232,14 @@ func genGenesis(t *testing.T, keys [][]byte) *core.Genesis {
 		}
 		addrStr := addr.String()
 		// setup init dist
-		genesis.InitYeeDist = append(genesis.InitYeeDist, core.InitYeeDist{
-			Address: addrStr, Value: "1000000000",
-		})
+		initDist[addrStr] = big.NewInt(1000000000)
 		// setup validator
 		validators = append(validators, addrStr)
 	}
-	genesis.Consensus.Tetris.Validators = validators
+	genesis, err := core.NewGenesis(core.ChainID(testChainID), initDist, validators)
+	if err != nil {
+		t.Fatalf("NewGenesis() %v", err)
+	}
 	return genesis
 }
 

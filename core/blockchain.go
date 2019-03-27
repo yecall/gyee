@@ -253,11 +253,11 @@ func (bc *BlockChain) AddBlock(b *Block) error {
 			return ErrBlockParentMismatch
 		}
 	}
-	if err := b.prepareTrie(bc.stateDB); err != nil {
-		return err
-	}
 	// add to storage
 	if err := bc.storeBlock(b); err != nil {
+		return err
+	}
+	if err := b.prepareTrie(bc.stateDB); err != nil {
 		return err
 	}
 

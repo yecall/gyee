@@ -23,7 +23,12 @@ package core
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"math/rand"
 	"testing"
+
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 )
 
 func getGenesis(t *testing.T, cid ChainID) *Genesis {
@@ -82,4 +87,41 @@ func TestTestNetGenesis(t *testing.T) {
 	}
 
 	fmt.Printf("block: %v\n", block)
+}
+
+func TestGenesisStateTrie(t *testing.T) {
+	ledger := make(map[common.Address]*big.Int)
+	initDist := make(map[string]*big.Int)
+	for i := int64(0); i < 8192; i++ {
+		// random addr
+		addr := common.Address{}
+		rand.Read(addr[:])
+		addrStr := address.NewAddressFromCommonAddress(addr).String()
+		// balance
+		balance := big.NewInt(i*10000 + i)
+		ledger[addr] = balance
+		initDist[addrStr] = balance
+	}
+	// generate genesis
+	genesis, err := NewGenesis(TestNetID, initDist, nil)
+	if err != nil {
+		t.Fatalf("NewGenesis() %v", err)
+	}
+	block, err := genesis.genBlock(nil)
+	if err != nil {
+		t.Fatalf("genBlock() %v", err)
+	}
+	// check genesis state trie
+	trie := block.stateTrie
+	for addr, balance := range ledger {
+		account := trie.GetAccount(addr, false)
+		if account == nil {
+			t.Errorf("account %v missing", addr)
+			continue
+		}
+		if account.Balance().Cmp(balance) != 0 {
+			t.Errorf("balance mismatch for %v, need %v got %v", addr, balance, account.Balance())
+			continue
+		}
+	}
 }

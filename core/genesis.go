@@ -50,6 +50,20 @@ type Genesis struct {
 	Hash string
 }
 
+func NewGenesis(chainID ChainID, initDist map[string]*big.Int, validators []string) (*Genesis, error) {
+	genesis := &Genesis{
+		ChainID:     chainID,
+		InitYeeDist: make([]InitYeeDist, 0, len(initDist)),
+	}
+	for addr, value := range initDist {
+		genesis.InitYeeDist = append(genesis.InitYeeDist, InitYeeDist{
+			Address: addr, Value: value.String(),
+		})
+	}
+	genesis.Consensus.Tetris.Validators = validators
+	return genesis, nil
+}
+
 func LoadGenesis(id ChainID) (*Genesis, error) {
 	switch id {
 	case MainNetID:

@@ -85,6 +85,18 @@ func NewAddressFromPublicKey(pubkey []byte) (*Address, error) {
 	return newAddressFromPublicKey(AddressTypeAccount, pubkey)
 }
 
+func NewAddressFromCommonAddress(addr common.Address) *Address {
+	buffer := make([]byte, AddressLength)
+	buffer[AddressTypeIndex] = byte(AddressTypeAccount)
+	buffer[AddressNetworkIdIndex] = 0x05 //TODO：这个要从其他地方取
+	copy(buffer[AddressContentIndex:AddressChecksumIndex], addr[:])
+	cs := checkSum(buffer[:AddressChecksumIndex])
+	copy(buffer[AddressChecksumIndex:], cs)
+	return &Address{
+		Raw: buffer,
+	}
+}
+
 func NewContractAddressFromData() (*Address, error) {
 	return nil, nil
 }
