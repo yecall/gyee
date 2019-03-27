@@ -47,6 +47,7 @@ type accountObj struct {
 func newAccount(trie *accountTrie, address common.Address) *accountObj {
 	return &accountObj{
 		trie:    trie,
+		dirty:   true,
 		address: address,
 		balance: new(big.Int),
 	}

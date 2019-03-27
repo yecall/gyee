@@ -26,9 +26,13 @@ import (
 	"math/big"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
+	"github.com/yeeco/gyee/core/state"
+	"github.com/yeeco/gyee/log"
+	"github.com/yeeco/gyee/persistent"
 )
 
 func getGenesis(t *testing.T, cid ChainID) *Genesis {
@@ -90,6 +94,7 @@ func TestTestNetGenesis(t *testing.T) {
 }
 
 func TestGenesisStateTrie(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
 	ledger := make(map[common.Address]*big.Int)
 	initDist := make(map[string]*big.Int)
 	for i := int64(0); i < 8192; i++ {
@@ -98,7 +103,7 @@ func TestGenesisStateTrie(t *testing.T) {
 		rand.Read(addr[:])
 		addrStr := address.NewAddressFromCommonAddress(addr).String()
 		// balance
-		balance := big.NewInt(i*10000 + i)
+		balance := big.NewInt(1 + i*10000 + i)
 		ledger[addr] = balance
 		initDist[addrStr] = balance
 	}
@@ -107,12 +112,16 @@ func TestGenesisStateTrie(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGenesis() %v", err)
 	}
-	block, err := genesis.genBlock(nil)
+	stateDB := state.NewDatabase(persistent.NewMemoryStorage())
+	block, err := genesis.genBlock(stateDB)
 	if err != nil {
 		t.Fatalf("genBlock() %v", err)
 	}
 	// check genesis state trie
-	trie := block.stateTrie
+	trie, err := state.NewAccountTrie(block.StateRoot(), stateDB)
+	if err != nil {
+		t.Fatalf("load trie from stateDB failed %v", err)
+	}
 	for addr, balance := range ledger {
 		account := trie.GetAccount(addr, false)
 		if account == nil {
@@ -124,4 +133,5 @@ func TestGenesisStateTrie(t *testing.T) {
 			continue
 		}
 	}
+	log.Info("done")
 }
