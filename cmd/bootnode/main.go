@@ -18,34 +18,34 @@
 package main
 
 import (
-	"os"
-	"fmt"
+	"crypto/ecdsa"
 	"flag"
+	"fmt"
+	"os"
 	"os/signal"
 	"path/filepath"
-	"crypto/ecdsa"
 
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
-	p2pcfg	"github.com/yeeco/gyee/p2p/config"
+	p2pcfg "github.com/yeeco/gyee/p2p/config"
 )
 
 func main() {
 	var (
 		genKey      = flag.Bool("genkey", false, "generate node key to file")
 		writeNodeID = flag.Bool("writenodeid", false, "write out the node's id and quit")
-		nodeDataDir	= flag.String("ndd", "", "node data directory")
-		nodeName	= flag.String("nn", "", "node name")
-		chainIp		= flag.String("cip", "", "chain ip(b1.b2.b3.b4)")
-		dhtIp		= flag.String("dip", "", "dht ip(b1.b2.b3.b4)")
-		nodeKey *ecdsa.PrivateKey
-		err     error
+		nodeDataDir = flag.String("nodeDataDir", "", "node data directory")
+		nodeName    = flag.String("nodeName", "", "node name")
+		chainIp     = flag.String("cip", "", "chain ip(b1.b2.b3.b4)")
+		dhtIp       = flag.String("dip", "", "dht ip(b1.b2.b3.b4)")
+		nodeKey     *ecdsa.PrivateKey
+		err         error
 	)
 	flag.Parse()
 
 	if *genKey {
 		if *nodeDataDir == "" || *nodeName == "" {
-			log.Crit("nodeDataDir and nodeName must not be empty","err", err)
+			log.Crit("nodeDataDir and nodeName must not be empty", "err", err)
 			os.Exit(-1)
 		}
 		kf := filepath.Join(*nodeDataDir, *nodeName, p2pcfg.KeyFileName)
@@ -54,7 +54,7 @@ func main() {
 			log.Crit("failed to generate nodekey", "err", err)
 		}
 		if err = p2pcfg.SaveECDSA(kf, nodeKey); err != nil {
-			log.Crit("failed to save nodekey","err", err)
+			log.Crit("failed to save nodekey", "err", err)
 			os.Exit(-1)
 		}
 		os.Exit(0)
@@ -96,12 +96,12 @@ func main() {
 	if *dhtIp != "" {
 		nodeCfg.LocalDhtIp = *dhtIp
 	}
-	nodeCfg.BootstrapNode		= true
-	nodeCfg.Validator			= false
-	nodeCfg.SubNetMaskBits		= 0
-	nodeCfg.NatType				= p2pcfg.NATT_NONE
-	nodeCfg.BootstrapNodes		= make([]string, 0)
-	nodeCfg.DhtBootstrapNodes	= make([]string, 0)
+	nodeCfg.BootstrapNode = true
+	nodeCfg.Validator = false
+	nodeCfg.SubNetMaskBits = 0
+	nodeCfg.NatType = p2pcfg.NATT_NONE
+	nodeCfg.BootstrapNodes = make([]string, 0)
+	nodeCfg.DhtBootstrapNodes = make([]string, 0)
 	bootNode, err := p2p.NewOsnService(&nodeCfg)
 	if err != nil {
 		log.Crit("failed to create bootnode")
