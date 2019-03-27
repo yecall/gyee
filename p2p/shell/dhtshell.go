@@ -21,50 +21,50 @@
 package shell
 
 import (
-	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	dht		"github.com/yeeco/gyee/p2p/dht"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	dht "github.com/yeeco/gyee/p2p/dht"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
 //
 // debug
 //
 type dhtShellLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var dhtLog = dhtShellLogger {
-	debug__:	false,
+var dhtLog = dhtShellLogger{
+	debug__: false,
 }
 
-func (log dhtShellLogger)Debug(fmt string, args ... interface{}) {
+func (log dhtShellLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
 const (
-	dhtShMgrName = sch.DhtShMgrName						// name registered in scheduler
-	dhtShEvQueueSize = 64								// event indication queue size
-	dhtShCsQueueSize = 64								// connection status indication queue size
+	dhtShMgrName     = sch.DhtShMgrName // name registered in scheduler
+	dhtShEvQueueSize = 64               // event indication queue size
+	dhtShCsQueueSize = 64               // connection status indication queue size
 )
 
 type DhtShellManager struct {
-	sdl				*sch.Scheduler						// pointer to scheduler
-	name			string								// my name
-	tep				sch.SchUserTaskEp					// task entry
-	ptnMe			interface{}							// pointer to task node of myself
-	ptnDhtMgr		interface{}							// pointer to dht manager task node
-	evChan			chan *sch.MsgDhtShEventInd			// event indication channel
-	csChan			chan *sch.MsgDhtConInstStatusInd	// connection status indication channel
+	sdl       *sch.Scheduler                   // pointer to scheduler
+	name      string                           // my name
+	tep       sch.SchUserTaskEp                // task entry
+	ptnMe     interface{}                      // pointer to task node of myself
+	ptnDhtMgr interface{}                      // pointer to dht manager task node
+	evChan    chan *sch.MsgDhtShEventInd       // event indication channel
+	csChan    chan *sch.MsgDhtConInstStatusInd // connection status indication channel
 }
 
 //
 // Create dht shell manager
 //
 func NewDhtShellMgr() *DhtShellManager {
-	shMgr := DhtShellManager {
-		name: dhtShMgrName,
+	shMgr := DhtShellManager{
+		name:   dhtShMgrName,
 		evChan: make(chan *sch.MsgDhtShEventInd, dhtShEvQueueSize),
 		csChan: make(chan *sch.MsgDhtConInstStatusInd, dhtShCsQueueSize),
 	}
@@ -75,14 +75,14 @@ func NewDhtShellMgr() *DhtShellManager {
 //
 // Entry point exported to scheduler
 //
-func (shMgr *DhtShellManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (shMgr *DhtShellManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return shMgr.tep(ptn, msg)
 }
 
 //
 // Shell manager entry
 //
-func (shMgr *DhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (shMgr *DhtShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	dhtLog.Debug("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
 
@@ -129,7 +129,7 @@ func (shMgr *DhtShellManager)shMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 	return eno
 }
 
-func (shMgr *DhtShellManager)poweron(ptn interface{}) sch.SchErrno {
+func (shMgr *DhtShellManager) poweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
@@ -140,14 +140,14 @@ func (shMgr *DhtShellManager)poweron(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)poweroff(ptn interface{}) sch.SchErrno {
+func (shMgr *DhtShellManager) poweroff(ptn interface{}) sch.SchErrno {
 	dhtLog.Debug("poweroff: task will be done...")
 	close(shMgr.evChan)
 	close(shMgr.csChan)
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
 }
 
-func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {
 
 	dhtLog.Debug("dhtShEventInd: event type: %d", ind.Evt)
 
@@ -157,37 +157,37 @@ func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 
 	switch evt {
 
-	case  sch.EvDhtBlindConnectRsp:
+	case sch.EvDhtBlindConnectRsp:
 		eno = shMgr.dhtBlindConnectRsp(msg.(*sch.MsgDhtBlindConnectRsp))
 
-	case  sch.EvDhtMgrFindPeerRsp:
+	case sch.EvDhtMgrFindPeerRsp:
 		eno = shMgr.dhtMgrFindPeerRsp(msg.(*sch.MsgDhtQryMgrQueryResultInd))
 
-	case  sch.EvDhtQryMgrQueryStartRsp:
+	case sch.EvDhtQryMgrQueryStartRsp:
 		eno = shMgr.dhtQryMgrQueryStartRsp(msg.(*sch.MsgDhtQryMgrQueryStartRsp))
 
-	case  sch.EvDhtQryMgrQueryStopRsp:
+	case sch.EvDhtQryMgrQueryStopRsp:
 		eno = shMgr.dhtQryMgrQueryStopRsp(msg.(*sch.MsgDhtQryMgrQueryStopRsp))
 
-	case  sch.EvDhtConMgrSendCfm:
+	case sch.EvDhtConMgrSendCfm:
 		eno = shMgr.dhtConMgrSendCfm(msg.(*sch.MsgDhtConMgrSendCfm))
 
-	case  sch.EvDhtMgrPutProviderRsp:
+	case sch.EvDhtMgrPutProviderRsp:
 		eno = shMgr.dhtMgrPutProviderRsp(msg.(*sch.MsgDhtPrdMgrAddProviderRsp))
 
-	case  sch.EvDhtMgrGetProviderRsp:
+	case sch.EvDhtMgrGetProviderRsp:
 		eno = shMgr.dhtMgrGetProviderRsp(msg.(*sch.MsgDhtMgrGetProviderRsp))
 
-	case  sch.EvDhtMgrPutValueRsp:
+	case sch.EvDhtMgrPutValueRsp:
 		eno = shMgr.dhtMgrPutValueRsp(msg.(*sch.MsgDhtMgrPutValueRsp))
 
-	case  sch.EvDhtMgrGetValueRsp:
+	case sch.EvDhtMgrGetValueRsp:
 		eno = shMgr.dhtMgrGetValueRsp(msg.(*sch.MsgDhtMgrGetValueRsp))
 
-	case  sch.EvDhtConMgrCloseRsp:
+	case sch.EvDhtConMgrCloseRsp:
 		eno = shMgr.dhtConMgrCloseRsp(msg.(*sch.MsgDhtConMgrCloseRsp))
 
-	case  sch.EvDhtConInstStatusInd:
+	case sch.EvDhtConInstStatusInd:
 		return shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
 
 	default:
@@ -198,63 +198,63 @@ func (shMgr *DhtShellManager)dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErr
 	dhtLog.Debug("dhtTestEventCallback: event put to channel, type: %d", evt)
 
 	if eno == sch.SchEnoNone {
-		shMgr.evChan<-ind
+		shMgr.evChan <- ind
 	}
 
 	return eno
 }
 
-func (shMgr *DhtShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	dhtLog.Debug("dhtBlindConnectRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 	dhtLog.Debug("dhtMgrFindPeerRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 	dhtLog.Debug("dhtQryMgrQueryStartRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
 	dhtLog.Debug("dhtQryMgrQueryStopRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
 	dhtLog.Debug("dhtConMgrSendCfm: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
 	dhtLog.Debug("dhtMgrPutProviderRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
 	dhtLog.Debug("dhtMgrGetProviderRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 	dhtLog.Debug("dhtMgrPutValueRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 	dhtLog.Debug("dhtMgrGetValueRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
 	dhtLog.Debug("dhtConMgrCloseRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrno {
 
 	switch msg.Status {
 
@@ -290,56 +290,56 @@ func (shMgr *DhtShellManager)dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusInd
 		return sch.SchEnoParameter
 	}
 
-	shMgr.csChan<-msg
+	shMgr.csChan <- msg
 	return sch.SchEnoNone
 }
 
-func (shMgr *DhtShellManager)dhtRutRefreshReq() sch.SchErrno {
+func (shMgr *DhtShellManager) dhtRutRefreshReq() sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtRutRefreshReq, nil)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)dhtShFindPeerReq(req *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShFindPeerReq(req *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrFindPeerReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectReq) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtBlindConnectReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetValueReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)dhtShPutValueReq(req *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShPutValueReq(req *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrPutValueReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)dhtShGetProviderReq(req *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShGetProviderReq(req *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetProviderReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)dhtShPutProviderReq(req *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
+func (shMgr *DhtShellManager) dhtShPutProviderReq(req *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrPutProviderReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 
-func (shMgr *DhtShellManager)GetEventChan() chan *sch.MsgDhtShEventInd {
+func (shMgr *DhtShellManager) GetEventChan() chan *sch.MsgDhtShEventInd {
 	return shMgr.evChan
 }
 
-func (shMgr *DhtShellManager)GetConnStatusChan() chan *sch.MsgDhtConInstStatusInd {
+func (shMgr *DhtShellManager) GetConnStatusChan() chan *sch.MsgDhtConInstStatusInd {
 	return shMgr.csChan
 }

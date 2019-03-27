@@ -19,32 +19,31 @@ package nat
 
 import (
 	"net"
-	"time"
 	"strings"
+	"time"
+
 	"github.com/huin/goupnp"
 	"github.com/huin/goupnp/dcps/internetgateway1"
 	"github.com/huin/goupnp/dcps/internetgateway2"
 )
 
-
-
 // see following packages under github.com/huin/goupnp for details:
 // internetgateway1.WANIPConnection1, internetgateway1.WANPPPConnection1,
 // internetgateway2.WANIPConnection1, internetgateway2.WANIPConnection2, internetgateway2.WANPPPConnection1
 const (
-	devType1 = internetgateway1.URN_WANConnectionDevice_1
-	devType1Str = "internetgateway1.URN_WANConnectionDevice_1"
-	devType2 = internetgateway2.URN_WANConnectionDevice_2
-	devType2Str = "internetgateway2.URN_WANConnectionDevice_2"
-	srvType11 = internetgateway1.URN_WANIPConnection_1
+	devType1     = internetgateway1.URN_WANConnectionDevice_1
+	devType1Str  = "internetgateway1.URN_WANConnectionDevice_1"
+	devType2     = internetgateway2.URN_WANConnectionDevice_2
+	devType2Str  = "internetgateway2.URN_WANConnectionDevice_2"
+	srvType11    = internetgateway1.URN_WANIPConnection_1
 	srvType11Str = "internetgateway1.URN_WANIPConnection_1"
-	srvType12 = internetgateway1.URN_WANPPPConnection_1
+	srvType12    = internetgateway1.URN_WANPPPConnection_1
 	srvType12Str = "internetgateway1.URN_WANPPPConnection_1"
-	srvType21 = internetgateway2.URN_WANIPConnection_1
+	srvType21    = internetgateway2.URN_WANIPConnection_1
 	srvType21Str = "internetgateway2.URN_WANIPConnection_1"
-	srvType22 = internetgateway2.URN_WANIPConnection_2
+	srvType22    = internetgateway2.URN_WANIPConnection_2
 	srvType22Str = "internetgateway2.URN_WANIPConnection_2"
-	srvType23 = internetgateway2.URN_WANPPPConnection_1
+	srvType23    = internetgateway2.URN_WANPPPConnection_1
 	srvType23Str = "internetgateway2.URN_WANPPPConnection_1"
 )
 
@@ -58,29 +57,29 @@ type upnpClient interface {
 }
 
 type upnpCtrlBlock struct {
-	devType		string				// device type
-	srvType		string				// service type
-	device     	*goupnp.RootDevice	// root device
-	client		upnpClient			// client to access services
+	devType string             // device type
+	srvType string             // service type
+	device  *goupnp.RootDevice // root device
+	client  upnpClient         // client to access services
 }
 
 func NewUpnpInterface() *upnpCtrlBlock {
 	cb := queryUpnp()
 	if cb == nil {
 		natLog.Debug("NewUpnpInterface: queryUpnp failed")
-		return (*upnpCtrlBlock )(nil)
+		return (*upnpCtrlBlock)(nil)
 	}
 	return cb
 }
 
-func (upnp *upnpCtrlBlock)makeMap(name string, proto string, locPort int, pubPort int, durKeep time.Duration) NatEno {
+func (upnp *upnpCtrlBlock) makeMap(name string, proto string, locPort int, pubPort int, durKeep time.Duration) NatEno {
 	ip, eno := upnp.getLocalAddress()
 	if eno != NatEnoNone {
 		natLog.Debug("makeMap: getLocalAddress failed, error: %s", eno.Error())
 		return eno
 	}
 	proto = strings.ToUpper(proto)
-	seconds := uint32(durKeep/time.Second)
+	seconds := uint32(durKeep / time.Second)
 	// we had filtered out the duplicated case in function makeMapReq,
 	// but would someone else(other application)... try removing...
 	upnp.removeMap(proto, locPort, pubPort)
@@ -92,7 +91,7 @@ func (upnp *upnpCtrlBlock)makeMap(name string, proto string, locPort int, pubPor
 	return NatEnoNone
 }
 
-func (upnp *upnpCtrlBlock)removeMap(proto string, locPort int, pubPort int) NatEno {
+func (upnp *upnpCtrlBlock) removeMap(proto string, locPort int, pubPort int) NatEno {
 	proto = strings.ToUpper(proto)
 	if err := upnp.client.DeletePortMapping("", uint16(pubPort), proto); err != nil {
 		natLog.Debug("removeMap: DeletePortMapping failed, error: %s", err.Error())
@@ -101,7 +100,7 @@ func (upnp *upnpCtrlBlock)removeMap(proto string, locPort int, pubPort int) NatE
 	return NatEnoNone
 }
 
-func (upnp *upnpCtrlBlock)getPublicIpAddr() (net.IP, NatEno) {
+func (upnp *upnpCtrlBlock) getPublicIpAddr() (net.IP, NatEno) {
 	ipStr, err := upnp.client.GetExternalIPAddress()
 	if err != nil {
 		natLog.Debug("getPublicIpAddr: GetExternalIPAddress failed, error: %s", err.Error())
@@ -115,7 +114,7 @@ func (upnp *upnpCtrlBlock)getPublicIpAddr() (net.IP, NatEno) {
 	return ip, NatEnoNone
 }
 
-func (upnp *upnpCtrlBlock)getLocalAddress() (net.IP, NatEno) {
+func (upnp *upnpCtrlBlock) getLocalAddress() (net.IP, NatEno) {
 	devaddr, err := net.ResolveUDPAddr("udp4", upnp.device.URLBase.Host)
 	if err != nil {
 		natLog.Debug("getLocalAddress: bad device address: %s", upnp.device.URLBase.Host)
@@ -147,18 +146,18 @@ func (upnp *upnpCtrlBlock)getLocalAddress() (net.IP, NatEno) {
 func devType1Matcher(dev *goupnp.RootDevice, sc goupnp.ServiceClient) *upnpCtrlBlock {
 	switch sc.Service.ServiceType {
 	case srvType11:
-		return &upnpCtrlBlock {
+		return &upnpCtrlBlock{
 			devType: devType1Str,
 			srvType: srvType11Str,
-			device: dev,
-			client: &internetgateway1.WANIPConnection1{ServiceClient: sc},
+			device:  dev,
+			client:  &internetgateway1.WANIPConnection1{ServiceClient: sc},
 		}
 	case srvType12:
-		return &upnpCtrlBlock {
+		return &upnpCtrlBlock{
 			devType: devType1Str,
 			srvType: srvType12Str,
-			device: dev,
-			client: &internetgateway1.WANPPPConnection1{ServiceClient: sc},
+			device:  dev,
+			client:  &internetgateway1.WANPPPConnection1{ServiceClient: sc},
 		}
 	}
 	return nil
@@ -169,25 +168,25 @@ type matcherT func(*goupnp.RootDevice, goupnp.ServiceClient) *upnpCtrlBlock
 func devType2Mathcer(dev *goupnp.RootDevice, sc goupnp.ServiceClient) *upnpCtrlBlock {
 	switch sc.Service.ServiceType {
 	case srvType21:
-		return &upnpCtrlBlock {
+		return &upnpCtrlBlock{
 			devType: devType2Str,
 			srvType: srvType21Str,
-			device: dev,
-			client: &internetgateway2.WANIPConnection1{ServiceClient: sc},
+			device:  dev,
+			client:  &internetgateway2.WANIPConnection1{ServiceClient: sc},
 		}
 	case srvType22:
-		return &upnpCtrlBlock {
+		return &upnpCtrlBlock{
 			devType: devType2Str,
 			srvType: srvType22Str,
-			device: dev,
-			client: &internetgateway2.WANIPConnection2{ServiceClient: sc},
+			device:  dev,
+			client:  &internetgateway2.WANIPConnection2{ServiceClient: sc},
 		}
 	case srvType23:
-		return &upnpCtrlBlock {
+		return &upnpCtrlBlock{
 			devType: devType2Str,
 			srvType: srvType23Str,
-			device: dev,
-			client: &internetgateway2.WANPPPConnection1{ServiceClient: sc},
+			device:  dev,
+			client:  &internetgateway2.WANPPPConnection1{ServiceClient: sc},
 		}
 	}
 	return nil

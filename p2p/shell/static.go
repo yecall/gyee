@@ -18,45 +18,44 @@
  *
  */
 
-
 package shell
 
 import (
 	"time"
-	config	"github.com/yeeco/gyee/p2p/config"
-	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	dcv		"github.com/yeeco/gyee/p2p/discover"
-	tab		"github.com/yeeco/gyee/p2p/discover/table"
-	ngb		"github.com/yeeco/gyee/p2p/discover/neighbor"
-	peer	"github.com/yeeco/gyee/p2p/peer"
-	dht		"github.com/yeeco/gyee/p2p/dht"
-	nat		"github.com/yeeco/gyee/p2p/nat"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
 
+	config "github.com/yeeco/gyee/p2p/config"
+	dht "github.com/yeeco/gyee/p2p/dht"
+	dcv "github.com/yeeco/gyee/p2p/discover"
+	ngb "github.com/yeeco/gyee/p2p/discover/neighbor"
+	tab "github.com/yeeco/gyee/p2p/discover/table"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	nat "github.com/yeeco/gyee/p2p/nat"
+	peer "github.com/yeeco/gyee/p2p/peer"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type staticTaskLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var stLog = staticTaskLogger {
-	debug__:	true,
+var stLog = staticTaskLogger{
+	debug__: true,
 }
 
-func (log staticTaskLogger)Debug(fmt string, args ... interface{}) {
+func (log staticTaskLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
 //
 // watch dog is not implemented
 //
-var noDog = sch.SchWatchDog {
-	HaveDog:false,
+var noDog = sch.SchWatchDog{
+	HaveDog: false,
 }
 
 //
@@ -78,29 +77,29 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 	if what == config.P2P_TYPE_CHAIN {
 
 		return []sch.TaskStaticDescription{
-			{Name: sch.NatMgrName,		Tep: nat.NewNatMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dcv.DcvMgrName,		Tep: dcv.NewDcvMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: tab.NdbcName,		Tep: tab.NewNdbCleaner(),	MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: ngb.LsnMgrName,		Tep: ngb.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: ngb.NgbMgrName,		Tep: ngb.NewNgbMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: tab.TabMgrName,		Tep: tab.NewTabMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: peer.PeerLsnMgrName,	Tep: peer.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: sch.PeerMgrName,		Tep: peer.NewPeerMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: sch.ShMgrName,		Tep: NewShellMgr(),			MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.NatMgrName, Tep: nat.NewNatMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dcv.DcvMgrName, Tep: dcv.NewDcvMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: tab.NdbcName, Tep: tab.NewNdbCleaner(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: ngb.LsnMgrName, Tep: ngb.NewLsnMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: ngb.NgbMgrName, Tep: ngb.NewNgbMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: tab.TabMgrName, Tep: tab.NewTabMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: peer.PeerLsnMgrName, Tep: peer.NewLsnMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.PeerMgrName, Tep: peer.NewPeerMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.ShMgrName, Tep: NewShellMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 
 	} else if what == config.P2P_TYPE_DHT {
 
 		return []sch.TaskStaticDescription{
-			{Name: sch.NatMgrName,		Tep: nat.NewNatMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.DhtMgrName,		Tep: dht.NewDhtMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.DsMgrName,		Tep: dht.NewDsMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.LsnMgrName,		Tep: dht.NewLsnMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.PrdMgrName,		Tep: dht.NewPrdMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.QryMgrName,		Tep: dht.NewQryMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.RutMgrName,		Tep: dht.NewRutMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.ConMgrName,		Tep: dht.NewConMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: sch.DhtShMgrName,	Tep: NewDhtShellMgr(),		MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.NatMgrName, Tep: nat.NewNatMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DhtMgrName, Tep: dht.NewDhtMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DsMgrName, Tep: dht.NewDsMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.LsnMgrName, Tep: dht.NewLsnMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.PrdMgrName, Tep: dht.NewPrdMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.QryMgrName, Tep: dht.NewQryMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.RutMgrName, Tep: dht.NewRutMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.ConMgrName, Tep: dht.NewConMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: sch.DhtShMgrName, Tep: NewDhtShellMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 		}
 	}
 
@@ -114,7 +113,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 // Notice: there are some dependencies between the tasks, one should check them
 // to modify this table if necessary.
 //
-var taskStaticPoweronOrder4Chain = []string {
+var taskStaticPoweronOrder4Chain = []string{
 	nat.NatMgrName,
 	dcv.DcvMgrName,
 	tab.NdbcName,
@@ -131,7 +130,7 @@ var taskStaticPoweronOrder4Chain = []string {
 // Notice: there are some dependencies between the tasks, one should check them
 // to modify this table if necessary.
 //
-var taskStaticPoweroffOrder4Chain = []string {
+var taskStaticPoweroffOrder4Chain = []string{
 	nat.NatMgrName,
 	sch.ShMgrName,
 	dcv.DcvMgrName,
@@ -148,7 +147,7 @@ var taskStaticPoweroffOrder4Chain = []string {
 // Notice: there are some dependencies between the tasks, one should check them
 // to modify this table if necessary.
 //
-var taskStaticPoweronOrder4Dht = [] string {
+var taskStaticPoweronOrder4Dht = []string{
 	nat.NatMgrName,
 	dht.DhtMgrName,
 	dht.DsMgrName,
@@ -165,7 +164,7 @@ var taskStaticPoweronOrder4Dht = [] string {
 // Notice: there are some dependencies between the tasks, one should check them
 // to modify this table if necessary.
 //
-var taskStaticPoweroffOrder4Dht = [] string {
+var taskStaticPoweroffOrder4Dht = []string{
 	nat.NatMgrName,
 	sch.DhtShMgrName,
 	dht.DhtMgrName,
@@ -257,7 +256,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
 	staticTasks := make([]string, 0)
-	powerOff := sch.SchMessage {
+	powerOff := sch.SchMessage{
 		Id: sch.EvSchPoweroff,
 	}
 
@@ -305,7 +304,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
 	seconds := 0
 	for {
-		time.Sleep(time.Second )
+		time.Sleep(time.Second)
 		seconds++
 		tasks := sdl.SchGetTaskNumber()
 		if tasks == 0 {
@@ -317,7 +316,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 			seconds, p2pInstName, appType, tasks, tkNames)
 	}
 
-	ch<-true
+	ch <- true
 
 	return sch.SchEnoNone
 }

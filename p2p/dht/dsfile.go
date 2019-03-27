@@ -22,24 +22,24 @@ package dht
 
 import (
 	"time"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
 
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+)
 
 //
 // debug
 //
 type dsfLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var dsfLog = dsfLogger {
-	debug__:	false,
+var dsfLog = dsfLogger{
+	debug__: false,
 }
 
-func (log dsfLogger)Debug(fmt string, args ... interface{}) {
+func (log dsfLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -48,34 +48,33 @@ func (log dsfLogger)Debug(fmt string, args ... interface{}) {
 //
 
 type FileDatastoreConfig struct {
-	path				string				// data store path
-	shardFuncName		string				// shard function name
-	padLength			int					// padding length
-	sync				bool				// sync file store flag
+	path          string // data store path
+	shardFuncName string // shard function name
+	padLength     int    // padding length
+	sync          bool   // sync file store flag
 }
 
-type FileDatastore struct {}
+type FileDatastore struct{}
 
 func NewFileDatastore(cfg *FileDatastoreConfig) *FileDatastore {
 	return (*FileDatastore)(nil)
 }
 
-func (fds *FileDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+func (fds *FileDatastore) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	return DhtEnoNotSup
 }
 
-func (fds *FileDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
+func (fds *FileDatastore) Get(k []byte) (eno DhtErrno, value DsValue) {
 	return DhtEnoNotSup, nil
 }
 
-func (fds *FileDatastore)Delete(k []byte) DhtErrno {
+func (fds *FileDatastore) Delete(k []byte) DhtErrno {
 	return DhtEnoNotSup
 }
 
-func (fds *FileDatastore)Close() DhtErrno {
+func (fds *FileDatastore) Close() DhtErrno {
 	return DhtEnoNotSup
 }
-
 
 /*****************************************************************************
  *

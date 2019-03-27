@@ -37,16 +37,16 @@ import (
 // debug
 //
 type tcpmsgLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var tcpmsgLog = tcpmsgLogger {
-	debug__:	false,
+var tcpmsgLog = tcpmsgLogger{
+	debug__: false,
 }
 
-func (log tcpmsgLogger)Debug(fmt string, args ... interface{}) {
+func (log tcpmsgLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -59,9 +59,9 @@ const MaxProtocols = config.MaxProtocols
 // Protocol identities
 //
 const (
-	PID_P2P			= pb.ProtocolId_PID_P2P		// p2p internal
-	PID_EXT			= pb.ProtocolId_PID_EXT		// external protocol
-	PID_UNKNOWN		= -1
+	PID_P2P     = pb.ProtocolId_PID_P2P // p2p internal
+	PID_EXT     = pb.ProtocolId_PID_EXT // external protocol
+	PID_UNKNOWN = -1
 )
 
 //
@@ -70,113 +70,113 @@ const (
 const (
 
 	// internal MID for PID_P2P
-	MID_HANDSHAKE	= pb.MessageId_MID_HANDSHAKE	// handshake
-	MID_PING		= pb.MessageId_MID_PING			// ping
-	MID_PONG		= pb.MessageId_MID_PONG			// pong
-	MID_CHKK		= pb.MessageId_MID_CHKK			// check key
-	MID_RPTK		= pb.MessageId_MID_RPTK			// report key
+	MID_HANDSHAKE = pb.MessageId_MID_HANDSHAKE // handshake
+	MID_PING      = pb.MessageId_MID_PING      // ping
+	MID_PONG      = pb.MessageId_MID_PONG      // pong
+	MID_CHKK      = pb.MessageId_MID_CHKK      // check key
+	MID_RPTK      = pb.MessageId_MID_RPTK      // report key
 
 	// external MID for PID_EXT
-	MID_TX			= pb.MessageId_MID_TX
-	MID_EVENT		= pb.MessageId_MID_EVENT
-	MID_BLOCKHEADER	= pb.MessageId_MID_BLOCKHEADER
-	MID_BLOCK		= pb.MessageId_MID_BLOCK
+	MID_TX          = pb.MessageId_MID_TX
+	MID_EVENT       = pb.MessageId_MID_EVENT
+	MID_BLOCKHEADER = pb.MessageId_MID_BLOCKHEADER
+	MID_BLOCK       = pb.MessageId_MID_BLOCK
 
 	// invalid MID
-	MID_INVALID		= pb.MessageId_MID_INVALID
+	MID_INVALID = pb.MessageId_MID_INVALID
 )
 
 //
 // Key status
 //
 const (
-	KS_NOTEXIST		= pb.KeyStatus_KS_NOTEXIST
-	KS_EXIST		= pb.KeyStatus_KS_EXIST
+	KS_NOTEXIST = pb.KeyStatus_KS_NOTEXIST
+	KS_EXIST    = pb.KeyStatus_KS_EXIST
 )
 
 //
 // Protocol
 //
 type Protocol struct {
-	Pid		uint32	// protocol identity
-	Ver		[4]byte	// protocol version: M.m0.m1.m2
+	Pid uint32  // protocol identity
+	Ver [4]byte // protocol version: M.m0.m1.m2
 }
 
 //
 // Handshake message
 //
 type Handshake struct {
-	Snid		SubNetworkID	// sub network identity
-	Dir			int				// direct
-	NodeId		config.NodeID	// node identity
-	IP			net.IP			// ip address
-	UDP			uint32			// udp port number
-	TCP			uint32			// tcp port number
-	ProtoNum	uint32			// number of protocols supported
-	Protocols	[]Protocol		// version of protocol
+	Snid      SubNetworkID  // sub network identity
+	Dir       int           // direct
+	NodeId    config.NodeID // node identity
+	IP        net.IP        // ip address
+	UDP       uint32        // udp port number
+	TCP       uint32        // tcp port number
+	ProtoNum  uint32        // number of protocols supported
+	Protocols []Protocol    // version of protocol
 }
 
 //
 // PingPong message
 //
 type Pingpong struct {
-	Seq			uint64		// sequence
-	Extra		[]byte		// extra info
+	Seq   uint64 // sequence
+	Extra []byte // extra info
 }
 
 //
 // Check key
 //
 type CheckKey struct {
-	Key			[]byte		// key
-	Extra		[]byte		// extra info
+	Key   []byte // key
+	Extra []byte // extra info
 }
 
 //
 // Report key
 //
 type ReportKey struct {
-	Key			[]byte		// key
-	Status		int32		// key status
-	Extra		[]byte		// extra info
+	Key    []byte // key
+	Status int32  // key status
+	Extra  []byte // extra info
 }
 
 //
 // Package for TCP message
 //
 type P2pPackage struct {
-	Pid				uint32	// protocol identity
-	Mid				uint32	// message identity
-	Key				[]byte	// key of message
-	PayloadLength	uint32	// payload length
-	Payload			[]byte	// payload
+	Pid           uint32 // protocol identity
+	Mid           uint32 // message identity
+	Key           []byte // key of message
+	PayloadLength uint32 // payload length
+	Payload       []byte // payload
 }
 
 //
 // Message for internal TCP message
 //
 type P2pMessage struct {
-	Mid				uint32		// message identity
-	Ping			*Pingpong	// ping message
-	Pong			*Pingpong	// pong message
-	Handshake		*Handshake	// handshake message
-	Chkk			*CheckKey	// check key message
-	Rptk			*ReportKey	// report key message
+	Mid       uint32     // message identity
+	Ping      *Pingpong  // ping message
+	Pong      *Pingpong  // pong message
+	Handshake *Handshake // handshake message
+	Chkk      *CheckKey  // check key message
+	Rptk      *ReportKey // report key message
 }
 
 //
 // Message for external TCP message
 //
 type ExtMessage struct {
-	Mid				uint32		// message identity
-	Chkk			*CheckKey	// check key message
-	Rptk			*ReportKey	// report key message
+	Mid  uint32     // message identity
+	Chkk *CheckKey  // check key message
+	Rptk *ReportKey // report key message
 }
 
 //
 // Read handshake message from inbound peer
 //
-func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMgrErrno) {
+func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMgrErrno) {
 
 	if inst.hto != 0 {
 		inst.conn.SetReadDeadline(time.Now().Add(inst.hto))
@@ -196,21 +196,21 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMg
 	}
 
 	if *pkg.Pid != PID_P2P {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		tcpmsgLog.Debug("getHandshakeInbound: "+
 			"not a p2p package, pid: %d",
 			*pkg.Pid)
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pkg.PayloadLength <= 0 {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		tcpmsgLog.Debug("getHandshakeInbound: "+
 			"invalid payload length: %d",
 			*pkg.PayloadLength)
 		return nil, PeMgrEnoMessage
 	}
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		tcpmsgLog.Debug("getHandshakeInbound: "+
 			"payload length mismatched, PlLen: %d, real: %d",
 			*pkg.PayloadLength, len(pkg.Payload))
 		return nil, PeMgrEnoMessage
@@ -218,14 +218,14 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMg
 
 	pbMsg := new(pb.P2PMessage)
 	if err := proto.Unmarshal(pkg.Payload, pbMsg); err != nil {
-		tcpmsgLog.Debug("getHandshakeInbound:" +
+		tcpmsgLog.Debug("getHandshakeInbound:"+
 			"Unmarshal failed, err: %s",
 			err.Error())
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pbMsg.Mid != MID_HANDSHAKE {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		tcpmsgLog.Debug("getHandshakeInbound: "+
 			"it's not a handshake message, mid: %d",
 			*pbMsg.Mid)
 		return nil, PeMgrEnoMessage
@@ -238,28 +238,28 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMg
 	}
 
 	if pbHS == nil {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		tcpmsgLog.Debug("getHandshakeInbound: "+
 			"invalid handshake message pointer: %p",
 			pbHS)
 		return nil, PeMgrEnoMessage
 	}
 
 	if len(pbHS.NodeId) != config.NodeIDBytes {
-		tcpmsgLog.Debug("getHandshakeInbound:" +
+		tcpmsgLog.Debug("getHandshakeInbound:"+
 			"invalid node identity length: %d",
-				len(pbHS.NodeId))
+			len(pbHS.NodeId))
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pbHS.ProtoNum > MaxProtocols {
-		tcpmsgLog.Debug("getHandshakeInbound:" +
+		tcpmsgLog.Debug("getHandshakeInbound:"+
 			"too much protocols: %d",
 			*pbHS.ProtoNum)
 		return nil, PeMgrEnoMessage
 	}
 
 	if int(*pbHS.ProtoNum) != len(pbHS.Protocols) {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		tcpmsgLog.Debug("getHandshakeInbound: "+
 			"number of protocols mismathced, ProtoNum: %d, real: %d",
 			int(*pbHS.ProtoNum), len(pbHS.Protocols))
 		return nil, PeMgrEnoMessage
@@ -285,7 +285,7 @@ func (upkg *P2pPackage)getHandshakeInbound(inst *PeerInstance) (*Handshake, PeMg
 //
 // Write handshake message to peer
 //
-func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) PeMgrErrno {
+func (upkg *P2pPackage) putHandshakeOutbound(inst *PeerInstance, hs *Handshake) PeMgrErrno {
 
 	pbHandshakeMsg := new(pb.P2PMessage_Handshake)
 	pbHandshakeMsg.SubNetId = append(pbHandshakeMsg.SubNetId, hs.Snid[:]...)
@@ -349,12 +349,12 @@ func (upkg *P2pPackage)putHandshakeOutbound(inst *PeerInstance, hs *Handshake) P
 //
 // Ping
 //
-func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMgrErrno {
-	pbPing := pb.P2PMessage {
-		Mid: 		new(pb.MessageId),
-		Ping:		&pb.P2PMessage_Ping{
-			Seq:	&ping.Seq,
-			Extra:	make([]byte, 0),
+func (upkg *P2pPackage) ping(inst *PeerInstance, ping *Pingpong, write bool) PeMgrErrno {
+	pbPing := pb.P2PMessage{
+		Mid: new(pb.MessageId),
+		Ping: &pb.P2PMessage_Ping{
+			Seq:   &ping.Seq,
+			Extra: make([]byte, 0),
 		},
 	}
 	*pbPing.Mid = MID_PING
@@ -372,11 +372,11 @@ func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMg
 		upkg.Payload = append(upkg.Payload, payload...)
 	} else {
 
-		pbPkg := pb.P2PPackage {
-			Pid:			new(pb.ProtocolId),
-			ExtMid:			new(pb.MessageId),
-			PayloadLength:	new(uint32),
-			Payload:		make([]byte, 0),
+		pbPkg := pb.P2PPackage{
+			Pid:           new(pb.ProtocolId),
+			ExtMid:        new(pb.MessageId),
+			PayloadLength: new(uint32),
+			Payload:       make([]byte, 0),
 		}
 
 		*pbPkg.PayloadLength = uint32(len(payload))
@@ -402,12 +402,12 @@ func (upkg *P2pPackage)ping(inst *PeerInstance, ping *Pingpong, write bool) PeMg
 //
 // Pong
 //
-func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong, write bool) PeMgrErrno {
+func (upkg *P2pPackage) pong(inst *PeerInstance, pong *Pingpong, write bool) PeMgrErrno {
 	pbPong := pb.P2PMessage{
-		Mid: 		new(pb.MessageId),
-		Pong:		&pb.P2PMessage_Pong{
-			Seq:	&pong.Seq,
-			Extra:	make([]byte, 0),
+		Mid: new(pb.MessageId),
+		Pong: &pb.P2PMessage_Pong{
+			Seq:   &pong.Seq,
+			Extra: make([]byte, 0),
 		},
 	}
 
@@ -425,11 +425,11 @@ func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong, write bool) PeMg
 		upkg.PayloadLength = uint32(len(payload))
 		upkg.Payload = append(upkg.Payload, payload...)
 	} else {
-		pbPkg := pb.P2PPackage {
-			Pid:			new(pb.ProtocolId),
-			ExtMid:			new(pb.MessageId),
-			PayloadLength:	new(uint32),
-			Payload:		make([]byte, 0),
+		pbPkg := pb.P2PPackage{
+			Pid:           new(pb.ProtocolId),
+			ExtMid:        new(pb.MessageId),
+			PayloadLength: new(uint32),
+			Payload:       make([]byte, 0),
 		}
 		*pbPkg.PayloadLength = uint32(len(payload))
 		*pbPkg.Pid = PID_P2P
@@ -453,11 +453,11 @@ func (upkg *P2pPackage)pong(inst *PeerInstance, pong *Pingpong, write bool) PeMg
 //
 // Check key
 //
-func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) PeMgrErrno {
+func (upkg *P2pPackage) CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) PeMgrErrno {
 	pbChkk := pb.ExtMessage{
-		Mid: 		new(pb.MessageId),
-		CheckKey:	&pb.ExtMessage_CheckKey {
-			Extra:	make([]byte, 0),
+		Mid: new(pb.MessageId),
+		CheckKey: &pb.ExtMessage_CheckKey{
+			Extra: make([]byte, 0),
 		},
 	}
 	*pbChkk.Mid = MID_CHKK
@@ -476,12 +476,12 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) 
 		upkg.Payload = append(upkg.Payload, payload...)
 	} else {
 
-		pbPkg := pb.P2PPackage {
-			Pid:			new(pb.ProtocolId),
-			ExtMid:			new(pb.MessageId),
-			ExtKey:			make([]byte, 0),
-			PayloadLength:	new(uint32),
-			Payload:		make([]byte, 0),
+		pbPkg := pb.P2PPackage{
+			Pid:           new(pb.ProtocolId),
+			ExtMid:        new(pb.MessageId),
+			ExtKey:        make([]byte, 0),
+			PayloadLength: new(uint32),
+			Payload:       make([]byte, 0),
 		}
 
 		*pbPkg.Pid = PID_EXT
@@ -508,12 +508,12 @@ func (upkg *P2pPackage)CheckKey(inst *PeerInstance, chkk *CheckKey, write bool) 
 //
 // Report key
 //
-func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey, write bool) PeMgrErrno {
+func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write bool) PeMgrErrno {
 	pbRptk := pb.ExtMessage{
-		Mid: 		new(pb.MessageId),
-		ReportKey:	&pb.ExtMessage_ReportKey {
-			Status:	new(pb.KeyStatus),
-			Extra:	make([]byte, 0),
+		Mid: new(pb.MessageId),
+		ReportKey: &pb.ExtMessage_ReportKey{
+			Status: new(pb.KeyStatus),
+			Extra:  make([]byte, 0),
 		},
 	}
 
@@ -535,11 +535,11 @@ func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey, write bool
 		upkg.Payload = append(upkg.Payload, payload...)
 
 	} else {
-		pbPkg := pb.P2PPackage {
-			Pid:			new(pb.ProtocolId),
-			ExtMid:			new(pb.MessageId),
-			PayloadLength:	new(uint32),
-			Payload:		make([]byte, 0),
+		pbPkg := pb.P2PPackage{
+			Pid:           new(pb.ProtocolId),
+			ExtMid:        new(pb.MessageId),
+			PayloadLength: new(uint32),
+			Payload:       make([]byte, 0),
 		}
 		*pbPkg.Pid = PID_EXT
 		*pbPkg.ExtMid = *pbRptk.Mid
@@ -566,7 +566,7 @@ func (upkg *P2pPackage)ReportKey(inst *PeerInstance, rptk *ReportKey, write bool
 // Send user packege
 //
 
-func (upkg *P2pPackage)SendPackage(inst *PeerInstance) PeMgrErrno {
+func (upkg *P2pPackage) SendPackage(inst *PeerInstance) PeMgrErrno {
 	if inst == nil {
 		tcpmsgLog.Debug("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
@@ -602,7 +602,7 @@ func (upkg *P2pPackage)SendPackage(inst *PeerInstance) PeMgrErrno {
 //
 // Receive user package
 //
-func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
+func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 	if inst == nil {
 		tcpmsgLog.Debug("RecvPackage: invalid parameter")
 		return PeMgrEnoParameter
@@ -626,9 +626,9 @@ func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 
 	pid := uint32(*pkg.Pid)
 	if pid != uint32(PID_P2P) && pid != uint32(PID_EXT) {
-		tcpmsgLog.Debug("RecvPackage: " +
+		tcpmsgLog.Debug("RecvPackage: "+
 			"Invalid protocol identity: %d",
-			pid	)
+			pid)
 		return PeMgrEnoMessage
 	}
 
@@ -639,7 +639,7 @@ func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 		upkg.Key = append(upkg.Key[0:], pkg.ExtKey...)
 	}
 	if upkg.PayloadLength > 0 {
-		upkg.Payload = append(upkg.Payload, pkg.Payload ...)
+		upkg.Payload = append(upkg.Payload, pkg.Payload...)
 	}
 	return PeMgrEnoNone
 }
@@ -647,7 +647,7 @@ func (upkg *P2pPackage)RecvPackage(inst *PeerInstance) PeMgrErrno {
 //
 // Decode message from package
 //
-func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
+func (upkg *P2pPackage) GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	if pmsg == nil {
 		tcpmsgLog.Debug("GetMessage: invalid parameter")
 		return PeMgrEnoParameter
@@ -692,7 +692,7 @@ func (upkg *P2pPackage)GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (upkg *P2pPackage)GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
+func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 	// Notice: the underlying p2p would not try really to decode the application user's
 	// message, except those "CheckKey" and "ReportKey" messages, which are applied for
 	// the deduplication function implemented currently in p2p.
@@ -718,7 +718,7 @@ func (upkg *P2pPackage)GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 		rptk.Status = int32(*pbMsg.ReportKey.Status)
 		extMsg.Rptk = rptk
 	} else {
-		tcpmsgLog.Debug("GetExtMessage: " +
+		tcpmsgLog.Debug("GetExtMessage: "+
 			"unknown message identity: %d",
 			extMsg.Mid)
 		return PeMgrEnoMessage
@@ -727,7 +727,7 @@ func (upkg *P2pPackage)GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
-func (upkg *P2pPackage)signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
+func (upkg *P2pPackage) signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
 	r, s, err := config.P2pSign(&inst.priKey, hs.NodeId)
 	if err != nil {
 		tcpmsgLog.Debug("signOutbound: P2pSign failed, error: %s", err.Error())
@@ -742,14 +742,14 @@ func (upkg *P2pPackage)signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handsh
 	return true
 }
 
-func (upkg *P2pPackage)verifyInbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
+func (upkg *P2pPackage) verifyInbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
 	pubKey := config.P2pNodeId2Pubkey(hs.NodeId)
 	r := config.P2pBigInt(int(*hs.SignR), hs.R)
 	s := config.P2pBigInt(int(*hs.SignS), hs.S)
 	return config.P2pVerify(pubKey, hs.NodeId, r, s)
 }
 
-func (upkg *P2pPackage)String() string {
+func (upkg *P2pPackage) String() string {
 	if !tcpmsgLog.debug__ {
 		return ""
 	} else {
@@ -760,15 +760,15 @@ func (upkg *P2pPackage)String() string {
 	}
 }
 
-func (ck *CheckKey)String() string {
+func (ck *CheckKey) String() string {
 	return fmt.Sprintf("CheckKey: key: %x", ck.Key)
 }
 
-func (rk *ReportKey)String() string {
+func (rk *ReportKey) String() string {
 	return fmt.Sprintf("ReportKey: status: %d, key: %x", rk.Status, rk.Key)
 }
 
-func (upkg *P2pPackage)DebugPeerPackage() {
+func (upkg *P2pPackage) DebugPeerPackage() {
 	if tcpmsgLog.debug__ {
 		tcpmsgLog.Debug("DebugPeerPackage: %s", upkg.String())
 	}

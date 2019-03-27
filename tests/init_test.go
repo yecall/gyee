@@ -184,14 +184,14 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 			}
 			if lastBlock == nil {
 				lastBlock = b
-				reached ++
+				reached++
 			} else {
 				if lastBlock.Hash() != b.Hash() {
 					log.Error("block mismatch", "idx", i, "height", height)
 					t.Errorf("block mismatch idx %d height %d", i, height)
-					mismatch ++
+					mismatch++
 				} else {
-					reached ++
+					reached++
 				}
 			}
 		}

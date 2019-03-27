@@ -30,8 +30,8 @@ import (
 )
 
 type OsnService struct {
-	yeShCfg		YeShellConfig
-	yeShMgr		Service
+	yeShCfg YeShellConfig
+	yeShMgr Service
 }
 
 func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
@@ -100,7 +100,7 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 
 var _ = OsnServiceConfig
 
-func NewOsnService(cfg *YeShellConfig)(*OsnService, error) {
+func NewOsnService(cfg *YeShellConfig) (*OsnService, error) {
 	osns := OsnService{
 		yeShCfg: *cfg,
 	}
@@ -110,39 +110,39 @@ func NewOsnService(cfg *YeShellConfig)(*OsnService, error) {
 	return &osns, nil
 }
 
-func (osns *OsnService)Start() error {
+func (osns *OsnService) Start() error {
 	return osns.yeShMgr.Start()
 }
 
-func (osns *OsnService)Stop() {
+func (osns *OsnService) Stop() {
 	osns.yeShMgr.Stop()
 }
 
-func (osns *OsnService)Reconfig(reCfg *RecfgCommand) error {
+func (osns *OsnService) Reconfig(reCfg *RecfgCommand) error {
 	return osns.yeShMgr.Reconfig(reCfg)
 }
 
-func (osns *OsnService)BroadcastMessage(message Message) error {
+func (osns *OsnService) BroadcastMessage(message Message) error {
 	return osns.yeShMgr.BroadcastMessage(message)
 }
 
-func (osns *OsnService)BroadcastMessageOsn(message Message) error {
+func (osns *OsnService) BroadcastMessageOsn(message Message) error {
 	return osns.yeShMgr.BroadcastMessageOsn(message)
 }
 
-func (osns *OsnService)Register(subscriber *Subscriber) {
+func (osns *OsnService) Register(subscriber *Subscriber) {
 	osns.yeShMgr.Register(subscriber)
 }
 
-func (osns *OsnService)UnRegister(subscriber *Subscriber) {
+func (osns *OsnService) UnRegister(subscriber *Subscriber) {
 	osns.yeShMgr.UnRegister(subscriber)
 }
 
-func (osns *OsnService)DhtGetValue(key []byte) ([]byte, error) {
+func (osns *OsnService) DhtGetValue(key []byte) ([]byte, error) {
 	return osns.yeShMgr.DhtGetValue(key)
 }
 
-func (osns *OsnService)DhtSetValue(key []byte, value []byte) error {
+func (osns *OsnService) DhtSetValue(key []byte, value []byte) error {
 	return osns.yeShMgr.DhtSetValue(key, value)
 }
 
@@ -154,10 +154,10 @@ func (osns *OsnService) GetChainInfo(kind string, key []byte) ([]byte, error) {
 	return osns.yeShMgr.GetChainInfo(kind, key)
 }
 
-func (osns *OsnService)GetLocalNode() *config.Node {
+func (osns *OsnService) GetLocalNode() *config.Node {
 	return osns.yeShMgr.(*YeShellManager).GetLocalNode()
 }
 
-func (osns *OsnService)GetLocalDhtNode() *config.Node {
+func (osns *OsnService) GetLocalDhtNode() *config.Node {
 	return osns.yeShMgr.(*YeShellManager).GetLocalDhtNode()
 }

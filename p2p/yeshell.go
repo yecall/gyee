@@ -20,37 +20,37 @@
 package p2p
 
 import (
-	"sync"
-	"time"
+	"bytes"
+	"container/list"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"bytes"
 	"math/rand"
-	"crypto/ecdsa"
-	"container/list"
-	config	"github.com/yeeco/gyee/p2p/config"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	dht		"github.com/yeeco/gyee/p2p/dht"
-	peer	"github.com/yeeco/gyee/p2p/peer"
-	p2psh	"github.com/yeeco/gyee/p2p/shell"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
+	"sync"
+	"time"
 
+	config "github.com/yeeco/gyee/p2p/config"
+	dht "github.com/yeeco/gyee/p2p/dht"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	peer "github.com/yeeco/gyee/p2p/peer"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+	p2psh "github.com/yeeco/gyee/p2p/shell"
+)
 
 //
 // debug
 //
 type yesLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var yesLog = yesLogger {
-	debug__:	false,
+var yesLog = yesLogger{
+	debug__: false,
 }
 
-func (log yesLogger)Debug(fmt string, args ... interface{}) {
+func (log yesLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -59,138 +59,138 @@ func (log yesLogger)Debug(fmt string, args ... interface{}) {
 //
 
 const (
-	yesKeyBytes = config.DhtKeyLength							// key length in bytes
-	yesMaxFindNode = 4											// max find node commands in pending
-	yesMaxGetProvider = 4										// max get provider commands in pending
-	yesMaxPutProvider = 4										// max put provider commands in pending
+	yesKeyBytes       = config.DhtKeyLength // key length in bytes
+	yesMaxFindNode    = 4                   // max find node commands in pending
+	yesMaxGetProvider = 4                   // max get provider commands in pending
+	yesMaxPutProvider = 4                   // max put provider commands in pending
 )
 
 var yesMtAtoi = map[string]int{
-	MessageTypeTx:					sch.MSBR_MT_TX,
-	MessageTypeEvent:				sch.MSBR_MT_EV,
-	MessageTypeBlockHeader:			sch.MSBR_MT_BLKH,
-	MessageTypeBlock:				sch.MSBR_MT_BLK,
+	MessageTypeTx:          sch.MSBR_MT_TX,
+	MessageTypeEvent:       sch.MSBR_MT_EV,
+	MessageTypeBlockHeader: sch.MSBR_MT_BLKH,
+	MessageTypeBlock:       sch.MSBR_MT_BLK,
 }
 
-var yesMidItoa = map[int] string {
-	int(sch.MSBR_MT_TX):			MessageTypeTx,
-	int(sch.MSBR_MT_EV):			MessageTypeEvent,
-	int(sch.MSBR_MT_BLKH):			MessageTypeBlockHeader,
-	int(sch.MSBR_MT_BLK):			MessageTypeBlock,
+var yesMidItoa = map[int]string{
+	int(sch.MSBR_MT_TX):   MessageTypeTx,
+	int(sch.MSBR_MT_EV):   MessageTypeEvent,
+	int(sch.MSBR_MT_BLKH): MessageTypeBlockHeader,
+	int(sch.MSBR_MT_BLK):  MessageTypeBlock,
 }
 
 type SubnetDescriptor struct {
-	SubNetKeyList		map[config.SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
-	SubNetNodeList		map[config.SubNetworkID]config.Node			// sub-node identities
-	SubNetMaxPeers		map[config.SubNetworkID]int					// max peers would be
-	SubNetMaxOutbounds	map[config.SubNetworkID]int					// max concurrency outbounds
-	SubNetMaxInBounds	map[config.SubNetworkID]int					// max concurrency inbounds
-	SubNetIdList		[]config.SubNetworkID						// sub network identity list
+	SubNetKeyList      map[config.SubNetworkID]ecdsa.PrivateKey // keys for sub-node
+	SubNetNodeList     map[config.SubNetworkID]config.Node      // sub-node identities
+	SubNetMaxPeers     map[config.SubNetworkID]int              // max peers would be
+	SubNetMaxOutbounds map[config.SubNetworkID]int              // max concurrency outbounds
+	SubNetMaxInBounds  map[config.SubNetworkID]int              // max concurrency inbounds
+	SubNetIdList       []config.SubNetworkID                    // sub network identity list
 }
 
-type SingleSubnetDescriptor = sch.SingleSubnetDescriptor			// single subnet descriptor
+type SingleSubnetDescriptor = sch.SingleSubnetDescriptor // single subnet descriptor
 
-type yesKey = config.DsKey											// key type
+type yesKey = config.DsKey // key type
 
 var yesInStopping = errors.New("yesmgr: in stopping")
 
 type YeShellManager struct {
-	name				string									// unique name of the shell manager
-	inStopping			bool									// in stopping procedure
-	chainInst			*sch.Scheduler							// chain scheduler pointer
-	ptnChainShell		interface{}								// chain shell manager task node pointer
-	ptChainShMgr		*p2psh.ShellManager						// chain shell manager object
-	dhtInst				*sch.Scheduler							// dht scheduler pointer
-	ptnDhtShell			interface{}								// dht shell manager task node pointer
-	ptDhtShMgr			*p2psh.DhtShellManager					// dht shell manager object
-	getValKey			yesKey									// key of value to get
-	getValChan			chan []byte								// get value channel
-	putValKey			[]byte									// key of value to put
-	putValChan			chan bool								// put value channel
-	findNodeMap			map[yesKey]chan interface{}				// find node command map to channel
-	getProviderMap		map[yesKey]chan interface{}				// find node command map to channel
-	putProviderMap		map[yesKey]chan interface{}				// find node command map to channel
-	dhtEvChan			chan *sch.MsgDhtShEventInd				// dht event indication channel
-	dhtCsChan			chan *sch.MsgDhtConInstStatusInd		// dht connection status indication channel
-	subscribers      	*sync.Map								// subscribers for incoming messages
-	chainRxChan			chan *peer.P2pPackageRx					// total rx channel for chain
-	deDupLock			sync.Mutex								// lock for deduplication timer manager
-	tmDedup				*dht.TimerManager						// deduplication timer manager
-	deDupMap			map[[yesKeyBytes]byte]bool				// map for keys of messages had been sent
-	deDupTiker			*time.Ticker							// deduplication ticker
-	ddtChan				chan bool								// deduplication ticker channel
-	bsTicker			*time.Ticker							// bootstrap ticker
-	dhtBsChan			chan bool								// bootstrap ticker channel
-	cp ChainProvider
+	name           string                           // unique name of the shell manager
+	inStopping     bool                             // in stopping procedure
+	chainInst      *sch.Scheduler                   // chain scheduler pointer
+	ptnChainShell  interface{}                      // chain shell manager task node pointer
+	ptChainShMgr   *p2psh.ShellManager              // chain shell manager object
+	dhtInst        *sch.Scheduler                   // dht scheduler pointer
+	ptnDhtShell    interface{}                      // dht shell manager task node pointer
+	ptDhtShMgr     *p2psh.DhtShellManager           // dht shell manager object
+	getValKey      yesKey                           // key of value to get
+	getValChan     chan []byte                      // get value channel
+	putValKey      []byte                           // key of value to put
+	putValChan     chan bool                        // put value channel
+	findNodeMap    map[yesKey]chan interface{}      // find node command map to channel
+	getProviderMap map[yesKey]chan interface{}      // find node command map to channel
+	putProviderMap map[yesKey]chan interface{}      // find node command map to channel
+	dhtEvChan      chan *sch.MsgDhtShEventInd       // dht event indication channel
+	dhtCsChan      chan *sch.MsgDhtConInstStatusInd // dht connection status indication channel
+	subscribers    *sync.Map                        // subscribers for incoming messages
+	chainRxChan    chan *peer.P2pPackageRx          // total rx channel for chain
+	deDupLock      sync.Mutex                       // lock for deduplication timer manager
+	tmDedup        *dht.TimerManager                // deduplication timer manager
+	deDupMap       map[[yesKeyBytes]byte]bool       // map for keys of messages had been sent
+	deDupTiker     *time.Ticker                     // deduplication ticker
+	ddtChan        chan bool                        // deduplication ticker channel
+	bsTicker       *time.Ticker                     // bootstrap ticker
+	dhtBsChan      chan bool                        // bootstrap ticker channel
+	cp             ChainProvider
 }
 
-const MaxSubNetMaskBits	= 15	// max number of mask bits for sub network identity
+const MaxSubNetMaskBits = 15 // max number of mask bits for sub network identity
 
 type YeShellConfig struct {
 	// Notice: in current stage, a simple configuration for p2p is applied, for total configuration
 	// about p2p, see config.Config please.
-	AppType				config.P2pAppType						// application type
-	Name				string									// node name, should be unique
-	Validator			bool									// validator flag
-	BootstrapNode		bool									// bootstrap node flag
-	BootstrapNodes		[]string								// bootstrap nodes
-	DhtBootstrapNodes	[]string								// bootstrap nodes for dht
-	LocalNodeIp			string									// local node ip for chain-peers
-	LocalUdpPort		uint16									// local node udp port
-	LocalTcpPort		uint16									// local node tcp port
-	LocalDhtIp			string									// local dht ip
-	LocalDhtPort		uint16									// local dht port
-	NodeDataDir			string									// node data directory
-	NodeDatabase		string									// node database
-	SubNetMaskBits		int										// mask bits for sub network identity
-	EvKeepTime			time.Duration							// duration for events kept by dht
-	DedupTime			time.Duration							// duration for deduplication cleanup timer
-	BootstrapTime		time.Duration							// duration for bootstrap blind connection
-	NatType				string									// nat type, "none"/"pmp"/"upnp"
-	GatewayIp			string									// gateway ip when nat type is "pmp"
-	localSnid			[]config.SubNetworkID					// local sub network identities
-	localNode			map[config.SubNetworkID]config.Node		// local sub nodes
-	dhtBootstrapNodes	[]*config.Node							// dht bootstarp nodes
+	AppType           config.P2pAppType                   // application type
+	Name              string                              // node name, should be unique
+	Validator         bool                                // validator flag
+	BootstrapNode     bool                                // bootstrap node flag
+	BootstrapNodes    []string                            // bootstrap nodes
+	DhtBootstrapNodes []string                            // bootstrap nodes for dht
+	LocalNodeIp       string                              // local node ip for chain-peers
+	LocalUdpPort      uint16                              // local node udp port
+	LocalTcpPort      uint16                              // local node tcp port
+	LocalDhtIp        string                              // local dht ip
+	LocalDhtPort      uint16                              // local dht port
+	NodeDataDir       string                              // node data directory
+	NodeDatabase      string                              // node database
+	SubNetMaskBits    int                                 // mask bits for sub network identity
+	EvKeepTime        time.Duration                       // duration for events kept by dht
+	DedupTime         time.Duration                       // duration for deduplication cleanup timer
+	BootstrapTime     time.Duration                       // duration for bootstrap blind connection
+	NatType           string                              // nat type, "none"/"pmp"/"upnp"
+	GatewayIp         string                              // gateway ip when nat type is "pmp"
+	localSnid         []config.SubNetworkID               // local sub network identities
+	localNode         map[config.SubNetworkID]config.Node // local sub nodes
+	dhtBootstrapNodes []*config.Node                      // dht bootstarp nodes
 }
 
 const (
-	ChainCfgIdx			= 0
-	DhtCfgIdx			= 1
-	DftEvKeepTime		= time.Minute * 1
-	DftDedupTime		= time.Second * 60
-	DftBootstrapTime	= time.Second * 4
-	DftNatType			= config.NATT_NONE
-	DftGatewayIp		= "0.0.0.0"
+	ChainCfgIdx      = 0
+	DhtCfgIdx        = 1
+	DftEvKeepTime    = time.Minute * 1
+	DftDedupTime     = time.Second * 60
+	DftBootstrapTime = time.Second * 4
+	DftNatType       = config.NATT_NONE
+	DftGatewayIp     = "0.0.0.0"
 )
 
 // Default yee shell configuration for convenience
 var DefaultYeShellConfig = YeShellConfig{
-	AppType:			config.P2P_TYPE_ALL,
-	Name:				config.DefaultNodeName,
-	Validator:			true,
-	BootstrapNode:		false,
-	BootstrapNodes:		[]string {
+	AppType:       config.P2P_TYPE_ALL,
+	Name:          config.DefaultNodeName,
+	Validator:     true,
+	BootstrapNode: false,
+	BootstrapNodes: []string{
 		"3CEF400192372CD94AAE8DCA465A4A48D4FFBF7E7364D5044CD003F07DCBB0D4EEA7E311D9ED0852890C2B72E79893F0CBA5238A09F7B441613218C3A0D4659B@192.168.1.109:30303:30303",
 	},
-	DhtBootstrapNodes:	[]string {
+	DhtBootstrapNodes: []string{
 		"3CEF400192372CD94AAE8DCA465A4A48D4FFBF7E7364D5044CD003F07DCBB0D4EEA7E311D9ED0852890C2B72E79893F0CBA5238A09F7B441613218C3A0D4659B@192.168.1.109:40404:40404",
 	},
-	LocalNodeIp:		config.P2pGetLocalIpAddr().String(),
-	LocalUdpPort:		config.DftUdpPort,
-	LocalTcpPort:		config.DftTcpPort,
-	LocalDhtIp:			config.P2pGetLocalIpAddr().String(),
-	LocalDhtPort:		config.DftDhtPort,
-	NodeDataDir:		config.P2pDefaultDataDir(true),
-	NodeDatabase:		config.DefaultNodeDatabase,
-	SubNetMaskBits:		config.DftSnmBits,
-	EvKeepTime:			DftEvKeepTime,
-	DedupTime:			DftDedupTime,
-	BootstrapTime:		DftBootstrapTime,
-	NatType:			DftNatType,
-	GatewayIp:			DftGatewayIp,
-	localSnid:			make([]config.SubNetworkID, 0),
-	localNode:			make(map[config.SubNetworkID]config.Node, 0),
-	dhtBootstrapNodes:	make([]*config.Node, 0),
+	LocalNodeIp:       config.P2pGetLocalIpAddr().String(),
+	LocalUdpPort:      config.DftUdpPort,
+	LocalTcpPort:      config.DftTcpPort,
+	LocalDhtIp:        config.P2pGetLocalIpAddr().String(),
+	LocalDhtPort:      config.DftDhtPort,
+	NodeDataDir:       config.P2pDefaultDataDir(true),
+	NodeDatabase:      config.DefaultNodeDatabase,
+	SubNetMaskBits:    config.DftSnmBits,
+	EvKeepTime:        DftEvKeepTime,
+	DedupTime:         DftDedupTime,
+	BootstrapTime:     DftBootstrapTime,
+	NatType:           DftNatType,
+	GatewayIp:         DftGatewayIp,
+	localSnid:         make([]config.SubNetworkID, 0),
+	localNode:         make(map[config.SubNetworkID]config.Node, 0),
+	dhtBootstrapNodes: make([]*config.Node, 0),
 }
 
 // Global shell configuration: this var is set when function YeShellConfigToP2pCfg called,
@@ -281,9 +281,9 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	var eno sch.SchErrno
 	yeShMgr := YeShellManager{
-		name: yesCfg.Name,
+		name:       yesCfg.Name,
 		inStopping: false,
-		putValKey: make([]byte, 0),
+		putValKey:  make([]byte, 0),
 	}
 
 	cfg := YeShellConfigToP2pCfg(yesCfg)
@@ -312,7 +312,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	return &yeShMgr
 }
 
-func (yeShMgr *YeShellManager)Start() error {
+func (yeShMgr *YeShellManager) Start() error {
 	var eno sch.SchErrno
 	var ok bool
 
@@ -386,7 +386,7 @@ func (yeShMgr *YeShellManager)Start() error {
 	return nil
 }
 
-func (yeShMgr *YeShellManager)Stop() {
+func (yeShMgr *YeShellManager) Stop() {
 	yesLog.Debug("Stop: close deduplication ticker")
 	yeShMgr.inStopping = true
 	close(yeShMgr.ddtChan)
@@ -409,7 +409,7 @@ func (yeShMgr *YeShellManager)Stop() {
 	yesLog.Debug("Stop: chain stopped")
 }
 
-func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
+func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
@@ -433,13 +433,13 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	SnidDel := make([]config.SubNetworkID, 0)
 	SnidDel = append(SnidDel, thisCfg.localSnid...)
 
-	sd := &SubnetDescriptor {
-		SubNetKeyList: make(map[config.SubNetworkID]ecdsa.PrivateKey, 0),
-		SubNetNodeList: make(map[config.SubNetworkID]config.Node, 0),
-		SubNetMaxPeers: make(map[config.SubNetworkID]int, 0),
+	sd := &SubnetDescriptor{
+		SubNetKeyList:      make(map[config.SubNetworkID]ecdsa.PrivateKey, 0),
+		SubNetNodeList:     make(map[config.SubNetworkID]config.Node, 0),
+		SubNetMaxPeers:     make(map[config.SubNetworkID]int, 0),
 		SubNetMaxOutbounds: make(map[config.SubNetworkID]int, 0),
-		SubNetMaxInBounds: make(map[config.SubNetworkID]int, 0),
-		SubNetIdList: make([]config.SubNetworkID, 0),
+		SubNetMaxInBounds:  make(map[config.SubNetworkID]int, 0),
+		SubNetIdList:       make([]config.SubNetworkID, 0),
 	}
 	local := yeShMgr.GetLocalNode()
 	priKey := yeShMgr.GetLocalPrivateKey()
@@ -448,9 +448,9 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	ssdl := sd.GetSubnetDescriptorList()
 	SnidAdd = append(SnidAdd, *ssdl...)
 
-	req := sch.MsgShellReconfigReq {
-		SnidAdd: SnidAdd,
-		SnidDel: SnidDel,
+	req := sch.MsgShellReconfigReq{
+		SnidAdd:  SnidAdd,
+		SnidDel:  SnidDel,
 		MaskBits: reCfg.SubnetMaskBits,
 	}
 
@@ -465,7 +465,7 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	for _, snid := range SnidDel {
 		for idx := 0; idx < len(thisCfg.localSnid); idx++ {
 			if thisCfg.localSnid[idx] == snid {
-				if idx != len(thisCfg.localSnid) - 1 {
+				if idx != len(thisCfg.localSnid)-1 {
 					thisCfg.localSnid = append(thisCfg.localSnid[0:idx], thisCfg.localSnid[idx+1:]...)
 				} else {
 					thisCfg.localSnid = thisCfg.localSnid[0:idx]
@@ -483,7 +483,7 @@ func (yeShMgr *YeShellManager)Reconfig(reCfg *RecfgCommand) error {
 	return nil
 }
 
-func (yeShMgr *YeShellManager)BroadcastMessage(message Message) error {
+func (yeShMgr *YeShellManager) BroadcastMessage(message Message) error {
 	// Notice: the function is not supported in fact, see handler function
 	// in each case please.
 	if yeShMgr.inStopping {
@@ -505,7 +505,7 @@ func (yeShMgr *YeShellManager)BroadcastMessage(message Message) error {
 	return err
 }
 
-func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
+func (yeShMgr *YeShellManager) BroadcastMessageOsn(message Message) error {
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
@@ -514,7 +514,7 @@ func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
 	case MessageTypeTx:
 		err = yeShMgr.broadcastTxOsn(&message, nil)
 	case MessageTypeEvent:
-		err = yeShMgr.broadcastEvOsn(&message, nil,true)
+		err = yeShMgr.broadcastEvOsn(&message, nil, true)
 	case MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBhOsn(&message, nil)
 	case MessageTypeBlock:
@@ -525,7 +525,7 @@ func (yeShMgr *YeShellManager)BroadcastMessageOsn(message Message) error {
 	return err
 }
 
-func (yeShMgr *YeShellManager)Register(subscriber *Subscriber) {
+func (yeShMgr *YeShellManager) Register(subscriber *Subscriber) {
 	if yeShMgr.inStopping {
 		return
 	}
@@ -534,7 +534,7 @@ func (yeShMgr *YeShellManager)Register(subscriber *Subscriber) {
 	m.(*sync.Map).Store(subscriber, true)
 }
 
-func (yeShMgr *YeShellManager)UnRegister(subscriber *Subscriber) {
+func (yeShMgr *YeShellManager) UnRegister(subscriber *Subscriber) {
 	if yeShMgr.inStopping {
 		return
 	}
@@ -546,7 +546,7 @@ func (yeShMgr *YeShellManager)UnRegister(subscriber *Subscriber) {
 	m.(*sync.Map).Delete(subscriber)
 }
 
-func (yeShMgr *YeShellManager)DhtGetValue(key []byte) ([]byte, error) {
+func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	if yeShMgr.inStopping {
 		return nil, yesInStopping
 	}
@@ -583,7 +583,7 @@ func (yeShMgr *YeShellManager)DhtGetValue(key []byte) ([]byte, error) {
 	return val, nil
 }
 
-func (yeShMgr *YeShellManager)DhtSetValue(key []byte, value []byte) error {
+func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
@@ -593,9 +593,9 @@ func (yeShMgr *YeShellManager)DhtSetValue(key []byte, value []byte) error {
 		return sch.SchEnoParameter
 	}
 
-	req := sch.MsgDhtMgrPutValueReq {
-		Key: key,
-		Val: value,
+	req := sch.MsgDhtMgrPutValueReq{
+		Key:      key,
+		Val:      value,
 		KeepTime: time.Duration(0),
 	}
 	msg := sch.SchMessage{}
@@ -631,7 +631,7 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	return nil, nil
 }
 
-func (yeShMgr *YeShellManager)DhtFindNode(target *config.NodeID, done chan interface{}) error {
+func (yeShMgr *YeShellManager) DhtFindNode(target *config.NodeID, done chan interface{}) error {
 	if target == nil || done == nil {
 		yesLog.Debug("DhtFindNode: invalid parameters")
 		return sch.SchEnoParameter
@@ -648,11 +648,11 @@ func (yeShMgr *YeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 		return sch.SchEnoDuplicated
 	}
 
-	req := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		key,
-		Msg:		nil,
-		ForWhat:	dht.MID_FINDNODE,
-		Seq:		dht.GetQuerySeqNo(),
+	req := sch.MsgDhtQryMgrQueryStartReq{
+		Target:  key,
+		Msg:     nil,
+		ForWhat: dht.MID_FINDNODE,
+		Seq:     dht.GetQuerySeqNo(),
 	}
 
 	msg := sch.SchMessage{}
@@ -666,7 +666,7 @@ func (yeShMgr *YeShellManager)DhtFindNode(target *config.NodeID, done chan inter
 	return nil
 }
 
-func (yeShMgr *YeShellManager)DhtGetProvider(key []byte, done chan interface{}) error {
+func (yeShMgr *YeShellManager) DhtGetProvider(key []byte, done chan interface{}) error {
 	if len(key) != yesKeyBytes {
 		yesLog.Debug("DhtGetProvider: invalid key: %x", key)
 		return sch.SchEnoParameter
@@ -683,7 +683,7 @@ func (yeShMgr *YeShellManager)DhtGetProvider(key []byte, done chan interface{}) 
 		return sch.SchEnoDuplicated
 	}
 
-	req := sch.MsgDhtMgrGetProviderReq {
+	req := sch.MsgDhtMgrGetProviderReq{
 		Key: key,
 	}
 	msg := sch.SchMessage{}
@@ -697,7 +697,7 @@ func (yeShMgr *YeShellManager)DhtGetProvider(key []byte, done chan interface{}) 
 	return nil
 }
 
-func (yeShMgr *YeShellManager)DhtSetProvider(key []byte, provider *config.Node, done chan interface{}) error {
+func (yeShMgr *YeShellManager) DhtSetProvider(key []byte, provider *config.Node, done chan interface{}) error {
 	if len(key) != yesKeyBytes {
 		yesLog.Debug("DhtSetProvider: invalid key: %x", key)
 		return sch.SchEnoParameter
@@ -714,7 +714,7 @@ func (yeShMgr *YeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 		return sch.SchEnoDuplicated
 	}
 
-	req := sch.MsgDhtPrdMgrAddProviderReq {
+	req := sch.MsgDhtPrdMgrAddProviderReq{
 		Key: key,
 		Prd: *provider,
 	}
@@ -729,7 +729,7 @@ func (yeShMgr *YeShellManager)DhtSetProvider(key []byte, provider *config.Node, 
 	return nil
 }
 
-func (yeShMgr *YeShellManager)dhtEvProc() {
+func (yeShMgr *YeShellManager) dhtEvProc() {
 
 	evCh := yeShMgr.dhtEvChan
 
@@ -740,34 +740,34 @@ func (yeShMgr *YeShellManager)dhtEvProc() {
 		eno := sch.SchEnoNone
 		switch evi.Evt {
 
-		case  sch.EvDhtBlindConnectRsp:
+		case sch.EvDhtBlindConnectRsp:
 			eno = yeShMgr.dhtBlindConnectRsp(evi.Msg.(*sch.MsgDhtBlindConnectRsp))
 
-		case  sch.EvDhtMgrFindPeerRsp:
+		case sch.EvDhtMgrFindPeerRsp:
 			eno = yeShMgr.dhtMgrFindPeerRsp(evi.Msg.(*sch.MsgDhtQryMgrQueryResultInd))
 
-		case  sch.EvDhtQryMgrQueryStartRsp:
+		case sch.EvDhtQryMgrQueryStartRsp:
 			eno = yeShMgr.dhtQryMgrQueryStartRsp(evi.Msg.(*sch.MsgDhtQryMgrQueryStartRsp))
 
-		case  sch.EvDhtQryMgrQueryStopRsp:
+		case sch.EvDhtQryMgrQueryStopRsp:
 			eno = yeShMgr.dhtQryMgrQueryStopRsp(evi.Msg.(*sch.MsgDhtQryMgrQueryStopRsp))
 
-		case  sch.EvDhtConMgrSendCfm:
+		case sch.EvDhtConMgrSendCfm:
 			eno = yeShMgr.dhtConMgrSendCfm(evi.Msg.(*sch.MsgDhtConMgrSendCfm))
 
-		case  sch.EvDhtMgrPutProviderRsp:
+		case sch.EvDhtMgrPutProviderRsp:
 			eno = yeShMgr.dhtMgrPutProviderRsp(evi.Msg.(*sch.MsgDhtPrdMgrAddProviderRsp))
 
-		case  sch.EvDhtMgrGetProviderRsp:
+		case sch.EvDhtMgrGetProviderRsp:
 			eno = yeShMgr.dhtMgrGetProviderRsp(evi.Msg.(*sch.MsgDhtMgrGetProviderRsp))
 
-		case  sch.EvDhtMgrPutValueRsp:
+		case sch.EvDhtMgrPutValueRsp:
 			eno = yeShMgr.dhtMgrPutValueRsp(evi.Msg.(*sch.MsgDhtMgrPutValueRsp))
 
-		case  sch.EvDhtMgrGetValueRsp:
+		case sch.EvDhtMgrGetValueRsp:
 			eno = yeShMgr.dhtMgrGetValueRsp(evi.Msg.(*sch.MsgDhtMgrGetValueRsp))
 
-		case  sch.EvDhtConMgrCloseRsp:
+		case sch.EvDhtConMgrCloseRsp:
 			eno = yeShMgr.dhtConMgrCloseRsp(evi.Msg.(*sch.MsgDhtConMgrCloseRsp))
 
 		default:
@@ -795,7 +795,7 @@ _evLoop:
 	yesLog.Debug("dhtEvProc: exit")
 }
 
-func (yeShMgr *YeShellManager)dhtCsProc() {
+func (yeShMgr *YeShellManager) dhtCsProc() {
 	csCh := yeShMgr.dhtCsChan
 	csHandler := func(csi *sch.MsgDhtConInstStatusInd) {
 		switch csi.Status {
@@ -847,7 +847,7 @@ _csLoop:
 	yesLog.Debug("dhtCsProc: exit")
 }
 
-func (yeShMgr *YeShellManager)chainRxProc() {
+func (yeShMgr *YeShellManager) chainRxProc() {
 _rxLoop:
 	for {
 		select {
@@ -875,11 +875,11 @@ _rxLoop:
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 				subList.(*sync.Map).Range(func(key, value interface{}) bool {
 
-					msg := Message {
+					msg := Message{
 						MsgType: msgType,
-						From: fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
-						Key: pkg.Key,
-						Data: pkg.Payload,
+						From:    fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
+						Key:     pkg.Key,
+						Data:    pkg.Payload,
 					}
 
 					sub, _ := key.(*Subscriber)
@@ -907,7 +907,7 @@ _rxLoop:
 	yesLog.Debug("chainRxProc: exit")
 }
 
-func (yeShMgr *YeShellManager)dhtBootstrapProc() {
+func (yeShMgr *YeShellManager) dhtBootstrapProc() {
 	defer yeShMgr.bsTicker.Stop()
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 
@@ -936,7 +936,7 @@ _bootstarp:
 	yesLog.Debug("dhtBootstrapProc: exit")
 }
 
-func (yeShMgr *YeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 
@@ -946,7 +946,7 @@ func (yeShMgr *YeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 
 				// done the blind-connect routine
 				yesLog.Debug("dhtBlindConnectRsp: bootstrap node connected, id: %x", msg.Peer.ID)
-				yeShMgr.dhtBsChan<-true
+				yeShMgr.dhtBsChan <- true
 
 				// when coming here, we should have added the connected bootstarp node to our
 				// dht route table, but it's the only node there, we need to start a bootstrap
@@ -964,31 +964,31 @@ func (yeShMgr *YeShellManager)dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp)
 	return sch.SchEnoMismatched
 }
 
-func (yeShMgr *YeShellManager)dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 	yesLog.Debug("dhtMgrFindPeerRsp: msg: %+v", *msg)
 	if done, ok := yeShMgr.findNodeMap[msg.Target]; ok {
-		done<-msg
+		done <- msg
 		delete(yeShMgr.findNodeMap, msg.Target)
 	}
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 	yesLog.Debug("dhtQryMgrQueryStartRsp: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
 	yesLog.Debug("dhtQryMgrQueryStopRsp: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
 	yesLog.Debug("dhtConMgrSendCfm: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
 	yesLog.Debug("dhtMgrPutProviderRsp: msg: %+v", *msg)
 	if len(msg.Key) != yesKeyBytes {
 		return sch.SchEnoParameter
@@ -996,13 +996,13 @@ func (yeShMgr *YeShellManager)dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProvi
 	yk := yesKey{}
 	copy(yk[0:], msg.Key)
 	if done, ok := yeShMgr.putProviderMap[yk]; ok {
-		done<-msg
+		done <- msg
 		delete(yeShMgr.putProviderMap, yk)
 	}
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
 	yesLog.Debug("dhtMgrGetProviderRsp: msg: %+v", *msg)
 	if len(msg.Key) != yesKeyBytes {
 		return sch.SchEnoParameter
@@ -1010,13 +1010,13 @@ func (yeShMgr *YeShellManager)dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvider
 	yk := yesKey{}
 	copy(yk[0:], msg.Key)
 	if done, ok := yeShMgr.getProviderMap[yk]; ok {
-		done<-msg
+		done <- msg
 		delete(yeShMgr.getProviderMap, yk)
 	}
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 	// Notice: only when function DhtSetValue called, yeShMgr.putValKey would be set
 	// and would play in a blocked mode, we check this case to feed the signal into
 	// the channel which the caller is pending for, else nothing done.
@@ -1034,42 +1034,42 @@ func (yeShMgr *YeShellManager)dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) s
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 	yesLog.Debug("dhtMgrGetValueRsp: msg: %+v", *msg)
 	if bytes.Compare(yeShMgr.getValKey[0:], msg.Key) != 0 {
 		yesLog.Debug("dhtMgrGetValueRsp: key mismatched")
 		return sch.SchEnoMismatched
 	}
 	if msg.Eno == dht.DhtEnoNone.GetEno() {
-		yeShMgr.getValChan<-msg.Val
+		yeShMgr.getValChan <- msg.Val
 	} else {
-		yeShMgr.getValChan<-[]byte{}
+		yeShMgr.getValChan <- []byte{}
 	}
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager) dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
 	yesLog.Debug("dhtConMgrCloseRsp: msg: %+v", *msg)
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager)broadcastTx(msg *Message) error {
+func (yeShMgr *YeShellManager) broadcastTx(msg *Message) error {
 	return errors.New("broadcastTx: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastEv(msg *Message) error {
+func (yeShMgr *YeShellManager) broadcastEv(msg *Message) error {
 	return errors.New("broadcastEv: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastBh(msg *Message) error {
+func (yeShMgr *YeShellManager) broadcastBh(msg *Message) error {
 	return errors.New("broadcastBh: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastBk(msg *Message) error {
+func (yeShMgr *YeShellManager) broadcastBk(msg *Message) error {
 	return errors.New("broadcastBk: not supported")
 }
 
-func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
+func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
 	// if local node is a validator, the Tx should be broadcast over the
 	// validator-subnet; else the Tx should be broadcast over the dynamic
 	// subnet. this is done in chain shell manager, and the message here
@@ -1086,11 +1086,11 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeI
 	}
 
 	schMsg := sch.SchMessage{}
-	req := sch.MsgShellBroadcastReq {
+	req := sch.MsgShellBroadcastReq{
 		MsgType: yesMtAtoi[msg.MsgType],
-		From: msg.From,
-		Key: msg.Key,
-		Data: msg.Data,
+		From:    msg.From,
+		Key:     msg.Key,
+		Data:    msg.Data,
 		Exclude: exclude,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
@@ -1101,7 +1101,7 @@ func (yeShMgr *YeShellManager)broadcastTxOsn(msg *Message, exclude *config.NodeI
 	return nil
 }
 
-func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeID, dht bool) error {
+func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.NodeID, dht bool) error {
 	// the local node must be a validator, and the Ev should be broadcast
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
@@ -1119,11 +1119,11 @@ func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeI
 	}
 
 	schMsg := sch.SchMessage{}
-	req := sch.MsgShellBroadcastReq {
+	req := sch.MsgShellBroadcastReq{
 		MsgType: yesMtAtoi[msg.MsgType],
-		From: msg.From,
-		Key: msg.Key,
-		Data: msg.Data,
+		From:    msg.From,
+		Key:     msg.Key,
+		Data:    msg.Data,
 		Exclude: exclude,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
@@ -1148,7 +1148,7 @@ func (yeShMgr *YeShellManager)broadcastEvOsn(msg *Message, exclude *config.NodeI
 	return nil
 }
 
-func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeID) error {
+func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.NodeID) error {
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
 	k := yesKey{}
@@ -1163,11 +1163,11 @@ func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeI
 	}
 
 	schMsg := sch.SchMessage{}
-	req := sch.MsgShellBroadcastReq {
+	req := sch.MsgShellBroadcastReq{
 		MsgType: yesMtAtoi[msg.MsgType],
-		From: msg.From,
-		Key: msg.Key,
-		Data: msg.Data,
+		From:    msg.From,
+		Key:     msg.Key,
+		Data:    msg.Data,
 		Exclude: exclude,
 	}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
@@ -1178,7 +1178,7 @@ func (yeShMgr *YeShellManager)broadcastBhOsn(msg *Message, exclude *config.NodeI
 	return nil
 }
 
-func (yeShMgr *YeShellManager)broadcastBkOsn(msg *Message, exclude *config.NodeID) error {
+func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.NodeID) error {
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
 	k := yesKey{}
@@ -1193,9 +1193,9 @@ func (yeShMgr *YeShellManager)broadcastBkOsn(msg *Message, exclude *config.NodeI
 	}
 
 	schMsg := sch.SchMessage{}
-	req := sch.MsgDhtMgrPutValueReq {
-		Key: msg.Key,
-		Val: msg.Data,
+	req := sch.MsgDhtMgrPutValueReq{
+		Key:      msg.Key,
+		Val:      msg.Data,
 		KeepTime: dht.DsMgrDurInf,
 	}
 
@@ -1214,16 +1214,16 @@ func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, err
 	}
 	end := len(id) - 1
 	snw := uint16((id[end-1] << 8) | id[end])
-	snw = snw << uint(16 - maskBits)
-	snw = snw >> uint(16 - maskBits)
-	snid := config.SubNetworkID {
+	snw = snw << uint(16-maskBits)
+	snw = snw >> uint(16-maskBits)
+	snid := config.SubNetworkID{
 		byte((snw >> 8) & 0xff),
 		byte(snw & 0xff),
 	}
 	return snid, nil
 }
 
-func (yeShMgr *YeShellManager)deDupTimerCb(el *list.Element, data interface{}) interface{} {
+func (yeShMgr *YeShellManager) deDupTimerCb(el *list.Element, data interface{}) interface{} {
 	// Notice: do not invoke Lock ... Unlock ... on yeShMgr.deDupLock here
 	// please, since this function is called back within TickProc of timer
 	// manager when any timer get expired. See function deDupTickerProc.
@@ -1235,7 +1235,7 @@ func (yeShMgr *YeShellManager)deDupTimerCb(el *list.Element, data interface{}) i
 	}
 }
 
-func (yeShMgr *YeShellManager)setDedupTimer(key [yesKeyBytes]byte) error {
+func (yeShMgr *YeShellManager) setDedupTimer(key [yesKeyBytes]byte) error {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
 
@@ -1262,7 +1262,7 @@ func (yeShMgr *YeShellManager)setDedupTimer(key [yesKeyBytes]byte) error {
 	return nil
 }
 
-func (yeShMgr *YeShellManager)deDupTickerProc(){
+func (yeShMgr *YeShellManager) deDupTickerProc() {
 	defer yeShMgr.deDupTiker.Stop()
 _dedup:
 	for {
@@ -1280,22 +1280,22 @@ _dedup:
 	yesLog.Debug("deDupTickerProc: exit")
 }
 
-func (yeShMgr *YeShellManager)GetLocalNode() *config.Node {
+func (yeShMgr *YeShellManager) GetLocalNode() *config.Node {
 	cfg := yeShMgr.chainInst.SchGetP2pConfig()
 	return &cfg.Local
 }
 
-func (yeShMgr *YeShellManager)GetLocalPrivateKey() *ecdsa.PrivateKey {
+func (yeShMgr *YeShellManager) GetLocalPrivateKey() *ecdsa.PrivateKey {
 	cfg := yeShMgr.chainInst.SchGetP2pConfig()
 	return cfg.PrivateKey
 }
 
-func (yeShMgr *YeShellManager)GetLocalDhtNode() *config.Node {
+func (yeShMgr *YeShellManager) GetLocalDhtNode() *config.Node {
 	cfg := yeShMgr.chainInst.SchGetP2pConfig()
 	return &cfg.DhtLocal
 }
 
-func (yeShMgr *YeShellManager)checkDupKey(k yesKey) bool {
+func (yeShMgr *YeShellManager) checkDupKey(k yesKey) bool {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
 	_, dup := yeShMgr.deDupMap[k]
@@ -1306,7 +1306,7 @@ func Snid2Int(snid config.SubNetworkID) int {
 	return (int(snid[0]) << 8) + int(snid[1])
 }
 
-func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
+func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool) error {
 	// Notice: this function should be called after config.Local is setup
 	if mbs < 0 || mbs > MaxSubNetMaskBits {
 		yesLog.Debug("setupSubNetwork: invalid subnet mask bits: %d", mbs)
@@ -1332,7 +1332,7 @@ func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
 	} else {
 		count := 1 << uint(mbs)
 		cfg.SubNetIdList = make([]config.SubNetworkID, count)
-		for ; count > 0; {
+		for count > 0 {
 			prvKey, err := config.GenerateKey()
 			if err != nil {
 				continue
@@ -1363,7 +1363,7 @@ func SetupSubNetwork(cfg *config.Config, mbs int, vdt bool ) error {
 	return nil
 }
 
-func (snd *SubnetDescriptor)Setup(node *config.Node, priKey *ecdsa.PrivateKey, mbs int, vdt bool) error {
+func (snd *SubnetDescriptor) Setup(node *config.Node, priKey *ecdsa.PrivateKey, mbs int, vdt bool) error {
 	if mbs < 0 || mbs > MaxSubNetMaskBits {
 		yesLog.Debug("Setup: invalid subnet mask bits: %d", mbs)
 		return errors.New("invalid subnet mask bits")
@@ -1389,7 +1389,7 @@ func (snd *SubnetDescriptor)Setup(node *config.Node, priKey *ecdsa.PrivateKey, m
 	} else {
 		count := 1 << uint(mbs)
 		snd.SubNetIdList = make([]config.SubNetworkID, count)
-		for ; count > 0; {
+		for count > 0 {
 			prvKey, err := config.GenerateKey()
 			if err != nil {
 				continue
@@ -1420,22 +1420,19 @@ func (snd *SubnetDescriptor)Setup(node *config.Node, priKey *ecdsa.PrivateKey, m
 	return nil
 }
 
-func (snd *SubnetDescriptor)GetSubnetDescriptorList() *[]SingleSubnetDescriptor {
+func (snd *SubnetDescriptor) GetSubnetDescriptorList() *[]SingleSubnetDescriptor {
 	ssdl := make([]SingleSubnetDescriptor, 0)
 	for idx := 0; idx < len(snd.SubNetIdList); idx++ {
 		snid := snd.SubNetIdList[idx]
-		ssd := SingleSubnetDescriptor {
-			SubNetKey: snd.SubNetKeyList[snid],
-			SubNetNode: snd.SubNetNodeList[snid],
-			SubNetMaxPeers: snd.SubNetMaxPeers[snid],
+		ssd := SingleSubnetDescriptor{
+			SubNetKey:          snd.SubNetKeyList[snid],
+			SubNetNode:         snd.SubNetNodeList[snid],
+			SubNetMaxPeers:     snd.SubNetMaxPeers[snid],
 			SubNetMaxOutbounds: snd.SubNetMaxOutbounds[snid],
-			SubNetMaxInBounds: snd.SubNetMaxInBounds[snid],
-			SubNetId: snid,
+			SubNetMaxInBounds:  snd.SubNetMaxInBounds[snid],
+			SubNetId:           snid,
 		}
 		ssdl = append(ssdl, ssd)
 	}
 	return &ssdl
 }
-
-
-

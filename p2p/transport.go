@@ -19,13 +19,13 @@
  */
 
 package p2p
+
 /*
    写一个内存测试版
    一个tcp版，直接连接
    一个全网广播版
    一个dht版，匿名连接, tor或者garlic routing
 
- */
+*/
 type Transport interface {
-
 }

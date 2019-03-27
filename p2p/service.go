@@ -34,7 +34,7 @@ osn_service: overlay sub-network
 注册消息处理handler，dispatch message
 消息去重
 消息格式：消息类型及payload？由应用层自己去解析
- */
+*/
 
 type RecfgCommand struct {
 	Validator      bool // is validator

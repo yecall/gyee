@@ -21,33 +21,33 @@
 package dht
 
 import (
-	"time"
+	"container/list"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
-	"runtime"
-	"container/list"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	config	"github.com/yeeco/gyee/p2p/config"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
+	"time"
 
+	"github.com/syndtr/goleveldb/leveldb/opt"
+	config "github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type dsLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var dsLog = dsLogger {
-	debug__:	false,
+var dsLog = dsLogger{
+	debug__: false,
 }
 
-func (log dsLogger)Debug(fmt string, args ... interface{}) {
+func (log dsLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -55,7 +55,8 @@ func (log dsLogger)Debug(fmt string, args ... interface{}) {
 // Datastore key
 //
 const DsKeyLength = config.DhtKeyLength
-type DsKey =  config.DsKey
+
+type DsKey = config.DsKey
 
 //
 // Datastore value
@@ -70,7 +71,7 @@ type DsQuery = interface{}
 //
 // Datastore query result
 //
-type DsQueryResult = interface {}
+type DsQueryResult = interface{}
 
 //
 // Common datastore interface
@@ -106,8 +107,8 @@ type Datastore interface {
 // Data store record
 //
 type DsRecord struct {
-	Key		DsKey				// record key
-	Value	DsValue				// record value
+	Key   DsKey   // record key
+	Value DsValue // record value
 }
 
 //
@@ -119,7 +120,7 @@ const DsMgrName = sch.DhtDsMgrName
 // data store type
 //
 const (
-	dstMemoryMap	= iota
+	dstMemoryMap = iota
 	dstFileSystem
 	dstLevelDB
 )
@@ -134,25 +135,24 @@ var dsType = dstLevelDB
 //
 const DsMgrDurInf = time.Duration(0)
 
-
 //
 // Data store manager
 //
 type DsMgr struct {
-	sdl			*sch.Scheduler			// pointer to scheduler
-	name		string					// my name
-	tep			sch.SchUserTaskEp		// task entry
-	ptnMe		interface{}				// pointer to task node of myself
-	ptnDhtMgr	interface{}				// pointer to dht manager task node
-	ptnQryMgr	interface{}				// pointer to query manager task node
-	ptnRutMgr	interface{}				// pointer to route manager task node
-	getfromPeer	bool					// do not try getting value from local store, true for debug/test only
-	ds			Datastore				// data store
-	dsExp		Datastore				// data store for expired time
-	fdsCfg		FileDatastoreConfig		// file data store configuration
-	ldsCfg		LeveldbDatastoreConfig	// levelDB stat store configuration
-	tmMgr		*TimerManager			// timer manager
-	tidTick		int						// tick timer identity
+	sdl         *sch.Scheduler         // pointer to scheduler
+	name        string                 // my name
+	tep         sch.SchUserTaskEp      // task entry
+	ptnMe       interface{}            // pointer to task node of myself
+	ptnDhtMgr   interface{}            // pointer to dht manager task node
+	ptnQryMgr   interface{}            // pointer to query manager task node
+	ptnRutMgr   interface{}            // pointer to route manager task node
+	getfromPeer bool                   // do not try getting value from local store, true for debug/test only
+	ds          Datastore              // data store
+	dsExp       Datastore              // data store for expired time
+	fdsCfg      FileDatastoreConfig    // file data store configuration
+	ldsCfg      LeveldbDatastoreConfig // levelDB stat store configuration
+	tmMgr       *TimerManager          // timer manager
+	tidTick     int                    // tick timer identity
 }
 
 //
@@ -161,12 +161,12 @@ type DsMgr struct {
 func NewDsMgr() *DsMgr {
 
 	dsMgr := DsMgr{
-		name:			DsMgrName,
-		getfromPeer:	false,
-		fdsCfg:			FileDatastoreConfig{},
-		ldsCfg:			LeveldbDatastoreConfig{},
-		tmMgr:			NewTimerManager(),
-		tidTick:		sch.SchInvalidTid,
+		name:        DsMgrName,
+		getfromPeer: false,
+		fdsCfg:      FileDatastoreConfig{},
+		ldsCfg:      LeveldbDatastoreConfig{},
+		tmMgr:       NewTimerManager(),
+		tidTick:     sch.SchInvalidTid,
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -177,14 +177,14 @@ func NewDsMgr() *DsMgr {
 //
 // Entry point exported to scheduler
 //
-func (dsMgr *DsMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dsMgr *DsMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return dsMgr.tep(ptn, msg)
 }
 
 //
 // Datastore manager entry
 //
-func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
@@ -235,7 +235,7 @@ func (dsMgr *DsMgr)dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno 
 //
 // put
 //
-func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+func (dsMgr *DsMgr) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
 	if eno := dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
 		dsLog.Debug("Put: failed, eno: %d", eno)
@@ -279,14 +279,14 @@ func (dsMgr *DsMgr)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 //
 // get
 //
-func (dsMgr *DsMgr)Get(k []byte) (eno DhtErrno, value DsValue) {
+func (dsMgr *DsMgr) Get(k []byte) (eno DhtErrno, value DsValue) {
 	return dsMgr.ds.Get(k)
 }
 
 //
 // delete
 //
-func (dsMgr *DsMgr)Delete(k []byte) DhtErrno {
+func (dsMgr *DsMgr) Delete(k []byte) DhtErrno {
 	// timer might be in running, and would be removed when expired if any,
 	// just delete [key, val] from the "real" store here.
 	return dsMgr.ds.Delete(k)
@@ -295,7 +295,7 @@ func (dsMgr *DsMgr)Delete(k []byte) DhtErrno {
 //
 // poweron handler
 //
-func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
+func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	if ptn == nil {
 		dsLog.Debug("poweron: invalid ptn")
@@ -392,7 +392,7 @@ func (dsMgr *DsMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 // poweroff handler
 //
-func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
+func (dsMgr *DsMgr) poweroff(ptn interface{}) sch.SchErrno {
 	dsLog.Debug("poweroff: task will be done ...")
 	dsMgr.ds.Close()
 	dsMgr.dsExp.Close()
@@ -402,7 +402,7 @@ func (dsMgr *DsMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 // tick timer handler
 //
-func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
+func (dsMgr *DsMgr) tickTimerHandler() sch.SchErrno {
 	if err := dsMgr.tmMgr.TickProc(); err != TmEnoNone {
 		dsLog.Debug("TickProc: error: %s", err.Error())
 		return sch.SchEnoUserTask
@@ -413,7 +413,7 @@ func (dsMgr *DsMgr)tickTimerHandler() sch.SchErrno {
 //
 // add value request handler
 //
-func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
+func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
 		dsLog.Debug("localAddValReq: invalid key length")
@@ -437,11 +437,11 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	// publish it to our neighbors
 	//
 
-	qry := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		k,
-		Msg:		msg,
-		ForWhat:	MID_PUTVALUE,
-		Seq:		GetQuerySeqNo(),
+	qry := sch.MsgDhtQryMgrQueryStartReq{
+		Target:  k,
+		Msg:     msg,
+		ForWhat: MID_PUTVALUE,
+		Seq:     GetQuerySeqNo(),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -452,7 +452,7 @@ func (dsMgr *DsMgr)localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 //
 // local node get-value request handler
 //
-func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
 		dsLog.Debug("localGetValueReq: invalid key length")
@@ -476,11 +476,11 @@ func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno 
 	// try to fetch the value from peers
 	//
 
-	qry := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		k,
-		Msg:		msg,
-		ForWhat:	MID_GETVALUE_REQ,
-		Seq:		GetQuerySeqNo(),
+	qry := sch.MsgDhtQryMgrQueryStartReq{
+		Target:  k,
+		Msg:     msg,
+		ForWhat: MID_GETVALUE_REQ,
+		Seq:     GetQuerySeqNo(),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -491,7 +491,7 @@ func (dsMgr *DsMgr)localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno 
 //
 // qryMgr query result indication handler
 //
-func (dsMgr *DsMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+func (dsMgr *DsMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 
 	if msg.ForWhat == MID_PUTVALUE {
 
@@ -511,7 +511,7 @@ func (dsMgr *DsMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch
 //
 // put value request handler
 //
-func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
+func (dsMgr *DsMgr) putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 
 	//
 	// we are requested to put value from remote peer
@@ -536,7 +536,7 @@ func (dsMgr *DsMgr)putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 //
 // get value request handler
 //
-func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
+func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	//
 	// we are requested to get value for remote peer
@@ -544,14 +544,14 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	gvReq, _ := msg.Msg.(*GetValueReq)
 	conInst := msg.ConInst.(*ConInst)
-	gvRsp := GetValueRsp {
-		From:		*conInst.local,
-		To:			conInst.hsInfo.peer,
-		Value:		nil,
-		Nodes:		nil,
-		Pcs:		nil,
-		Id:			gvReq.Id,
-		Extra:		nil,
+	gvRsp := GetValueRsp{
+		From:  *conInst.local,
+		To:    conInst.hsInfo.peer,
+		Value: nil,
+		Nodes: nil,
+		Pcs:   nil,
+		Id:    gvReq.Id,
+		Extra: nil,
 	}
 
 	dsk := DsKey{}
@@ -561,9 +561,9 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	rsp2Peer := func() sch.SchErrno {
 
-		dhtMsg := DhtMessage {
-			Mid:			MID_GETVALUE_RSP,
-			GetValueRsp:	&gvRsp,
+		dhtMsg := DhtMessage{
+			Mid:         MID_GETVALUE_RSP,
+			GetValueRsp: &gvRsp,
 		}
 
 		dhtPkg := DhtPackage{}
@@ -572,12 +572,12 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 			return sch.SchEnoUserTask
 		}
 
-		txReq := sch.MsgDhtConInstTxDataReq {
-			Task:		dsMgr.ptnMe,
-			WaitRsp:	false,
-			WaitMid:	-1,
-			WaitSeq:	-1,
-			Payload:	&dhtPkg,
+		txReq := sch.MsgDhtConInstTxDataReq{
+			Task:    dsMgr.ptnMe,
+			WaitRsp: false,
+			WaitMid: -1,
+			WaitSeq: -1,
+			Payload: &dhtPkg,
 		}
 
 		schMsg := sch.SchMessage{}
@@ -590,9 +590,9 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	//
 
 	if val := dsMgr.fromStore(&dsk); len(val) > 0 {
-		gvRsp.Value = &DhtValue {
-			Key:	dsk[0:],
-			Val:	val,
+		gvRsp.Value = &DhtValue{
+			Key: dsk[0:],
+			Val: val,
 		}
 		return rsp2Peer()
 	}
@@ -621,12 +621,12 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	schMsg := sch.SchMessage{}
 	fnReq := sch.MsgDhtRutMgrNearestReq{
-		Target:		dsk,
-		Max:		rutMgrMaxNearest,
-		NtfReq:		false,
-		Task:		dsMgr.ptnMe,
-		ForWhat:	MID_FINDNODE,
-		Msg:		msg,
+		Target:  dsk,
+		Max:     rutMgrMaxNearest,
+		NtfReq:  false,
+		Task:    dsMgr.ptnMe,
+		ForWhat: MID_FINDNODE,
+		Msg:     msg,
 	}
 
 	conInst.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &fnReq)
@@ -636,7 +636,7 @@ func (dsMgr *DsMgr)getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 //
 // nearest response handler
 //
-func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
+func (dsMgr *DsMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
 	//
 	// see dsMgr.getValReq for more please. we assume that no more "get-value"
@@ -656,20 +656,20 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 
 	ci, _ := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).ConInst.(*ConInst)
 	req, _ := msg.Msg.(*sch.MsgDhtDsMgrGetValReq).Msg.(*GetValueReq)
-	rsp := GetValueRsp {
-		From:		*ci.local,
-		To:			ci.hsInfo.peer,
-		Key:		req.Key,
-		Value:		nil,
-		Nodes:		nodes,
-		Pcs:		msg.Pcs.([]int),
-		Id:			req.Id,
-		Extra:		nil,
+	rsp := GetValueRsp{
+		From:  *ci.local,
+		To:    ci.hsInfo.peer,
+		Key:   req.Key,
+		Value: nil,
+		Nodes: nodes,
+		Pcs:   msg.Pcs.([]int),
+		Id:    req.Id,
+		Extra: nil,
 	}
 
-	dhtMsg := DhtMessage {
-		Mid:			MID_GETVALUE_RSP,
-		GetValueRsp:	&rsp,
+	dhtMsg := DhtMessage{
+		Mid:         MID_GETVALUE_RSP,
+		GetValueRsp: &rsp,
 	}
 
 	dhtPkg := DhtPackage{}
@@ -678,12 +678,12 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		return sch.SchEnoUserTask
 	}
 
-	txReq := sch.MsgDhtConInstTxDataReq {
-		Task:		dsMgr.ptnMe,
-		WaitRsp:	false,
-		WaitMid:	-1,
-		WaitSeq:	-1,
-		Payload:	&dhtPkg,
+	txReq := sch.MsgDhtConInstTxDataReq{
+		Task:    dsMgr.ptnMe,
+		WaitRsp: false,
+		WaitMid: -1,
+		WaitSeq: -1,
+		Payload: &dhtPkg,
 	}
 
 	schMsg := sch.SchMessage{}
@@ -691,7 +691,7 @@ func (dsMgr *DsMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	return dsMgr.sdl.SchSendMessage(&schMsg)
 }
 
-func (dsMgr *DsMgr)qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+func (dsMgr *DsMgr) qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
 	if msg.Eno != DhtEnoNone.GetEno() {
 		dsLog.Debug("qryStartRsp: errors reported, eno: %d", msg.Eno)
 	}
@@ -701,22 +701,22 @@ func (dsMgr *DsMgr)qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno 
 //
 // get value from store by key
 //
-func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
+func (dsMgr *DsMgr) fromStore(k *DsKey) []byte {
 
 	eno, val := dsMgr.ds.Get(k[0:])
 	if eno != DhtEnoNone {
-		return  nil
+		return nil
 	}
 
-	dsr := DsRecord {
-		Key:	*k,
-		Value:	val,
+	dsr := DsRecord{
+		Key:   *k,
+		Value: val,
 	}
 
-	ddsr := &DhtDatastoreRecord {
-		Key:	k[0:],
-		Value:	nil,
-		Extra:	nil,
+	ddsr := &DhtDatastoreRecord{
+		Key:   k[0:],
+		Value: nil,
+		Extra: nil,
 	}
 
 	if eno := ddsr.DecDsRecord(&dsr); eno != DhtEnoNone {
@@ -724,18 +724,18 @@ func (dsMgr *DsMgr)fromStore(k *DsKey) []byte {
 		return nil
 	}
 
-	return  ddsr.Value
+	return ddsr.Value
 }
 
 //
 // store (key, value) pair to data store
 //
-func (dsMgr *DsMgr)store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
+func (dsMgr *DsMgr) store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 
-	ddsr := DhtDatastoreRecord {
-		Key:	k[0:],
-		Value:	v.([]byte),
-		Extra:	nil,
+	ddsr := DhtDatastoreRecord{
+		Key:   k[0:],
+		Value: v.([]byte),
+		Extra: nil,
 	}
 
 	dsr := new(DsRecord)
@@ -750,12 +750,12 @@ func (dsMgr *DsMgr)store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 //
 // response the add-value request sender task
 //
-func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
+func (dsMgr *DsMgr) localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
 
-	rsp := sch.MsgDhtMgrPutValueRsp {
-		Eno:	int(eno),
-		Key:	key,
-		Peers:	peers,
+	rsp := sch.MsgDhtMgrPutValueRsp{
+		Eno:   int(eno),
+		Key:   key,
+		Peers: peers,
 	}
 
 	msg := sch.SchMessage{}
@@ -766,12 +766,12 @@ func (dsMgr *DsMgr)localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno
 //
 // response the get-value request sender task
 //
-func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
+func (dsMgr *DsMgr) localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
 
-	rsp := sch.MsgDhtMgrGetValueRsp {
-		Eno:	int(eno),
-		Key:	key,
-		Val:	val,
+	rsp := sch.MsgDhtMgrGetValueRsp{
+		Eno: int(eno),
+		Key: key,
+		Val: val,
 	}
 
 	msg := sch.SchMessage{}
@@ -782,14 +782,14 @@ func (dsMgr *DsMgr)localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchE
 //
 // get file data store configuration
 //
-func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
+func (dsMgr *DsMgr) getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
-	dsMgr.fdsCfg = FileDatastoreConfig {
-		path:			path.Join(cfg.Path, "fds"),
-		shardFuncName:	cfg.ShardFuncName,
-		padLength:		cfg.PadLength,
-		sync:			cfg.Sync,
+	dsMgr.fdsCfg = FileDatastoreConfig{
+		path:          path.Join(cfg.Path, "fds"),
+		shardFuncName: cfg.ShardFuncName,
+		padLength:     cfg.PadLength,
+		sync:          cfg.Sync,
 	}
 
 	*fdc = dsMgr.fdsCfg
@@ -800,15 +800,15 @@ func (dsMgr *DsMgr)getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 //
 // get levelDB data store configuration
 //
-func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
+func (dsMgr *DsMgr) getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
 
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
-	dsMgr.ldsCfg = LeveldbDatastoreConfig {
-		Path:					path.Join(cfg.Path, "lds"),
-		OpenFilesCacheCapacity:	500,
-		BlockCacheCapacity:		8 * opt.MiB,
-		BlockSize:				4 * opt.MiB,
-		FilterBits:				10,
+	dsMgr.ldsCfg = LeveldbDatastoreConfig{
+		Path:                   path.Join(cfg.Path, "lds"),
+		OpenFilesCacheCapacity: 500,
+		BlockCacheCapacity:     8 * opt.MiB,
+		BlockSize:              4 * opt.MiB,
+		FilterBits:             10,
 	}
 
 	*ldc = dsMgr.ldsCfg
@@ -819,7 +819,7 @@ func (dsMgr *DsMgr)getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErr
 //
 // cleanup in power on stage
 //
-func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
+func (dsMgr *DsMgr) cleanUpReboot() DhtErrno {
 
 	// clean up those [key, val] pairs out of keep time. we loop the "expired" database
 	// keys, split them get the "real" key for the value, and then delete the "expired"
@@ -850,14 +850,14 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 				continue
 			}
 
-			if time.Now().Unix() >=  secondes {
+			if time.Now().Unix() >= secondes {
 
 				dsMgr.Delete(k)
 				lds.Delete(ek)
 
 			} else {
 
-				kt := time.Second * time.Duration(secondes - time.Now().Unix())
+				kt := time.Second * time.Duration(secondes-time.Now().Unix())
 				tm, err := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 
 				if err != nil {
@@ -879,13 +879,13 @@ func (dsMgr *DsMgr)cleanUpReboot() DhtErrno {
 	return DhtEnoNone
 }
 
-func (dsMgr *DsMgr)startTickTimer() DhtErrno {
-	td := sch.TimerDescription {
-		Name:	"_dsMgrTickTimer",
-		Utid:	sch.DhtDsMgrTickTimerId,
-		Tmt:	sch.SchTmTypePeriod,
-		Dur:	oneTick,
-		Extra:	nil,
+func (dsMgr *DsMgr) startTickTimer() DhtErrno {
+	td := sch.TimerDescription{
+		Name:  "_dsMgrTickTimer",
+		Utid:  sch.DhtDsMgrTickTimerId,
+		Tmt:   sch.SchTmTypePeriod,
+		Dur:   oneTick,
+		Extra: nil,
 	}
 
 	eno, tid := dsMgr.sdl.SchSetTimer(dsMgr.ptnMe, &td)
@@ -902,7 +902,7 @@ func (dsMgr *DsMgr)startTickTimer() DhtErrno {
 //
 // called back to clean [key, val] out of keep time
 //
-func (dsMgr *DsMgr)cleanUpTimerCb(el *list.Element, data interface{})interface{} {
+func (dsMgr *DsMgr) cleanUpTimerCb(el *list.Element, data interface{}) interface{} {
 
 	// notice: need not to call dsMgr.tmMgr.KillTimer, since the timer would
 	// be removed by timer manager itself.
@@ -938,9 +938,9 @@ _cleanUpfailed:
 //
 // make a "expired" key for [key, val] which expired
 //
-func (dsMgr *DsMgr)makeExpiredKey(k []byte, to time.Time) []byte {
+func (dsMgr *DsMgr) makeExpiredKey(k []byte, to time.Time) []byte {
 	strTime := strconv.FormatInt(to.Unix(), 10)
-	strTime = strings.Repeat("0", 16 - len(strTime)) + strTime
+	strTime = strings.Repeat("0", 16-len(strTime)) + strTime
 	ek := append([]byte(strTime), k...)
 	return ek
 }
@@ -948,7 +948,6 @@ func (dsMgr *DsMgr)makeExpiredKey(k []byte, to time.Time) []byte {
 //
 // split a "expired" key into "expired time" and "real key"
 //
-func (dsMgr *DsMgr)splitExpiredKey(expKey []byte) (t []byte, k []byte) {
+func (dsMgr *DsMgr) splitExpiredKey(expKey []byte) (t []byte, k []byte) {
 	return expKey[0:16], expKey[16:]
 }
-

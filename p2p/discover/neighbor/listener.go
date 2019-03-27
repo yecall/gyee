@@ -21,84 +21,83 @@
 package neighbor
 
 import (
-	"os"
-	"syscall"
-	"net"
-	"fmt"
-	"time"
-	"sync"
 	"crypto/ecdsa"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	config	"github.com/yeeco/gyee/p2p/config"
-	umsg	"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
+	"fmt"
+	"net"
+	"os"
+	"sync"
+	"syscall"
+	"time"
 
+	config "github.com/yeeco/gyee/p2p/config"
+	umsg "github.com/yeeco/gyee/p2p/discover/udpmsg"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type lsnMgrLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var lsnLog = lsnMgrLogger  {
-	debug__:	false,
+var lsnLog = lsnMgrLogger{
+	debug__: false,
 }
 
-func (log lsnMgrLogger)Debug(fmt string, args ... interface{}) {
+func (log lsnMgrLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
-
 
 // the listener task name
 const LsnMgrName = sch.NgbLsnName
 
 type listenerConfig struct {
-	IP			net.IP			// IP
-	UDP			uint16			// UDP port number
-	TCP			uint16			// TCP port number
-	ID			config.NodeID	// node identity: the public key
-	CheckAddr	bool			// check the address reported against the source address
+	IP        net.IP        // IP
+	UDP       uint16        // UDP port number
+	TCP       uint16        // TCP port number
+	ID        config.NodeID // node identity: the public key
+	CheckAddr bool          // check the address reported against the source address
 }
 
 type ListenerManager struct {
-	sdl			*sch.Scheduler		// pointer to scheduler
-	name		string				// name
-	tep			sch.SchUserTaskEp	// entry
-	cfg			listenerConfig		// configuration
-	conn		*net.UDPConn		// udp connection
-	addr		net.UDPAddr			// real udp address
-	state		int					// state
-	ptnMe		interface{}			// pointer to myself task
-	ptnReader	interface{}			// pointer to udp reader task
-	lock		sync.Mutex			// lock for stop udp reader
+	sdl       *sch.Scheduler    // pointer to scheduler
+	name      string            // name
+	tep       sch.SchUserTaskEp // entry
+	cfg       listenerConfig    // configuration
+	conn      *net.UDPConn      // udp connection
+	addr      net.UDPAddr       // real udp address
+	state     int               // state
+	ptnMe     interface{}       // pointer to myself task
+	ptnReader interface{}       // pointer to udp reader task
+	lock      sync.Mutex        // lock for stop udp reader
 }
 
 // listener manager task state
 const (
-	LmsNull		= iota		// not be inited, configurations are all invalid
-	LmsInited				// configurated but not started
-	LmsStarted				// in running
-	LmsStopped				// stopped, configurations are still validate
+	LmsNull    = iota // not be inited, configurations are all invalid
+	LmsInited         // configurated but not started
+	LmsStarted        // in running
+	LmsStopped        // stopped, configurations are still validate
 )
 
 func NewLsnMgr() *ListenerManager {
 	var lsnMgr = ListenerManager{
-		name:      LsnMgrName,
-		state:     LmsNull,
+		name:  LsnMgrName,
+		state: LmsNull,
 	}
 	lsnMgr.tep = lsnMgr.lsnMgrProc
 	return &lsnMgr
 }
 
-func (lsnMgr *ListenerManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (lsnMgr *ListenerManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return lsnMgr.tep(ptn, msg)
 }
 
-func (lsnMgr *ListenerManager)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (lsnMgr *ListenerManager) lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	var eno = sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -125,17 +124,17 @@ func (lsnMgr *ListenerManager) setupConfig() sch.SchErrno {
 	if ptCfg = config.P2pConfig4UdpNgbListener(lsnMgr.sdl.SchGetP2pCfgName()); ptCfg == nil {
 		return sch.SchEnoConfig
 	}
-	lsnMgr.cfg.IP	= ptCfg.IP
-	lsnMgr.cfg.UDP	= ptCfg.UDP
-	lsnMgr.cfg.TCP	= ptCfg.TCP
-	lsnMgr.cfg.ID	= ptCfg.ID
+	lsnMgr.cfg.IP = ptCfg.IP
+	lsnMgr.cfg.UDP = ptCfg.UDP
+	lsnMgr.cfg.TCP = ptCfg.TCP
+	lsnMgr.cfg.ID = ptCfg.ID
 	lsnMgr.cfg.CheckAddr = ptCfg.CheckAddr
 	return sch.SchEnoNone
 }
 
-func (lsnMgr *ListenerManager)setupUdpConn() sch.SchErrno {
-	var conn		*net.UDPConn = nil
-	var realAddr	*net.UDPAddr = nil
+func (lsnMgr *ListenerManager) setupUdpConn() sch.SchErrno {
+	var conn *net.UDPConn = nil
+	var realAddr *net.UDPAddr = nil
 
 	strAddr := fmt.Sprintf("%s:%d", lsnMgr.cfg.IP.String(), lsnMgr.cfg.UDP)
 	udpAddr, err := net.ResolveUDPAddr("udp", strAddr)
@@ -189,7 +188,7 @@ func (lsnMgr *ListenerManager) canStart() sch.SchErrno {
 func (lsnMgr *ListenerManager) canStop() sch.SchErrno {
 	if lsnMgr.state == LmsStarted &&
 		lsnMgr.ptnReader != nil &&
-		lsnMgr.conn != nil	{
+		lsnMgr.conn != nil {
 		return sch.SchEnoNone
 	}
 	return sch.SchEnoMismatched
@@ -271,7 +270,7 @@ func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
 	return lsnMgr.nextState(LmsStopped)
 }
 
-func (lsnMgr *ListenerManager)nblDataReq(ptn interface{}, msg interface{}) sch.SchErrno {
+func (lsnMgr *ListenerManager) nblDataReq(ptn interface{}, msg interface{}) sch.SchErrno {
 	_ = ptn
 	req := msg.(*sch.NblDataReq)
 	return lsnMgr.sendUdpMsg(req.Payload, req.TgtAddr)
@@ -281,31 +280,31 @@ func (lsnMgr *ListenerManager)nblDataReq(ptn interface{}, msg interface{}) sch.S
 const udpReaderName = sch.NgbReaderName
 const udpMaxMsgSize = 1024 * 32
 
-var noDog = sch.SchWatchDog {
-	HaveDog:false,
+var noDog = sch.SchWatchDog{
+	HaveDog: false,
 }
 
 type UdpReaderTask struct {
-	sdl			*sch.Scheduler			// pointer to scheduler
-	lsnMgr		*ListenerManager		// pointer to listener manager
-	name		string					// name
-	tep			sch.SchUserTaskEp		// entry
-	priKey		*ecdsa.PrivateKey		// local node private key
-	conn		*net.UDPConn			// udp connection
-	ptnMe		interface{}				// pointer to myself task
-	ptnNgbMgr	interface{}				// pointer to neighbor manager task
-	desc		sch.SchTaskDescription	// description
-	udpMsg		*umsg.UdpMsg			// decode/encode wrapper
-	chkAddr		bool					// check sender ip with that reported
+	sdl       *sch.Scheduler         // pointer to scheduler
+	lsnMgr    *ListenerManager       // pointer to listener manager
+	name      string                 // name
+	tep       sch.SchUserTaskEp      // entry
+	priKey    *ecdsa.PrivateKey      // local node private key
+	conn      *net.UDPConn           // udp connection
+	ptnMe     interface{}            // pointer to myself task
+	ptnNgbMgr interface{}            // pointer to neighbor manager task
+	desc      sch.SchTaskDescription // description
+	udpMsg    *umsg.UdpMsg           // decode/encode wrapper
+	chkAddr   bool                   // check sender ip with that reported
 }
 
 type UdpMsgInd struct {
-	msgType		umsg.UdpMsgType			// message type
-	msgBody		interface{}				// message body, like Ping, Pong, ... see udpmsg.go
+	msgType umsg.UdpMsgType // message type
+	msgBody interface{}     // message body, like Ping, Pong, ... see udpmsg.go
 }
 
 func NewUdpReader() *UdpReaderTask {
-	var udpReader = UdpReaderTask {
+	var udpReader = UdpReaderTask{
 		name: udpReaderName,
 		tep:  nil,
 		conn: nil,
@@ -319,16 +318,16 @@ func NewUdpReader() *UdpReaderTask {
 		},
 		udpMsg: umsg.NewUdpMsg(),
 	}
-	udpReader.tep		= udpReader.udpReaderLoop
-	udpReader.desc.Ep	= &udpReader
+	udpReader.tep = udpReader.udpReaderLoop
+	udpReader.desc.Ep = &udpReader
 	return &udpReader
 }
 
-func (udpReader *UdpReaderTask)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (udpReader *UdpReaderTask) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return udpReader.tep(ptn, msg)
 }
 
-func (udpReader *UdpReaderTask)udpReaderLoop(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
+func (udpReader *UdpReaderTask) udpReaderLoop(ptn interface{}, _ *sch.SchMessage) sch.SchErrno {
 	var eno = sch.SchEnoNone
 	buf := make([]byte, udpMaxMsgSize)
 	udpReader.ptnMe = ptn
@@ -398,9 +397,9 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 	if eno = udpReader.udpMsg.Decode(); eno != umsg.UdpMsgEnoNone {
 		return sch.SchEnoUserTask
 	}
-	udpMsgInd := UdpMsgInd {
-		msgType:udpReader.udpMsg.GetDecodedMsgType(),
-		msgBody:udpReader.udpMsg.GetDecodedMsg(),
+	udpMsgInd := UdpMsgInd{
+		msgType: udpReader.udpMsg.GetDecodedMsgType(),
+		msgBody: udpReader.udpMsg.GetDecodedMsg(),
 	}
 	if eno = udpReader.udpMsg.CheckUdpMsgFromPeer(from, udpReader.chkAddr); eno != umsg.UdpMsgEnoNone {
 		lsnLog.Debug("msgHandler: CheckUdpMsgFromPeer failed, eno: %d", eno)
@@ -412,7 +411,7 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 	return sch.SchEnoNone
 }
 
-func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
+func (lsnMgr *ListenerManager) sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 	lsnMgr.lock.Lock()
 	defer lsnMgr.lock.Unlock()
 	if lsnMgr.conn == nil {
@@ -441,9 +440,9 @@ func (lsnMgr *ListenerManager)sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.Sc
 
 func sendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 	var schMsg = sch.SchMessage{}
-	req := sch.NblDataReq {
-		Payload:	buf,
-		TgtAddr:	toAddr,
+	req := sch.NblDataReq{
+		Payload: buf,
+		TgtAddr: toAddr,
 	}
 	sdl.SchMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req)
 	sdl.SchSendMessage(&schMsg)

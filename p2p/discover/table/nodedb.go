@@ -34,25 +34,24 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
-
 
 //
 // debug
 //
 type ndbLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var ndbLog = ndbLogger {
-	debug__:	false,
+var ndbLog = ndbLogger{
+	debug__: false,
 }
 
-func (log ndbLogger)Debug(fmt string, args ... interface{}) {
+func (log ndbLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -65,8 +64,8 @@ var (
 )
 
 type nodeDB struct {
-	lvl    *leveldb.DB   // Pointer to level database
-	self   NodeID        // Identity of the owner node of this database
+	lvl  *leveldb.DB // Pointer to level database
+	self NodeID      // Identity of the owner node of this database
 }
 
 var (
@@ -84,10 +83,10 @@ var (
 	// for node with context:
 	//		key=nodeId + root + context
 	// See function makeKey for more.
-	rootKey			= "dcvMgr"				// root
-	pingKey			= rootKey + ":lpi"		// last ping
-	pongKey			= rootKey + ":lpo"		// last pong
-	findfailKey		= rootKey + ":ffa"		// find fail
+	rootKey     = "dcvMgr"         // root
+	pingKey     = rootKey + ":lpi" // last ping
+	pongKey     = rootKey + ":lpo" // last pong
+	findfailKey = rootKey + ":ffa" // find fail
 )
 
 func newNodeDB(path string, version int, self NodeID) (*nodeDB, error) {
@@ -385,12 +384,12 @@ func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
 	udp := node.UDP
 	hb := byte((udp >> 8) & 0xff)
 	lb := byte(udp & 0xff)
-	blob = append(blob, []byte{hb,lb}...)
+	blob = append(blob, []byte{hb, lb}...)
 
 	tcp := node.TCP
 	hb = byte((tcp >> 8) & 0xff)
 	lb = byte(tcp & 0xff)
-	blob = append(blob, []byte{hb,lb}...)
+	blob = append(blob, []byte{hb, lb}...)
 
 	blob = append(blob, node.ID[:]...)
 	blob = append(blob, snid[:]...)
@@ -402,8 +401,8 @@ func EncodeToBytes(snid SubNetworkID, node *Node) ([]byte, error) {
 func DecodeBytes(blob []byte, node *Node, snid *SubNetworkID) error {
 	// Test version, only IPV4 supported
 	node.IP = append(node.IP, blob[0:4]...)
-	node.UDP = (uint16(blob[4]) << 8) +uint16(blob[5])
-	node.TCP = (uint16(blob[6]) << 8) +uint16(blob[7])
+	node.UDP = (uint16(blob[4]) << 8) + uint16(blob[5])
+	node.TCP = (uint16(blob[6]) << 8) + uint16(blob[7])
 	copy(node.ID[0:], blob[8:8+cap(node.ID)])
 	if snid != nil {
 		(*snid)[0] = blob[8+cap(node.ID)]
@@ -412,4 +411,3 @@ func DecodeBytes(blob []byte, node *Node, snid *SubNetworkID) error {
 	copy(node.sha[0:], blob[8+cap(node.ID)+2:])
 	return nil
 }
-

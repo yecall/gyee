@@ -21,9 +21,9 @@
 package udpmsg
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"net"
-	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/p2p/config"
@@ -35,22 +35,22 @@ import (
 // debug
 //
 type udpmsgLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var udpmsgLog = udpmsgLogger {
-	debug__:	false,
+var udpmsgLog = udpmsgLogger{
+	debug__: false,
 }
 
-func (log udpmsgLogger)Debug(fmt string, args ... interface{}) {
+func (log udpmsgLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
 // message type
 const (
-	UdpMsgTypePing		= iota
+	UdpMsgTypePing = iota
 	UdpMsgTypePong
 	UdpMsgTypeFindNode
 	UdpMsgTypeNeighbors
@@ -65,16 +65,16 @@ type (
 
 	// Endpoint
 	Endpoint struct {
-		IP			net.IP		// ip address
-		UDP			uint16		// udp port number
-		TCP			uint16		// tcp port number
+		IP  net.IP // ip address
+		UDP uint16 // udp port number
+		TCP uint16 // tcp port number
 	}
 
 	// Node: endpoint with node identity
 	Node struct {
-		IP			net.IP			// ip address
-		UDP, TCP	uint16			// udp port number
-		NodeId		config.NodeID	// node identity
+		IP       net.IP        // ip address
+		UDP, TCP uint16        // udp port number
+		NodeId   config.NodeID // node identity
 	}
 
 	//
@@ -84,49 +84,49 @@ type (
 
 	// Ping
 	Ping struct {
-		From			Node			// source node
-		To				Node			// destination node
-		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
-		SubNetId		SubNetworkID	// sub network identity
-		Id				uint64			// message identity
-		Expiration		uint64			// time to expired of this message
-		Extra			[]byte			// extra info
+		From         Node           // source node
+		To           Node           // destination node
+		FromSubNetId []SubNetworkID // sub network identities of "From"
+		SubNetId     SubNetworkID   // sub network identity
+		Id           uint64         // message identity
+		Expiration   uint64         // time to expired of this message
+		Extra        []byte         // extra info
 	}
 
 	// Pong: response to Ping
 	Pong struct {
-		From			Node			// source node
-		To				Node			// destination node
-		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
-		SubNetId		SubNetworkID	// sub network identity
-		Id				uint64			// message identity
-		Expiration		uint64			// time to expired of this message
-		Extra			[]byte			// extra info
+		From         Node           // source node
+		To           Node           // destination node
+		FromSubNetId []SubNetworkID // sub network identities of "From"
+		SubNetId     SubNetworkID   // sub network identity
+		Id           uint64         // message identity
+		Expiration   uint64         // time to expired of this message
+		Extra        []byte         // extra info
 	}
 
 	// FindNode: request the endpoint of the target
 	FindNode struct {
-		From			Node			// source node
-		To				Node			// destination node
-		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
-		SubNetId		SubNetworkID	// sub network identity
-		MaskBits		int				// mask bits for subnet identity
-		Target			config.NodeID	// target node identity
-		Id				uint64			// message identity
-		Expiration		uint64			// time to expired of this message
-		Extra			[]byte			// extra info
+		From         Node           // source node
+		To           Node           // destination node
+		FromSubNetId []SubNetworkID // sub network identities of "From"
+		SubNetId     SubNetworkID   // sub network identity
+		MaskBits     int            // mask bits for subnet identity
+		Target       config.NodeID  // target node identity
+		Id           uint64         // message identity
+		Expiration   uint64         // time to expired of this message
+		Extra        []byte         // extra info
 	}
 
 	// Neighbors: response to FindNode
 	Neighbors struct {
-		From			Node			// source node
-		To				Node			// destination node
-		FromSubNetId	[]SubNetworkID	// sub network identities of "From"
-		SubNetId		SubNetworkID	// sub network identity
-		Nodes			[]*Node			// neighbor nodes
-		Id				uint64			// message identity
-		Expiration		uint64			// time to expired of this message
-		Extra			[]byte			// extra info
+		From         Node           // source node
+		To           Node           // destination node
+		FromSubNetId []SubNetworkID // sub network identities of "From"
+		SubNetId     SubNetworkID   // sub network identity
+		Nodes        []*Node        // neighbor nodes
+		Id           uint64         // message identity
+		Expiration   uint64         // time to expired of this message
+		Extra        []byte         // extra info
 	}
 )
 
@@ -136,21 +136,21 @@ type (
 // the raw one; for encoding, bytes will be wriiten into raw buffer.
 //
 type UdpMsg struct {
-	Pbuf	*[]byte			// buffer pointer
-	Len		int				// bytes buffered
-	From	*net.UDPAddr	// source address from underlying network library
-	Msg		*pb.UdpMessage	// protobuf message
-	Eno		UdpMsgErrno		// current errno
-	Key		interface{}		// private key
-	typ		UdpMsgType		// message type
-	pum		interface{}		// pointer to Ping, Pong...
+	Pbuf *[]byte        // buffer pointer
+	Len  int            // bytes buffered
+	From *net.UDPAddr   // source address from underlying network library
+	Msg  *pb.UdpMessage // protobuf message
+	Eno  UdpMsgErrno    // current errno
+	Key  interface{}    // private key
+	typ  UdpMsgType     // message type
+	pum  interface{}    // pointer to Ping, Pong...
 }
 
 //
 // errno
 //
 const (
-	UdpMsgEnoNone 		= iota
+	UdpMsgEnoNone = iota
 	UdpMsgEnoParameter
 	UdpMsgEnoEncodeFailed
 	UdpMsgEnoDecodeFailed
@@ -160,19 +160,18 @@ const (
 
 type UdpMsgErrno int
 
-
 //
 // Create UdpMsg object
 //
 func NewUdpMsg() *UdpMsg {
-	return &UdpMsg {
-		Pbuf:	nil,
-		Len:	0,
-		From:	nil,
-		Msg:	nil,
-		Eno:	UdpMsgEnoUnknown,
-		typ:	UdpMsgTypeUnknown,
-		pum:	nil,
+	return &UdpMsg{
+		Pbuf: nil,
+		Len:  0,
+		From: nil,
+		Msg:  nil,
+		Eno:  UdpMsgEnoUnknown,
+		typ:  UdpMsgTypeUnknown,
+		pum:  nil,
 	}
 }
 
@@ -197,7 +196,7 @@ func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) Udp
 func (pum *UdpMsg) Decode() UdpMsgErrno {
 	pum.Msg = new(pb.UdpMessage)
 	if err := proto.Unmarshal((*pum.Pbuf)[0:pum.Len], pum.Msg); err != nil {
-		udpmsgLog.Debug("Decode: " +
+		udpmsgLog.Debug("Decode: "+
 			"Unmarshal failed, err: %s",
 			err.Error())
 		return UdpMsgEnoDecodeFailed
@@ -219,29 +218,29 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	mt := pum.GetDecodedMsgType()
 	if mt == UdpMsgTypeUnknown {
-		udpmsgLog.Debug("GetDecodedMsg: " +
+		udpmsgLog.Debug("GetDecodedMsg: "+
 			"GetDecodedMsgType failed, mt: %d",
 			mt)
 		return nil
 	}
 
-	var funcMap = map[UdpMsgType]interface{} {
-		UdpMsgTypePing: pum.GetPing,
-		UdpMsgTypePong: pum.GetPong,
-		UdpMsgTypeFindNode: pum.GetFindNode,
+	var funcMap = map[UdpMsgType]interface{}{
+		UdpMsgTypePing:      pum.GetPing,
+		UdpMsgTypePong:      pum.GetPong,
+		UdpMsgTypeFindNode:  pum.GetFindNode,
 		UdpMsgTypeNeighbors: pum.GetNeighbors,
 	}
 	var f interface{}
 	var ok bool
 
 	if f, ok = funcMap[mt]; !ok {
-		udpmsgLog.Debug("GetDecodedMsg: " +
+		udpmsgLog.Debug("GetDecodedMsg: "+
 			"invalid message type: %d",
 			mt)
 		return nil
 	}
 	pum.typ = mt
-	pum.pum = f.(func()interface{})()
+	pum.pum = f.(func() interface{})()
 	return pum.pum
 }
 
@@ -249,11 +248,11 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 // Get deocded message type
 //
 func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
-	var pbMap = map[pb.UdpMessage_MessageType]UdpMsgType {
-		pb.UdpMessage_PING:			UdpMsgTypePing,
-		pb.UdpMessage_PONG:			UdpMsgTypePong,
-		pb.UdpMessage_FINDNODE:		UdpMsgTypeFindNode,
-		pb.UdpMessage_NEIGHBORS:	UdpMsgTypeNeighbors,
+	var pbMap = map[pb.UdpMessage_MessageType]UdpMsgType{
+		pb.UdpMessage_PING:      UdpMsgTypePing,
+		pb.UdpMessage_PONG:      UdpMsgTypePong,
+		pb.UdpMessage_FINDNODE:  UdpMsgTypeFindNode,
+		pb.UdpMessage_NEIGHBORS: UdpMsgTypeNeighbors,
 	}
 	var key pb.UdpMessage_MessageType
 	var val UdpMsgType
@@ -423,7 +422,7 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 	var ipv4 = net.IPv4zero
 	if *pum.Msg.MsgType == pb.UdpMessage_PING {
 		ipv4 = net.IP(pum.Msg.Ping.From.IP).To4()
-	} else if *pum.Msg.MsgType == pb.UdpMessage_PONG  {
+	} else if *pum.Msg.MsgType == pb.UdpMessage_PONG {
 		ipv4 = net.IP(pum.Msg.Pong.From.IP).To4()
 	} else if *pum.Msg.MsgType == pb.UdpMessage_FINDNODE {
 		ipv4 = net.IP(pum.Msg.FindNode.From.IP).To4()
@@ -449,7 +448,7 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 	var err error
 	if *pum.Pbuf, err = proto.Marshal(pum.Msg); err != nil {
-		udpmsgLog.Debug("Encode: " +
+		udpmsgLog.Debug("Encode: "+
 			"Marshal failed, err: %s",
 			err.Error())
 		pum.Eno = UdpMsgEnoEncodeFailed
@@ -462,7 +461,7 @@ func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 //
 // Encode for UDP messages
 //
-func (pum *UdpMsg)Encode(t int, msg interface{}) UdpMsgErrno {
+func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 
 	var eno UdpMsgErrno
 	pum.Msg = new(pb.UdpMessage)
@@ -512,7 +511,7 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 	pbPing.From.UDP = new(uint32)
 	pbPing.From.TCP = new(uint32)
 
-	pbPing.From.IP =  append(pbPing.From.IP, ping.From.IP...)
+	pbPing.From.IP = append(pbPing.From.IP, ping.From.IP...)
 	*pbPing.From.TCP = uint32(ping.From.TCP)
 	*pbPing.From.UDP = uint32(ping.From.UDP)
 	pbPing.From.NodeId = append(pbPing.From.NodeId, ping.From.NodeId[:]...)
@@ -633,35 +632,35 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 
 	pbm.MsgType = new(pb.UdpMessage_MessageType)
 
-	pbFN = &pb.UdpMessage_FindNode {
+	pbFN = &pb.UdpMessage_FindNode{
 
-		From: &pb.UdpMessage_Node {
-			IP:					make([]byte,0),
-			UDP:				new(uint32),
-			TCP:				new(uint32),
-			NodeId:				make([]byte,0),
-			XXX_unrecognized:	make([]byte,0),
+		From: &pb.UdpMessage_Node{
+			IP:               make([]byte, 0),
+			UDP:              new(uint32),
+			TCP:              new(uint32),
+			NodeId:           make([]byte, 0),
+			XXX_unrecognized: make([]byte, 0),
 		},
 
-		To: &pb.UdpMessage_Node {
-			IP:					make([]byte,0),
-			UDP:				new(uint32),
-			TCP:				new(uint32),
-			NodeId:				make([]byte,0),
-			XXX_unrecognized:	make([]byte,0),
+		To: &pb.UdpMessage_Node{
+			IP:               make([]byte, 0),
+			UDP:              new(uint32),
+			TCP:              new(uint32),
+			NodeId:           make([]byte, 0),
+			XXX_unrecognized: make([]byte, 0),
 		},
 
-		MaskBits: new(int32),
+		MaskBits:     new(int32),
 		FromSubNetId: make([]*pb.UdpMessage_SubNetworkID, 0),
-		SubNetId: &pb.UdpMessage_SubNetworkID {
+		SubNetId: &pb.UdpMessage_SubNetworkID{
 			Id: make([]byte, 0),
 		},
 
-		Target:				make([]byte, 0),
-		Id:					new(uint64),
-		Expiration:			new(uint64),
-		Extra:				make([]byte, 0),
-		XXX_unrecognized:	make([]byte, 0),
+		Target:           make([]byte, 0),
+		Id:               new(uint64),
+		Expiration:       new(uint64),
+		Extra:            make([]byte, 0),
+		XXX_unrecognized: make([]byte, 0),
 	}
 
 	*pbm.MsgType = pb.UdpMessage_FINDNODE
@@ -797,7 +796,7 @@ func (pum *UdpMsg) GetRawMessage() (buf []byte, len int) {
 //
 // sign with node identity
 //
-func (pum *UdpMsg)sign(priKey *ecdsa.PrivateKey, nodeId []byte)(R []byte, SignR int32 , S []byte, SignS int32) {
+func (pum *UdpMsg) sign(priKey *ecdsa.PrivateKey, nodeId []byte) (R []byte, SignR int32, S []byte, SignS int32) {
 	r, s, _ := config.P2pSign(priKey, nodeId)
 	SignR = int32(config.P2pSignBigInt(r))
 	R = append(R, config.P2pBigIntAbs2Bytes(r)...)
@@ -809,7 +808,7 @@ func (pum *UdpMsg)sign(priKey *ecdsa.PrivateKey, nodeId []byte)(R []byte, SignR 
 //
 // verify with node identity
 //
-func (pum *UdpMsg)verify(R []byte, SignR int32, S []byte, SignS int32, nodeId []byte) bool {
+func (pum *UdpMsg) verify(R []byte, SignR int32, S []byte, SignS int32, nodeId []byte) bool {
 	pubKey := config.P2pNodeId2Pubkey(nodeId)
 	r := config.P2pBigInt(int(SignR), R)
 	s := config.P2pBigInt(int(SignS), S)
@@ -820,7 +819,7 @@ func (pum *UdpMsg)verify(R []byte, SignR int32, S []byte, SignS int32, nodeId []
 // Compare two nodes
 //
 const (
-	CmpNodeEqu		= iota
+	CmpNodeEqu = iota
 	CmpNodeNotEquId
 	CmpNodeNotEquIp
 	CmpNodeNotEquUdpPort
@@ -834,7 +833,7 @@ func (n *Node) CompareWith(n2 *Node) int {
 		return CmpNodeNotEquTcpPort
 	} else if n.IP.Equal(n2.IP) != true {
 		return CmpNodeNotEquIp
-	}	else	if n.NodeId != n2.NodeId {
+	} else if n.NodeId != n2.NodeId {
 		return CmpNodeNotEquId
 	}
 	return CmpNodeEqu
@@ -844,7 +843,7 @@ func (n *Node) CompareWith(n2 *Node) int {
 // String udp messages
 //
 
-func (n *Node)Srting() string {
+func (n *Node) Srting() string {
 	NodeId := "\t" + "NodeId: " + fmt.Sprintf("%x", n.NodeId) + "\n"
 	IP := "\t" + "IP: " + n.IP.String() + "\n"
 	UDP := "\t" + "UDP: " + fmt.Sprintf("%d", n.UDP) + "\n"
@@ -853,7 +852,7 @@ func (n *Node)Srting() string {
 	return strNode
 }
 
-func (ping *Ping)String() string {
+func (ping *Ping) String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
@@ -873,7 +872,7 @@ func (ping *Ping)String() string {
 	}
 }
 
-func (pong *Pong)String() string {
+func (pong *Pong) String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
@@ -893,7 +892,7 @@ func (pong *Pong)String() string {
 	}
 }
 
-func (findnode *FindNode)String() string {
+func (findnode *FindNode) String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
@@ -915,7 +914,7 @@ func (findnode *FindNode)String() string {
 	}
 }
 
-func (neighbors *Neighbors)String() string {
+func (neighbors *Neighbors) String() string {
 	if !udpmsgLog.debug__ {
 		return ""
 	} else {
@@ -939,7 +938,7 @@ func (neighbors *Neighbors)String() string {
 	}
 }
 
-func (pum *UdpMsg)DebugMessageFromPeer() {
+func (pum *UdpMsg) DebugMessageFromPeer() {
 	if udpmsgLog.debug__ {
 		switch pum.typ {
 		case UdpMsgTypePing:
@@ -956,7 +955,7 @@ func (pum *UdpMsg)DebugMessageFromPeer() {
 	}
 }
 
-func (pum *UdpMsg)DebugMessageToPeer() {
+func (pum *UdpMsg) DebugMessageToPeer() {
 	if udpmsgLog.debug__ {
 		switch pum.typ {
 		case UdpMsgTypePing:

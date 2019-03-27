@@ -21,30 +21,30 @@
 package dht
 
 import (
-	"net"
 	"fmt"
+	"net"
 	"sync"
 	"time"
-	config	"github.com/yeeco/gyee/p2p/config"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
 
+	config "github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type lsnMgrLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var lsnLog = lsnMgrLogger  {
-	debug__:	false,
+var lsnLog = lsnMgrLogger{
+	debug__: false,
 }
 
-func (log lsnMgrLogger)Debug(fmt string, args ... interface{}) {
+func (log lsnMgrLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -57,41 +57,41 @@ const LsnMgrName = sch.DhtLsnMgrName
 // Listener manager
 //
 type LsnMgr struct {
-	sdl			*sch.Scheduler			// pointer to scheduler
-	name		string					// my name
-	status		int						// status
-	config		lsnMgrCfg				// configuration
-	tep			sch.SchUserTaskEp		// task entry
-	ptnMe		interface{}				// pointer to task node of myself
-	ptnConMgr	interface{}				// pointer to connection manager task node
-	listener	net.Listener			// listener of net
-	listenAddr	*net.TCPAddr			// listen address
-	lock		sync.Mutex				// lock for forcing to get out of accept
+	sdl        *sch.Scheduler    // pointer to scheduler
+	name       string            // my name
+	status     int               // status
+	config     lsnMgrCfg         // configuration
+	tep        sch.SchUserTaskEp // task entry
+	ptnMe      interface{}       // pointer to task node of myself
+	ptnConMgr  interface{}       // pointer to connection manager task node
+	listener   net.Listener      // listener of net
+	listenAddr *net.TCPAddr      // listen address
+	lock       sync.Mutex        // lock for forcing to get out of accept
 }
 
 //
 // Tcp accept deadline
 //
-const lmAcceptTimeout = time.Second * 4	// so task might be block for this duration
+const lmAcceptTimeout = time.Second * 4 // so task might be block for this duration
 
 //
 // Listener manager status
 //
 const (
-	lmsNull		= iota					// not inited
-	lmsStartup							// all are ready
-	lmsWorking							// in trying to accept more
-	lmsPaused							// paused
-	lmsStopped							// underlying network errors, listener might be destroy
+	lmsNull    = iota // not inited
+	lmsStartup        // all are ready
+	lmsWorking        // in trying to accept more
+	lmsPaused         // paused
+	lmsStopped        // underlying network errors, listener might be destroy
 )
 
 //
 // Configuration
 //
 type lsnMgrCfg struct {
-	network		string					// network name like "tcp", "udp", only "tcp" supported currently
-	ip			net.IP					// ip address
-	port		uint16					// port numbers
+	network string // network name like "tcp", "udp", only "tcp" supported currently
+	ip      net.IP // ip address
+	port    uint16 // port numbers
 }
 
 //
@@ -99,13 +99,13 @@ type lsnMgrCfg struct {
 //
 func NewLsnMgr() *LsnMgr {
 
-	lsnMgr := LsnMgr {
-		name:		LsnMgrName,
-		status:		lmsNull,
-		config:		lsnMgrCfg {
-			network:	"tcp",
-			ip:			net.IP{127,0,0,1},
-			port:		8899,
+	lsnMgr := LsnMgr{
+		name:   LsnMgrName,
+		status: lmsNull,
+		config: lsnMgrCfg{
+			network: "tcp",
+			ip:      net.IP{127, 0, 0, 1},
+			port:    8899,
 		},
 	}
 
@@ -117,17 +117,17 @@ func NewLsnMgr() *LsnMgr {
 //
 // Entry point exported to shceduler
 //
-func (lsnMgr *LsnMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (lsnMgr *LsnMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return lsnMgr.tep(ptn, msg)
 }
 
 //
 // Listener manager entry
 //
-func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (lsnMgr *LsnMgr) lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		lsnLog.Debug("lsnMgrProc: " +
+		lsnLog.Debug("lsnMgrProc: "+
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -169,7 +169,7 @@ func (lsnMgr *LsnMgr)lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 //
 // Poweron event handler
 //
-func (lsnMgr *LsnMgr)poweron(ptn interface{}) sch.SchErrno {
+func (lsnMgr *LsnMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	sdl := sch.SchGetScheduler(ptn)
 	lsnMgr.sdl = sdl
@@ -195,7 +195,7 @@ func (lsnMgr *LsnMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 // Poweroff event handler
 //
-func (lsnMgr *LsnMgr)poweroff(ptn interface{}) sch.SchErrno {
+func (lsnMgr *LsnMgr) poweroff(ptn interface{}) sch.SchErrno {
 	lsnLog.Debug("poweroff: task will be done ...")
 	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, sch.SchEnoKilled)
 }
@@ -203,7 +203,7 @@ func (lsnMgr *LsnMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 // Start-requst event handler
 //
-func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
+func (lsnMgr *LsnMgr) startReq() sch.SchErrno {
 
 	if lsnMgr.status != lmsStopped && lsnMgr.status != lmsNull {
 		lsnLog.Debug("startReq: status mismatched: %d", lsnMgr.status)
@@ -231,7 +231,7 @@ func (lsnMgr *LsnMgr)startReq() sch.SchErrno {
 //
 // Stop-request event handler
 //
-func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
+func (lsnMgr *LsnMgr) stopReq() sch.SchErrno {
 	if lsnMgr.status == lmsNull || lsnMgr.status == lmsStopped {
 		lsnLog.Debug("stopReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
@@ -252,7 +252,7 @@ func (lsnMgr *LsnMgr)stopReq() sch.SchErrno {
 //
 // Pause-request event handler
 //
-func (lsnMgr *LsnMgr)pauseReq() sch.SchErrno {
+func (lsnMgr *LsnMgr) pauseReq() sch.SchErrno {
 	if lsnMgr.status != lmsWorking {
 		lsnLog.Debug("pauseReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
@@ -265,7 +265,7 @@ func (lsnMgr *LsnMgr)pauseReq() sch.SchErrno {
 //
 // Resume-request event handler
 //
-func (lsnMgr *LsnMgr)resumeReq() sch.SchErrno {
+func (lsnMgr *LsnMgr) resumeReq() sch.SchErrno {
 	if lsnMgr.status != lmsPaused {
 		lsnLog.Debug("resumeReq: status mismatched: %d", lsnMgr.status)
 		return sch.SchEnoUserTask
@@ -284,7 +284,7 @@ func (lsnMgr *LsnMgr)resumeReq() sch.SchErrno {
 //
 // Drive self event handler
 //
-func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
+func (lsnMgr *LsnMgr) driveSelf() sch.SchErrno {
 
 	//
 	// to support force to get out of accept
@@ -316,7 +316,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	// ForceAcceptOut.
 	//
 
-	lsnLog.Debug("driveSelf: " +
+	lsnLog.Debug("driveSelf: "+
 		"listener:[%s:%d], try accept again ...",
 		lsnMgr.config.ip.String(), lsnMgr.config.port)
 
@@ -371,7 +371,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrAcceptInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 
-	lsnLog.Debug("driveSelf: connection accepted ok, " +
+	lsnLog.Debug("driveSelf: connection accepted ok, "+
 		"listener:[%s:%d], loccal address: %s, remote address: %s",
 		lsnMgr.config.ip.String(), lsnMgr.config.port,
 		con.LocalAddr().String(),
@@ -385,7 +385,7 @@ func (lsnMgr *LsnMgr)driveSelf() sch.SchErrno {
 //
 // Setup net lsitener
 //
-func (lsnMgr *LsnMgr)setupListener() DhtErrno {
+func (lsnMgr *LsnMgr) setupListener() DhtErrno {
 	var err error
 	network := lsnMgr.config.network
 	ip := lsnMgr.config.ip.String()
@@ -409,9 +409,9 @@ func (lsnMgr *LsnMgr)setupListener() DhtErrno {
 //
 // Report current status to connection manager
 //
-func (lsnMgr *LsnMgr)dispStaus() DhtErrno {
+func (lsnMgr *LsnMgr) dispStaus() DhtErrno {
 	msg := sch.SchMessage{}
-	ind := sch.MsgDhtLsnMgrStatusInd{Status:lsnMgr.status}
+	ind := sch.MsgDhtLsnMgrStatusInd{Status: lsnMgr.status}
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrStatusInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
@@ -420,7 +420,7 @@ func (lsnMgr *LsnMgr)dispStaus() DhtErrno {
 //
 // Drive our manager self one more times
 //
-func (lsnMgr *LsnMgr)driveMore() DhtErrno {
+func (lsnMgr *LsnMgr) driveMore() DhtErrno {
 	msg := sch.SchMessage{}
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnMe, sch.EvDhtLsnMgrDriveSelf, nil)
 	lsnMgr.sdl.SchSendMessage(&msg)

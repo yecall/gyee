@@ -18,36 +18,34 @@
  *
  */
 
-
 package discover
 
 import (
 	"github.com/yeeco/gyee/p2p/config"
-	sch 	"github.com/yeeco/gyee/p2p/scheduler"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
 //
 // debug
 //
 type dcvLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var dcvLog = dcvLogger {
-	debug__:	false,
+var dcvLog = dcvLogger{
+	debug__: false,
 }
 
-func (log dcvLogger)Debug(fmt string, args ... interface{}) {
+func (log dcvLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
-
 // errno
 const (
-	DcvMgrEnoNone		= iota
+	DcvMgrEnoNone = iota
 	DcvMgrEnoParameter
 	DcvMgrEnoScheduler
 )
@@ -59,18 +57,18 @@ type DcvMgrReconfig = sch.MsgDcvReconfigReq
 const DcvMgrName = sch.DcvMgrName
 
 type DiscoverManager struct {
-	sdl			*sch.Scheduler		// pointer to scheduler
-	name		string				// name
-	tep			sch.SchUserTaskEp	// entry
-	ptnMe		interface{}			// task node pointer to myself
-	ptnTab		interface{}			// task node pointer to table manager task
-	ptnPeMgr	interface{}			// task node pointer to peer manager task
-	more		int					// number more peers are needed
-	reCfg		DcvMgrReconfig		// reconfiguration request from peer manager
+	sdl      *sch.Scheduler    // pointer to scheduler
+	name     string            // name
+	tep      sch.SchUserTaskEp // entry
+	ptnMe    interface{}       // task node pointer to myself
+	ptnTab   interface{}       // task node pointer to table manager task
+	ptnPeMgr interface{}       // task node pointer to peer manager task
+	more     int               // number more peers are needed
+	reCfg    DcvMgrReconfig    // reconfiguration request from peer manager
 }
 
 func NewDcvMgr() *DiscoverManager {
-	var dcvMgr = DiscoverManager {
+	var dcvMgr = DiscoverManager{
 		name:     DcvMgrName,
 		tep:      nil,
 		ptnMe:    nil,
@@ -82,11 +80,11 @@ func NewDcvMgr() *DiscoverManager {
 	return &dcvMgr
 }
 
-func (dcvMgr *DiscoverManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dcvMgr *DiscoverManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return dcvMgr.tep(ptn, msg)
 }
 
-func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (dcvMgr *DiscoverManager) dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	if dcvLog.debug__ {
 		dcvLog.Debug("dcvMgrProc: msg: %d", msg.Id)
 	}
@@ -119,7 +117,7 @@ func (dcvMgr *DiscoverManager)dcvMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	return sch.SchEnoNone
 }
 
-func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
+func (dcvMgr *DiscoverManager) DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	var eno sch.SchErrno
 	dcvMgr.ptnMe = ptn
 	dcvMgr.sdl = sch.SchGetScheduler(ptn)
@@ -150,7 +148,7 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	return DcvMgrEnoNone
 }
 
-func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
+func (dcvMgr *DiscoverManager) DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 	dcvLog.Debug("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.name)
 	if dcvMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
 		return DcvMgrEnoScheduler
@@ -158,9 +156,9 @@ func (dcvMgr *DiscoverManager)DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 	return DcvMgrEnoNone
 }
 
-func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvMgrErrno {
+func (dcvMgr *DiscoverManager) DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvMgrErrno {
 	var schMsg = sch.SchMessage{}
-	var reqRefresh = sch.MsgTabRefreshReq{req.Snid,nil,nil}
+	var reqRefresh = sch.MsgTabRefreshReq{req.Snid, nil, nil}
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
 		dcvLog.Debug("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
 			reqRefresh.Snid, dcvMgr.more)
@@ -171,7 +169,7 @@ func (dcvMgr *DiscoverManager)DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvM
 	return DcvMgrEnoNone
 }
 
-func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) DcvMgrErrno {
+func (dcvMgr *DiscoverManager) DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) DcvMgrErrno {
 	if dcvMgr.more <= 0 {
 		// since nodes reported to peer manager might be useless for these nods might
 		// be duplicated ones in current implement, we can't return here, this should
@@ -191,8 +189,8 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 
 	schMsg := sch.SchMessage{}
 	r := sch.MsgDcvFindNodeRsp{
-		Snid:	rsp.Snid,
-		Nodes:	rsp.Nodes,
+		Snid:  rsp.Snid,
+		Nodes: rsp.Nodes,
 	}
 
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r)
@@ -202,10 +200,7 @@ func (dcvMgr *DiscoverManager)DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dcv
 	return DcvMgrEnoNone
 }
 
-func (dcvMgr *DiscoverManager)DcvMgrReconfigReq(req *sch.MsgDcvReconfigReq) DcvMgrErrno {
+func (dcvMgr *DiscoverManager) DcvMgrReconfigReq(req *sch.MsgDcvReconfigReq) DcvMgrErrno {
 	dcvMgr.reCfg = *req
 	return DcvMgrEnoNone
 }
-
-
-

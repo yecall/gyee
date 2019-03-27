@@ -21,38 +21,38 @@
 package neighbor
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
-	"fmt"
-	config	"github.com/yeeco/gyee/p2p/config"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	um		"github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-	tab		"github.com/yeeco/gyee/p2p/discover/table"
-)
 
+	config "github.com/yeeco/gyee/p2p/config"
+	tab "github.com/yeeco/gyee/p2p/discover/table"
+	um "github.com/yeeco/gyee/p2p/discover/udpmsg"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type ngbLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var ngbLog = ngbLogger  {
-	debug__:	false,
+var ngbLog = ngbLogger{
+	debug__: false,
 }
 
-func (log ngbLogger)Debug(fmt string, args ... interface{}) {
+func (log ngbLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
 // errno
 const (
-	NgbMgrEnoNone	= iota
+	NgbMgrEnoNone = iota
 	NgbMgrEnoParameter
 	NgbMgrEnoTimeout
 	NgbMgrEnoNotFound
@@ -66,50 +66,50 @@ const (
 type NgbMgrErrno int
 
 const (
-	NgbProcName = "ngbproto"	// Neighbor task name
-	ngbProcMailboxSize = 512	// Mailbox size of a ngighbor instance
+	NgbProcName        = "ngbproto" // Neighbor task name
+	ngbProcMailboxSize = 512        // Mailbox size of a ngighbor instance
 )
 
 // The control block of neighbor task instance
 type neighborInst struct {
-	sdl			*sch.Scheduler		// pointer to scheduler
-	ngbMgr		*NeighborManager	// pointer to neighbor manager
-	ptn			interface{}			// task node pointer
-	name		string				// task instance name
-	tep			sch.SchUserTaskEp	// entry
-	msgType		um.UdpMsgType		// message type to inited this instance
-	msgBody		interface{}			// message body
-	tidFN		int					// FindNode timer identity
-	tidPP		int					// Pingpong timer identity
+	sdl     *sch.Scheduler    // pointer to scheduler
+	ngbMgr  *NeighborManager  // pointer to neighbor manager
+	ptn     interface{}       // task node pointer
+	name    string            // task instance name
+	tep     sch.SchUserTaskEp // entry
+	msgType um.UdpMsgType     // message type to inited this instance
+	msgBody interface{}       // message body
+	tidFN   int               // FindNode timer identity
+	tidPP   int               // Pingpong timer identity
 }
 
 // Protocol handler errno
 const (
-	NgbProtoEnoNone	= 0
+	NgbProtoEnoNone = 0
 
-	NgbProtoEnoParameter = iota + 100	// +100, an offset is necessary to distinct this errno from
-										// those NgbMgrEnoxxx.
+	NgbProtoEnoParameter = iota + 100 // +100, an offset is necessary to distinct this errno from
+	// those NgbMgrEnoxxx.
 
-	NgbProtoEnoScheduler				// scheduler
-	NgbProtoEnoTimeout					// timeout
-	NgbProtoEnoUdp						// udp
+	NgbProtoEnoScheduler // scheduler
+	NgbProtoEnoTimeout   // timeout
+	NgbProtoEnoUdp       // udp
 )
 
 type NgbProtoErrno int
 
 // Timeouts, zero value would be no timeout
 const (
-	NgbProtoWriteTimeout			= 8 * time.Second		// for underlying sending
-	NgbProtoReadTimeout				= 0						// for underlying receiving
-	NgbProtoPingResponseTimeout		= 20 * time.Second		// for ping
-	NgbProtoFindNodeResponseTimeout = 20 * time.Second		// for find node
+	NgbProtoWriteTimeout            = 8 * time.Second  // for underlying sending
+	NgbProtoReadTimeout             = 0                // for underlying receiving
+	NgbProtoPingResponseTimeout     = 20 * time.Second // for ping
+	NgbProtoFindNodeResponseTimeout = 20 * time.Second // for find node
 )
 
-func (inst *neighborInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (inst *neighborInst) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return inst.tep(ptn, msg)
 }
 
-func (inst *neighborInst)ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (inst *neighborInst) ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	ngbLog.Debug("ngbProtoProc: inst.name: %s, msg.Id: %d", inst.name, msg.Id)
 
@@ -169,19 +169,19 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 		inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		inst.sdl.SchSendMessage(&schMsg)
 		inst.cleanMap(inst.name)
-	 	return NgbProtoEnoUdp
-	 }
+		return NgbProtoEnoUdp
+	}
 
-	 var tmd  = sch.TimerDescription {
-		 Name:	NgbProcName + "_timer_findnode",
-		 Utid:	sch.NblFindNodeTimerId,
-		 Tmt:	sch.SchTmTypeAbsolute,
-		 Dur:	NgbProtoFindNodeResponseTimeout,
-		 Extra:	nil,
-	 }
-	 _, inst.tidFN = inst.sdl.SchSetTimer(ptn, &tmd)
+	var tmd = sch.TimerDescription{
+		Name:  NgbProcName + "_timer_findnode",
+		Utid:  sch.NblFindNodeTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   NgbProtoFindNodeResponseTimeout,
+		Extra: nil,
+	}
+	_, inst.tidFN = inst.sdl.SchSetTimer(ptn, &tmd)
 
-	 return NgbProtoEnoNone
+	return NgbProtoEnoNone
 }
 
 func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbProtoErrno {
@@ -196,12 +196,12 @@ func (inst *neighborInst) NgbProtoPingReq(ptn interface{}, ping *um.Ping) NgbPro
 	pum.DebugMessageToPeer()
 	sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst)
 
-	var tmd  = sch.TimerDescription {
-		Name:	NgbProcName + "_timer_pingpong",
-		Utid:	sch.NblPingpongTimerId,
-		Tmt:	sch.SchTmTypeAbsolute,
-		Dur:	NgbProtoPingResponseTimeout,
-		Extra:	nil,
+	var tmd = sch.TimerDescription{
+		Name:  NgbProcName + "_timer_pingpong",
+		Utid:  sch.NblPingpongTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   NgbProtoPingResponseTimeout,
+		Extra: nil,
 	}
 	_, inst.tidPP = inst.sdl.SchSetTimer(ptn, &tmd)
 	return NgbProtoEnoNone
@@ -285,37 +285,37 @@ func (inst *neighborInst) NgbProtoPingTimeout() NgbProtoErrno {
 	return NgbProtoEnoNone
 }
 
-func (inst *neighborInst)cleanMap(name string) NgbMgrErrno {
+func (inst *neighborInst) cleanMap(name string) NgbMgrErrno {
 	msg := sch.SchMessage{}
 	inst.sdl.SchMakeMessage(&msg, inst.ptn, inst.ngbMgr.ptnMe, sch.EvNblCleanMapReq, name)
 	inst.sdl.SchSendMessage(&msg)
 	return NgbMgrEnoNone
 }
 
-func (inst *neighborInst)NgbProtoDieCb(ptn interface{}) sch.SchErrno {
+func (inst *neighborInst) NgbProtoDieCb(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
 const (
-	NgbMgrName = sch.NgbMgrName				// Neighbor manager task name
-	expiration  = 20 * time.Second			// Timeouts
+	NgbMgrName = sch.NgbMgrName   // Neighbor manager task name
+	expiration = 20 * time.Second // Timeouts
 )
 
 // Control block of neighbor manager task
 type NeighborManager struct {
-	cfg			config.Cfg4UdpNgbManager	// configuration
-	lock		sync.Mutex					// lock for protection
-	sdl			*sch.Scheduler				// pointer to scheduler
-	name		string						// name
-	tep			sch.SchUserTaskEp			// entry
-	bootstrap	bool						// bootstrap node flag
-	ptnMe		interface{}					// pointer to task node of myself
-	ptnTab		interface{}					// pointer to task node of table task
-	tabMgr		*tab.TableManager			// pointer to table manager
-	ptnLsn		interface{}					// pointer to task node of listner
-	ngbMap		map[string]*neighborInst	// map neighbor node id to task node pointer
-	fnInstSeq	int							// findnode instance sequence number
-	ppInstSeq	int							// pingpong instance sequence number
+	cfg       config.Cfg4UdpNgbManager // configuration
+	lock      sync.Mutex               // lock for protection
+	sdl       *sch.Scheduler           // pointer to scheduler
+	name      string                   // name
+	tep       sch.SchUserTaskEp        // entry
+	bootstrap bool                     // bootstrap node flag
+	ptnMe     interface{}              // pointer to task node of myself
+	ptnTab    interface{}              // pointer to task node of table task
+	tabMgr    *tab.TableManager        // pointer to table manager
+	ptnLsn    interface{}              // pointer to task node of listner
+	ngbMap    map[string]*neighborInst // map neighbor node id to task node pointer
+	fnInstSeq int                      // findnode instance sequence number
+	ppInstSeq int                      // pingpong instance sequence number
 }
 
 func NewNgbMgr() *NeighborManager {
@@ -329,11 +329,11 @@ func NewNgbMgr() *NeighborManager {
 	return &ngbMgr
 }
 
-func (ngbMgr *NeighborManager)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (ngbMgr *NeighborManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return ngbMgr.tep(ptn, msg)
 }
 
-func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (ngbMgr *NeighborManager) ngbMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	ngbLog.Debug("ngbMgrProc: ngbMgr.name: %s, msg.Id: %d", ngbMgr.name, msg.Id)
 
@@ -369,7 +369,7 @@ func (ngbMgr *NeighborManager)ngbMgrProc(ptn interface{}, msg *sch.SchMessage) s
 	return sch.SchEnoNone
 }
 
-func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
+func (ngbMgr *NeighborManager) PoweronHandler(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	var ptnTab interface{}
 	var ptnLsn interface{}
@@ -398,11 +398,11 @@ func (ngbMgr *NeighborManager)PoweronHandler(ptn interface{}) sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
+func (ngbMgr *NeighborManager) PoweroffHandler(ptn interface{}) sch.SchErrno {
 	ngbLog.Debug("PoweroffHandler: task will be done, name: %s", ngbMgr.sdl.SchGetTaskName(ptn))
-	powerOff := sch.SchMessage {
-		Id:		sch.EvSchPoweroff,
-		Body:	nil,
+	powerOff := sch.SchMessage{
+		Id:   sch.EvSchPoweroff,
+		Body: nil,
 	}
 
 	ngbMgr.lock.Lock()
@@ -416,14 +416,14 @@ func (ngbMgr *NeighborManager)PoweroffHandler(ptn interface{}) sch.SchErrno {
 	return ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
 
-func (ngbMgr *NeighborManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) NgbMgrErrno {
+func (ngbMgr *NeighborManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) NgbMgrErrno {
 	add := msg.SnidAdd
 	del := msg.SnidDel
 
 	for _, d := range del {
 		for idx, id := range ngbMgr.cfg.SubNetIdList {
 			if id == d {
-				if idx != len(ngbMgr.cfg.SubNetIdList) - 1 {
+				if idx != len(ngbMgr.cfg.SubNetIdList)-1 {
 					ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList[0:idx], ngbMgr.cfg.SubNetIdList[idx+1:]...)
 				} else {
 					ngbMgr.cfg.SubNetIdList = ngbMgr.cfg.SubNetIdList[0:idx]
@@ -441,7 +441,7 @@ func (ngbMgr *NeighborManager)shellReconfigReq(msg *sch.MsgShellReconfigReq) Ngb
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
+func (ngbMgr *NeighborManager) UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 	var eno NgbMgrErrno
 	switch msg.msgType {
 	case um.UdpMsgTypePing:
@@ -459,7 +459,7 @@ func (ngbMgr *NeighborManager)UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 	return eno
 }
 
-func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
+func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping) NgbMgrErrno {
 	if ngbMgr.checkDestNode(&ping.To, ping.SubNetId) == false {
 		ngbLog.Debug("PingHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -483,18 +483,18 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	}
 
 	pong := um.Pong{
-		From:			ping.To,
-		To:				ping.From,
-		FromSubNetId:	ngbMgr.cfg.SubNetIdList,
-		SubNetId:		ping.SubNetId,
-		Id:				uint64(time.Now().UnixNano()),
-		Expiration:		0,
-		Extra:			nil,
+		From:         ping.To,
+		To:           ping.From,
+		FromSubNetId: ngbMgr.cfg.SubNetIdList,
+		SubNetId:     ping.SubNetId,
+		Id:           uint64(time.Now().UnixNano()),
+		Expiration:   0,
+		Extra:        nil,
 	}
-	toAddr := net.UDPAddr {
-		IP: 	ping.From.IP,
-		Port:	int(ping.From.UDP),
-		Zone:	"",
+	toAddr := net.UDPAddr{
+		IP:   ping.From.IP,
+		Port: int(ping.From.UDP),
+		Zone: "",
 	}
 
 	pum := new(um.UdpMsg)
@@ -529,7 +529,7 @@ func (ngbMgr *NeighborManager)PingHandler(ping *um.Ping) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
+func (ngbMgr *NeighborManager) PongHandler(pong *um.Pong) NgbMgrErrno {
 	if ngbMgr.checkDestNode(&pong.To, pong.SubNetId) == false {
 		ngbLog.Debug("PongHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -560,7 +560,7 @@ func (ngbMgr *NeighborManager)PongHandler(pong *um.Pong) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno {
+func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode) NgbMgrErrno {
 	if ngbMgr.checkDestNode(&findNode.To, findNode.SubNetId) == false {
 		ngbLog.Debug("FindNodeHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -580,9 +580,9 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 		}
 		nodes = append(nodes,
 			mgr.TabClosest(tab.Closest4Queried,
-							tab.NodeID(findNode.Target),
-							findNode.MaskBits,
-							tab.TabInstQPendingMax)...)
+				tab.NodeID(findNode.Target),
+				findNode.MaskBits,
+				tab.TabInstQPendingMax)...)
 	} else {
 
 		mgrs := ngbMgr.tabMgr.TabGetInstAll()
@@ -603,15 +603,15 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	}
 
 	cfgNode := config.Node{
-		IP:		ngbMgr.cfg.IP,
-		UDP:	ngbMgr.cfg.UDP,
-		TCP:	ngbMgr.cfg.TCP,
-		ID:		ngbMgr.cfg.ID,
+		IP:  ngbMgr.cfg.IP,
+		UDP: ngbMgr.cfg.UDP,
+		TCP: ngbMgr.cfg.TCP,
+		ID:  ngbMgr.cfg.ID,
 	}
 
 	for idx, n := range nodes {
 		if n.ID == findNode.From.NodeId {
-			if idx != len(nodes) - 1 {
+			if idx != len(nodes)-1 {
 				nodes = append(nodes[:idx], nodes[idx+1:]...)
 			} else {
 				nodes = nodes[0:idx]
@@ -632,31 +632,30 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	}
 
 	for _, n := range nodes {
-		umn := um.Node {
-			IP:		n.IP,
-			UDP:	n.UDP,
-			TCP:	n.TCP,
-			NodeId:	n.ID,
+		umn := um.Node{
+			IP:     n.IP,
+			UDP:    n.UDP,
+			TCP:    n.TCP,
+			NodeId: n.ID,
 		}
 		umNodes = append(umNodes, &umn)
 	}
 
 	neighbors := um.Neighbors{
-		From: 			findNode.To,
-		To:				findNode.From,
-		FromSubNetId:	ngbMgr.cfg.SubNetIdList,
-		SubNetId:		findNode.SubNetId,
-		Id:				uint64(time.Now().UnixNano()),
-		Nodes:			umNodes,
-		Expiration:		0,
-		Extra:			nil,
-
+		From:         findNode.To,
+		To:           findNode.From,
+		FromSubNetId: ngbMgr.cfg.SubNetIdList,
+		SubNetId:     findNode.SubNetId,
+		Id:           uint64(time.Now().UnixNano()),
+		Nodes:        umNodes,
+		Expiration:   0,
+		Extra:        nil,
 	}
 
-	toAddr := net.UDPAddr {
-		IP: 	findNode.From.IP,
-		Port:	int(findNode.From.UDP),
-		Zone:	"",
+	toAddr := net.UDPAddr{
+		IP:   findNode.From.IP,
+		Port: int(findNode.From.UDP),
+		Zone: "",
 	}
 
 	pum := new(um.UdpMsg)
@@ -690,7 +689,7 @@ func (ngbMgr *NeighborManager)FindNodeHandler(findNode *um.FindNode) NgbMgrErrno
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
+func (ngbMgr *NeighborManager) NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	if ngbMgr.checkDestNode(&nbs.To, nbs.SubNetId) == false {
 		ngbLog.Debug("NeighborsHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -716,10 +715,10 @@ func (ngbMgr *NeighborManager)NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
+func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	var rsp = sch.NblFindNodeRsp{}
-	var schMsg  = sch.SchMessage{}
-	var funcRsp2Tab = func () NgbMgrErrno {
+	var schMsg = sch.SchMessage{}
+	var funcRsp2Tab = func() NgbMgrErrno {
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
@@ -736,28 +735,28 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 
 	ngbMgr.fnInstSeq++
 
-	var ngbInst = neighborInst {
-		sdl:		ngbMgr.sdl,
-		ngbMgr:		ngbMgr,
-		ptn:		nil,
-		name:		strPeerNodeId,
-		msgType:	um.UdpMsgTypeFindNode,
-		msgBody:	findNode,
-		tidFN:		sch.SchInvalidTid,
-		tidPP:		sch.SchInvalidTid,
+	var ngbInst = neighborInst{
+		sdl:     ngbMgr.sdl,
+		ngbMgr:  ngbMgr,
+		ptn:     nil,
+		name:    strPeerNodeId,
+		msgType: um.UdpMsgTypeFindNode,
+		msgBody: findNode,
+		tidFN:   sch.SchInvalidTid,
+		tidPP:   sch.SchInvalidTid,
 	}
 	ngbInst.tep = ngbInst.ngbProtoProc
 
-	var noDog = sch.SchWatchDog {
-		HaveDog:false,
+	var noDog = sch.SchWatchDog{
+		HaveDog: false,
 	}
-	var dc = sch.SchTaskDescription {
-		Name:	fmt.Sprintf("FindNode:%d:%s", ngbMgr.fnInstSeq, strPeerNodeId),
-		MbSize:	ngbProcMailboxSize,
-		Ep:		&ngbInst,
-		Wd:		&noDog,
-		Flag:	sch.SchCreatedSuspend,
-		DieCb:	ngbInst.NgbProtoDieCb,
+	var dc = sch.SchTaskDescription{
+		Name:   fmt.Sprintf("FindNode:%d:%s", ngbMgr.fnInstSeq, strPeerNodeId),
+		MbSize: ngbProcMailboxSize,
+		Ep:     &ngbInst,
+		Wd:     &noDog,
+		Flag:   sch.SchCreatedSuspend,
+		DieCb:  ngbInst.NgbProtoDieCb,
 		UserDa: &ngbInst,
 	}
 
@@ -784,10 +783,10 @@ func (ngbMgr *NeighborManager)FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
+func (ngbMgr *NeighborManager) PingpongReq(ping *um.Ping) NgbMgrErrno {
 	var rsp = sch.NblPingRsp{}
-	var schMsg  = sch.SchMessage{}
-	var funcRsp2Tab = func () NgbMgrErrno {
+	var schMsg = sch.SchMessage{}
+	var funcRsp2Tab = func() NgbMgrErrno {
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
@@ -807,31 +806,31 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 		return funcRsp2Tab()
 	}
 
-	var ngbInst = neighborInst {
-		sdl:		ngbMgr.sdl,
-		ngbMgr:		ngbMgr,
-		ptn:		nil,
-		name:		strPeerNodeId,
-		msgType:	um.UdpMsgTypePing,
-		msgBody:	ping,
-		tidFN:		sch.SchInvalidTid,
-		tidPP:		sch.SchInvalidTid,
+	var ngbInst = neighborInst{
+		sdl:     ngbMgr.sdl,
+		ngbMgr:  ngbMgr,
+		ptn:     nil,
+		name:    strPeerNodeId,
+		msgType: um.UdpMsgTypePing,
+		msgBody: ping,
+		tidFN:   sch.SchInvalidTid,
+		tidPP:   sch.SchInvalidTid,
 	}
 	ngbInst.tep = ngbInst.ngbProtoProc
 
-	var noDog = sch.SchWatchDog {
-		HaveDog:false,
+	var noDog = sch.SchWatchDog{
+		HaveDog: false,
 	}
 
 	ngbMgr.ppInstSeq++
 
-	var dc = sch.SchTaskDescription {
-		Name:	fmt.Sprintf("Ping:%d:%s", ngbMgr.ppInstSeq, strPeerNodeId),
-		MbSize:	ngbProcMailboxSize,
-		Ep:		&ngbInst,
-		Wd:		&noDog,
-		Flag:	sch.SchCreatedSuspend,
-		DieCb:	ngbInst.NgbProtoDieCb,
+	var dc = sch.SchTaskDescription{
+		Name:   fmt.Sprintf("Ping:%d:%s", ngbMgr.ppInstSeq, strPeerNodeId),
+		MbSize: ngbProcMailboxSize,
+		Ep:     &ngbInst,
+		Wd:     &noDog,
+		Flag:   sch.SchCreatedSuspend,
+		DieCb:  ngbInst.NgbProtoDieCb,
 		UserDa: &ngbInst,
 	}
 
@@ -859,7 +858,7 @@ func (ngbMgr *NeighborManager)PingpongReq(ping *um.Ping) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager)CleanMapReq(name string) NgbMgrErrno {
+func (ngbMgr *NeighborManager) CleanMapReq(name string) NgbMgrErrno {
 	return ngbMgr.cleanMap(name)
 }
 
@@ -897,19 +896,19 @@ func (ngbMgr *NeighborManager) getMap(name string) *neighborInst {
 }
 
 func (ngbMgr *NeighborManager) localEndpoint() *um.Endpoint {
-	return &um.Endpoint {
-		IP:		ngbMgr.cfg.IP,
-		UDP:	ngbMgr.cfg.UDP,
-		TCP:	ngbMgr.cfg.TCP,
+	return &um.Endpoint{
+		IP:  ngbMgr.cfg.IP,
+		UDP: ngbMgr.cfg.UDP,
+		TCP: ngbMgr.cfg.TCP,
 	}
 }
 
 func (ngbMgr *NeighborManager) localNode() *um.Node {
-	return &um.Node {
-		IP:		ngbMgr.cfg.IP,
-		UDP:	ngbMgr.cfg.UDP,
-		TCP:	ngbMgr.cfg.TCP,
-		NodeId:	ngbMgr.cfg.ID,
+	return &um.Node{
+		IP:     ngbMgr.cfg.IP,
+		UDP:    ngbMgr.cfg.UDP,
+		TCP:    ngbMgr.cfg.TCP,
+		NodeId: ngbMgr.cfg.ID,
 	}
 }
 
@@ -918,32 +917,34 @@ func (ngbMgr *NeighborManager) localSubNode(snid config.SubNetworkID) *um.Node {
 	if id == nil {
 		return nil
 	}
-	return &um.Node {
-		IP:		ngbMgr.cfg.IP,
-		UDP:	ngbMgr.cfg.UDP,
-		TCP:	ngbMgr.cfg.TCP,
-		NodeId:	*id,
+	return &um.Node{
+		IP:     ngbMgr.cfg.IP,
+		UDP:    ngbMgr.cfg.UDP,
+		TCP:    ngbMgr.cfg.TCP,
+		NodeId: *id,
 	}
 }
 
 func expired(ts uint64) bool {
-	if ts == 0 { return false }
+	if ts == 0 {
+		return false
+	}
 	return time.Unix(int64(ts), 0).Before(time.Now())
 }
 
-func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
+func (ngbMgr *NeighborManager) setupConfig() sch.SchErrno {
 	var ptCfg *config.Cfg4UdpNgbManager = nil
 	if ptCfg = config.P2pConfig4UdpNgbManager(ngbMgr.sdl.SchGetP2pCfgName()); ptCfg == nil {
 		ngbLog.Debug("setupConfig: P2pConfig4UdpNgbManager failed")
 		return sch.SchEnoConfig
 	}
-	ngbMgr.cfg.IP				= ptCfg.IP
-	ngbMgr.cfg.UDP				= ptCfg.UDP
-	ngbMgr.cfg.TCP				= ptCfg.TCP
-	ngbMgr.cfg.ID				= ptCfg.ID
-	ngbMgr.cfg.NetworkType		= ptCfg.NetworkType
-	ngbMgr.cfg.SubNetNodeList	= ptCfg.SubNetNodeList
-	ngbMgr.cfg.SubNetIdList		= ptCfg.SubNetIdList
+	ngbMgr.cfg.IP = ptCfg.IP
+	ngbMgr.cfg.UDP = ptCfg.UDP
+	ngbMgr.cfg.TCP = ptCfg.TCP
+	ngbMgr.cfg.ID = ptCfg.ID
+	ngbMgr.cfg.NetworkType = ptCfg.NetworkType
+	ngbMgr.cfg.SubNetNodeList = ptCfg.SubNetNodeList
+	ngbMgr.cfg.SubNetIdList = ptCfg.SubNetIdList
 	if len(ngbMgr.cfg.SubNetIdList) == 0 &&
 		ngbMgr.cfg.NetworkType == config.P2pNetworkTypeDynamic {
 		ngbMgr.cfg.SubNetIdList = append(ngbMgr.cfg.SubNetIdList, config.AnySubNet)
@@ -951,7 +952,7 @@ func (ngbMgr *NeighborManager)setupConfig() sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-func (ngbMgr *NeighborManager)checkDestNode(dst *um.Node, snid config.SubNetworkID) bool {
+func (ngbMgr *NeighborManager) checkDestNode(dst *um.Node, snid config.SubNetworkID) bool {
 	if snid == config.AnySubNet {
 		return true
 	}
@@ -965,26 +966,26 @@ func (ngbMgr *NeighborManager)checkDestNode(dst *um.Node, snid config.SubNetwork
 	return false
 }
 
-func (ngbMgr *NeighborManager)getSubNode(snid config.SubNetworkID) *config.Node {
+func (ngbMgr *NeighborManager) getSubNode(snid config.SubNetworkID) *config.Node {
 	if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
 		return &me
 	}
 	return nil
 }
 
-func (ngbMgr *NeighborManager)getSubNodeId(snid config.SubNetworkID) *config.NodeID {
+func (ngbMgr *NeighborManager) getSubNodeId(snid config.SubNetworkID) *config.NodeID {
 	if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
 		return &me.ID
 	}
 	return nil
 }
 
-func (ngbMgr *NeighborManager)natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchInd) NgbMgrErrno {
+func (ngbMgr *NeighborManager) natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchInd) NgbMgrErrno {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
-	powerOff := sch.SchMessage {
-		Id:		sch.EvSchPoweroff,
-		Body:	nil,
+	powerOff := sch.SchMessage{
+		Id:   sch.EvSchPoweroff,
+		Body: nil,
 	}
 	ngbLog.Debug("natPubAddrSwitchInd: entered")
 	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)

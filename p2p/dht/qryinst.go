@@ -21,37 +21,37 @@
 package dht
 
 import (
+	"bytes"
 	"fmt"
 	"time"
-	"bytes"
-	config	"github.com/yeeco/gyee/p2p/config"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
 
+	config "github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type qiMgrLogger struct {
-	debug__			bool
-	debugForce__	bool
+	debug__      bool
+	debugForce__ bool
 }
 
-var qiLog = qiMgrLogger  {
-	debug__:		false,
-	debugForce__:	false,
+var qiLog = qiMgrLogger{
+	debug__:      false,
+	debugForce__: false,
 }
 
-func (log qiMgrLogger)Debug(fmt string, args ... interface{}) {
+func (log qiMgrLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
-func (log qiMgrLogger)ForceDebug(fmt string, args ... interface{}) {
+func (log qiMgrLogger) ForceDebug(fmt string, args ...interface{}) {
 	if log.debugForce__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -59,17 +59,16 @@ func (log qiMgrLogger)ForceDebug(fmt string, args ... interface{}) {
 // timeout value
 //
 const (
-	qiWaitConnectTimeout = time.Second * 8
+	qiWaitConnectTimeout  = time.Second * 8
 	qiWaitResponseTimeout = time.Second * 8
 )
-
 
 //
 // Query instance
 //
 type QryInst struct {
-	tep		sch.SchUserTaskEp			// task entry
-	icb		*qryInstCtrlBlock			// instance control block
+	tep sch.SchUserTaskEp // task entry
+	icb *qryInstCtrlBlock // instance control block
 }
 
 //
@@ -78,8 +77,8 @@ type QryInst struct {
 func NewQryInst() *QryInst {
 
 	qryInst := QryInst{
-		tep:	nil,
-		icb:	nil,
+		tep: nil,
+		icb: nil,
 	}
 
 	qryInst.tep = qryInst.qryInstProc
@@ -90,14 +89,14 @@ func NewQryInst() *QryInst {
 //
 // Entry point exported to shceduler
 //
-func (qryInst *QryInst)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (qryInst *QryInst) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return qryInst.tep(ptn, msg)
 }
 
 //
 // Query instance entry
 //
-func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (qryInst *QryInst) qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	qiLog.Debug("qryInstProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	var eno = sch.SchEnoUnknown
@@ -138,7 +137,7 @@ func (qryInst *QryInst)qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sch
 //
 // Power on handler
 //
-func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
+func (qryInst *QryInst) powerOn(ptn interface{}) sch.SchErrno {
 
 	var sdl = sch.SchGetScheduler(ptn)
 	var ptnQryMgr interface{}
@@ -177,10 +176,10 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 	icb.ptnRutMgr = ptnRutMgr
 	qryInst.icb = icb
 
-	ind := sch.MsgDhtQryInstStatusInd {
-		Peer:	icb.to.ID,
-		Target:	icb.target,
-		Status:	qisInited,
+	ind := sch.MsgDhtQryInstStatusInd{
+		Peer:   icb.to.ID,
+		Target: icb.target,
+		Status: qisInited,
 	}
 
 	schMsg := sch.SchMessage{}
@@ -193,7 +192,7 @@ func (qryInst *QryInst)powerOn(ptn interface{}) sch.SchErrno {
 //
 // Power off handler
 //
-func (qryInst *QryInst)powerOff(ptn interface{}) sch.SchErrno {
+func (qryInst *QryInst) powerOff(ptn interface{}) sch.SchErrno {
 	qiLog.Debug("powerOff: task will be done ...")
 	return qryInst.icb.sdl.SchTaskDone(qryInst.icb.ptnInst, sch.SchEnoKilled)
 }
@@ -201,7 +200,7 @@ func (qryInst *QryInst)powerOff(ptn interface{}) sch.SchErrno {
 //
 // Start instance handler
 //
-func (qryInst *QryInst)startReq() sch.SchErrno {
+func (qryInst *QryInst) startReq() sch.SchErrno {
 
 	icb := qryInst.icb
 	if icb.status != qisInited {
@@ -211,10 +210,10 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 
 	msg := sch.SchMessage{}
 	req := sch.MsgDhtConMgrConnectReq{
-		Task:		icb.ptnInst,
-		Name:		icb.name,
-		Peer:		&icb.to,
-		IsBlind:	false,
+		Task:    icb.ptnInst,
+		Name:    icb.name,
+		Peer:    &icb.to,
+		IsBlind: false,
 	}
 
 	qiLog.ForceDebug("startReq: ask connection manager for peer, inst: %s, ForWhat: %d",
@@ -225,19 +224,19 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 	icb.conBegTime = time.Now()
 
 	td := sch.TimerDescription{
-		Name:	"qiConnTimer" + fmt.Sprintf("%d", icb.seq),
-		Utid:	sch.DhtQryMgrIcbTimerId,
-		Tmt:	sch.SchTmTypeAbsolute,
-		Dur:	qiWaitConnectTimeout,
-		Extra:	qryInst,
+		Name:  "qiConnTimer" + fmt.Sprintf("%d", icb.seq),
+		Utid:  sch.DhtQryMgrIcbTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   qiWaitConnectTimeout,
+		Extra: qryInst,
 	}
 
 	var eno sch.SchErrno
 	var tid int
-	ind := sch.MsgDhtQryInstStatusInd {
-		Peer:	icb.to.ID,
-		Target:	icb.target,
-		Status:	qisNull,
+	ind := sch.MsgDhtQryInstStatusInd{
+		Peer:   icb.to.ID,
+		Target: icb.target,
+		Status: qisNull,
 	}
 	eno, tid = icb.sdl.SchSetTimer(icb.ptnInst, &td)
 	if eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
@@ -262,13 +261,13 @@ func (qryInst *QryInst)startReq() sch.SchErrno {
 //
 // instance timer handler
 //
-func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
+func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	if msg == nil {
 		qiLog.Debug("icbTimerHandler: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
-	qiLog.Debug("icbTimerHandler: " +
+	qiLog.Debug("icbTimerHandler: "+
 		"query instance timer expired, inst: %s", qryInst.icb.name)
 
 	if qryInst != msg {
@@ -320,10 +319,10 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 
 	var updateReq = sch.MsgDhtRutMgrUpdateReq{
-		Why:	rutMgrUpdate4Query,
-		Eno:	DhtEnoTimeout.GetEno(),
-		Seens:	[]config.Node{icb.to},
-		Duras:	[]time.Duration{-1},
+		Why:   rutMgrUpdate4Query,
+		Eno:   DhtEnoTimeout.GetEno(),
+		Seens: []config.Node{icb.to},
+		Duras: []time.Duration{-1},
 	}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
 	sdl.SchSendMessage(&schMsg)
@@ -333,10 +332,10 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 	// need not to close the connection.
 	//
 
-	ind := sch.MsgDhtQryInstStatusInd {
-		Peer:	icb.to.ID,
-		Target:	icb.target,
-		Status:	qisDone,
+	ind := sch.MsgDhtQryInstStatusInd{
+		Peer:   icb.to.ID,
+		Target: icb.target,
+		Status: qisDone,
 	}
 
 	icb.status = qisDone
@@ -349,7 +348,7 @@ func (qryInst *QryInst)icbTimerHandler(msg *QryInst) sch.SchErrno {
 //
 // Connect response handler
 //
-func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno {
+func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno {
 
 	icb := qryInst.icb
 	sdl := icb.sdl
@@ -364,10 +363,10 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	}
 
 	schMsg := sch.SchMessage{}
-	ind := sch.MsgDhtQryInstStatusInd {
-		Peer:	icb.to.ID,
-		Target:	icb.target,
-		Status:	qisNull,
+	ind := sch.MsgDhtQryInstStatusInd{
+		Peer:   icb.to.ID,
+		Target: icb.target,
+		Status: qisNull,
 	}
 	sendReq := sch.MsgDhtConMgrSendReq{}
 
@@ -423,10 +422,10 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	sendReq.Peer = &icb.to
 	sendReq.Data = pkg
 
-	var waitMid = map[int]int {
-		MID_FINDNODE:			MID_NEIGHBORS,
-		MID_GETPROVIDER_REQ:	MID_GETPROVIDER_RSP,
-		MID_GETVALUE_REQ:		MID_GETVALUE_RSP,
+	var waitMid = map[int]int{
+		MID_FINDNODE:        MID_NEIGHBORS,
+		MID_GETPROVIDER_REQ: MID_GETPROVIDER_RSP,
+		MID_GETVALUE_REQ:    MID_GETVALUE_RSP,
 	}
 
 	if icb.qryReq.ForWhat == MID_FINDNODE ||
@@ -457,20 +456,20 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 		// tell query manager the result
 		//
 
-		fwMap := map[int] int {
-			MID_PUTVALUE:		sch.EvDhtMgrPutValueReq,
-			MID_PUTPROVIDER:	sch.EvDhtMgrPutProviderReq,
+		fwMap := map[int]int{
+			MID_PUTVALUE:    sch.EvDhtMgrPutValueReq,
+			MID_PUTPROVIDER: sch.EvDhtMgrPutProviderReq,
 		}
 		fw := fwMap[icb.qryReq.ForWhat]
 		indResult := sch.MsgDhtQryInstResultInd{
-			From:		icb.to,
-			Target:		icb.target,
-			Latency:	icb.conEndTime.Sub(icb.conBegTime),
-			ForWhat:	fw,
-			Peers:		[]*config.Node{&icb.to},
-			Provider:	nil,
-			Value:		nil,
-			Pcs:		[]int{pcsConnYes},
+			From:     icb.to,
+			Target:   icb.target,
+			Latency:  icb.conEndTime.Sub(icb.conBegTime),
+			ForWhat:  fw,
+			Peers:    []*config.Node{&icb.to},
+			Provider: nil,
+			Value:    nil,
+			Pcs:      []int{pcsConnYes},
 		}
 		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
@@ -492,12 +491,12 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 	// start timer to wait query response from peer
 	//
 
-	td := sch.TimerDescription {
-		Name:	"qiQryTimer" + fmt.Sprintf("%d", icb.seq),
-		Utid:	sch.DhtQryMgrIcbTimerId,
-		Tmt:	sch.SchTmTypeAbsolute,
-		Dur:	qiWaitResponseTimeout,
-		Extra:	qryInst,
+	td := sch.TimerDescription{
+		Name:  "qiQryTimer" + fmt.Sprintf("%d", icb.seq),
+		Utid:  sch.DhtQryMgrIcbTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   qiWaitResponseTimeout,
+		Extra: qryInst,
 	}
 
 	schEno, tid := sdl.SchSetTimer(icb.ptnInst, &td)
@@ -515,7 +514,7 @@ func (qryInst *QryInst)connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno 
 //
 // Incoming DHT messages handler
 //
-func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErrno {
+func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErrno {
 
 	//
 	// notice: here response from peer got, means result of query instance obtained,
@@ -536,15 +535,15 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			return sch.SchEnoMismatched
 		}
 
-		ind := sch.MsgDhtQryInstResultInd {
-			From:		nbs.From,
-			Target:		icb.target,
-			ForWhat:	msg.ForWhat,
-			Latency:	icb.endTime.Sub(icb.begTime),
-			Peers:		nbs.Nodes,
-			Provider:	nil,
-			Value:		nil,
-			Pcs:		nbs.Pcs,
+		ind := sch.MsgDhtQryInstResultInd{
+			From:     nbs.From,
+			Target:   icb.target,
+			ForWhat:  msg.ForWhat,
+			Latency:  icb.endTime.Sub(icb.begTime),
+			Peers:    nbs.Nodes,
+			Provider: nil,
+			Value:    nil,
+			Pcs:      nbs.Pcs,
 		}
 
 		icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -565,14 +564,14 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			}
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:		gvr.From,
-				Target:		icb.target,
-				ForWhat:	msg.ForWhat,
-				Latency:	icb.endTime.Sub(icb.begTime),
-				Peers:		nil,
-				Provider:	nil,
-				Value:		gvr.Value.Val,
-				Pcs:		gvr.Pcs,
+				From:     gvr.From,
+				Target:   icb.target,
+				ForWhat:  msg.ForWhat,
+				Latency:  icb.endTime.Sub(icb.begTime),
+				Peers:    nil,
+				Provider: nil,
+				Value:    gvr.Value.Val,
+				Pcs:      gvr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -580,19 +579,18 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		} else {
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:		gvr.From,
-				Target:		icb.target,
-				ForWhat:	msg.ForWhat,
-				Latency:	icb.endTime.Sub(icb.begTime),
-				Peers:		gvr.Nodes,
-				Provider:	nil,
-				Value:		nil,
-				Pcs:		gvr.Pcs,
+				From:     gvr.From,
+				Target:   icb.target,
+				ForWhat:  msg.ForWhat,
+				Latency:  icb.endTime.Sub(icb.begTime),
+				Peers:    gvr.Nodes,
+				Provider: nil,
+				Value:    nil,
+				Pcs:      gvr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
 		}
-
 
 	case sch.EvDhtConInstGetProviderRsp:
 
@@ -610,14 +608,14 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 			}
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:		gpr.From,
-				Target:		icb.target,
-				ForWhat:	msg.ForWhat,
-				Latency:	icb.endTime.Sub(icb.begTime),
-				Peers:		nil,
-				Provider:	(*sch.Provider)(gpr.Provider),
-				Value:		nil,
-				Pcs:		gpr.Pcs,
+				From:     gpr.From,
+				Target:   icb.target,
+				ForWhat:  msg.ForWhat,
+				Latency:  icb.endTime.Sub(icb.begTime),
+				Peers:    nil,
+				Provider: (*sch.Provider)(gpr.Provider),
+				Value:    nil,
+				Pcs:      gpr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -625,14 +623,14 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 		} else {
 
 			ind := sch.MsgDhtQryInstResultInd{
-				From:		gpr.From,
-				Target:		icb.target,
-				ForWhat:	msg.ForWhat,
-				Latency:	icb.endTime.Sub(icb.begTime),
-				Peers:		gpr.Nodes,
-				Provider:	nil,
-				Value:		nil,
-				Pcs:		gpr.Pcs,
+				From:     gpr.From,
+				Target:   icb.target,
+				ForWhat:  msg.ForWhat,
+				Latency:  icb.endTime.Sub(icb.begTime),
+				Peers:    gpr.Nodes,
+				Provider: nil,
+				Value:    nil,
+				Pcs:      gpr.Pcs,
 			}
 
 			icb.sdl.SchMakeMessage(&msgResult, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &ind)
@@ -647,10 +645,10 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 
 	icb.status = qisDoneOk
 	msgInd := sch.SchMessage{}
-	ind := sch.MsgDhtQryInstStatusInd {
-		Peer:	icb.to.ID,
-		Target:	icb.target,
-		Status:	qisNull,
+	ind := sch.MsgDhtQryInstStatusInd{
+		Peer:   icb.to.ID,
+		Target: icb.target,
+		Status: qisNull,
 	}
 	icb.sdl.SchMakeMessage(&msgInd, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	icb.sdl.SchSendMessage(&msgInd)
@@ -660,7 +658,7 @@ func (qryInst *QryInst)protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchErr
 //
 // Tx status indication handler
 //
-func (qryInst *QryInst)conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
+func (qryInst *QryInst) conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
 	if msg == nil {
 		qiLog.Debug("conInstTxInd： invalid parameter, inst: %s", qryInst.icb.name)
 		return sch.SchEnoParameter
@@ -672,22 +670,22 @@ func (qryInst *QryInst)conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
 //
 // Setup the package for query by protobuf schema
 //
-func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
+func (qryInst *QryInst) setupQryPkg() (DhtErrno, *DhtPackage) {
 
 	icb := qryInst.icb
 	forWhat := icb.qryReq.ForWhat
-	dhtMsg := DhtMessage{Mid:MID_UNKNOWN}
+	dhtMsg := DhtMessage{Mid: MID_UNKNOWN}
 	dhtPkg := DhtPackage{}
 
 	if forWhat == MID_PUTPROVIDER {
 
 		msg := icb.qryReq.Msg.(*sch.MsgDhtPrdMgrAddProviderReq)
-		pp := PutProvider {
-			From:   *icb.local,
-			To:     icb.to,
-			Provider: &DhtProvider{Key:msg.Key, Nodes:[]*config.Node{&msg.Prd}, Extra:nil},
-			Id:     icb.qryReq.Seq,
-			Extra:  nil,
+		pp := PutProvider{
+			From:     *icb.local,
+			To:       icb.to,
+			Provider: &DhtProvider{Key: msg.Key, Nodes: []*config.Node{&msg.Prd}, Extra: nil},
+			Id:       icb.qryReq.Seq,
+			Extra:    nil,
 		}
 
 		dhtMsg.Mid = MID_PUTPROVIDER
@@ -696,10 +694,10 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 	} else if forWhat == MID_PUTVALUE {
 
 		msg := icb.qryReq.Msg.(*sch.MsgDhtDsMgrAddValReq)
-		pv := PutValue {
+		pv := PutValue{
 			From:   *icb.local,
 			To:     icb.to,
-			Values:	[]DhtValue{{Key:msg.Key, Val:msg.Val, Extra:nil}},
+			Values: []DhtValue{{Key: msg.Key, Val: msg.Val, Extra: nil}},
 			Id:     icb.qryReq.Seq,
 			Extra:  nil,
 		}
@@ -709,7 +707,7 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 
 	} else if forWhat == MID_FINDNODE {
 
-		fn := FindNode {
+		fn := FindNode{
 			From:   *icb.local,
 			To:     icb.to,
 			Target: icb.target,
@@ -722,12 +720,12 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 
 	} else if forWhat == MID_GETVALUE_REQ {
 
-		gvr := GetValueReq {
-			From:   *qryInst.icb.local,
-			To:     qryInst.icb.to,
-			Key:	icb.target[0:],
-			Id:     icb.qryReq.Seq,
-			Extra:  nil,
+		gvr := GetValueReq{
+			From:  *qryInst.icb.local,
+			To:    qryInst.icb.to,
+			Key:   icb.target[0:],
+			Id:    icb.qryReq.Seq,
+			Extra: nil,
 		}
 
 		dhtMsg.Mid = MID_GETVALUE_REQ
@@ -735,12 +733,12 @@ func (qryInst *QryInst)setupQryPkg() (DhtErrno, *DhtPackage) {
 
 	} else if forWhat == MID_GETPROVIDER_REQ {
 
-		gpr := GetProviderReq {
-			From:   *qryInst.icb.local,
-			To:     qryInst.icb.to,
-			Key:	icb.target[0:],
-			Id:     icb.qryReq.Seq,
-			Extra:  nil,
+		gpr := GetProviderReq{
+			From:  *qryInst.icb.local,
+			To:    qryInst.icb.to,
+			Key:   icb.target[0:],
+			Id:    icb.qryReq.Seq,
+			Extra: nil,
 		}
 
 		dhtMsg.Mid = MID_GETPROVIDER_REQ

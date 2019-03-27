@@ -18,12 +18,12 @@
  *
  */
 
-
 package scheduler
 
 import (
 	"sync"
 	"time"
+
 	"github.com/yeeco/gyee/p2p/config"
 )
 
@@ -51,17 +51,17 @@ type schWatchDog = SchWatchDog
 // Mail box
 //
 type schMailBox struct {
-	que		*chan schMessage	// channel for message
-	size	int					// number of messages buffered
+	que  *chan schMessage // channel for message
+	size int              // number of messages buffered
 }
 
 //
 // Timer type
 //
 const (
-	schTmTypeNull		= -1					// null
-	schTmTypePeriod		= SchTmTypePeriod		// cycle timer
-	schTmTypeAbsolute	= SchTmTypeAbsolute		// absolute timer
+	schTmTypeNull     = -1                // null
+	schTmTypePeriod   = SchTmTypePeriod   // cycle timer
+	schTmTypeAbsolute = SchTmTypeAbsolute // absolute timer
 )
 
 type schTimerType SchTimerType
@@ -75,66 +75,66 @@ type timerDescription TimerDescription
 // Timer control block
 //
 type schTimerCtrlBlock struct {
-	name		string			// timer name
-	utid		int				// user timer identity
-	tmt			schTimerType	// timer type, see aboved
-	dur			time.Duration	// duration: a period value or duration from now
-	stop		chan bool		// should be stop
-	stopped		chan bool		// had been stopped
-	taskNode	*schTaskNode	// pointer to owner task node
-	extra		interface{}		// extra data return to timer owner when expired
+	name     string        // timer name
+	utid     int           // user timer identity
+	tmt      schTimerType  // timer type, see aboved
+	dur      time.Duration // duration: a period value or duration from now
+	stop     chan bool     // should be stop
+	stopped  chan bool     // had been stopped
+	taskNode *schTaskNode  // pointer to owner task node
+	extra    interface{}   // extra data return to timer owner when expired
 }
 
 //
 // Timer control block node
 //
 type schTmcbNode struct {
-	tmcb	schTimerCtrlBlock	// timer control block
-	last	*schTmcbNode		// pointer to last node
-	next	*schTmcbNode		// pointer to next node
+	tmcb schTimerCtrlBlock // timer control block
+	last *schTmcbNode      // pointer to last node
+	next *schTmcbNode      // pointer to next node
 }
 
 //
 // Timer node pool
 //
-const schTimerNodePoolSize	= 2048						// timer node pool size, must be (2^n)
+const schTimerNodePoolSize = 2048 // timer node pool size, must be (2^n)
 
 //
 // Task struct
 //
-const schMaxTaskTimer	= SchMaxTaskTimer			// max timers can be held by one user task
-const schInvalidTid		= SchInvalidTid				// invalid timer identity
-const evHistorySize		= 64						// round buffer size fo event history
+const schMaxTaskTimer = SchMaxTaskTimer // max timers can be held by one user task
+const schInvalidTid = SchInvalidTid     // invalid timer identity
+const evHistorySize = 64                // round buffer size fo event history
 type schTask struct {
-	lock			sync.Mutex						// lock to protect task control block
-	sdl				*scheduler						// pointer to scheduler
-	name			string							// task name
-	utep			schUserTaskProc					// user task entry point
-	mailbox			schMailBox						// mail box
-	done			chan SchErrno					// done with errno
-	stopped			chan bool						// stopped signal
-	tmTab			[schMaxTaskTimer]*schTmcbNode	// timer node table
-	tmIdxTab		map[*schTmcbNode] int			// map time node pointer to its' index in tmTab
-	dog				schWatchDog						// wathch dog
-	dieCb			func(interface{}) SchErrno		// callbacked when going to die
-	goStatus		int								// in going or suspended
-	evHistory		[evHistorySize]schMessage		// event history
-	evhIndex		int								// event history index
-	evTotal			int64							// total event number
-	userData		interface{}						// data area pointer of user task
-	isStatic		bool							// is static task
-	isPoweron		bool							// if EvSchPoweron sent to task
-	delayMessages	[]*schMessage					// messages before EvSchPoweron
-	discardMessages	int64							// messages discarded
+	lock            sync.Mutex                    // lock to protect task control block
+	sdl             *scheduler                    // pointer to scheduler
+	name            string                        // task name
+	utep            schUserTaskProc               // user task entry point
+	mailbox         schMailBox                    // mail box
+	done            chan SchErrno                 // done with errno
+	stopped         chan bool                     // stopped signal
+	tmTab           [schMaxTaskTimer]*schTmcbNode // timer node table
+	tmIdxTab        map[*schTmcbNode]int          // map time node pointer to its' index in tmTab
+	dog             schWatchDog                   // wathch dog
+	dieCb           func(interface{}) SchErrno    // callbacked when going to die
+	goStatus        int                           // in going or suspended
+	evHistory       [evHistorySize]schMessage     // event history
+	evhIndex        int                           // event history index
+	evTotal         int64                         // total event number
+	userData        interface{}                   // data area pointer of user task
+	isStatic        bool                          // is static task
+	isPoweron       bool                          // if EvSchPoweron sent to task
+	delayMessages   []*schMessage                 // messages before EvSchPoweron
+	discardMessages int64                         // messages discarded
 }
 
 //
 // Task node
 //
 type schTaskNode struct {
-	task	schTask			// this task node
-	last	*schTaskNode	// pointing to the last node
-	next	*schTaskNode	// pointing to the next node
+	task schTask      // this task node
+	last *schTaskNode // pointing to the last node
+	next *schTaskNode // pointing to the next node
 }
 
 //
@@ -142,7 +142,7 @@ type schTaskNode struct {
 // internal mode ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
-const schTaskNodePoolSize = 1024						// task node pool size, must be (2^n)
+const schTaskNodePoolSize = 1024 // task node pool size, must be (2^n)
 
 type scheduler struct {
 
@@ -152,19 +152,19 @@ type scheduler struct {
 	// practice really, we might take it into account future ...
 	//
 
-	lock				sync.Mutex							// lock to protect the scheduler
-	appType				int									// application type
-	p2pCfg				*config.Config						// p2p network configuration
-	tkFree				*schTaskNode						// free task queue
-	freeSize			int									// number of nodes in free
-	tkBusy				*schTaskNode						// busy task queue in scheduling
-	tkMap				map[string]*schTaskNode				// map task name to pointer of running task node
-	busySize			int									// number of nodes in busy
-	tmFree				*schTmcbNode						// free timer node queue
-	tmFreeSize			int									// free timer node queue size
-	schTaskNodePool		[schTaskNodePoolSize]schTaskNode	// task node pool
-	schTimerNodePool	[schTimerNodePoolSize]schTmcbNode	// timer node pool
-	powerOff			bool								// power off stage flag
+	lock             sync.Mutex                        // lock to protect the scheduler
+	appType          int                               // application type
+	p2pCfg           *config.Config                    // p2p network configuration
+	tkFree           *schTaskNode                      // free task queue
+	freeSize         int                               // number of nodes in free
+	tkBusy           *schTaskNode                      // busy task queue in scheduling
+	tkMap            map[string]*schTaskNode           // map task name to pointer of running task node
+	busySize         int                               // number of nodes in busy
+	tmFree           *schTmcbNode                      // free timer node queue
+	tmFreeSize       int                               // free timer node queue size
+	schTaskNodePool  [schTaskNodePoolSize]schTaskNode  // task node pool
+	schTimerNodePool [schTimerNodePoolSize]schTmcbNode // timer node pool
+	powerOff         bool                              // power off stage flag
 }
 
 //
@@ -176,34 +176,34 @@ const (
 	// shell manager name
 	//
 
-	ShMgrName			= "ShMgr"			// chain shell manager
-	DhtShMgrName		= "DhtShMgr"		// dht shell manager
+	ShMgrName    = "ShMgr"    // chain shell manager
+	DhtShMgrName = "DhtShMgr" // dht shell manager
 
 	//
 	// followings are for chain application
 	//
 
-	DcvMgrName			= "DcvMgr"			// disccover manager
-	TabMgrName			= "TabMgr"			// table
-	NgbLsnName			= "NgbLsn"			// udp neighbor listener
-	NgbMgrName			= "NgbMgr"			// udp neighbor manager
-	NgbReaderName		= "UdpReader"		// udp reader
-	PeerLsnMgrName		= "PeerLsnMgr"		// tcp peer listener
-	PeerAccepterName	= "peerAccepter"	// tcp accepter
-	PeerMgrName			= "PeerMgr"			// tcp peer manager
+	DcvMgrName       = "DcvMgr"       // disccover manager
+	TabMgrName       = "TabMgr"       // table
+	NgbLsnName       = "NgbLsn"       // udp neighbor listener
+	NgbMgrName       = "NgbMgr"       // udp neighbor manager
+	NgbReaderName    = "UdpReader"    // udp reader
+	PeerLsnMgrName   = "PeerLsnMgr"   // tcp peer listener
+	PeerAccepterName = "peerAccepter" // tcp accepter
+	PeerMgrName      = "PeerMgr"      // tcp peer manager
 
 	//
 	// followings are for DHT application
 	//
 
-	DhtMgrName			= "DhtMgr"			// dht manager
-	DhtLsnMgrName		= "DhtLsnMgr"		// dht listner manager
-	DhtPrdMgrName		= "DhtPrdMgr"		// dht provider manager
-	DhtQryMgrName		= "DhtQryMgr"		// dht query manager
-	DhtRutMgrName		= "DhtRutMgr"		// dht route manager
-	DhtConMgrName		= "DhtConMgr"		// dht connection manager
-	DhtDsMgrName		= "DhtDsMgr"		// dht data store manager
+	DhtMgrName    = "DhtMgr"    // dht manager
+	DhtLsnMgrName = "DhtLsnMgr" // dht listner manager
+	DhtPrdMgrName = "DhtPrdMgr" // dht provider manager
+	DhtQryMgrName = "DhtQryMgr" // dht query manager
+	DhtRutMgrName = "DhtRutMgr" // dht route manager
+	DhtConMgrName = "DhtConMgr" // dht connection manager
+	DhtDsMgrName  = "DhtDsMgr"  // dht data store manager
 
 	// NAT
-	NatMgrName			= "NatMgr"			// nat manager
+	NatMgrName = "NatMgr" // nat manager
 )

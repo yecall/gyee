@@ -25,18 +25,14 @@ import (
 	"github.com/yeeco/gyee/common/trie"
 )
 
-/*
-DerivableList can be add to a trie for hashing, getting a proof to verify the list
- */
+// DerivableList can be add to a trie for hashing, getting a proof to verify the list
 type DerivableList interface {
 	Len() int
 	GetEncoded(index int) []byte
 }
 
-/*
-Add list elements to a in-mem trie, with index as key,
-trie root hash is returned.
- */
+// Add list elements to a in-mem trie, with index as key,
+// trie root hash is returned.
 func DeriveHash(list DerivableList) common.Hash {
 	keybuf := new(bytes.Buffer)
 	t := new(trie.Trie)

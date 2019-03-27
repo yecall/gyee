@@ -31,229 +31,229 @@ import (
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
 
-
 //
 // debug
 //
 type protoLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var protoLog = protoLogger  {
-	debug__:	false,
+var protoLog = protoLogger{
+	debug__: false,
 }
 
-func (log protoLogger)Debug(fmt string, args ... interface{}) {
+func (log protoLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
 //
 // Protocol
 //
-const DhtProtoBytes	= 4
+const DhtProtoBytes = 4
+
 type DhtProtocol struct {
-	Pid				uint32					// protocol identity
-	Ver				[DhtProtoBytes]byte		// protocol version: M.m0.m1.m2
+	Pid uint32              // protocol identity
+	Ver [DhtProtoBytes]byte // protocol version: M.m0.m1.m2
 }
 
-var DhtVersion = [DhtProtoBytes]byte {1, 0, 0, 0}
+var DhtVersion = [DhtProtoBytes]byte{1, 0, 0, 0}
 
 //
 // Protocol identity
 //
 const (
-	PID_DHT = pb.ProtocolId_PID_DHT			// dht internal
-	PID_EXT = pb.ProtocolId_PID_EXT			// external, for dht users
+	PID_DHT = pb.ProtocolId_PID_DHT // dht internal
+	PID_EXT = pb.ProtocolId_PID_EXT // external, for dht users
 )
 
 //
 // Message type identity
 //
 const (
-	MID_HANDSHAKE           = 0
-	MID_FINDNODE            = 1
-	MID_NEIGHBORS           = 2
-	MID_PUTVALUE            = 3
-	MID_GETVALUE_REQ        = 4
-	MID_GETVALUE_RSP        = 5
-	MID_PUTPROVIDER         = 6
-	MID_GETPROVIDER_REQ     = 7
-	MID_GETPROVIDER_RSP     = 8
-	MID_PING                = 9
-	MID_PONG                = 10
-	MID_UNKNOWN				= 0xffffffff
+	MID_HANDSHAKE       = 0
+	MID_FINDNODE        = 1
+	MID_NEIGHBORS       = 2
+	MID_PUTVALUE        = 3
+	MID_GETVALUE_REQ    = 4
+	MID_GETVALUE_RSP    = 5
+	MID_PUTPROVIDER     = 6
+	MID_GETPROVIDER_REQ = 7
+	MID_GETPROVIDER_RSP = 8
+	MID_PING            = 9
+	MID_PONG            = 10
+	MID_UNKNOWN         = 0xffffffff
 )
 
 //
 // Value
 //
 type DhtKey = []byte
-type DhtVal	= []byte
+type DhtVal = []byte
 
 type DhtValue struct {
-	Key				DhtKey					// key of value
-	Val				DhtVal					// value
-	Extra			interface{}				// extra inforamtion
+	Key   DhtKey      // key of value
+	Val   DhtVal      // value
+	Extra interface{} // extra inforamtion
 }
 
 //
 // Provider
 //
 type DhtProvider struct {
-	Key				DhtKey					// key of provider
-	Nodes			[]*config.Node			// node of provider
-	Extra			interface{}				// extra inforamtion
+	Key   DhtKey         // key of provider
+	Nodes []*config.Node // node of provider
+	Extra interface{}    // extra inforamtion
 }
 
 //
 // Package for DHT protocol
 //
 type DhtPackage struct {
-	Pid				uint32					// protocol identity
-	PayloadLength	uint32					// payload length
-	Payload			[]byte					// payload
+	Pid           uint32 // protocol identity
+	PayloadLength uint32 // payload length
+	Payload       []byte // payload
 }
 
 //
 // Message for DHT protocol
 //
 type DhtMessage struct {
-	Mid				uint32					// message identity
-	Handshake		*Handshake				// handshake message
-	FindNode		*FindNode				// find node message
-	Neighbors		*Neighbors				// neighbors message
-	PutValue		*PutValue				// put value message
-	GetValueReq		*GetValueReq			// get value request message
-	GetValueRsp		*GetValueRsp			// get value response message
-	PutProvider		*PutProvider			// put provider message
-	GetProviderReq	*GetProviderReq			// get provider request message
-	GetProviderRsp	*GetProviderRsp			// get provider response message
-	Ping			*Ping					// ping message
-	Pong			*Pong					// pong message
+	Mid            uint32          // message identity
+	Handshake      *Handshake      // handshake message
+	FindNode       *FindNode       // find node message
+	Neighbors      *Neighbors      // neighbors message
+	PutValue       *PutValue       // put value message
+	GetValueReq    *GetValueReq    // get value request message
+	GetValueRsp    *GetValueRsp    // get value response message
+	PutProvider    *PutProvider    // put provider message
+	GetProviderReq *GetProviderReq // get provider request message
+	GetProviderRsp *GetProviderRsp // get provider response message
+	Ping           *Ping           // ping message
+	Pong           *Pong           // pong message
 }
 
 type Handshake struct {
-	Dir				int						// direct
-	NodeId			config.NodeID			// node identity
-	IP				net.IP					// ip address
-	UDP				uint32					// udp port number
-	TCP				uint32					// tcp port number
-	ProtoNum		uint32					// number of protocols supported
-	Protocols		[]DhtProtocol			// version of protocol
-	Extra			[]byte					// extra info
+	Dir       int           // direct
+	NodeId    config.NodeID // node identity
+	IP        net.IP        // ip address
+	UDP       uint32        // udp port number
+	TCP       uint32        // tcp port number
+	ProtoNum  uint32        // number of protocols supported
+	Protocols []DhtProtocol // version of protocol
+	Extra     []byte        // extra info
 }
 
 type FindNode struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Target			config.DsKey			// target node identity
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From   config.Node  // source node
+	To     config.Node  // destination node
+	Target config.DsKey // target node identity
+	Id     int64        // message identity
+	Extra  []byte       // extra info
 }
 
 type Neighbors struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Nodes			[]*config.Node			// neighbor nodes
-	Pcs				[]int					// peer connection status
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From  config.Node    // source node
+	To    config.Node    // destination node
+	Nodes []*config.Node // neighbor nodes
+	Pcs   []int          // peer connection status
+	Id    int64          // message identity
+	Extra []byte         // extra info
 }
 
 type PutValue struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Values			[]DhtValue				// values
-	Id				int64					// message identity
-	KT				time.Duration			// duration to keep this [key, val] pair
-	Extra			[]byte					// extra info
+	From   config.Node   // source node
+	To     config.Node   // destination node
+	Values []DhtValue    // values
+	Id     int64         // message identity
+	KT     time.Duration // duration to keep this [key, val] pair
+	Extra  []byte        // extra info
 }
 
 type GetValueReq struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Key				DhtKey					// keys requested
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From  config.Node // source node
+	To    config.Node // destination node
+	Key   DhtKey      // keys requested
+	Id    int64       // message identity
+	Extra []byte      // extra info
 }
 
 type GetValueRsp struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Value			*DhtValue				// values
-	Key				DhtKey					// keys requested
-	Nodes			[]*config.Node			// neighbor nodes
-	Pcs				[]int					// peer connection status
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From  config.Node    // source node
+	To    config.Node    // destination node
+	Value *DhtValue      // values
+	Key   DhtKey         // keys requested
+	Nodes []*config.Node // neighbor nodes
+	Pcs   []int          // peer connection status
+	Id    int64          // message identity
+	Extra []byte         // extra info
 }
 
 type PutProvider struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Provider		*DhtProvider			// providers
-	Pcs				[]int					// prividers connection status
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From     config.Node  // source node
+	To       config.Node  // destination node
+	Provider *DhtProvider // providers
+	Pcs      []int        // prividers connection status
+	Id       int64        // message identity
+	Extra    []byte       // extra info
 }
 
 type GetProviderReq struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Key				DhtKey					// key wanted
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From  config.Node // source node
+	To    config.Node // destination node
+	Key   DhtKey      // key wanted
+	Id    int64       // message identity
+	Extra []byte      // extra info
 }
 
 type GetProviderRsp struct {
-	From			config.Node				// source node
-	To				config.Node				// destination node
-	Provider		*DhtProvider			// provider
-	Key				DhtKey					// key
-	Nodes			[]*config.Node			// neighbor nodes
-	Pcs				[]int					// peer connection status
-	Id				int64					// message identity
-	Extra			[]byte					// extra info
+	From     config.Node    // source node
+	To       config.Node    // destination node
+	Provider *DhtProvider   // provider
+	Key      DhtKey         // key
+	Nodes    []*config.Node // neighbor nodes
+	Pcs      []int          // peer connection status
+	Id       int64          // message identity
+	Extra    []byte         // extra info
 }
 
 type Ping struct {
-	From			config.Node				// from whom
-	To				config.Node				// to whom
-	Seq				int64					// sequence
-	Extra			[]byte					// extra info
+	From  config.Node // from whom
+	To    config.Node // to whom
+	Seq   int64       // sequence
+	Extra []byte      // extra info
 }
 
 type Pong struct {
-	From			config.Node				// from whom
-	To				config.Node				// to whom
-	Seq				int64					// sequence
-	Extra			[]byte					// extra info
+	From  config.Node // from whom
+	To    config.Node // to whom
+	Seq   int64       // sequence
+	Extra []byte      // extra info
 }
 
 //
 // Data store (key, value) record
 //
 type DhtDatastoreRecord struct {
-	Key				[]byte					// key
-	Value			[]byte					// value
-	Extra			[]byte					// extra info
+	Key   []byte // key
+	Value []byte // value
+	Extra []byte // extra info
 }
 
 //
 // Provider store (key, provider) record
 //
 type DhtProviderStoreRecord struct {
-	Key				[]byte					// key
-	Providers		[]*config.Node			// providers
-	Extra			[]byte					// extra info
+	Key       []byte         // key
+	Providers []*config.Node // providers
+	Extra     []byte         // extra info
 }
 
 //
 // Extract message from package
 //
-func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
+func (dhtPkg *DhtPackage) GetMessage(dhtMsg *DhtMessage) DhtErrno {
 
 	if dhtMsg == nil {
 		protoLog.Debug("GetMessage: invalid parameters")
@@ -336,7 +336,7 @@ func (dhtPkg *DhtPackage)GetMessage(dhtMsg *DhtMessage) DhtErrno {
 //
 // Setup dht package from protobuf package
 //
-func (dhtPkg *DhtPackage)FromPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
+func (dhtPkg *DhtPackage) FromPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
 	if pbPkg == nil {
 		return DhtEnoParameter
 	}
@@ -349,7 +349,7 @@ func (dhtPkg *DhtPackage)FromPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
 //
 // Setup protobuf package from dht package
 //
-func (dhtPkg *DhtPackage)ToPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
+func (dhtPkg *DhtPackage) ToPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
 	if pbPkg == nil {
 		return DhtEnoParameter
 	}
@@ -368,7 +368,7 @@ func (dhtPkg *DhtPackage)ToPbPackage(pbPkg *pb.DhtPackage) DhtErrno {
 //
 // Setup package from message
 //
-func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetPackage(dhtPkg *DhtPackage) DhtErrno {
 	if dhtPkg == nil {
 		return DhtEnoParameter
 	}
@@ -422,7 +422,7 @@ func (dhtMsg *DhtMessage)GetPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Reset dht message
 //
-func (dhtMsg *DhtMessage)reset() {
+func (dhtMsg *DhtMessage) reset() {
 	*dhtMsg = DhtMessage{}
 	dhtMsg.Mid = MID_UNKNOWN
 }
@@ -430,14 +430,14 @@ func (dhtMsg *DhtMessage)reset() {
 //
 // Get dht node specification from protobuf node
 //
-func (dhtMsg *DhtMessage)getNode(n *pb.DhtMessage_Node) *config.Node {
+func (dhtMsg *DhtMessage) getNode(n *pb.DhtMessage_Node) *config.Node {
 	if n == nil {
 		return nil
 	}
 	dn := config.Node{
-		IP:		n.IP,
-		TCP:	uint16(*n.TCP & 0xffff),
-		UDP:	uint16(*n.UDP & 0xffff),
+		IP:  n.IP,
+		TCP: uint16(*n.TCP & 0xffff),
+		UDP: uint16(*n.UDP & 0xffff),
 	}
 	copy(dn.ID[0:], n.NodeId)
 	return &dn
@@ -446,7 +446,7 @@ func (dhtMsg *DhtMessage)getNode(n *pb.DhtMessage_Node) *config.Node {
 //
 // Set protobuf node from dht node specification
 //
-func (dhtMsg *DhtMessage)setNode(n *config.Node, ct pb.DhtMessage_ConnectionType) *pb.DhtMessage_Node {
+func (dhtMsg *DhtMessage) setNode(n *config.Node, ct pb.DhtMessage_ConnectionType) *pb.DhtMessage_Node {
 	if n == nil {
 		return nil
 	}
@@ -465,7 +465,7 @@ func (dhtMsg *DhtMessage)setNode(n *config.Node, ct pb.DhtMessage_ConnectionType
 //
 // Setup protobuf package from message
 //
-func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
+func (dhtMsg *DhtMessage) GetPbPackage() *pb.DhtPackage {
 	dhtPkg := DhtPackage{}
 	dhtMsg.GetPackage(&dhtPkg)
 
@@ -483,7 +483,7 @@ func (dhtMsg *DhtMessage)GetPbPackage() *pb.DhtPackage {
 //
 // Setup dht handshake message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) DhtErrno {
+func (dhtMsg *DhtMessage) GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetHandshakeMessage: invalid parameters")
@@ -536,7 +536,7 @@ func (dhtMsg *DhtMessage)GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) Dht
 //
 // Setup dht find-node message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtErrno {
+func (dhtMsg *DhtMessage) GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetFindNodeMessage: invalid parameters")
@@ -561,7 +561,7 @@ func (dhtMsg *DhtMessage)GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtEr
 //
 // Setup dht neighbors message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) DhtErrno {
+func (dhtMsg *DhtMessage) GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetNeighborsMessage: invalid parameters")
@@ -582,14 +582,14 @@ func (dhtMsg *DhtMessage)GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) Dht
 	dhtMsg.reset()
 	dhtMsg.Mid = MID_NEIGHBORS
 	dhtMsg.Neighbors = nbs
-	
+
 	return DhtEnoNone
 }
 
 //
 // Setup dht put-value message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtErrno {
+func (dhtMsg *DhtMessage) GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetPutValueMessage: invalid parameters")
@@ -602,7 +602,7 @@ func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtEr
 	pv.To = *dhtMsg.getNode(pbMsg.To)
 
 	for _, v := range pbMsg.Values {
-		val := DhtValue {
+		val := DhtValue{
 			Key: v.Key,
 			Val: v.Val,
 		}
@@ -622,7 +622,7 @@ func (dhtMsg *DhtMessage)GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtEr
 //
 // Setup dht get-value-req message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetGetValueReqMessage: invalid parameters")
@@ -651,7 +651,7 @@ func (dhtMsg *DhtMessage)GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq)
 //
 // Setup dht get-value-rsp message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetGetValueRspMessage: invalid parameters")
@@ -685,7 +685,7 @@ func (dhtMsg *DhtMessage)GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp)
 //
 // Setup dht put-provider message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider) DhtErrno {
+func (dhtMsg *DhtMessage) GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetPutProviderMessage: invalid parameters")
@@ -698,8 +698,8 @@ func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider)
 	pp.To = *dhtMsg.getNode(pbMsg.To)
 
 	p := pbMsg.Provider
-	dhtP := DhtProvider {
-		Key: 	DhtKey(p.Key),
+	dhtP := DhtProvider{
+		Key: DhtKey(p.Key),
 	}
 	for _, n := range p.Nodes {
 		dhtP.Nodes = append(dhtP.Nodes, dhtMsg.getNode(n))
@@ -719,7 +719,7 @@ func (dhtMsg *DhtMessage)GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider)
 //
 // Setup dht get-provider-req message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProviderReq) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProviderReq) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetGetProviderReqMessage: invalid parameters")
@@ -745,7 +745,7 @@ func (dhtMsg *DhtMessage)GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProvid
 //
 // Setup dht get-provider-rsp message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProviderRsp) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProviderRsp) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetGetProviderRspMessage: invalid parameters")
@@ -759,7 +759,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProvid
 
 	p := pbMsg.Provider
 	gpr.Provider = &DhtProvider{
-		Key:	DhtKey(p.Key),
+		Key: DhtKey(p.Key),
 	}
 	for _, n := range p.Nodes {
 		gpr.Provider.Nodes = append(gpr.Provider.Nodes, dhtMsg.getNode(n))
@@ -778,7 +778,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProvid
 //
 // Setup dht ping message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
+func (dhtMsg *DhtMessage) GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetPingMessage: invalid parameters")
@@ -802,7 +802,7 @@ func (dhtMsg *DhtMessage)GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 //
 // Setup dht pong message from protobuf message
 //
-func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
+func (dhtMsg *DhtMessage) GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 
 	if pbMsg == nil {
 		protoLog.Debug("GetPongMessage: invalid parameters")
@@ -826,7 +826,7 @@ func (dhtMsg *DhtMessage)GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 //
 // Setup dht handshake package from dht message
 //
-func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetHandshakePackage: invalid parameters")
@@ -835,8 +835,8 @@ func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbHs := new(pb.DhtMessage_Handshake)
 	pbMsg := pb.DhtMessage{
-		MsgType:	new(pb.DhtMessage_MessageType),
-		Handshake:	pbHs,
+		MsgType:   new(pb.DhtMessage_MessageType),
+		Handshake: pbHs,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_HANDSHAKE
 	hs := dhtMsg.Handshake
@@ -854,9 +854,9 @@ func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 	*pbHs.ProtoNum = hs.ProtoNum
 
 	for _, p := range hs.Protocols {
-		pbp := &pb.DhtMessage_Protocol {
-			Pid:	new(pb.ProtocolId),
-			Ver:	p.Ver[0:],
+		pbp := &pb.DhtMessage_Protocol{
+			Pid: new(pb.ProtocolId),
+			Ver: p.Ver[0:],
 		}
 		*pbp.Pid = pb.ProtocolId(p.Pid)
 		pbHs.Protocols = append(pbHs.Protocols, pbp)
@@ -882,7 +882,7 @@ func (dhtMsg *DhtMessage)GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht find-node package from dht message
 //
-func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetFindNodePackage: invalid parameters")
@@ -890,9 +890,9 @@ func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbFn := new(pb.DhtMessage_FindNode)
-	pbMsg := pb.DhtMessage {
-		MsgType:	new(pb.DhtMessage_MessageType),
-		FindNode:	pbFn,
+	pbMsg := pb.DhtMessage{
+		MsgType:  new(pb.DhtMessage_MessageType),
+		FindNode: pbFn,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_FINDNODE
 	fn := dhtMsg.FindNode
@@ -920,7 +920,7 @@ func (dhtMsg *DhtMessage)GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht neighbors package from dht message
 //
-func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetNeighborsPackage: invalid parameters")
@@ -928,9 +928,9 @@ func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbNbs := new(pb.DhtMessage_Neighbors)
-	pbMsg := pb.DhtMessage {
-		MsgType:	new(pb.DhtMessage_MessageType),
-		Neighbors:	pbNbs,
+	pbMsg := pb.DhtMessage{
+		MsgType:   new(pb.DhtMessage_MessageType),
+		Neighbors: pbNbs,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_NEIGHBORS
 	nbs := dhtMsg.Neighbors
@@ -962,7 +962,7 @@ func (dhtMsg *DhtMessage)GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht put-value package from dht message
 //
-func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetPutValuePackage: invalid parameters")
@@ -970,9 +970,9 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbPv := new(pb.DhtMessage_PutValue)
-	pbMsg := pb.DhtMessage {
-		MsgType:	new(pb.DhtMessage_MessageType),
-		PutValue:	pbPv,
+	pbMsg := pb.DhtMessage{
+		MsgType:  new(pb.DhtMessage_MessageType),
+		PutValue: pbPv,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PUTVALUE
 	pv := dhtMsg.PutValue
@@ -981,9 +981,9 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 	pbPv.To = dhtMsg.setNode(&pv.To, pb.DhtMessage_CONT_YES)
 
 	for _, v := range pv.Values {
-		pbV := &pb.DhtMessage_Value {
-			Key:	v.Key,
-			Val:	v.Val,
+		pbV := &pb.DhtMessage_Value{
+			Key: v.Key,
+			Val: v.Val,
 		}
 		pbPv.Values = append(pbPv.Values, pbV)
 	}
@@ -1008,7 +1008,7 @@ func (dhtMsg *DhtMessage)GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht get-value-req package from dht message
 //
-func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetGetValueReqPackage: invalid parameters")
@@ -1017,8 +1017,8 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbGvr := new(pb.DhtMessage_GetValueReq)
 	pbMsg := pb.DhtMessage{
-		MsgType:		new(pb.DhtMessage_MessageType),
-		GetValueReq:	pbGvr,
+		MsgType:     new(pb.DhtMessage_MessageType),
+		GetValueReq: pbGvr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETVALUE_REQ
 	gvr := dhtMsg.GetValueReq
@@ -1047,7 +1047,7 @@ func (dhtMsg *DhtMessage)GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht get-value-rsp package from dht message
 //
-func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetGetValueRspPackage: invalid parameters")
@@ -1055,9 +1055,9 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 
 	pbGvr := new(pb.DhtMessage_GetValueRsp)
-	pbMsg := pb.DhtMessage {
-		MsgType:		new(pb.DhtMessage_MessageType),
-		GetValueRsp:	pbGvr,
+	pbMsg := pb.DhtMessage{
+		MsgType:     new(pb.DhtMessage_MessageType),
+		GetValueRsp: pbGvr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETVALUE_RSP
 	gvr := dhtMsg.GetValueRsp
@@ -1094,7 +1094,7 @@ func (dhtMsg *DhtMessage)GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht put-provider package from dht message
 //
-func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetPutProviderPackage: invalid parameters")
@@ -1103,16 +1103,16 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbPP := new(pb.DhtMessage_PutProvider)
 	pbMsg := pb.DhtMessage{
-		MsgType:		new(pb.DhtMessage_MessageType),
-		PutProvider:	pbPP,
+		MsgType:     new(pb.DhtMessage_MessageType),
+		PutProvider: pbPP,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PUTPROVIDER
 	pp := dhtMsg.PutProvider
 
 	pbPP.From = dhtMsg.setNode(&pp.From, pb.DhtMessage_CONT_YES)
 	pbPP.To = dhtMsg.setNode(&pp.To, pb.DhtMessage_CONT_YES)
-	pbPP.Provider = &pb.DhtMessage_Provider {
-		Key:	pp.Provider.Key,
+	pbPP.Provider = &pb.DhtMessage_Provider{
+		Key: pp.Provider.Key,
 	}
 
 	for idx, p := range pp.Provider.Nodes {
@@ -1140,7 +1140,7 @@ func (dhtMsg *DhtMessage)GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht get-provider-req package from dht message
 //
-func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetGetProviderReqPackage: invalid parameters")
@@ -1149,8 +1149,8 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbGpr := new(pb.DhtMessage_GetProviderReq)
 	pbMsg := pb.DhtMessage{
-		MsgType:		new(pb.DhtMessage_MessageType),
-		GetProviderReq:	pbGpr,
+		MsgType:        new(pb.DhtMessage_MessageType),
+		GetProviderReq: pbGpr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETPROVIDER_REQ
 	gpr := dhtMsg.GetProviderReq
@@ -1178,7 +1178,7 @@ func (dhtMsg *DhtMessage)GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht get-provider-rsp package from dht message
 //
-func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetGetProviderRspPackage: invalid parameters")
@@ -1187,8 +1187,8 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbGpr := new(pb.DhtMessage_GetProviderRsp)
 	pbMsg := pb.DhtMessage{
-		MsgType:		new(pb.DhtMessage_MessageType),
-		GetProviderRsp:	pbGpr,
+		MsgType:        new(pb.DhtMessage_MessageType),
+		GetProviderRsp: pbGpr,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_GETPROVIDER_RSP
 	gpr := dhtMsg.GetProviderRsp
@@ -1227,7 +1227,7 @@ func (dhtMsg *DhtMessage)GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht ping package from dht message
 //
-func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetPingPackage: invalid parameters")
@@ -1236,12 +1236,11 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbPing := new(pb.DhtMessage_Ping)
 	pbMsg := pb.DhtMessage{
-		MsgType:	new(pb.DhtMessage_MessageType),
-		Ping:		pbPing,
+		MsgType: new(pb.DhtMessage_MessageType),
+		Ping:    pbPing,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PING
 	ping := dhtMsg.Ping
-
 
 	pbPing.From = dhtMsg.setNode(&ping.From, pb.DhtMessage_CONT_YES)
 	pbPing.To = dhtMsg.setNode(&ping.To, pb.DhtMessage_CONT_YES)
@@ -1265,7 +1264,7 @@ func (dhtMsg *DhtMessage)GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Setup dht pong package from dht message
 //
-func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
+func (dhtMsg *DhtMessage) GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
 		protoLog.Debug("GetPongPackage: invalid parameters")
@@ -1274,8 +1273,8 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pbPong := new(pb.DhtMessage_Pong)
 	pbMsg := pb.DhtMessage{
-		MsgType:	new(pb.DhtMessage_MessageType),
-		Pong:		pbPong,
+		MsgType: new(pb.DhtMessage_MessageType),
+		Pong:    pbPong,
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_PONG
 	pong := dhtMsg.Pong
@@ -1302,7 +1301,7 @@ func (dhtMsg *DhtMessage)GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 //
 // Encode data store (key, value) record
 //
-func (dhtDsRec *DhtDatastoreRecord)EncDsRecord(dsr *DsRecord) DhtErrno {
+func (dhtDsRec *DhtDatastoreRecord) EncDsRecord(dsr *DsRecord) DhtErrno {
 
 	// Notice: the [key, value] pair stored can not be a simple pair of [key, value]
 	// from the datastore user, depended on the application, more complexity might be
@@ -1320,10 +1319,10 @@ func (dhtDsRec *DhtDatastoreRecord)EncDsRecord(dsr *DsRecord) DhtErrno {
 	}
 	copy(dsr.Key[0:], dhtDsRec.Key)
 
-	pbr := pb.DhtRecord {
-		Key:	dhtDsRec.Key,
-		Value:	dhtDsRec.Value,
-		Extra:	dhtDsRec.Extra,
+	pbr := pb.DhtRecord{
+		Key:   dhtDsRec.Key,
+		Value: dhtDsRec.Value,
+		Extra: dhtDsRec.Extra,
 	}
 
 	val, err := proto.Marshal(&pbr)
@@ -1339,7 +1338,7 @@ func (dhtDsRec *DhtDatastoreRecord)EncDsRecord(dsr *DsRecord) DhtErrno {
 //
 // Decode data store (key, value) record
 //
-func (dhtDsRec *DhtDatastoreRecord)DecDsRecord(dsr *DsRecord) DhtErrno {
+func (dhtDsRec *DhtDatastoreRecord) DecDsRecord(dsr *DsRecord) DhtErrno {
 
 	if dsr == nil {
 		protoLog.Debug("DecDsRecord: invalid parameters")
@@ -1367,7 +1366,7 @@ func (dhtDsRec *DhtDatastoreRecord)DecDsRecord(dsr *DsRecord) DhtErrno {
 //
 // Encode provider store (key, provider) record
 //
-func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PsRecord) DhtErrno {
+func (dhtPsRec *DhtProviderStoreRecord) EncPsRecord(psr *PsRecord) DhtErrno {
 
 	if psr == nil {
 		protoLog.Debug("EncPsRecord: invalid parameters")
@@ -1381,12 +1380,12 @@ func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PsRecord) DhtErrno {
 	for _, prd := range dhtPsRec.Providers {
 		pbprd := new(pb.DhtProviderRecord_Provider)
 		pbprd.Extra = nil
-		pbprd.Node = &pb.DhtProviderRecord_Node {
-			NodeId:	prd.ID[0:],
-			IP:		prd.IP,
-			TCP:	new(uint32),
-			UDP:	new(uint32),
-			Extra:	nil,
+		pbprd.Node = &pb.DhtProviderRecord_Node{
+			NodeId: prd.ID[0:],
+			IP:     prd.IP,
+			TCP:    new(uint32),
+			UDP:    new(uint32),
+			Extra:  nil,
 		}
 		*pbprd.Node.TCP = uint32(prd.TCP)
 		*pbprd.Node.UDP = uint32(prd.UDP)
@@ -1408,7 +1407,7 @@ func (dhtPsRec *DhtProviderStoreRecord)EncPsRecord(psr *PsRecord) DhtErrno {
 //
 // Decode provider store (key, provider) record
 //
-func (dhtPsRec *DhtProviderStoreRecord)DecPsRecord(psr *PsRecord) DhtErrno {
+func (dhtPsRec *DhtProviderStoreRecord) DecPsRecord(psr *PsRecord) DhtErrno {
 
 	if psr == nil {
 		protoLog.Debug("DecPsRecord: invalid parameters")

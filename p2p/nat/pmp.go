@@ -18,20 +18,20 @@
 package nat
 
 import (
-	"time"
 	"net"
 	"strings"
+	"time"
+
 	"github.com/jackpal/go-nat-pmp"
 )
-
 
 const (
 	pmpClientTimout = time.Second * 8
 )
 
 type pmpCtrlBlock struct {
-	gateWay	net.IP				// gateway ip address
-	client	*natpmp.Client		// client to interactive with the gateway
+	gateWay net.IP         // gateway ip address
+	client  *natpmp.Client // client to interactive with the gateway
 }
 
 func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
@@ -41,7 +41,7 @@ func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
 	}
 	cb := pmpCtrlBlock{
 		gateWay: gw,
-		client: natpmp.NewClient(gw),
+		client:  natpmp.NewClient(gw),
 		//client: natpmp.NewClientWithTimeout(gw, pmpClientTimout),
 	}
 	if cb.client == nil {
@@ -50,26 +50,24 @@ func NewPmpInterface(gw net.IP) *pmpCtrlBlock {
 	return &cb
 }
 
-func (pmp *pmpCtrlBlock)makeMap(name string, proto string, locPort int, pubPort int, durKeep time.Duration) NatEno {
-	seconds := int(durKeep/time.Second)
-	if _, err := pmp.client.AddPortMapping(strings.ToLower(proto), locPort, pubPort, seconds);
-		err != nil {
+func (pmp *pmpCtrlBlock) makeMap(name string, proto string, locPort int, pubPort int, durKeep time.Duration) NatEno {
+	seconds := int(durKeep / time.Second)
+	if _, err := pmp.client.AddPortMapping(strings.ToLower(proto), locPort, pubPort, seconds); err != nil {
 		natLog.Debug("makeMap: AddPortMapping failed, error: %s", err.Error())
 		return NatEnoFromPmpLib
 	}
 	return NatEnoNone
 }
 
-func (pmp *pmpCtrlBlock)removeMap(proto string, locPort int, pubPort int) NatEno {
-	if _, err := pmp.client.AddPortMapping(strings.ToLower(proto), locPort, 0, 0);
-		err != nil {
+func (pmp *pmpCtrlBlock) removeMap(proto string, locPort int, pubPort int) NatEno {
+	if _, err := pmp.client.AddPortMapping(strings.ToLower(proto), locPort, 0, 0); err != nil {
 		natLog.Debug("removeMap: AddPortMapping(0,0) failed, error: %s", err.Error())
 		return NatEnoFromPmpLib
 	}
 	return NatEnoNone
 }
 
-func (pmp *pmpCtrlBlock)getPublicIpAddr() (net.IP, NatEno) {
+func (pmp *pmpCtrlBlock) getPublicIpAddr() (net.IP, NatEno) {
 	rsp, err := pmp.client.GetExternalAddress()
 	if err != nil {
 		natLog.Debug("makeMap: GetExternalAddress failed, error: %s", err.Error())

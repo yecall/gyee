@@ -18,11 +18,10 @@
  *
  */
 
-
 package shell
 
 import (
-	dht	"github.com/yeeco/gyee/p2p/dht"
+	dht "github.com/yeeco/gyee/p2p/dht"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
@@ -75,4 +74,3 @@ func DhtCommand(dhtMgr *dht.DhtMgr, cmd int, msg interface{}) sch.SchErrno {
 	}
 	return dhtMgr.DhtCommand(cmd, msg)
 }
-

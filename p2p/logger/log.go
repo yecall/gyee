@@ -18,16 +18,16 @@
  *
  */
 
-
 package logger
 
 import (
-	"os"
-	"time"
 	"fmt"
-	"runtime"
 	"log"
+	"os"
 	"path/filepath"
+	"runtime"
+	"time"
+
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
@@ -35,21 +35,21 @@ import (
 )
 
 type P2pLogger struct {
-	logger				*logrus.Logger	// global or local logger
-	Tag					string			// tag string
-	Level				uint32			// logger level
-	Global				bool			// if global logger applied
-	Skip				int				// callers to be skipped
-	LogPosition			bool			// if caller's file and line needed
+	logger      *logrus.Logger // global or local logger
+	Tag         string         // tag string
+	Level       uint32         // logger level
+	Global      bool           // if global logger applied
+	Skip        int            // callers to be skipped
+	LogPosition bool           // if caller's file and line needed
 }
 
 var (
-	GyeeProject = false					// is playing in github.com/yeeco/gyee project
-	GlobalLogger *logrus.Logger = nil	// the global logger
-	Level = logrus.DebugLevel
-	Skip = 2
-	Tag = "global"
-	LogPosition = true
+	GyeeProject                 = false // is playing in github.com/yeeco/gyee project
+	GlobalLogger *logrus.Logger = nil   // the global logger
+	Level                       = logrus.DebugLevel
+	Skip                        = 2
+	Tag                         = "global"
+	LogPosition                 = true
 )
 
 func init() {
@@ -66,10 +66,10 @@ func init() {
 }
 
 func NewP2pLogger(tag string, level uint32, isGlobal bool, isPosition bool) *P2pLogger {
-	logger := P2pLogger {
-		Tag: tag,
-		Level: level,
-		Global:	isGlobal,
+	logger := P2pLogger{
+		Tag:         tag,
+		Level:       level,
+		Global:      isGlobal,
 		LogPosition: isPosition,
 	}
 	if isGlobal {
@@ -83,12 +83,12 @@ func NewP2pLogger(tag string, level uint32, isGlobal bool, isPosition bool) *P2p
 	return &logger
 }
 
-func (p2pLog *P2pLogger)getCallerFileLine() (string, int) {
+func (p2pLog *P2pLogger) getCallerFileLine() (string, int) {
 	_, file, line, _ := runtime.Caller(p2pLog.Skip)
 	return file, line
 }
 
-func (p2pLog *P2pLogger)Debug(format string, args ... interface{}) {
+func (p2pLog *P2pLogger) Debug(format string, args ...interface{}) {
 	if !p2pLog.LogPosition {
 		msg := fmt.Sprintf(format, args...)
 		p2pLog.logger.Debug(msg)
@@ -101,7 +101,7 @@ func (p2pLog *P2pLogger)Debug(format string, args ... interface{}) {
 	}
 }
 
-func Debug(format string, args ... interface{}) {
+func Debug(format string, args ...interface{}) {
 	if !LogPosition {
 		//GlobalLogger.Debugf(format, args...)
 		log.Printf(format, args...)
@@ -114,12 +114,12 @@ func Debug(format string, args ... interface{}) {
 	}
 }
 
-func (p2pLog *P2pLogger)SetFileRotationHooker(path string, count uint) {
+func (p2pLog *P2pLogger) SetFileRotationHooker(path string, count uint) {
 	frHook := p2pLog.newFileRotateHooker(path, count)
 	p2pLog.logger.Hooks.Add(frHook)
 }
 
-func (p2pLog *P2pLogger)newFileRotateHooker(path string, count uint) logrus.Hook {
+func (p2pLog *P2pLogger) newFileRotateHooker(path string, count uint) logrus.Hook {
 	if len(path) == 0 {
 		panic("Failed to parse logger folder:" + path + ".")
 	}

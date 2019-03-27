@@ -25,29 +25,30 @@
 package main
 
 import (
-	"time"
-	"fmt"
-	"os"
-	"syscall"
 	"bytes"
-	"strconv"
-	"runtime"
-	"os/signal"
 	"crypto/sha256"
-	_ "net/http/pprof"
+	"fmt"
 	"net/http"
-	config	"github.com/yeeco/gyee/p2p/config"
-	log		"github.com/yeeco/gyee/p2p/logger"
-	yep2p	"github.com/yeeco/gyee/p2p"
+	_ "net/http/pprof"
+	"os"
+	"os/signal"
+	"runtime"
+	"strconv"
+	"syscall"
+	"time"
+
+	yep2p "github.com/yeeco/gyee/p2p"
+	config "github.com/yeeco/gyee/p2p/config"
+	log "github.com/yeeco/gyee/p2p/logger"
 )
 
 //
 // test case
 //
 type testCase struct {
-	name		string
-	description	string
-	entry		func(tc *testCase)
+	name        string
+	description string
+	entry       func(tc *testCase)
 }
 
 //
@@ -55,99 +56,99 @@ type testCase struct {
 //
 var testCaseTable = []testCase{
 	{
-		name:			"testCase0",
-		description:	"bootstrap node with SubNetMaskBits == 0",
-		entry:			testCase0,
+		name:        "testCase0",
+		description: "bootstrap node with SubNetMaskBits == 0",
+		entry:       testCase0,
 	},
 	{
-		name:			"testCase0Ex",
-		description:	"bootstrap node with (SubNetMaskBits == 4, and Validator == true)",
-		entry:			testCase0Ex,
+		name:        "testCase0Ex",
+		description: "bootstrap node with (SubNetMaskBits == 4, and Validator == true)",
+		entry:       testCase0Ex,
 	},
 	{
-		name:			"testCase1",
-		description:	"little-white node, SubNetMaskBits == 4",
-		entry:			testCase1,
+		name:        "testCase1",
+		description: "little-white node, SubNetMaskBits == 4",
+		entry:       testCase1,
 	},
 	{
-		name:			"testCase2",
-		description:	"little-white node, start/stop, SubNetMaskBits == 4",
-		entry:			testCase2,
+		name:        "testCase2",
+		description: "little-white node, start/stop, SubNetMaskBits == 4",
+		entry:       testCase2,
 	},
 	{
-		name:			"testCase3",
-		description:	"little-white node, broadcast, SubNetMaskBits == 4",
-		entry:			testCase3,
+		name:        "testCase3",
+		description: "little-white node, broadcast, SubNetMaskBits == 4",
+		entry:       testCase3,
 	},
 	{
-		name:			"testCase4",
-		description:	"little-white node, SubNetMaskBits == 0",
-		entry:			testCase4,
+		name:        "testCase4",
+		description: "little-white node, SubNetMaskBits == 0",
+		entry:       testCase4,
 	},
 	{
-		name:			"testCase5",
-		description:	"yee chain start/stop test, SubNetMaskBits == 0",
-		entry:			testCase5,
+		name:        "testCase5",
+		description: "yee chain start/stop test, SubNetMaskBits == 0",
+		entry:       testCase5,
 	},
 	{
-		name:			"testCase6",
-		description:	"yee chain start/stop test, SubNetMaskBits != 0",
-		entry:			testCase6,
+		name:        "testCase6",
+		description: "yee chain start/stop test, SubNetMaskBits != 0",
+		entry:       testCase6,
 	},
 	{
-		name:			"testCase7",
-		description:	"yee chain test, SubNetMaskBits == 0",
-		entry:			testCase7,
+		name:        "testCase7",
+		description: "yee chain test, SubNetMaskBits == 0",
+		entry:       testCase7,
 	},
 	{
-		name:			"testCase8",
-		description:	"yee chain test, SubNetMaskBits != 0",
-		entry:			testCase8,
+		name:        "testCase8",
+		description: "yee chain test, SubNetMaskBits != 0",
+		entry:       testCase8,
 	},
 	{
-		name:			"testCase9",
-		description:	"yee dht test",
-		entry:			testCase9,
+		name:        "testCase9",
+		description: "yee dht test",
+		entry:       testCase9,
 	},
 	{
-		name:			"testCase10",
-		description:	"yee chain OSN test, SubNetMaskBits == 0",
-		entry:			testCase10,
+		name:        "testCase10",
+		description: "yee chain OSN test, SubNetMaskBits == 0",
+		entry:       testCase10,
 	},
 	{
-		name:			"testCase11",
-		description:	"yee chain OSN test, SubNetMaskBits != 0",
-		entry:			testCase11,
+		name:        "testCase11",
+		description: "yee chain OSN test, SubNetMaskBits != 0",
+		entry:       testCase11,
 	},
 	{
-		name:			"testCase12",
-		description:	"multiple yee chain OSN test on one host",
-		entry:			testCase12,
+		name:        "testCase12",
+		description: "multiple yee chain OSN test on one host",
+		entry:       testCase12,
 	},
 	{
-		name:			"testCase13",
-		description:	"reconfiguration: validator => little-white with same mask bits",
-		entry:			testCase13,
+		name:        "testCase13",
+		description: "reconfiguration: validator => little-white with same mask bits",
+		entry:       testCase13,
 	},
 	{
-		name:			"testCase14",
-		description:	"reconfiguration: little-white => validator with same mask bits",
-		entry:			testCase14,
+		name:        "testCase14",
+		description: "reconfiguration: little-white => validator with same mask bits",
+		entry:       testCase14,
 	},
 	{
-		name:			"testCase15",
-		description:	"reconfiguration: little-white => validator with defferent mask bits",
-		entry:			testCase15,
+		name:        "testCase15",
+		description: "reconfiguration: little-white => validator with defferent mask bits",
+		entry:       testCase15,
 	},
 	{
-		name:			"testCase16",
-		description:	"reconfiguration: nat",
-		entry:			testCase16,
+		name:        "testCase16",
+		description: "reconfiguration: nat",
+		entry:       testCase16,
 	},
 	{
-		name:			"testCase17",
-		description:	"reconfiguration: traffic with nat",
-		entry:			testCase17,
+		name:        "testCase17",
+		description: "reconfiguration: traffic with nat",
+		entry:       testCase17,
 	},
 }
 
@@ -243,48 +244,48 @@ func waitInterruptWithCallback(srv yep2p.Service, workp appWorkProc, stopp appSt
 
 var (
 	ev = yep2p.Message{
-		MsgType:	yep2p.MessageTypeEvent,
+		MsgType: yep2p.MessageTypeEvent,
 	}
 
 	tx = yep2p.Message{
-		MsgType:	yep2p.MessageTypeTx,
+		MsgType: yep2p.MessageTypeTx,
 	}
 
 	bh = yep2p.Message{
-		MsgType:	yep2p.MessageTypeBlockHeader,
+		MsgType: yep2p.MessageTypeBlockHeader,
 	}
 
 	bk = yep2p.Message{
-		MsgType:	yep2p.MessageTypeBlock,
+		MsgType: yep2p.MessageTypeBlock,
 	}
 
-	subEv = yep2p.Subscriber {
-		MsgChan:	make(chan yep2p.Message, 64),
-		MsgType:	yep2p.MessageTypeEvent,
+	subEv = yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeEvent,
 	}
 
-	subTx = yep2p.Subscriber {
-		MsgChan:	make(chan yep2p.Message, 64),
-		MsgType:	yep2p.MessageTypeTx,
+	subTx = yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeTx,
 	}
 
-	subBh = yep2p.Subscriber {
-		MsgChan:	make(chan yep2p.Message, 64),
-		MsgType:	yep2p.MessageTypeBlockHeader,
+	subBh = yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeBlockHeader,
 	}
 )
 
 type appMessages struct {
-	ev	yep2p.Message
-	tx	yep2p.Message
-	bh	yep2p.Message
-	bk	yep2p.Message
+	ev yep2p.Message
+	tx yep2p.Message
+	bh yep2p.Message
+	bk yep2p.Message
 }
 
 type appSubcribers struct {
-	subEv	yep2p.Subscriber
-	subTx	yep2p.Subscriber
-	subBh	yep2p.Subscriber
+	subEv yep2p.Subscriber
+	subTx yep2p.Subscriber
+	subBh yep2p.Subscriber
 }
 
 type appWorkProc func(srv yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep2p.Message, bk yep2p.Message)
@@ -299,7 +300,7 @@ _loop:
 			if !ok {
 				break _loop
 			}
-			if count++; count & 0x7f == 0 {
+			if count++; count&0x7f == 0 {
 				log.Debug("subFunc: count: %d, %s: %x", count, tag, msg.Key)
 			}
 		}
@@ -307,7 +308,7 @@ _loop:
 	log.Debug("subFunc: done, tag: %s", tag)
 }
 
-func (msgs *appMessages)setMessageFrom(n *config.Node) {
+func (msgs *appMessages) setMessageFrom(n *config.Node) {
 	from := fmt.Sprintf("%x", n.ID)
 	msgs.ev.From = from
 	msgs.tx.From = from
@@ -315,43 +316,43 @@ func (msgs *appMessages)setMessageFrom(n *config.Node) {
 	msgs.bk.From = from
 }
 
-func (msgs *appMessages)init() {
+func (msgs *appMessages) init() {
 	msgs.ev.MsgType = yep2p.MessageTypeEvent
 	msgs.tx.MsgType = yep2p.MessageTypeTx
 	msgs.bh.MsgType = yep2p.MessageTypeBlockHeader
 	msgs.bk.MsgType = yep2p.MessageTypeBlock
 }
 
-func (msgs *appMessages)yeChainProc(srv yep2p.Service) {
+func (msgs *appMessages) yeChainProc(srv yep2p.Service) {
 	yeChainProc(srv, msgs.ev, msgs.tx, msgs.bh, msgs.bk)
 }
 
-func (subs *appSubcribers)Register(srv yep2p.Service) {
+func (subs *appSubcribers) Register(srv yep2p.Service) {
 	srv.Register(&subs.subEv)
 	srv.Register(&subs.subTx)
 	srv.Register(&subs.subBh)
 }
 
-func (subs *appSubcribers)yeChainStop(srv yep2p.Service) {
+func (subs *appSubcribers) yeChainStop(srv yep2p.Service) {
 	yeChainStop(srv, subs.subEv, subs.subTx, subs.subBh)
 }
 
-func (subs *appSubcribers)init() {
-	subs.subEv = yep2p.Subscriber {
-		MsgChan:	make(chan yep2p.Message, 64),
-		MsgType:	yep2p.MessageTypeEvent,
+func (subs *appSubcribers) init() {
+	subs.subEv = yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeEvent,
 	}
-	subs.subTx = yep2p.Subscriber {
-		MsgChan:	make(chan yep2p.Message, 64),
-		MsgType:	yep2p.MessageTypeTx,
+	subs.subTx = yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeTx,
 	}
-	subs.subBh = yep2p.Subscriber {
-		MsgChan:	make(chan yep2p.Message, 64),
-		MsgType:	yep2p.MessageTypeBlockHeader,
+	subs.subBh = yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeBlockHeader,
 	}
 }
 
-func (subs *appSubcribers)goSubFunc() {
+func (subs *appSubcribers) goSubFunc() {
 	go subFunc(subs.subEv, "ev")
 	go subFunc(subs.subTx, "tx")
 	go subFunc(subs.subBh, "bh")
@@ -400,7 +401,7 @@ func yeChainProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh y
 		bk.Key = append(bk.Key[0:0], key[0:]...)
 		yeShMgr.BroadcastMessageOsn(bk)
 
-		if cnt & 0x7f == 0 {
+		if cnt&0x7f == 0 {
 			log.Debug("yeChainProc: cnt: %d, loop BroadcastMessageOsn", cnt)
 		}
 
@@ -502,7 +503,7 @@ func yeDhtProc(yeShMgr yep2p.Service, ev yep2p.Message, tx yep2p.Message, bh yep
 			time.Sleep(time.Millisecond * 2000)
 		}
 
-		if cnt & 0x7f == 0 {
+		if cnt&0x7f == 0 {
 			log.Debug("yeDhtProc: cnt: %d, loop BroadcastMessageOsn", cnt)
 		}
 	}
@@ -520,9 +521,8 @@ func yeChainStop(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subs
 
 func yeChainStopEx(yeShMgr yep2p.Service, subEv yep2p.Subscriber, subTx yep2p.Subscriber, subBh yep2p.Subscriber, done chan bool) {
 	close(done)
-	yeChainStop(yeShMgr, subEv, subTx, subBh )
+	yeChainStop(yeShMgr, subEv, subTx, subBh)
 }
-
 
 //
 // testCase0

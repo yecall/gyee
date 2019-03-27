@@ -28,37 +28,37 @@ import (
 // Package passed into user's callback
 //
 type P2pPackageRx struct {
-	Ptn				interface{}		// instance task node pointer
-	PeerInfo		*PeerInfo		// peer information
-	ProtoId			int				// protocol identity
-	MsgId			int				// message identity
-	Key				[]byte			// message key
-	PayloadLength	int				// bytes in payload buffer
-	Payload			[]byte			// payload buffer
+	Ptn           interface{} // instance task node pointer
+	PeerInfo      *PeerInfo   // peer information
+	ProtoId       int         // protocol identity
+	MsgId         int         // message identity
+	Key           []byte      // message key
+	PayloadLength int         // bytes in payload buffer
+	Payload       []byte      // payload buffer
 }
 
 //
 // Message from user
 //
 type P2pPackage2Peer struct {
-	P2pInst			*sch.Scheduler			// p2p network instance
-	SubNetId		SubNetworkID			// sub network identity
-	IdList			[]PeerId				// peer identity list
-	ProtoId			int						// protocol identity
-	Mid				int						// message identity
-	Key				[]byte					// message key
-	PayloadLength	int						// payload length
-	Payload			[]byte					// payload
-	Extra			interface{}				// extra info: user this field to tell p2p more about this message,
-											// for example, if broadcasting is wanted, then set IdList to nil
-											// and setup thie extra info field.
+	P2pInst       *sch.Scheduler // p2p network instance
+	SubNetId      SubNetworkID   // sub network identity
+	IdList        []PeerId       // peer identity list
+	ProtoId       int            // protocol identity
+	Mid           int            // message identity
+	Key           []byte         // message key
+	PayloadLength int            // payload length
+	Payload       []byte         // payload
+	Extra         interface{}    // extra info: user this field to tell p2p more about this message,
+	// for example, if broadcasting is wanted, then set IdList to nil
+	// and setup thie extra info field.
 }
 
 //
 // callback type
 //
 const (
-	P2pIndCb	= iota
+	P2pIndCb = iota
 	P2pPkgCb
 )
 
@@ -66,20 +66,20 @@ const (
 // P2p peer status indication callback type
 //
 const (
-	P2pIndPeerActivated	= iota		// peer activated
-	P2pIndPeerClosed				// connection closed
+	P2pIndPeerActivated = iota // peer activated
+	P2pIndPeerClosed           // connection closed
 )
 
 type P2pIndPeerActivatedPara struct {
-	P2pInst		*sch.Scheduler		// p2p instance pointer
-	RxChan		chan *P2pPackageRx	// channel for packages received
-	PeerInfo	*Handshake			// handshake info
+	P2pInst  *sch.Scheduler     // p2p instance pointer
+	RxChan   chan *P2pPackageRx // channel for packages received
+	PeerInfo *Handshake         // handshake info
 }
 
 type P2pIndConnStatusPara struct {
-	Ptn			interface{}			// task node pointer
-	PeerInfo	*Handshake			// handshake info
-	Status		int					// status code
+	Ptn      interface{} // task node pointer
+	PeerInfo *Handshake  // handshake info
+	Status   int         // status code
 
 	//
 	// Indicate that if the instance would be closed by underlying of p2p.
@@ -88,16 +88,16 @@ type P2pIndConnStatusPara struct {
 	// close the instance if necessary.
 	//
 
-	Flag		bool				// flag
+	Flag bool // flag
 
-	Description	string				// description
+	Description string // description
 }
 
 type P2pIndPeerClosedPara struct {
-	P2pInst		*sch.Scheduler		// p2p instance pointer
-	Snid		SubNetworkID		// sub network identity
-	PeerId		PeerId				// peer identity
-	Dir			int					// direction
+	P2pInst *sch.Scheduler // p2p instance pointer
+	Snid    SubNetworkID   // sub network identity
+	PeerId  PeerId         // peer identity
+	Dir     int            // direction
 }
 
 type P2pIndCallback func(what int, para interface{}, userData interface{}) interface{}
@@ -106,6 +106,3 @@ type P2pIndCallback func(what int, para interface{}, userData interface{}) inter
 // P2p callback function type for package incoming
 //
 type P2pPkgCallback func(msg *P2pPackageRx, userData interface{}) interface{}
-
-
-

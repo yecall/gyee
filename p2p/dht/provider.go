@@ -20,32 +20,31 @@
 
 package dht
 
-
 import (
-	"time"
-	"sync"
 	"bytes"
-	"github.com/yeeco/gyee/p2p/config"
-	lru		"github.com/hashicorp/golang-lru"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
+	"sync"
+	"time"
 
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type prdMgrLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var prdLog = prdMgrLogger  {
-	debug__:	false,
+var prdLog = prdMgrLogger{
+	debug__: false,
 }
 
-func (log prdMgrLogger)Debug(fmt string, args ... interface{}) {
+func (log prdMgrLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -58,46 +57,46 @@ const PrdMgrName = sch.DhtPrdMgrName
 // Providers cache parameters
 //
 const (
-	prdCacheSize = 4096					// cache size
-	prdCleanupInterval = time.Hour * 1	// cleanup period
-	prdLifeCached = time.Hour * 24		// lifetime
-	prdDftKeepTime = time.Hour * 24		// default duration to keep [key, provider] pair
+	prdCacheSize       = 4096           // cache size
+	prdCleanupInterval = time.Hour * 1  // cleanup period
+	prdLifeCached      = time.Hour * 24 // lifetime
+	prdDftKeepTime     = time.Hour * 24 // default duration to keep [key, provider] pair
 )
 
 //
 // Provider manager
 //
 type PrdMgr struct {
-	sdl			*sch.Scheduler			// pointer to scheduler
-	name		string					// my name
-	tep			sch.SchUserTaskEp		// task entry
-	ptnMe		interface{}				// pointer to task node of myself
-	ptnDhtMgr	interface{}				// pointer to dht manager task node
-	ptnQryMgr	interface{}				// pointer to query manager task node
-	ptnRutMgr	interface{}				// pointer to route manager task node
-	clrTid		int						// cleanup timer identity
-	ds			Datastore				// data store
-	lockStore	sync.Mutex				// sync with store
-	prdCache	*lru.Cache				// providers cache
-	lockCache	sync.Mutex				// sync with cache operations
-	tmMgr		*TimerManager			// timer manager
+	sdl       *sch.Scheduler    // pointer to scheduler
+	name      string            // my name
+	tep       sch.SchUserTaskEp // task entry
+	ptnMe     interface{}       // pointer to task node of myself
+	ptnDhtMgr interface{}       // pointer to dht manager task node
+	ptnQryMgr interface{}       // pointer to query manager task node
+	ptnRutMgr interface{}       // pointer to route manager task node
+	clrTid    int               // cleanup timer identity
+	ds        Datastore         // data store
+	lockStore sync.Mutex        // sync with store
+	prdCache  *lru.Cache        // providers cache
+	lockCache sync.Mutex        // sync with cache operations
+	tmMgr     *TimerManager     // timer manager
 }
 
 //
 // Provider set
 //
 type PrdSet struct {
-	set 	map[DsKey]config.Node			// provider set
-	addTime	map[DsKey]time.Time		// time for providers added
+	set     map[DsKey]config.Node // provider set
+	addTime map[DsKey]time.Time   // time for providers added
 }
 
 //
 // Provider data store record
 //
 type PsRecord struct {
-	Key		DsKey				// provider record key
-	Value	DsValue				// provider record value
-	KT		time.Duration		// duratio to keep this [key, val] pair
+	Key   DsKey         // provider record key
+	Value DsValue       // provider record value
+	KT    time.Duration // duratio to keep this [key, val] pair
 }
 
 //
@@ -106,9 +105,9 @@ type PsRecord struct {
 func NewPrdMgr() *PrdMgr {
 
 	prdMgr := PrdMgr{
-		name:		PrdMgrName,
-		clrTid:		sch.SchInvalidTid,
-		tmMgr:		NewTimerManager(),
+		name:   PrdMgrName,
+		clrTid: sch.SchInvalidTid,
+		tmMgr:  NewTimerManager(),
 	}
 
 	prdMgr.tep = prdMgr.prdMgrProc
@@ -119,14 +118,14 @@ func NewPrdMgr() *PrdMgr {
 //
 // Entry point exported to shceduler
 //
-func (prdMgr *PrdMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (prdMgr *PrdMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return prdMgr.tep(ptn, msg)
 }
 
 //
 // Provider manager entry
 //
-func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (prdMgr *PrdMgr) prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
 		prdLog.Debug("prdMgrProc: invalid parameters")
@@ -175,7 +174,7 @@ func (prdMgr *PrdMgr)prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 //
 // power on handler
 //
-func (prdMgr *PrdMgr)poweron(ptn interface{}) sch.SchErrno {
+func (prdMgr *PrdMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	prdMgr.sdl = sch.SchGetScheduler(ptn)
 	prdMgr.ptnMe = ptn
@@ -185,12 +184,12 @@ func (prdMgr *PrdMgr)poweron(ptn interface{}) sch.SchErrno {
 	prdMgr.prdCache, _ = lru.New(prdCacheSize)
 	prdMgr.ds = NewMapDatastore()
 
-	var td = sch.TimerDescription {
-		Name:	"TmPrdMgrCleanup",
-		Utid:	sch.DhtPrdMgrCleanupTimerId,
-		Tmt:	sch.SchTmTypePeriod,
-		Dur:	prdCleanupInterval,
-		Extra:	nil,
+	var td = sch.TimerDescription{
+		Name:  "TmPrdMgrCleanup",
+		Utid:  sch.DhtPrdMgrCleanupTimerId,
+		Tmt:   sch.SchTmTypePeriod,
+		Dur:   prdCleanupInterval,
+		Extra: nil,
 	}
 
 	eno, tid := prdMgr.sdl.SchSetTimer(prdMgr.ptnMe, &td)
@@ -206,7 +205,7 @@ func (prdMgr *PrdMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 // power off handler
 //
-func (prdMgr *PrdMgr)poweroff(ptn interface{}) sch.SchErrno {
+func (prdMgr *PrdMgr) poweroff(ptn interface{}) sch.SchErrno {
 	prdLog.Debug("poweroff: task will be done ...")
 	return prdMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
 }
@@ -214,7 +213,7 @@ func (prdMgr *PrdMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 // cleanup timer handler
 //
-func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
+func (prdMgr *PrdMgr) cleanupTimer() sch.SchErrno {
 
 	prdMgr.lockCache.Lock()
 	defer prdMgr.lockCache.Unlock()
@@ -253,7 +252,7 @@ func (prdMgr *PrdMgr)cleanupTimer() sch.SchErrno {
 //
 // local add provider request handler
 //
-func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
+func (prdMgr *PrdMgr) localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sch.SchErrno {
 
 	//
 	// we are commanded to add a provider by external module of local
@@ -291,11 +290,11 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 	// publish it to our neighbors
 	//
 
-	qry := sch.MsgDhtQryMgrQueryStartReq {
-		Target:		k,
-		Msg:		msg,
-		ForWhat:	MID_PUTPROVIDER,
-		Seq:		GetQuerySeqNo(),
+	qry := sch.MsgDhtQryMgrQueryStartReq{
+		Target:  k,
+		Msg:     msg,
+		ForWhat: MID_PUTPROVIDER,
+		Seq:     GetQuerySeqNo(),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -306,7 +305,7 @@ func (prdMgr *PrdMgr)localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) sc
 //
 // local get provider request handler
 //
-func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
+func (prdMgr *PrdMgr) localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
 		return sch.SchEnoParameter
@@ -328,7 +327,7 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 		for _, id := range prdSet.set {
 			prds = append(prds, &id)
 		}
-		if len(prds) >0 {
+		if len(prds) > 0 {
 			eno = DhtEnoNone
 			goto _rsp2DhtMgr
 		}
@@ -342,7 +341,7 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 		for _, id := range prdSet.set {
 			prds = append(prds, &id)
 		}
-		if len(prds) >0 {
+		if len(prds) > 0 {
 			eno = DhtEnoNone
 			goto _rsp2DhtMgr
 		}
@@ -352,11 +351,11 @@ func (prdMgr *PrdMgr)localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.S
 	// lookup our neighbors
 	//
 
-	qry = sch.MsgDhtQryMgrQueryStartReq {
-		Target:		dsk,
-		Msg:		nil,
-		ForWhat:	MID_GETPROVIDER_REQ,
-		Seq:		GetQuerySeqNo(),
+	qry = sch.MsgDhtQryMgrQueryStartReq{
+		Target:  dsk,
+		Msg:     nil,
+		ForWhat: MID_GETPROVIDER_REQ,
+		Seq:     GetQuerySeqNo(),
 	}
 
 	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
@@ -370,7 +369,7 @@ _rsp2DhtMgr:
 //
 // qryMgr query result indication handler
 //
-func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
+func (prdMgr *PrdMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
 
 	if msg.ForWhat == MID_PUTPROVIDER {
 
@@ -412,7 +411,7 @@ func (prdMgr *PrdMgr)qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) s
 //
 // put provider request handler
 //
-func (prdMgr *PrdMgr)putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.SchErrno {
+func (prdMgr *PrdMgr) putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.SchErrno {
 
 	//
 	// we are required to put-provider by remote peer, we just put it into the
@@ -439,7 +438,7 @@ func (prdMgr *PrdMgr)putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.Sch
 //
 // get provider handler
 //
-func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.SchErrno {
+func (prdMgr *PrdMgr) getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.SchErrno {
 
 	//
 	// we are required to get-provider by remote peer
@@ -449,14 +448,14 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 	req := msg.Msg.(*GetProviderReq)
 	ci := msg.ConInst.(*ConInst)
 	rsp := GetProviderRsp{
-		From:		*ci.local,
-		To:			ci.hsInfo.peer,
-		Provider:	nil,
-		Key:		nil,
-		Nodes:		nil,
-		Pcs:		nil,
-		Id:			req.Id,
-		Extra:		nil,
+		From:     *ci.local,
+		To:       ci.hsInfo.peer,
+		Provider: nil,
+		Key:      nil,
+		Nodes:    nil,
+		Pcs:      nil,
+		Id:       req.Id,
+		Extra:    nil,
 	}
 
 	makeDhtPrd := func(dsk *DsKey, ps *PrdSet) *DhtProvider {
@@ -473,7 +472,6 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 	//
 	// check cache and data store
 	//
-
 
 	var dhtPrd *DhtProvider = nil
 	copy(dsk[0:], req.Key)
@@ -498,10 +496,10 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 	// if providers got, we then response peer
 	//
 
-	if rsp.Provider != nil  {
+	if rsp.Provider != nil {
 
-		dhtMsg := DhtMessage {
-			Mid:	MID_GETPROVIDER_RSP,
+		dhtMsg := DhtMessage{
+			Mid:            MID_GETPROVIDER_RSP,
 			GetProviderRsp: &rsp,
 		}
 
@@ -511,13 +509,12 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 			return sch.SchEnoUserTask
 		}
 
-
-		txReq := sch.MsgDhtConInstTxDataReq {
-			Task:		prdMgr.ptnMe,
-			WaitRsp:	false,
-			WaitMid:	-1,
-			WaitSeq:	-1,
-			Payload:	&dhtPkg,
+		txReq := sch.MsgDhtConInstTxDataReq{
+			Task:    prdMgr.ptnMe,
+			WaitRsp: false,
+			WaitMid: -1,
+			WaitSeq: -1,
+			Payload: &dhtPkg,
 		}
 
 		schMsg := sch.SchMessage{}
@@ -531,12 +528,12 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 
 	schMsg := sch.SchMessage{}
 	fnReq := sch.MsgDhtRutMgrNearestReq{
-		Target:		dsk,
-		Max:		rutMgrMaxNearest,
-		NtfReq:		false,
-		Task:		prdMgr.ptnMe,
-		ForWhat:	MID_FINDNODE,
-		Msg:		msg,
+		Target:  dsk,
+		Max:     rutMgrMaxNearest,
+		NtfReq:  false,
+		Task:    prdMgr.ptnMe,
+		ForWhat: MID_FINDNODE,
+		Msg:     msg,
 	}
 
 	ci.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &fnReq)
@@ -546,7 +543,7 @@ func (prdMgr *PrdMgr)getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sch
 //
 // nearest response handler
 //
-func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
+func (prdMgr *PrdMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 
 	//
 	// see prdMgr.getProviderReq for more please. we assume that no more "get-provider"
@@ -567,19 +564,19 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 	ci := msg.Msg.(*sch.MsgDhtPrdMgrGetProviderReq).ConInst.(*ConInst)
 	req := msg.Msg.(*sch.MsgDhtPrdMgrGetProviderReq).Msg.(*GetProviderReq)
 	rsp := GetProviderRsp{
-		From:		*ci.local,
-		To:			ci.hsInfo.peer,
-		Provider:	nil,
-		Key:		req.Key,
-		Nodes:		nodes,
-		Pcs:		msg.Pcs.([]int),
-		Id:			req.Id,
-		Extra:		nil,
+		From:     *ci.local,
+		To:       ci.hsInfo.peer,
+		Provider: nil,
+		Key:      req.Key,
+		Nodes:    nodes,
+		Pcs:      msg.Pcs.([]int),
+		Id:       req.Id,
+		Extra:    nil,
 	}
 
-	dhtMsg := DhtMessage {
-		Mid:			MID_GETPROVIDER_RSP,
-		GetProviderRsp:	&rsp,
+	dhtMsg := DhtMessage{
+		Mid:            MID_GETPROVIDER_RSP,
+		GetProviderRsp: &rsp,
 	}
 
 	dhtPkg := DhtPackage{}
@@ -588,12 +585,12 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 		return sch.SchEnoUserTask
 	}
 
-	txReq := sch.MsgDhtConInstTxDataReq {
-		Task:		prdMgr.ptnMe,
-		WaitRsp:	false,
-		WaitMid:	-1,
-		WaitSeq:	-1,
-		Payload:	&dhtPkg,
+	txReq := sch.MsgDhtConInstTxDataReq{
+		Task:    prdMgr.ptnMe,
+		WaitRsp: false,
+		WaitMid: -1,
+		WaitSeq: -1,
+		Payload: &dhtPkg,
 	}
 
 	schMsg := sch.SchMessage{}
@@ -604,7 +601,7 @@ func (prdMgr *PrdMgr)rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchEr
 //
 // try get provider from cache
 //
-func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
+func (prdMgr *PrdMgr) prdFromCache(key *DsKey) *PrdSet {
 
 	prdMgr.lockCache.Lock()
 	defer prdMgr.lockCache.Unlock()
@@ -623,7 +620,7 @@ func (prdMgr *PrdMgr)prdFromCache(key *DsKey) *PrdSet {
 //
 // try get provider form data store
 //
-func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
+func (prdMgr *PrdMgr) prdFromStore(key *DsKey) *PrdSet {
 
 	prdMgr.lockStore.Lock()
 	defer prdMgr.lockStore.Unlock()
@@ -643,7 +640,7 @@ func (prdMgr *PrdMgr)prdFromStore(key *DsKey) *PrdSet {
 //
 // store a provider
 //
-func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
+func (prdMgr *PrdMgr) store(key *DsKey, peerId *config.Node) DhtErrno {
 
 	prdMgr.lockStore.Lock()
 	defer prdMgr.lockStore.Unlock()
@@ -652,10 +649,10 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 		return DhtEnoParameter
 	}
 
-	var dpsr = &DhtProviderStoreRecord {
-		Key:		key[0:],
-		Providers:	nil,
-		Extra:		nil,
+	var dpsr = &DhtProviderStoreRecord{
+		Key:       key[0:],
+		Providers: nil,
+		Extra:     nil,
 	}
 
 	if eno, val := prdMgr.ds.Get(key[0:]); eno == DhtEnoNone && val != nil {
@@ -686,11 +683,11 @@ func (prdMgr *PrdMgr)store(key *DsKey, peerId *config.Node) DhtErrno {
 //
 // response to local dhtMgr for "add-provider"
 //
-func (prdMgr *PrdMgr)localAddProviderRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
-	rsp := sch.MsgDhtPrdMgrAddProviderRsp {
-		Eno: 	int(eno),
-		Key: 	key,
-		Peers:	peers,
+func (prdMgr *PrdMgr) localAddProviderRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
+	rsp := sch.MsgDhtPrdMgrAddProviderRsp{
+		Eno:   int(eno),
+		Key:   key,
+		Peers: peers,
 	}
 	msg := sch.SchMessage{}
 	prdMgr.sdl.SchMakeMessage(&msg, prdMgr.ptnMe, prdMgr.ptnDhtMgr, sch.EvDhtMgrPutProviderRsp, &rsp)
@@ -700,11 +697,11 @@ func (prdMgr *PrdMgr)localAddProviderRsp(key []byte, peers []*config.Node, eno D
 //
 // response to local dhtMgr for "get-provider"
 //
-func (prdMgr *PrdMgr)localGetProviderRsp(key []byte, prds []*config.Node, eno DhtErrno) sch.SchErrno {
-	rsp := sch.MsgDhtMgrGetProviderRsp {
-		Eno:	int(eno),
-		Key:	key,
-		Prds:	prds,
+func (prdMgr *PrdMgr) localGetProviderRsp(key []byte, prds []*config.Node, eno DhtErrno) sch.SchErrno {
+	rsp := sch.MsgDhtMgrGetProviderRsp{
+		Eno:  int(eno),
+		Key:  key,
+		Prds: prds,
 	}
 	msg := sch.SchMessage{}
 	prdMgr.sdl.SchMakeMessage(&msg, prdMgr.ptnMe, prdMgr.ptnDhtMgr, sch.EvDhtMgrGetProviderRsp, &rsp)
@@ -714,7 +711,7 @@ func (prdMgr *PrdMgr)localGetProviderRsp(key []byte, prds []*config.Node, eno Dh
 //
 // cache a provider
 //
-func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
+func (prdMgr *PrdMgr) cache(k *DsKey, prd *config.Node) DhtErrno {
 
 	if prdSet := prdMgr.prdFromCache(k); prdSet != nil {
 
@@ -744,10 +741,9 @@ func (prdMgr *PrdMgr)cache(k *DsKey, prd *config.Node) DhtErrno {
 //
 // add new provider to set
 //
-func (prdSet *PrdSet)append(key DsKey, peerId *config.Node, addTime time.Time) {
+func (prdSet *PrdSet) append(key DsKey, peerId *config.Node, addTime time.Time) {
 	if _, exist := prdSet.addTime[key]; !exist {
 		prdSet.set[key] = *peerId
 	}
 	prdSet.addTime[key] = addTime
 }
-

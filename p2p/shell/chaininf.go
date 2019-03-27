@@ -18,34 +18,34 @@
  *
  */
 
-
 package shell
 
 import (
 	"fmt"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	peer	"github.com/yeeco/gyee/p2p/peer"
+
+	peer "github.com/yeeco/gyee/p2p/peer"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
 //
 // errno about this interface
 //
-type P2pErrno	int
+type P2pErrno int
 
 const (
-	P2pEnoNone		P2pErrno = 0	// none of errors
-	P2pEnoParameter	P2pErrno = 1	// invalid parameters
-	P2pEnoScheduler	P2pErrno = 2	// shceduler
-	P2pEnoNotImpl	P2pErrno = 3	// not implemented
-	P2pEnoInternal	P2pErrno = 4	// internal
-	P2pEnoUnknown	P2pErrno = 5	// unknown
-	P2pEnoMax		P2pErrno = 6	// max, for bound checking
+	P2pEnoNone      P2pErrno = 0 // none of errors
+	P2pEnoParameter P2pErrno = 1 // invalid parameters
+	P2pEnoScheduler P2pErrno = 2 // shceduler
+	P2pEnoNotImpl   P2pErrno = 3 // not implemented
+	P2pEnoInternal  P2pErrno = 4 // internal
+	P2pEnoUnknown   P2pErrno = 5 // unknown
+	P2pEnoMax       P2pErrno = 6 // max, for bound checking
 )
 
 //
 // Description about user interface errno
 //
-var P2pErrnoDescription = []string {
+var P2pErrnoDescription = []string{
 	"none of errors",
 	"invalid parameters",
 	"shceduler",
@@ -76,13 +76,13 @@ func (eno P2pErrno) Error() string {
 // Register user callback function to p2p
 //
 const (
-	P2pIndCb = peer.P2pIndCb	// callback type for indication
-	P2pPkgCb = peer.P2pPkgCb	// callback type for incoming packages
+	P2pIndCb = peer.P2pIndCb // callback type for indication
+	P2pPkgCb = peer.P2pPkgCb // callback type for incoming packages
 )
 
 const (
-	P2pIndPeerActivated	= peer.P2pIndPeerActivated	// indication for a peer activated to work
-	P2pIndPeerClosed	= peer.P2pIndPeerClosed		// indication for peer connection closed
+	P2pIndPeerActivated = peer.P2pIndPeerActivated // indication for a peer activated to work
+	P2pIndPeerClosed    = peer.P2pIndPeerClosed    // indication for peer connection closed
 )
 
 func P2pRegisterCallback(what int, cb interface{}, userData interface{}, target interface{}) P2pErrno {

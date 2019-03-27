@@ -22,24 +22,24 @@ package dht
 
 import (
 	"time"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
 
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+)
 
 //
 // debug
 //
 type dsmemLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var dsmemLog = dsmemLogger  {
-	debug__:	false,
+var dsmemLog = dsmemLogger{
+	debug__: false,
 }
 
-func (log dsmemLogger)Debug(fmt string, args ... interface{}) {
+func (log dsmemLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -47,7 +47,7 @@ func (log dsmemLogger)Debug(fmt string, args ... interface{}) {
 // Data store based on "map" in memory, for test only
 //
 type MapDatastore struct {
-	ds map[DsKey]DsValue		// (key, value) map
+	ds map[DsKey]DsValue // (key, value) map
 }
 
 //
@@ -62,7 +62,7 @@ func NewMapDatastore() *MapDatastore {
 //
 // Put
 //
-func (mds *MapDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+func (mds *MapDatastore) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	dsKey := DsKey{}
 	copy(dsKey[0:], k)
 	mds.ds[dsKey] = v
@@ -72,7 +72,7 @@ func (mds *MapDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 //
 // Get
 //
-func (mds *MapDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
+func (mds *MapDatastore) Get(k []byte) (eno DhtErrno, value DsValue) {
 	dsKey := DsKey{}
 	copy(dsKey[0:], k)
 	v, ok := mds.ds[dsKey]
@@ -85,7 +85,7 @@ func (mds *MapDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
 //
 // Delete
 //
-func (mds *MapDatastore)Delete(k []byte) DhtErrno {
+func (mds *MapDatastore) Delete(k []byte) DhtErrno {
 	dsKey := DsKey{}
 	copy(dsKey[0:], k)
 	delete(mds.ds, dsKey)
@@ -95,7 +95,7 @@ func (mds *MapDatastore)Delete(k []byte) DhtErrno {
 //
 // Clsoe
 //
-func (mds *MapDatastore)Close() DhtErrno {
+func (mds *MapDatastore) Close() DhtErrno {
 	mds.ds = nil
 	return DhtEnoNone
 }

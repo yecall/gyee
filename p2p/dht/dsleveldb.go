@@ -22,25 +22,25 @@ package dht
 
 import (
 	"time"
-	"github.com/yeeco/gyee/persistent"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
 
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	"github.com/yeeco/gyee/persistent"
+)
 
 //
 // debug
 //
 type dsdbLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var dsdbLog = dsdbLogger  {
-	debug__:	false,
+var dsdbLog = dsdbLogger{
+	debug__: false,
 }
 
-func (log dsdbLogger)Debug(fmt string, args ... interface{}) {
+func (log dsdbLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -49,32 +49,32 @@ func (log dsdbLogger)Debug(fmt string, args ... interface{}) {
 //
 
 type LeveldbDatastoreConfig struct {
-	Path					string
-	OpenFilesCacheCapacity	int
-	BlockCacheCapacity		int
-	BlockSize				int
-	FilterBits				int
+	Path                   string
+	OpenFilesCacheCapacity int
+	BlockCacheCapacity     int
+	BlockSize              int
+	FilterBits             int
 }
 
 type LeveldbDatastore struct {
-	ldsCfg		*LeveldbDatastoreConfig
-	ls			*persistent.LevelStorage
+	ldsCfg *LeveldbDatastoreConfig
+	ls     *persistent.LevelStorage
 }
 
 func NewLeveldbDatastore(cfg *LeveldbDatastoreConfig) *LeveldbDatastore {
-	ds := LeveldbDatastore {
-		ldsCfg:	cfg,
+	ds := LeveldbDatastore{
+		ldsCfg: cfg,
 	}
 	ls, err := persistent.NewLevelStorage(cfg.Path)
 	if err != nil {
 		dsdbLog.Debug("NewLeveldbDatastore: failed, error: %s", err.Error())
-		return  nil
+		return nil
 	}
 	ds.ls = ls
 	return &ds
 }
 
-func (lds *LeveldbDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+func (lds *LeveldbDatastore) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	if err := lds.ls.Put(k[0:], v.([]byte)); err != nil {
 		dsdbLog.Debug("Put: failed, error: %s", err.Error())
 		return DhtEnoDatastore
@@ -82,7 +82,7 @@ func (lds *LeveldbDatastore)Put(k []byte, v DsValue, kt time.Duration) DhtErrno 
 	return DhtEnoNone
 }
 
-func (lds *LeveldbDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
+func (lds *LeveldbDatastore) Get(k []byte) (eno DhtErrno, value DsValue) {
 	err := error(nil)
 	value, err = lds.ls.Get(k[0:])
 	if err != nil {
@@ -95,7 +95,7 @@ func (lds *LeveldbDatastore)Get(k []byte) (eno DhtErrno, value DsValue) {
 	return
 }
 
-func (lds *LeveldbDatastore)Delete(k []byte) DhtErrno {
+func (lds *LeveldbDatastore) Delete(k []byte) DhtErrno {
 	if err := lds.ls.Del(k[0:]); err != nil {
 		dsdbLog.Debug("Delete: failed, error: %s", err.Error())
 		return DhtEnoDatastore
@@ -103,7 +103,7 @@ func (lds *LeveldbDatastore)Delete(k []byte) DhtErrno {
 	return DhtEnoNone
 }
 
-func (lds *LeveldbDatastore)Close() DhtErrno {
+func (lds *LeveldbDatastore) Close() DhtErrno {
 	if err := lds.ls.Close(); err != nil {
 		dsdbLog.Debug("Close: failed, error: %s", err.Error())
 		return DhtEnoDatastore

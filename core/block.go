@@ -155,10 +155,8 @@ func (b *Block) getBody() *corepb.BlockBody {
 	return b.body
 }
 
-/*
-Update contents of header to match with block body.
-State Trie should be already operated to match with txs.
- */
+// Update contents of header to match with block body.
+// State Trie should be already operated to match with txs.
 func (b *Block) updateHeader() error {
 	if b.header == nil {
 		log.Crit("must have header with essential data when sealing", "block", b)
@@ -263,9 +261,7 @@ func (b *Block) ValidatorAddr() []common.Address {
 	return validators
 }
 
-/*
-Verify block body match with hash in header
- */
+// Verify block body match with hash in header
 func (b *Block) VerifyBody() error {
 	txHash := DeriveHash(b.transactions)
 	if txHash != b.header.TxsRoot {

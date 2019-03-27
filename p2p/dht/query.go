@@ -21,34 +21,34 @@
 package dht
 
 import (
+	"bytes"
+	"container/list"
 	"fmt"
 	"net"
-	"time"
-	"bytes"
 	"strings"
-	"container/list"
-	sch		"github.com/yeeco/gyee/p2p/scheduler"
-	config	"github.com/yeeco/gyee/p2p/config"
-	nat		"github.com/yeeco/gyee/p2p/nat"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
 	"sync"
-)
+	"time"
 
+	config "github.com/yeeco/gyee/p2p/config"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+	nat "github.com/yeeco/gyee/p2p/nat"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
+)
 
 //
 // debug
 //
 type qryMgrLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var qryLog = qryMgrLogger  {
-	debug__:	false,
+var qryLog = qryMgrLogger{
+	debug__: false,
 }
 
-func (log qryMgrLogger)Debug(fmt string, args ... interface{}) {
+func (log qryMgrLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -56,14 +56,14 @@ func (log qryMgrLogger)Debug(fmt string, args ... interface{}) {
 // Constants
 //
 const (
-	QryMgrName = sch.DhtQryMgrName			// query manage name registered in shceduler
-	qryMgrMaxPendings = 64					// max pendings can be held in the list
-	qryMgrMaxActInsts = 8					// max concurrent actived instances for one query
-	qryMgrQryExpired = time.Second * 60		// duration to get expired for a query
-	qryMgrQryMaxWidth = 64					// not the true "width", the max number of peers queryied
-	qryMgrQryMaxDepth = 8					// the max depth for a query
-	qryInstExpired = time.Second * 16		// duration to get expired for a query instance
-	natMapKeepTime = nat.MinKeepDuration	// NAT map keep time
+	QryMgrName        = sch.DhtQryMgrName                         // query manage name registered in shceduler
+	qryMgrMaxPendings = 64                                        // max pendings can be held in the list
+	qryMgrMaxActInsts = 8                                         // max concurrent actived instances for one query
+	qryMgrQryExpired  = time.Second * 60                          // duration to get expired for a query
+	qryMgrQryMaxWidth = 64                                        // not the true "width", the max number of peers queryied
+	qryMgrQryMaxDepth = 8                                         // the max depth for a query
+	qryInstExpired    = time.Second * 16                          // duration to get expired for a query instance
+	natMapKeepTime    = nat.MinKeepDuration                       // NAT map keep time
 	natMapRefreshTime = nat.MinKeepDuration - nat.MinRefreshDelta // NAT map refresh time
 )
 
@@ -71,11 +71,11 @@ const (
 // Query manager configuration
 //
 type qryMgrCfg struct {
-	local			*config.Node		// pointer to local node specification
-	maxPendings		int					// max pendings can be held in the list
-	maxActInsts		int					// max concurrent actived instances for one query
-	qryExpired		time.Duration		// duration to get expired for a query
-	qryInstExpired	time.Duration		// duration to get expired for a query instance
+	local          *config.Node  // pointer to local node specification
+	maxPendings    int           // max pendings can be held in the list
+	maxActInsts    int           // max concurrent actived instances for one query
+	qryExpired     time.Duration // duration to get expired for a query
+	qryInstExpired time.Duration // duration to get expired for a query instance
 }
 
 //
@@ -84,104 +84,104 @@ type qryMgrCfg struct {
 type QryStatus = int
 
 const (
-	qsNull		= iota		// null state
-	qsPreparing				// in preparing, waiting for the nearest response from route manager
-	qsInited				// had been initialized
+	qsNull      = iota // null state
+	qsPreparing        // in preparing, waiting for the nearest response from route manager
+	qsInited           // had been initialized
 )
 
 //
 // Query result node info
 //
 type qryResultInfo struct {
-	node	config.Node				// peer node info
-	pcs		conMgrPeerConnStat		// connection status
-	dist	int						// distance from local node
+	node config.Node        // peer node info
+	pcs  conMgrPeerConnStat // connection status
+	dist int                // distance from local node
 }
 
 //
 // Query pending node info
 //
 type qryPendingInfo struct {
-	rutMgrBucketNode				// bucket node
-	depth		int					// depth
+	rutMgrBucketNode     // bucket node
+	depth            int // depth
 }
 
 //
 // Query control block
 //
 type qryCtrlBlock struct {
-	ptnOwner	interface{}								// owner task node pointer
-	qryReq		*sch.MsgDhtQryMgrQueryStartReq			// original query request message
-	seq			int										// sequence number
-	forWhat		int										// what's the query control block for
-	target		config.DsKey							// target for looking up
-	status		QryStatus								// query status
-	qryHistory	map[config.NodeID]*qryPendingInfo		// history peers had been queried
-	qryPending	*list.List								// pending peers to be queried, with type qryPendingInfo
-	qryActived	map[config.NodeID]*qryInstCtrlBlock		// queries activated
-	qryResult	*list.List								// list of qryResultNodeInfo type object
-	qryTid		int										// query timer identity
-	icbSeq		int										// query instance control block sequence number
-	rutNtfFlag	bool									// if notification asked for
-	width		int										// the current number of peer had been queried
-	depth		int										// the current max depth of query
+	ptnOwner   interface{}                         // owner task node pointer
+	qryReq     *sch.MsgDhtQryMgrQueryStartReq      // original query request message
+	seq        int                                 // sequence number
+	forWhat    int                                 // what's the query control block for
+	target     config.DsKey                        // target for looking up
+	status     QryStatus                           // query status
+	qryHistory map[config.NodeID]*qryPendingInfo   // history peers had been queried
+	qryPending *list.List                          // pending peers to be queried, with type qryPendingInfo
+	qryActived map[config.NodeID]*qryInstCtrlBlock // queries activated
+	qryResult  *list.List                          // list of qryResultNodeInfo type object
+	qryTid     int                                 // query timer identity
+	icbSeq     int                                 // query instance control block sequence number
+	rutNtfFlag bool                                // if notification asked for
+	width      int                                 // the current number of peer had been queried
+	depth      int                                 // the current max depth of query
 }
 
 //
 // Query instance status
 //
 const (
-	qisNull		= iota				// null state
-	qisInited						// had been inited to ready to start
-	qisWaitConnect					// connect request sent, wait response from connection manager task
-	qisWaitResponse					// query sent, wait response from peer
-	qisDone							// done with exception
-	qisDoneOk						// done normally
+	qisNull         = iota // null state
+	qisInited              // had been inited to ready to start
+	qisWaitConnect         // connect request sent, wait response from connection manager task
+	qisWaitResponse        // query sent, wait response from peer
+	qisDone                // done with exception
+	qisDoneOk              // done normally
 )
 
 //
 // Query instance control block
 //
 type qryInstCtrlBlock struct {
-	sdl				*sch.Scheduler					// pointer to scheduler
-	seq				int								// sequence number
-	qryReq			*sch.MsgDhtQryMgrQueryStartReq	// original query request message
-	name			string							// instance name
-	ptnInst			interface{}						// pointer to query instance task node
-	ptnConMgr		interface{}						// pointer to connection manager task node
-	ptnQryMgr		interface{}						// pointer to query manager task node
-	ptnRutMgr		interface{}						// pointer to rute manager task node
-	status			int								// instance status
-	local			*config.Node					// pointer to local node specification
-	target			config.DsKey					// target is looking up
-	to				config.Node						// to whom the query message sent
-	dir				int								// connection direction
-	qTid			int								// query timer identity
-	begTime			time.Time						// query begin time
-	endTime			time.Time						// query end time
-	conBegTime		time.Time						// time to start connection
-	conEndTime		time.Time						// time connection established
-	depth			int								// the current depth of the query instance
+	sdl        *sch.Scheduler                 // pointer to scheduler
+	seq        int                            // sequence number
+	qryReq     *sch.MsgDhtQryMgrQueryStartReq // original query request message
+	name       string                         // instance name
+	ptnInst    interface{}                    // pointer to query instance task node
+	ptnConMgr  interface{}                    // pointer to connection manager task node
+	ptnQryMgr  interface{}                    // pointer to query manager task node
+	ptnRutMgr  interface{}                    // pointer to rute manager task node
+	status     int                            // instance status
+	local      *config.Node                   // pointer to local node specification
+	target     config.DsKey                   // target is looking up
+	to         config.Node                    // to whom the query message sent
+	dir        int                            // connection direction
+	qTid       int                            // query timer identity
+	begTime    time.Time                      // query begin time
+	endTime    time.Time                      // query end time
+	conBegTime time.Time                      // time to start connection
+	conEndTime time.Time                      // time connection established
+	depth      int                            // the current depth of the query instance
 }
 
 //
 // Query manager
 //
 type QryMgr struct {
-	sdl				*sch.Scheduler					// pointer to scheduler
-	name			string							// query manager name
-	tep				sch.SchUserTaskEp				// task entry
-	ptnMe			interface{}						// pointer to task node of myself
-	ptnRutMgr		interface{}						// pointer to task node of route manager
-	ptnDhtMgr		interface{}						// pointer to task node of dht manager
-	ptnNatMgr		interface{}						// pointer to task naode of nat manager
-	instSeq			int								// query instance sequence number
-	qcbTab			map[config.DsKey]*qryCtrlBlock	// query control blocks
-	qmCfg			qryMgrCfg						// query manager configuration
-	qcbSeq			int								// query control block sequence number
-	natTcpResult	bool							// result about nap mapping for tcp
-	pubTcpIp		net.IP							// should be same as pubUdpIp
-	pubTcpPort		int								// public port form nat to be announced for tcp
+	sdl          *sch.Scheduler                 // pointer to scheduler
+	name         string                         // query manager name
+	tep          sch.SchUserTaskEp              // task entry
+	ptnMe        interface{}                    // pointer to task node of myself
+	ptnRutMgr    interface{}                    // pointer to task node of route manager
+	ptnDhtMgr    interface{}                    // pointer to task node of dht manager
+	ptnNatMgr    interface{}                    // pointer to task naode of nat manager
+	instSeq      int                            // query instance sequence number
+	qcbTab       map[config.DsKey]*qryCtrlBlock // query control blocks
+	qmCfg        qryMgrCfg                      // query manager configuration
+	qcbSeq       int                            // query control block sequence number
+	natTcpResult bool                           // result about nap mapping for tcp
+	pubTcpIp     net.IP                         // should be same as pubUdpIp
+	pubTcpPort   int                            // public port form nat to be announced for tcp
 }
 
 //
@@ -189,21 +189,21 @@ type QryMgr struct {
 //
 func NewQryMgr() *QryMgr {
 
-	qmCfg := qryMgrCfg {
-		maxPendings:	qryMgrMaxPendings,
-		maxActInsts:	qryMgrMaxActInsts,
-		qryExpired:		qryMgrQryExpired,
-		qryInstExpired:	qryInstExpired,
+	qmCfg := qryMgrCfg{
+		maxPendings:    qryMgrMaxPendings,
+		maxActInsts:    qryMgrMaxActInsts,
+		qryExpired:     qryMgrQryExpired,
+		qryInstExpired: qryInstExpired,
 	}
 
 	qryMgr := QryMgr{
-		name:		QryMgrName,
-		instSeq:	0,
-		qcbTab:		map[config.DsKey]*qryCtrlBlock{},
-		qmCfg:		qmCfg,
-		qcbSeq:		0,
-		pubTcpIp:	net.IPv4zero,
-		pubTcpPort:	0,
+		name:       QryMgrName,
+		instSeq:    0,
+		qcbTab:     map[config.DsKey]*qryCtrlBlock{},
+		qmCfg:      qmCfg,
+		qcbSeq:     0,
+		pubTcpIp:   net.IPv4zero,
+		pubTcpPort: 0,
 	}
 
 	qryMgr.tep = qryMgr.qryMgrProc
@@ -214,14 +214,14 @@ func NewQryMgr() *QryMgr {
 //
 // Entry point exported to shceduler
 //
-func (qryMgr *QryMgr)TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (qryMgr *QryMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	return qryMgr.tep(ptn, msg)
 }
 
 //
 // Query manager entry
 //
-func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
+func (qryMgr *QryMgr) qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	qryLog.Debug("qryMgrProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
@@ -278,25 +278,22 @@ func (qryMgr *QryMgr)qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErr
 //
 // Poweron handler
 //
-func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
+func (qryMgr *QryMgr) poweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	qryMgr.ptnMe = ptn
 	if qryMgr.sdl = sch.SchGetScheduler(ptn); qryMgr.sdl == nil {
 		qryLog.Debug("poweron: nil scheduler")
 		return sch.SchEnoInternal
 	}
-	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetUserTaskNode(DhtMgrName);
-	eno != sch.SchEnoNone {
+	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetUserTaskNode(DhtMgrName); eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", DhtMgrName)
 		return eno
 	}
-	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetUserTaskNode(RutMgrName);
-	eno != sch.SchEnoNone {
+	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetUserTaskNode(RutMgrName); eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", RutMgrName)
 		return eno
 	}
-	if eno, qryMgr.ptnNatMgr = qryMgr.sdl.SchGetUserTaskNode(nat.NatMgrName);
-	eno != sch.SchEnoNone {
+	if eno, qryMgr.ptnNatMgr = qryMgr.sdl.SchGetUserTaskNode(nat.NatMgrName); eno != sch.SchEnoNone {
 		qryLog.Debug("poweron: get task failed, task: %s", nat.NatMgrName)
 		return eno
 	}
@@ -310,7 +307,7 @@ func (qryMgr *QryMgr)poweron(ptn interface{}) sch.SchErrno {
 //
 // Poweroff handler
 //
-func (qryMgr *QryMgr)poweroff(ptn interface{}) sch.SchErrno {
+func (qryMgr *QryMgr) poweroff(ptn interface{}) sch.SchErrno {
 	qryLog.Debug("poweroff: task will be done ...")
 	po := sch.SchMessage{}
 	for _, qcb := range qryMgr.qcbTab {
@@ -325,7 +322,7 @@ func (qryMgr *QryMgr)poweroff(ptn interface{}) sch.SchErrno {
 //
 // Query start request handler
 //
-func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
+func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
 	if sender == nil || msg == nil {
 		qryLog.Debug("queryStartReq: invalid prameters")
 		return sch.SchEnoParameter
@@ -343,7 +340,7 @@ func (qryMgr *QryMgr)queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 		msg.ForWhat, qryMgr.sdl.SchGetTaskName(sender))
 
 	var forWhat = msg.ForWhat
-	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno:DhtEnoUnknown.GetEno()}
+	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno: DhtEnoUnknown.GetEno()}
 	var qcb *qryCtrlBlock = nil
 	var schMsg = sch.SchMessage{}
 
@@ -404,7 +401,7 @@ _rsp2Sender:
 //
 // Nearest response handler
 //
-func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
+func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno {
 	if msg == nil {
 		qryLog.Debug("rutNearestRsp: invalid parameter")
 		return sch.SchEnoParameter
@@ -440,11 +437,11 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 		return sch.SchEnoMismatched
 	}
 
-	qryFailed2Sender := func (eno DhtErrno) {
+	qryFailed2Sender := func(eno DhtErrno) {
 		schMsg := sch.SchMessage{}
 		rsp := sch.MsgDhtQryMgrQueryStartRsp{
-			Target:	msg.Target,
-			Eno:	int(eno),
+			Target: msg.Target,
+			Eno:    int(eno),
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryStartRsp, &rsp)
 		qryMgr.sdl.SchSendMessage(&schMsg)
@@ -453,10 +450,10 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	qryOk2Sender := func(peer *config.Node) {
 		schMsg := sch.SchMessage{}
 		ind := sch.MsgDhtQryMgrQueryResultInd{
-			Eno:		DhtEnoNone.GetEno(),
-			ForWhat:	msg.ForWhat,
-			Target:		target,
-			Peers:		[]*config.Node{peer},
+			Eno:     DhtEnoNone.GetEno(),
+			ForWhat: msg.ForWhat,
+			Target:  target,
+			Peers:   []*config.Node{peer},
 		}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 		qryMgr.sdl.SchSendMessage(&schMsg)
@@ -510,10 +507,10 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 			}
 		}
 
-		qri := qryResultInfo {
-			node:	peer.node,
-			pcs:	pcs[idx],
-			dist:	dists[idx],
+		qri := qryResultInfo{
+			node: peer.node,
+			pcs:  pcs[idx],
+			dist: dists[idx],
 		}
 		qcb.qcbUpdateResult(&qri)
 	}
@@ -527,8 +524,8 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 	pendInfo := make([]*qryPendingInfo, 0)
 	for idx := 0; idx < len(peers); idx++ {
 		pi := qryPendingInfo{
-			rutMgrBucketNode:*peers[idx],
-			depth: 0,
+			rutMgrBucketNode: *peers[idx],
+			depth:            0,
 		}
 		pendInfo = append(pendInfo, &pi)
 	}
@@ -552,10 +549,10 @@ func (qryMgr *QryMgr)rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrno
 //
 // Query stop request handler
 //
-func (qryMgr *QryMgr)queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
+func (qryMgr *QryMgr) queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStopReq) sch.SchErrno {
 	target := msg.Target
-	rsp := sch.MsgDhtQryMgrQueryStopRsp{Target:target, Eno:DhtEnoNone.GetEno()}
-	rsp2Sender := func (rsp *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
+	rsp := sch.MsgDhtQryMgrQueryStopRsp{Target: target, Eno: DhtEnoNone.GetEno()}
+	rsp2Sender := func(rsp *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
 		var schMsg = sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStopRsp, rsp)
 		return qryMgr.sdl.SchSendMessage(&schMsg)
@@ -567,7 +564,7 @@ func (qryMgr *QryMgr)queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQuery
 //
 //Route notification handler
 //
-func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sch.SchErrno {
+func (qryMgr *QryMgr) rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sch.SchErrno {
 	qcb := (*qryCtrlBlock)(nil)
 	target := msg.Target
 	if qcb = qryMgr.qcbTab[target]; qcb == nil {
@@ -584,8 +581,8 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 	pendInfo := make([]*qryPendingInfo, 0)
 	for idx := 0; idx < len(qpi); idx++ {
 		var pi = qryPendingInfo{
-			rutMgrBucketNode:*qpi[idx],
-			depth: 0,
+			rutMgrBucketNode: *qpi[idx],
+			depth:            0,
 		}
 		pendInfo = append(pendInfo, &pi)
 	}
@@ -598,7 +595,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 		return sch.SchEnoUserTask
 	}
 
-	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0 {
 		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 			qryLog.Debug("rutNotificationInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
@@ -615,7 +612,7 @@ func (qryMgr *QryMgr)rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) sc
 //
 // Instance status indication handler
 //
-func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno {
+func (qryMgr *QryMgr) instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno {
 	switch msg.Status {
 	case qisNull:
 		qryLog.Debug("instStatusInd: qisNull")
@@ -651,10 +648,9 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 		// result and end the query.
 		qryLog.Debug("instStatusInd: pending: %d, actived: %d", qcb.qryPending.Len(), len(qcb.qryActived))
 
-		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0 {
 			qryLog.Debug("instStatusInd: query done: %x", qcb.target)
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil);
-			dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 				qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 				return sch.SchEnoUserTask
 			}
@@ -675,7 +671,7 @@ func (qryMgr *QryMgr)instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno
 //
 // Instance query result indication handler
 //
-func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
+func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
 	if msg == nil {
 		qryLog.Debug("instResultInd: invalid parameter")
 		return sch.SchEnoParameter
@@ -693,11 +689,11 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	qryLog.Debug("instResultInd: ForWhat: %d", msg.ForWhat)
 	var (
-		qcb *qryCtrlBlock= nil
-		qpiList = make([]*qryPendingInfo, 0)
-		hashList = make([]*Hash, 0)
-		distList = make([]int, 0)
-		rutMgr = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
+		qcb      *qryCtrlBlock = nil
+		qpiList                = make([]*qryPendingInfo, 0)
+		hashList               = make([]*Hash, 0)
+		distList               = make([]int, 0)
+		rutMgr                 = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
 	)
 
 	if len(msg.Peers) != len(msg.Pcs) {
@@ -711,7 +707,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 	for idx, peer := range msg.Peers {
 		if bytes.Compare(peer.ID[0:], qryMgr.qmCfg.local.ID[0:]) == 0 {
-			if idx != len(msg.Peers) - 1 {
+			if idx != len(msg.Peers)-1 {
 				msg.Peers = append(msg.Peers[0:idx], msg.Peers[idx+1:]...)
 				msg.Pcs = append(msg.Pcs[0:idx], msg.Pcs[idx+1:]...)
 			} else {
@@ -763,10 +759,10 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		dist := rutMgr.rutMgrLog2Dist(nil, hash)
 		distList = append(distList, dist)
 
-		qri := qryResultInfo {
-			node:	*peer,
-			pcs:	conMgrPeerConnStat(msg.Pcs[idx]),
-			dist:	distList[idx],
+		qri := qryResultInfo{
+			node: *peer,
+			pcs:  conMgrPeerConnStat(msg.Pcs[idx]),
+			dist: distList[idx],
 		}
 
 		qcb.qcbUpdateResult(&qri)
@@ -832,7 +828,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 
 		for idx, peer := range msg.Peers {
 			qpi := qryPendingInfo{
-					rutMgrBucketNode: rutMgrBucketNode{
+				rutMgrBucketNode: rutMgrBucketNode{
 					node: *peer,
 					hash: *hashList[idx],
 					dist: distList[idx],
@@ -851,17 +847,15 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
-	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0{
+	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0 {
 		if msg.ForWhat == sch.EvDhtConInstNeighbors ||
 			msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
 			msg.ForWhat == sch.EvDhtConInstGetValRsp {
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil);
-			dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 				qryLog.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			}
 		} else {
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil);
-			dhtEno != DhtEnoNone {
+			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
 				qryLog.Debug("instResultInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			}
 		}
@@ -878,7 +872,7 @@ func (qryMgr *QryMgr)instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno
 //
 // nat ready to work
 //
-func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
+func (qryMgr *QryMgr) natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 	qryLog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
@@ -904,7 +898,7 @@ func (qryMgr *QryMgr)natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 //
 // nat make mapping response
 //
-func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
+func (qryMgr *QryMgr) natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatMakeMapRsp for more please.
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
@@ -941,7 +935,7 @@ func (qryMgr *QryMgr)natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 //
 // public address changed indication
 //
-func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
+func (qryMgr *QryMgr) natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatPubAddrUpdateInd for more please. to query manager,
 	// when status from nat is bad, nothing to do but just backup the status.
 	_, ptrConMgr := qryMgr.sdl.SchGetUserTaskNode(ConMgrName)
@@ -979,7 +973,7 @@ func (qryMgr *QryMgr)natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 //
 // Get query manager configuration
 //
-func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
+func (qryMgr *QryMgr) qryMgrGetConfig() DhtErrno {
 	cfg := config.P2pConfig4DhtQryManager(qryMgr.sdl.SchGetP2pCfgName())
 	qmCfg := &qryMgr.qmCfg
 	qmCfg.local = cfg.Local
@@ -993,19 +987,19 @@ func (qryMgr *QryMgr)qryMgrGetConfig() DhtErrno {
 // Delete query control blcok from manager
 //
 const (
-	delQcb4TargetFound	= iota		// target had been found
-	delQcb4NoMoreQueries			// no pendings and no actived instances
-	delQcb4Timeout					// query manager time out for the control block
-	delQcb4Command					// required by other module
-	delQcb4NoSeeds					// no seeds for query
-	delQcb4TargetInLocal			// target found in local
-	delQcb4QryInstDoneInd			// query instance done is indicated
-	delQcb4QryInstResultInd			// query instance result indicated
-	delQcb4InteralErrors			// internal errors while tring to query
-	delQcb4PubAddrSwitch			// public address switching
+	delQcb4TargetFound      = iota // target had been found
+	delQcb4NoMoreQueries           // no pendings and no actived instances
+	delQcb4Timeout                 // query manager time out for the control block
+	delQcb4Command                 // required by other module
+	delQcb4NoSeeds                 // no seeds for query
+	delQcb4TargetInLocal           // target found in local
+	delQcb4QryInstDoneInd          // query instance done is indicated
+	delQcb4QryInstResultInd        // query instance result indicated
+	delQcb4InteralErrors           // internal errors while tring to query
+	delQcb4PubAddrSwitch           // public address switching
 )
 
-func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
+func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	var strDebug = ""
 	switch why {
 	case delQcb4TargetFound:
@@ -1057,9 +1051,9 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 
 	if qcb.rutNtfFlag == true {
 		msg := new(sch.SchMessage)
-		req := sch.MsgDhtRutMgrStopNofiyReq {
-			Task:	qryMgr.ptnMe,
-			Target:	qcb.target,
+		req := sch.MsgDhtRutMgrStopNofiyReq{
+			Task:   qryMgr.ptnMe,
+			Target: qcb.target,
 		}
 		qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
 		qryMgr.sdl.SchSendMessage(msg)
@@ -1072,7 +1066,7 @@ func (qryMgr *QryMgr)qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 //
 // Delete query instance control block
 //
-func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.NodeID) DhtErrno {
+func (qryMgr *QryMgr) qryMgrDelIcb(why int, target *config.DsKey, peer *config.NodeID) DhtErrno {
 
 	qryLog.Debug("qryMgrDelIcb: why: %d", why)
 
@@ -1110,7 +1104,7 @@ func (qryMgr *QryMgr)qryMgrDelIcb(why int, target *config.DsKey, peer *config.No
 //
 // Update query result of query control block
 //
-func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
+func (qcb *qryCtrlBlock) qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 	li := qcb.qryResult
 	for el := li.Front(); el != nil; el = el.Next() {
 		v := el.Value.(*qryResultInfo)
@@ -1126,13 +1120,13 @@ func (qcb *qryCtrlBlock)qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 //
 // Put node to pending queue
 //
-func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) DhtErrno {
+func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) DhtErrno {
 	if len(nodes) == 0 || size <= 0 {
 		qryLog.Debug("qryMgrQcbPutPending: no pendings to be put")
 		return DhtEnoParameter
 	}
 
-	qryLog.Debug("qryMgrQcbPutPending: " +
+	qryLog.Debug("qryMgrQcbPutPending: "+
 		"number of nodes to be put: %d, size: %d", len(nodes), size)
 
 	li := qcb.qryPending
@@ -1170,7 +1164,7 @@ func (qcb *qryCtrlBlock)qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) D
 //
 // Put node to actived queue and start query to the node
 //
-func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
+func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 
 	if qcb.qryPending == nil || qcb.qryPending.Len() == 0 {
 		qryLog.Debug("qryMgrQcbPutActived: no pending")
@@ -1201,26 +1195,26 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 
 		qryLog.Debug("qryMgrQcbPutActived: pending to be activated: %+v", *pending)
 
-		icb := qryInstCtrlBlock {
-			sdl:		qryMgr.sdl,
-			seq:		qcb.icbSeq,
-			qryReq:		qcb.qryReq,
-			name:		"qryMgrIcb" + fmt.Sprintf("_q%d_i%d", qcb.seq, qcb.icbSeq),
-			ptnInst:	nil,
-			ptnConMgr:	nil,
-			ptnRutMgr:	nil,
-			ptnQryMgr:	nil,
-			local:		qryMgr.qmCfg.local,
-			status:		qisNull,
-			target:		qcb.target,
-			to:			pending.node,
-			dir:		ConInstDirUnknown,
-			qTid:		sch.SchInvalidTid,
-			begTime:	time.Time{},
-			endTime:	time.Time{},
-			conBegTime:	time.Time{},
-			conEndTime:	time.Time{},
-			depth:		pending.depth,
+		icb := qryInstCtrlBlock{
+			sdl:        qryMgr.sdl,
+			seq:        qcb.icbSeq,
+			qryReq:     qcb.qryReq,
+			name:       "qryMgrIcb" + fmt.Sprintf("_q%d_i%d", qcb.seq, qcb.icbSeq),
+			ptnInst:    nil,
+			ptnConMgr:  nil,
+			ptnRutMgr:  nil,
+			ptnQryMgr:  nil,
+			local:      qryMgr.qmCfg.local,
+			status:     qisNull,
+			target:     qcb.target,
+			to:         pending.node,
+			dir:        ConInstDirUnknown,
+			qTid:       sch.SchInvalidTid,
+			begTime:    time.Time{},
+			endTime:    time.Time{},
+			conBegTime: time.Time{},
+			conEndTime: time.Time{},
+			depth:      pending.depth,
 		}
 
 		qryLog.Debug("qryMgrQcbPutActived: ForWhat: %d", icb.qryReq.ForWhat)
@@ -1228,13 +1222,13 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qryInst := NewQryInst()
 		qryInst.icb = &icb
 		td := sch.SchTaskDescription{
-			Name:		icb.name,
-			MbSize:		sch.SchMaxMbSize,
-			Ep:			qryInst,
-			Wd:			&sch.SchWatchDog{HaveDog:false,},
-			Flag:		sch.SchCreatedGo,
-			DieCb:		nil,
-			UserDa:		&icb,
+			Name:   icb.name,
+			MbSize: sch.SchMaxMbSize,
+			Ep:     qryInst,
+			Wd:     &sch.SchWatchDog{HaveDog: false},
+			Flag:   sch.SchCreatedGo,
+			DieCb:  nil,
+			UserDa: &icb,
 		}
 
 		qcb.qryActived[icb.to.ID] = &icb
@@ -1244,7 +1238,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		eno, ptn := qryMgr.sdl.SchCreateTask(&td)
 		if eno != sch.SchEnoNone || ptn == nil {
 
-			qryLog.Debug("qryMgrQcbPutActived: " +
+			qryLog.Debug("qryMgrQcbPutActived: "+
 				"SchCreateTask failed, eno: %d, ptn: %p", eno, ptn)
 
 			dhtEno = DhtEnoScheduler
@@ -1268,7 +1262,7 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qcb.qryPending.Remove(el)
 	}
 
-	qryLog.Debug("qryMgrQcbPutActived: " +
+	qryLog.Debug("qryMgrQcbPutActived: "+
 		"pending: %d, actived: %d, history: %d",
 		qcb.qryPending.Len(), len(qcb.qryActived), len(qcb.qryHistory))
 
@@ -1278,18 +1272,17 @@ func (qryMgr *QryMgr)qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 //
 // Start timer for query control block
 //
-func (qryMgr *QryMgr)qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
-	td := sch.TimerDescription {
-		Name:	"qryMgrQcbTimer" + fmt.Sprintf("%d", qcb.seq),
-		Utid:	sch.DhtQryMgrQcbTimerId,
-		Tmt:	sch.SchTmTypeAbsolute,
-		Dur:	qryMgr.qmCfg.qryExpired,
-		Extra:	qcb,
+func (qryMgr *QryMgr) qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
+	td := sch.TimerDescription{
+		Name:  "qryMgrQcbTimer" + fmt.Sprintf("%d", qcb.seq),
+		Utid:  sch.DhtQryMgrQcbTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   qryMgr.qmCfg.qryExpired,
+		Extra: qcb,
 	}
 	tid := sch.SchInvalidTid
 	eno := sch.SchEnoUnknown
-	if eno, tid = qryMgr.sdl.SchSetTimer(qryMgr.ptnMe, &td);
-		eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
+	if eno, tid = qryMgr.sdl.SchSetTimer(qryMgr.ptnMe, &td); eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
 		qryLog.Debug("qryMgrQcbStartTimer: SchSetTimer failed, eno: %d", eno)
 		return DhtEnoScheduler
 	}
@@ -1300,7 +1293,7 @@ func (qryMgr *QryMgr)qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
 //
 // Query control block timer handler
 //
-func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
+func (qryMgr *QryMgr) qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
 	qryMgr.qryMgrResultReport(qcb, DhtEnoTimeout.GetEno(), nil, nil, nil)
 	qryMgr.qryMgrDelQcb(delQcb4Timeout, qcb.target)
 	return sch.SchEnoNone
@@ -1309,12 +1302,12 @@ func (qryMgr *QryMgr)qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
 //
 // Query result report
 //
-func (qryMgr *QryMgr)qryMgrResultReport(
-	qcb		*qryCtrlBlock,
-	eno		int,
-	peer	*config.Node,
-	val		[]byte,
-	prd		*sch.Provider) DhtErrno {
+func (qryMgr *QryMgr) qryMgrResultReport(
+	qcb *qryCtrlBlock,
+	eno int,
+	peer *config.Node,
+	val []byte,
+	prd *sch.Provider) DhtErrno {
 
 	//
 	// notice:
@@ -1342,12 +1335,12 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 
 	var msg = sch.SchMessage{}
 	var ind = sch.MsgDhtQryMgrQueryResultInd{
-		Eno:		eno,
-		ForWhat:	qcb.forWhat,
-		Target:		qcb.target,
-		Val:		val,
-		Prds:		nil,
-		Peers:		nil,
+		Eno:     eno,
+		ForWhat: qcb.forWhat,
+		Target:  qcb.target,
+		Val:     val,
+		Prds:    nil,
+		Peers:   nil,
 	}
 
 	if prd != nil {
@@ -1375,7 +1368,7 @@ func (qryMgr *QryMgr)qryMgrResultReport(
 //
 // switch address to that reported from nat manager
 //
-func (qryMgr *QryMgr)switch2NatAddr(proto string) DhtErrno {
+func (qryMgr *QryMgr) switch2NatAddr(proto string) DhtErrno {
 	if proto == nat.NATP_TCP {
 		qryMgr.qmCfg.local.IP = qryMgr.pubTcpIp
 		qryMgr.qmCfg.local.TCP = uint16(qryMgr.pubTcpPort & 0xffff)
@@ -1388,17 +1381,17 @@ func (qryMgr *QryMgr)switch2NatAddr(proto string) DhtErrno {
 //
 // start nat map switching procedure
 //
-func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
+func (qryMgr *QryMgr) natMapSwitch() DhtErrno {
 	qryLog.Debug("natMapSwitch: entered")
 	for k, qcb := range qryMgr.qcbTab {
 		fw := qcb.forWhat
 		ind := sch.MsgDhtQryMgrQueryResultInd{
-			Eno: DhtEnoNatMapping.GetEno(),
+			Eno:     DhtEnoNatMapping.GetEno(),
 			ForWhat: fw,
-			Target: k,
-			Peers: make([]*config.Node, 0),
-			Val: make([]byte, 0),
-			Prds: make([]*config.Node, 0),
+			Target:  k,
+			Peers:   make([]*config.Node, 0),
+			Val:     make([]byte, 0),
+			Prds:    make([]*config.Node, 0),
 		}
 		msg := sch.SchMessage{}
 		if qcb.ptnOwner != nil {
@@ -1429,6 +1422,7 @@ func (qryMgr *QryMgr)natMapSwitch() DhtErrno {
 // get unique sequence number all query
 //
 var qrySeqLock sync.Mutex
+
 func GetQuerySeqNo() int64 {
 	qrySeqLock.Lock()
 	defer qrySeqLock.Unlock()

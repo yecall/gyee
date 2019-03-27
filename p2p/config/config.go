@@ -18,47 +18,46 @@
  *
  */
 
-
 package config
 
 import (
-	"path"
-	"strings"
-	"strconv"
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"math/big"
 	"net"
 	"os"
 	"os/user"
-	"runtime"
-	"fmt"
-	"time"
-	"io"
-	"errors"
-	"bytes"
-	"crypto/rand"
-	"crypto/ecdsa"
-	"crypto/elliptic"
+	"path"
 	"path/filepath"
-	"encoding/hex"
-	"io/ioutil"
-	"math/big"
-	p2plog	"github.com/yeeco/gyee/p2p/logger"
-)
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
 
+	p2plog "github.com/yeeco/gyee/p2p/logger"
+)
 
 //
 // debug
 //
 type cfgLogger struct {
-	debug__		bool
+	debug__ bool
 }
 
-var cfgLog = cfgLogger  {
-	debug__:	true,
+var cfgLog = cfgLogger{
+	debug__: true,
 }
 
-func (log cfgLogger)Debug(fmt string, args ... interface{}) {
+func (log cfgLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
-		p2plog.Debug(fmt, args ...)
+		p2plog.Debug(fmt, args...)
 	}
 }
 
@@ -78,30 +77,31 @@ const (
 	P2pCfgEnoUnknown
 )
 
-func (eno P2pCfgErrno)Error() string {
-	errMsg := map[P2pCfgErrno]string {
-		P2pCfgEnoNone: "none",
-		P2pCfgEnoParameter: "parameters",
-		P2pCfgEnoPublicKye: "public key",
+func (eno P2pCfgErrno) Error() string {
+	errMsg := map[P2pCfgErrno]string{
+		P2pCfgEnoNone:       "none",
+		P2pCfgEnoParameter:  "parameters",
+		P2pCfgEnoPublicKye:  "public key",
 		P2pCfgEnoPrivateKye: "private key",
-		P2pCfgEnoDataDir: "data directory",
-		P2pCfgEnoDatabase: "database",
-		P2pCfgEnoIpAddr: "ip address",
-		P2pCfgEnoNodeId: "node identity",
-		P2pCfgEnoUnknown: "unknown",
+		P2pCfgEnoDataDir:    "data directory",
+		P2pCfgEnoDatabase:   "database",
+		P2pCfgEnoIpAddr:     "ip address",
+		P2pCfgEnoNodeId:     "node identity",
+		P2pCfgEnoUnknown:    "unknown",
 	}
 	return errMsg[eno]
 }
 
 // Some specific paths
 const (
-	KeyFileName	= "nodekey"		// Path within the datadir to the node's private key
-	dirNodeDatabase = "nodes"		// Path within the datadir to store the nodes
+	KeyFileName     = "nodekey" // Path within the datadir to the node's private key
+	dirNodeDatabase = "nodes"   // Path within the datadir to store the nodes
 )
 
 // Bootstrap nodes, in a format like: node-identity-hex-string@ip:udp-port:tcp-port
 const P2pMaxBootstrapNodes = 32
-var BootstrapNodeUrl = []string {
+
+var BootstrapNodeUrl = []string{
 	"4909CDF2A2C60BF1FE1E6BA849CC9297B06E00B54F0F8EB0F4B9A6AA688611FD7E43EDE402613761EC890AB46FE2218DC9B29FC47BE3AB8D1544B6C0559599AC@192.168.2.191:30303:30303",
 }
 
@@ -109,14 +109,15 @@ var BootstrapNodeUrl = []string {
 var BootstrapNodes = P2pSetupDefaultBootstrapNodes()
 
 // Node ID length in bits
-const NodeIDBits	= 512
-const NodeIDBytes	= NodeIDBits / 8
+const NodeIDBits = 512
+const NodeIDBytes = NodeIDBits / 8
 
 // Node identity
 type NodeID [NodeIDBytes]byte
 
 // DHT key length
 const DhtKeyLength = 32
+
 type DsKey [DhtKeyLength]byte
 
 // Max protocols
@@ -126,234 +127,236 @@ const MaxProtocols = 32
 const MaxPeers = 16
 
 // Max concurrency inboudn and outbound
-const MaxInbounds	= MaxPeers / 2 // +2
-const MaxOutbounds	= MaxPeers / 2 // +2
+const MaxInbounds = MaxPeers / 2  // +2
+const MaxOutbounds = MaxPeers / 2 // +2
 
 // Subnet
-const SubNetIdBytes = 2						// 2 bytes for sub network identity
-type SubNetworkID [SubNetIdBytes]byte		// sbu network identity
+const SubNetIdBytes = 2               // 2 bytes for sub network identity
+type SubNetworkID [SubNetIdBytes]byte // sbu network identity
 
 var (
-	ZeroSubNet = SubNetworkID{0x80,0x00}	// zero sub network
-	AnySubNet = SubNetworkID{0xff, 0xff}	// any sub network
-	VSubNet = SubNetworkID{0xef, 0xff}		// validators' sub network identity
+	ZeroSubNet = SubNetworkID{0x80, 0x00} // zero sub network
+	AnySubNet  = SubNetworkID{0xff, 0xff} // any sub network
+	VSubNet    = SubNetworkID{0xef, 0xff} // validators' sub network identity
 )
 
 // Node
 type Node struct {
-	IP				net.IP					// ip address
-	UDP, TCP		uint16					// port numbers
-	ID				NodeID					// the node's public key
+	IP       net.IP // ip address
+	UDP, TCP uint16 // port numbers
+	ID       NodeID // the node's public key
 }
 
 type Protocol struct {
-	Pid		uint32							// protocol identity
-	Ver		[4]byte							// protocol version: M.m0.m1.m2
+	Pid uint32  // protocol identity
+	Ver [4]byte // protocol version: M.m0.m1.m2
 }
 
 // Node static Configuration parameters
 const (
-	P2pNetworkTypeDynamic	= 0				// neighbor discovering needed
-	P2pNetworkTypeStatic	= 1				// no discovering
+	P2pNetworkTypeDynamic = 0 // neighbor discovering needed
+	P2pNetworkTypeStatic  = 1 // no discovering
 )
 
 // Application type
 type P2pAppType int
+
 const (
-	P2P_TYPE_CHAIN	P2pAppType = 0
-	P2P_TYPE_DHT	P2pAppType = 1
-	P2P_TYPE_ALL	P2pAppType = 2
+	P2P_TYPE_CHAIN P2pAppType = 0
+	P2P_TYPE_DHT   P2pAppType = 1
+	P2P_TYPE_ALL   P2pAppType = 2
 )
 
 // Total configuration
 type Config struct {
-
-	AppType				P2pAppType				// application type
+	AppType P2pAppType // application type
 
 	//
 	// Chain application part
 	//
 
-	CfgName				string					// configureation name
-	Version				string					// p2p version
-	Name				string					// node name
-	PrivateKey			*ecdsa.PrivateKey		// node private key
-	PublicKey			*ecdsa.PublicKey		// node public key
-	NetworkType			int						// p2p network type
-	BootstrapNodes		[]*Node					// bootstrap nodes
-	StaticMaxPeers		int						// max peers would be
-	StaticMaxOutbounds	int						// max concurrency outbounds
-	StaticMaxInbounds	int						// max concurrency inbounds
-	StaticNetId			SubNetworkID			// static network identity
-	StaticNodes			[]*Node					// static nodes
-	NodeDataDir			string					// node data directory
-	NodeDatabase		string					// node database
-	NoNdbHistory		bool					// do not use history of nodes
-	NoDial				bool					// do not dial out flag
-	NoAccept			bool					// do not accept incoming dial flag
-	BootstrapNode		bool					// bootstrap node flag
-	Local				Node					// local node struct
-	CheckAddress		bool					// check the neighbor reported address with the source ip
-	ProtoNum			uint32					// local protocol number
-	Protocols			[]Protocol				// local protocol table
-	SnidMaskBits		int						// mask bits for subnet identity
-	SubNetKeyList		map[SubNetworkID]ecdsa.PrivateKey // keys for sub-node
-	SubNetNodeList		map[SubNetworkID]Node	// sub-node identities
-	SubNetMaxPeers		map[SubNetworkID]int	// max peers would be
-	SubNetMaxOutbounds	map[SubNetworkID]int	// max concurrency outbounds
-	SubNetMaxInBounds	map[SubNetworkID]int	// max concurrency inbounds
-	SubNetIdList		[]SubNetworkID			// sub network identity list
+	CfgName            string                            // configureation name
+	Version            string                            // p2p version
+	Name               string                            // node name
+	PrivateKey         *ecdsa.PrivateKey                 // node private key
+	PublicKey          *ecdsa.PublicKey                  // node public key
+	NetworkType        int                               // p2p network type
+	BootstrapNodes     []*Node                           // bootstrap nodes
+	StaticMaxPeers     int                               // max peers would be
+	StaticMaxOutbounds int                               // max concurrency outbounds
+	StaticMaxInbounds  int                               // max concurrency inbounds
+	StaticNetId        SubNetworkID                      // static network identity
+	StaticNodes        []*Node                           // static nodes
+	NodeDataDir        string                            // node data directory
+	NodeDatabase       string                            // node database
+	NoNdbHistory       bool                              // do not use history of nodes
+	NoDial             bool                              // do not dial out flag
+	NoAccept           bool                              // do not accept incoming dial flag
+	BootstrapNode      bool                              // bootstrap node flag
+	Local              Node                              // local node struct
+	CheckAddress       bool                              // check the neighbor reported address with the source ip
+	ProtoNum           uint32                            // local protocol number
+	Protocols          []Protocol                        // local protocol table
+	SnidMaskBits       int                               // mask bits for subnet identity
+	SubNetKeyList      map[SubNetworkID]ecdsa.PrivateKey // keys for sub-node
+	SubNetNodeList     map[SubNetworkID]Node             // sub-node identities
+	SubNetMaxPeers     map[SubNetworkID]int              // max peers would be
+	SubNetMaxOutbounds map[SubNetworkID]int              // max concurrency outbounds
+	SubNetMaxInBounds  map[SubNetworkID]int              // max concurrency inbounds
+	SubNetIdList       []SubNetworkID                    // sub network identity list
 
 	//
 	// DHT application part
 	//
 
-	DhtLocal			Node					// dht local node config
-	DhtRutCfg			Cfg4DhtRouteManager		// for dht route manager
-	DhtQryCfg			Cfg4DhtQryManager		// for dht query manager
-	DhtConCfg			Cfg4DhtConManager		// for dht connection manager
-	DhtFdsCfg			Cfg4DhtFileDatastore	// for dht file data store
+	DhtLocal  Node                 // dht local node config
+	DhtRutCfg Cfg4DhtRouteManager  // for dht route manager
+	DhtQryCfg Cfg4DhtQryManager    // for dht query manager
+	DhtConCfg Cfg4DhtConManager    // for dht connection manager
+	DhtFdsCfg Cfg4DhtFileDatastore // for dht file data store
 
 	//
 	// NAT part
 	//
 
-	NatCfg				Cfg4NatManager			// for nat manager
+	NatCfg Cfg4NatManager // for nat manager
 }
 
 // Configuration about neighbor manager on UDP
 type Cfg4UdpNgbManager struct {
-	IP				net.IP						// ip address
-	UDP				uint16						// udp port numbers
-	TCP				uint16						// tcp port numbers
-	ID				NodeID						// the node's public key
-	NetworkType		int							// network type
-	SubNetNodeList	map[SubNetworkID]Node		// sub-node identities
-	SubNetIdList	[]SubNetworkID				// sub network identity list
+	IP             net.IP                // ip address
+	UDP            uint16                // udp port numbers
+	TCP            uint16                // tcp port numbers
+	ID             NodeID                // the node's public key
+	NetworkType    int                   // network type
+	SubNetNodeList map[SubNetworkID]Node // sub-node identities
+	SubNetIdList   []SubNetworkID        // sub network identity list
 }
 
 // Configuration about neighbor listener on UDP
 type Cfg4UdpNgbListener struct {
-	IP				net.IP			// ip address
-	UDP				uint16			// udp port numbers
-	TCP				uint16			// tcp port numbers
-	ID				NodeID			// the node's public key
-	CheckAddr		bool			// check reported address against the source ip
+	IP        net.IP // ip address
+	UDP       uint16 // udp port numbers
+	TCP       uint16 // tcp port numbers
+	ID        NodeID // the node's public key
+	CheckAddr bool   // check reported address against the source ip
 }
 
 // Configuration about peer listener on TCP
 type Cfg4PeerListener struct {
-	IP				net.IP			// ip address
-	Port			uint16			// port numbers
-	ID				NodeID			// the node's public key
-	MaxInBounds		int				// max concurrency inbounds
+	IP          net.IP // ip address
+	Port        uint16 // port numbers
+	ID          NodeID // the node's public key
+	MaxInBounds int    // max concurrency inbounds
 }
 
 // Configuration about peer manager
 type Cfg4PeerManager struct {
-	CfgName				string								// p2p configuration name
-	NetworkType			int									// p2p network type
-	IP					net.IP								// ip address
-	Port				uint16								// tcp port number
-	UDP					uint16								// udp port number, used with handshake procedure
-	ID					NodeID								// the node's public key
-	StaticMaxPeers		int									// max peers would be
-	StaticMaxOutbounds	int									// max concurrency outbounds
-	StaticMaxInBounds	int									// max concurrency inbounds
-	StaticNodes			[]*Node								// static nodes
-	StaticNetId			SubNetworkID						// static network identity
-	SubNetMaxPeers		map[SubNetworkID]int				// max peers would be
-	SubNetMaxOutbounds	map[SubNetworkID]int				// max concurrency outbounds
-	SubNetMaxInBounds	map[SubNetworkID]int				// max concurrency inbounds
-	SubNetKeyList		map[SubNetworkID]ecdsa.PrivateKey	// keys for sub-node
-	SubNetNodeList		map[SubNetworkID]Node				// sub-node
-	SubNetIdList		[]SubNetworkID						// sub network identity list. do not put the identity
-															// of the local node in this list.
-	NoDial				bool								// do not dial outbound
-	NoAccept			bool								// do not accept inbound
-	BootstrapNode		bool								// local is a bootstrap node
-	ProtoNum			uint32								// local protocol number
-	Protocols			[]Protocol							// local protocol table
+	CfgName            string                            // p2p configuration name
+	NetworkType        int                               // p2p network type
+	IP                 net.IP                            // ip address
+	Port               uint16                            // tcp port number
+	UDP                uint16                            // udp port number, used with handshake procedure
+	ID                 NodeID                            // the node's public key
+	StaticMaxPeers     int                               // max peers would be
+	StaticMaxOutbounds int                               // max concurrency outbounds
+	StaticMaxInBounds  int                               // max concurrency inbounds
+	StaticNodes        []*Node                           // static nodes
+	StaticNetId        SubNetworkID                      // static network identity
+	SubNetMaxPeers     map[SubNetworkID]int              // max peers would be
+	SubNetMaxOutbounds map[SubNetworkID]int              // max concurrency outbounds
+	SubNetMaxInBounds  map[SubNetworkID]int              // max concurrency inbounds
+	SubNetKeyList      map[SubNetworkID]ecdsa.PrivateKey // keys for sub-node
+	SubNetNodeList     map[SubNetworkID]Node             // sub-node
+	SubNetIdList       []SubNetworkID                    // sub network identity list. do not put the identity
+	// of the local node in this list.
+	NoDial        bool       // do not dial outbound
+	NoAccept      bool       // do not accept inbound
+	BootstrapNode bool       // local is a bootstrap node
+	ProtoNum      uint32     // local protocol number
+	Protocols     []Protocol // local protocol table
 }
 
 // Configuration about table manager
 type Cfg4TabManager struct {
-	NetworkType		int						// Network type
-	Local			Node					// local node
-	BootstrapNodes	[]*Node					// bootstrap nodes
-	DataDir			string					// data directory
-	Name			string					// node name
-	NodeDB			string					// node database
-	NoHistory		bool					// do not use history of nodes
-	BootstrapNode	bool					// bootstrap node flag
-	SnidMaskBits	int						// mask bits for subnet identity
-	SubNetNodeList	map[SubNetworkID]Node	// sub network node identities
-	SubNetIdList	[]SubNetworkID			// sub network identity list. do not put the identity
-											// of the local node in this list.
+	NetworkType    int                   // Network type
+	Local          Node                  // local node
+	BootstrapNodes []*Node               // bootstrap nodes
+	DataDir        string                // data directory
+	Name           string                // node name
+	NodeDB         string                // node database
+	NoHistory      bool                  // do not use history of nodes
+	BootstrapNode  bool                  // bootstrap node flag
+	SnidMaskBits   int                   // mask bits for subnet identity
+	SubNetNodeList map[SubNetworkID]Node // sub network node identities
+	SubNetIdList   []SubNetworkID        // sub network identity list. do not put the identity
+	// of the local node in this list.
 }
 
 // Configuration about protocols supported
 type Cfg4Protocols struct {
-	ProtoNum  		uint32 	    	// local protocol number
-	Protocols 		[]Protocol		// local protocol table
+	ProtoNum  uint32     // local protocol number
+	Protocols []Protocol // local protocol table
 }
 
 // Configuration about dht route manager
 type Cfg4DhtRouteManager struct {
-	BootstrapNode	bool			// bootstarp node flag
-	NodeId			NodeID			// local node identity
-	RandomQryNum	int				// times to try query for a random peer identity
-	Period			time.Duration	// timer period to fire a bootstrap
+	BootstrapNode bool          // bootstarp node flag
+	NodeId        NodeID        // local node identity
+	RandomQryNum  int           // times to try query for a random peer identity
+	Period        time.Duration // timer period to fire a bootstrap
 }
 
 // Configuration about dht query manager
 type Cfg4DhtQryManager struct {
-	Local			*Node			// pointer to local node specification
-	MaxPendings		int				// max pendings can be held in the list
-	MaxActInsts		int           	// max concurrent actived instances for one query
-	QryExpired		time.Duration 	// duration to get expired for a query
-	QryInstExpired	time.Duration 	// duration to get expired for a query instance
+	Local          *Node         // pointer to local node specification
+	MaxPendings    int           // max pendings can be held in the list
+	MaxActInsts    int           // max concurrent actived instances for one query
+	QryExpired     time.Duration // duration to get expired for a query
+	QryInstExpired time.Duration // duration to get expired for a query instance
 }
 
 // Configuration about dht listener management
 type Cfg4DhtLsnManager struct {
-	IP				net.IP			// ip address
-	PortTcp			uint16			// port number for tcp
-	PortUdp			uint16			// port number for udp
+	IP      net.IP // ip address
+	PortTcp uint16 // port number for tcp
+	PortUdp uint16 // port number for udp
 }
 
 // Configuration about dht connection manager
 type Cfg4DhtConManager struct {
-	Local			*Node			// pointer to local node specification
-	BootstrapNode	bool			// bootstrap node flag
-	MaxCon    		int				// max number of connection
-	MinCon			int				// min number of connection
-	HsTimeout 		time.Duration	// handshake timeout duration
+	Local         *Node         // pointer to local node specification
+	BootstrapNode bool          // bootstrap node flag
+	MaxCon        int           // max number of connection
+	MinCon        int           // min number of connection
+	HsTimeout     time.Duration // handshake timeout duration
 }
 
 // configuration about dht file data store
 const (
-	sfnPrefix		= "prefix"
-	sfnSuffix		= "suffix"
-	sfnNextToLast	= "next-to-last"
+	sfnPrefix     = "prefix"
+	sfnSuffix     = "suffix"
+	sfnNextToLast = "next-to-last"
 )
+
 type Cfg4DhtFileDatastore struct {
-	Path				string		// data store path
-	ShardFuncName		string		// shard function name
-	PadLength			int			// padding length
-	Sync				bool		// sync file store flag
+	Path          string // data store path
+	ShardFuncName string // shard function name
+	PadLength     int    // padding length
+	Sync          bool   // sync file store flag
 }
 
 // Configuration about nat
 const (
 	NATT_NONE = "none"
-	NATT_PMP = "pmp"
+	NATT_PMP  = "pmp"
 	NATT_UPNP = "upnp"
-	NATT_ANY = "any"
+	NATT_ANY  = "any"
 )
+
 type Cfg4NatManager struct {
-	NatType		string				// "pmp", "upnp", "none"
-	GwIp		net.IP				// gateway ip address when "pmp" specified
+	NatType string // "pmp", "upnp", "none"
+	GwIp    net.IP // gateway ip address when "pmp" specified
 }
 
 // Default version string, formated as "M.m0.m1.m2"
@@ -374,99 +377,99 @@ const (
 	DftDhtPort = 40405
 	DftSnmBits = 0
 )
-var DefaultLocalNode = Node {
-	IP:		P2pGetLocalIpAddr(),
-	UDP:	DftUdpPort,
-	TCP:	DftTcpPort,
-	ID:		NodeID{0},
+
+var DefaultLocalNode = Node{
+	IP:  P2pGetLocalIpAddr(),
+	UDP: DftUdpPort,
+	TCP: DftTcpPort,
+	ID:  NodeID{0},
 }
 
-
-var DefaultDhtLocalNode = Node {
-	IP:		P2pGetLocalIpAddr(),
-	UDP:	0,	// udp not in use for DHT
-	TCP:	DftDhtPort,
-	ID:		NodeID{0},
+var DefaultDhtLocalNode = Node{
+	IP:  P2pGetLocalIpAddr(),
+	UDP: 0, // udp not in use for DHT
+	TCP: DftDhtPort,
+	ID:  NodeID{0},
 }
 
 // Multiple configurations each identified by its' name
-var config = make(map[string] *Config)
+var config = make(map[string]*Config)
 
 // Get default non-bootstrap node config
 var DftDatDir = P2pDefaultDataDir(true)
 
 func P2pDefaultConfig(bsUrls []string) *Config {
-	var defaultConfig = Config {
+	var defaultConfig = Config{
 		//
 		// Chain application part
 		//
 
-		NetworkType:			P2pNetworkTypeDynamic,
-		Name:					DefaultNodeName,
-		Version:				DefaultVersion,
-		PrivateKey:				nil,
-		PublicKey:				nil,
-		StaticMaxPeers:			MaxPeers,
-		StaticMaxInbounds:		MaxInbounds,
-		StaticMaxOutbounds:		MaxOutbounds,
-		BootstrapNodes:			BootstrapNodes,
-		StaticNodes:			nil,
-		StaticNetId:			ZeroSubNet,
-		NodeDataDir:			DftDatDir,
-		NodeDatabase:			dirNodeDatabase,
-		NoNdbHistory:			true,
-		NoDial:					false,
-		NoAccept:				false,
-		BootstrapNode:			false,
-		Local:					DefaultLocalNode,
-		CheckAddress:			false,
-		ProtoNum:				1,
-		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
-		SnidMaskBits:			0,
-		SubNetKeyList:			map[SubNetworkID]ecdsa.PrivateKey{},
-		SubNetNodeList:			map[SubNetworkID]Node{},
-		SubNetMaxPeers:			map[SubNetworkID]int{},
-		SubNetMaxOutbounds:		map[SubNetworkID]int{},
-		SubNetMaxInBounds:		map[SubNetworkID]int{},
-		SubNetIdList:			[]SubNetworkID{},
+		NetworkType:        P2pNetworkTypeDynamic,
+		Name:               DefaultNodeName,
+		Version:            DefaultVersion,
+		PrivateKey:         nil,
+		PublicKey:          nil,
+		StaticMaxPeers:     MaxPeers,
+		StaticMaxInbounds:  MaxInbounds,
+		StaticMaxOutbounds: MaxOutbounds,
+		BootstrapNodes:     BootstrapNodes,
+		StaticNodes:        nil,
+		StaticNetId:        ZeroSubNet,
+		NodeDataDir:        DftDatDir,
+		NodeDatabase:       dirNodeDatabase,
+		NoNdbHistory:       true,
+		NoDial:             false,
+		NoAccept:           false,
+		BootstrapNode:      false,
+		Local:              DefaultLocalNode,
+		CheckAddress:       false,
+		ProtoNum:           1,
+		Protocols:          []Protocol{{Pid: 0, Ver: [4]byte{0, 1, 0, 0}}},
+		SnidMaskBits:       0,
+		SubNetKeyList:      map[SubNetworkID]ecdsa.PrivateKey{},
+		SubNetNodeList:     map[SubNetworkID]Node{},
+		SubNetMaxPeers:     map[SubNetworkID]int{},
+		SubNetMaxOutbounds: map[SubNetworkID]int{},
+		SubNetMaxInBounds:  map[SubNetworkID]int{},
+		SubNetIdList:       []SubNetworkID{},
 
 		//
 		// DHT application part
 		//
 
-		DhtLocal:				DefaultDhtLocalNode,
-		DhtRutCfg: Cfg4DhtRouteManager {
-			NodeId:				NodeID{0},
-			RandomQryNum:		1,
-			Period:				time.Minute * 1,
+		DhtLocal: DefaultDhtLocalNode,
+		DhtRutCfg: Cfg4DhtRouteManager{
+			NodeId:       NodeID{0},
+			RandomQryNum: 1,
+			Period:       time.Minute * 1,
 		},
-		DhtQryCfg: Cfg4DhtQryManager {
-			Local:				&DefaultDhtLocalNode,
-			MaxPendings:		32,
-			MaxActInsts:		8,
-			QryExpired:			time.Second * 60,
-			QryInstExpired:		time.Second * 16,
+		DhtQryCfg: Cfg4DhtQryManager{
+			Local:          &DefaultDhtLocalNode,
+			MaxPendings:    32,
+			MaxActInsts:    8,
+			QryExpired:     time.Second * 60,
+			QryInstExpired: time.Second * 16,
 		},
-		DhtConCfg: Cfg4DhtConManager {
-			Local:				&DefaultDhtLocalNode,
-			MaxCon:				512,
-			MinCon:				8,
-			HsTimeout:			time.Second * 16,
+		DhtConCfg: Cfg4DhtConManager{
+			Local:     &DefaultDhtLocalNode,
+			MaxCon:    512,
+			MinCon:    8,
+			HsTimeout: time.Second * 16,
 		},
-		DhtFdsCfg: Cfg4DhtFileDatastore {
-			Path:				DftDatDir,
-			ShardFuncName:		sfnNextToLast,
-			PadLength:			2,
-			Sync:				true,
+		DhtFdsCfg: Cfg4DhtFileDatastore{
+			Path:          DftDatDir,
+			ShardFuncName: sfnNextToLast,
+			PadLength:     2,
+			Sync:          true,
 		},
 
 		//
 		// NAT part
 		//
 
-		NatCfg: Cfg4NatManager {
-			NatType:			NATT_ANY,
-			GwIp:				net.IPv4zero,
+		NatCfg: Cfg4NatManager{
+			NatType: NATT_ANY,
+			GwIp:    net.IPv4zero,
 		},
 	}
 
@@ -479,73 +482,73 @@ func P2pDefaultConfig(bsUrls []string) *Config {
 
 // Get default bootstrap node config
 func P2pDefaultBootstrapConfig(bsUrls []string) *Config {
-	var defaultConfig = Config {
+	var defaultConfig = Config{
 		//
 		// Chain application part
 		//
-		NetworkType:			P2pNetworkTypeDynamic,
-		Name:					DefaultNodeName,
-		Version:				DefaultVersion,
-		PrivateKey:				nil,
-		PublicKey:				nil,
-		StaticMaxPeers:			0,
-		StaticMaxInbounds:		0,
-		StaticMaxOutbounds:		0,
-		BootstrapNodes:			BootstrapNodes,
-		StaticNodes:			nil,
-		StaticNetId:			ZeroSubNet,
-		NodeDataDir:			P2pDefaultDataDir(true),
-		NodeDatabase:			dirNodeDatabase,
-		NoNdbHistory:			true,
-		NoDial:					true,
-		NoAccept:				true,
-		BootstrapNode:			true,
-		Local:					DefaultLocalNode,
-		ProtoNum:				1,
-		Protocols:				[]Protocol {{Pid:0,Ver:[4]byte{0,1,0,0},}},
-		SnidMaskBits:			0,
-		SubNetKeyList:			map[SubNetworkID]ecdsa.PrivateKey{},
-		SubNetNodeList:			map[SubNetworkID]Node{},
-		SubNetMaxPeers:			map[SubNetworkID]int{},
-		SubNetMaxOutbounds:		map[SubNetworkID]int{},
-		SubNetMaxInBounds:		map[SubNetworkID]int{},
-		SubNetIdList:			[]SubNetworkID{},
+		NetworkType:        P2pNetworkTypeDynamic,
+		Name:               DefaultNodeName,
+		Version:            DefaultVersion,
+		PrivateKey:         nil,
+		PublicKey:          nil,
+		StaticMaxPeers:     0,
+		StaticMaxInbounds:  0,
+		StaticMaxOutbounds: 0,
+		BootstrapNodes:     BootstrapNodes,
+		StaticNodes:        nil,
+		StaticNetId:        ZeroSubNet,
+		NodeDataDir:        P2pDefaultDataDir(true),
+		NodeDatabase:       dirNodeDatabase,
+		NoNdbHistory:       true,
+		NoDial:             true,
+		NoAccept:           true,
+		BootstrapNode:      true,
+		Local:              DefaultLocalNode,
+		ProtoNum:           1,
+		Protocols:          []Protocol{{Pid: 0, Ver: [4]byte{0, 1, 0, 0}}},
+		SnidMaskBits:       0,
+		SubNetKeyList:      map[SubNetworkID]ecdsa.PrivateKey{},
+		SubNetNodeList:     map[SubNetworkID]Node{},
+		SubNetMaxPeers:     map[SubNetworkID]int{},
+		SubNetMaxOutbounds: map[SubNetworkID]int{},
+		SubNetMaxInBounds:  map[SubNetworkID]int{},
+		SubNetIdList:       []SubNetworkID{},
 
 		//
 		// DHT application part
 		//
-		DhtLocal:				DefaultDhtLocalNode,
-		DhtRutCfg: Cfg4DhtRouteManager {
-			NodeId:				NodeID{0},
-			RandomQryNum:		1,
-			Period:				time.Minute * 1,
+		DhtLocal: DefaultDhtLocalNode,
+		DhtRutCfg: Cfg4DhtRouteManager{
+			NodeId:       NodeID{0},
+			RandomQryNum: 1,
+			Period:       time.Minute * 1,
 		},
-		DhtQryCfg: Cfg4DhtQryManager {
-			Local:				&DefaultDhtLocalNode,
-			MaxPendings:		32,
-			MaxActInsts:		8,
-			QryExpired:			time.Second * 60,
-			QryInstExpired:		time.Second * 16,
+		DhtQryCfg: Cfg4DhtQryManager{
+			Local:          &DefaultDhtLocalNode,
+			MaxPendings:    32,
+			MaxActInsts:    8,
+			QryExpired:     time.Second * 60,
+			QryInstExpired: time.Second * 16,
 		},
-		DhtConCfg: Cfg4DhtConManager {
-			MaxCon:				512,
-			MinCon:				8,
-			HsTimeout:			time.Second * 16,
+		DhtConCfg: Cfg4DhtConManager{
+			MaxCon:    512,
+			MinCon:    8,
+			HsTimeout: time.Second * 16,
 		},
-		DhtFdsCfg: Cfg4DhtFileDatastore {
-			Path:				DftDatDir,
-			ShardFuncName:		sfnNextToLast,
-			PadLength:			2,
-			Sync:				true,
+		DhtFdsCfg: Cfg4DhtFileDatastore{
+			Path:          DftDatDir,
+			ShardFuncName: sfnNextToLast,
+			PadLength:     2,
+			Sync:          true,
 		},
 
 		//
 		// NAT part
 		//
 
-		NatCfg: Cfg4NatManager {
-			NatType:			NATT_NONE,
-			GwIp:				net.IPv4zero,
+		NatCfg: Cfg4NatManager{
+			NatType: NATT_NONE,
+			GwIp:    net.IPv4zero,
 		},
 	}
 
@@ -583,7 +586,7 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 
 	for key, maxPeers := range cfg.SubNetMaxPeers {
-		if maxPeers < cfg.SubNetMaxOutbounds[key] + cfg.SubNetMaxInBounds[key] {
+		if maxPeers < cfg.SubNetMaxOutbounds[key]+cfg.SubNetMaxInBounds[key] {
 			cfgLog.Debug("P2pSetConfig: invalid sub network configuration")
 			return name, P2pCfgEnoParameter
 		}
@@ -669,7 +672,7 @@ func P2pSubNetId2HexString(id SubNetworkID) string {
 // Hex-string to node identity
 func P2pHexString2NodeId(hex string) *NodeID {
 	var nid = NodeID{byte(0)}
-	if len(hex) != NodeIDBytes * 2 {
+	if len(hex) != NodeIDBytes*2 {
 		cfgLog.Debug("P2pHexString2NodeId: invalid length: %d", len(hex))
 		return nil
 	}
@@ -685,7 +688,7 @@ func P2pHexString2NodeId(hex string) *NodeID {
 			return nil
 		}
 		bidx := cidx >> 1
-		if cidx & 0x01 == 0 {
+		if cidx&0x01 == 0 {
 			nid[bidx] = byte(c << 4)
 		} else {
 			nid[bidx] += byte(c)
@@ -726,8 +729,8 @@ func P2pDefaultDataDir(flag bool) string {
 // Get local ip address
 func P2pGetLocalIpAddr() net.IP {
 	// Filter for debug only
-	filter := func (ip net.IP) bool {
-		ipWithNetworkId := [3]byte{192, 168, 1,}
+	filter := func(ip net.IP) bool {
+		ipWithNetworkId := [3]byte{192, 168, 1}
 		return bytes.Compare(ip[0:3], ipWithNetworkId[:]) == 0
 	}
 
@@ -847,14 +850,14 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 
 // Trans node identity to public key
 func P2pNodeId2Pubkey(id []byte) *ecdsa.PublicKey {
-	data := make([]byte, 1 + NodeIDBytes)
+	data := make([]byte, 1+NodeIDBytes)
 	data[0] = 4
 	copy(data[1:], id[0:])
 	x, y := elliptic.Unmarshal(S256(), data)
-	return &ecdsa.PublicKey {
-		Curve:S256(),
-		X: x,
-		Y: y,
+	return &ecdsa.PublicKey{
+		Curve: S256(),
+		X:     x,
+		Y:     y,
 	}
 }
 
@@ -888,7 +891,7 @@ func P2pSign(priKey *ecdsa.PrivateKey, data []byte) (r, s *big.Int, err error) {
 }
 
 // Verify
-func P2pVerify(pubKey *ecdsa.PublicKey, data [] byte, r, s *big.Int) bool {
+func P2pVerify(pubKey *ecdsa.PublicKey, data []byte, r, s *big.Int) bool {
 	return ecdsa.Verify(pubKey, data, r, s)
 }
 
@@ -936,13 +939,13 @@ func P2pSetupDefaultBootstrapNodes() []*Node {
 func P2pSetupBootstrapNodes(urls []string) []*Node {
 	var bsn = make([]*Node, 0, P2pMaxBootstrapNodes)
 	for idx, url := range urls {
-		strs := strings.Split(url,"@")
+		strs := strings.Split(url, "@")
 		if len(strs) != 2 {
 			cfgLog.Debug("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
 			return nil
 		}
 		strNodeId := strs[0]
-		strs = strings.Split(strs[1],":")
+		strs = strings.Split(strs[1], ":")
 		if len(strs) != 3 {
 			cfgLog.Debug("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
 			return nil
@@ -975,90 +978,90 @@ func P2pSetupBootstrapNodes(urls []string) []*Node {
 		}
 	}
 
-	return  bsn
+	return bsn
 }
 
 // Get configuration of neighbor discovering manager
 func P2pConfig4UdpNgbManager(name string) *Cfg4UdpNgbManager {
-	return &Cfg4UdpNgbManager {
-		IP:				config[name].Local.IP,
-		UDP:			config[name].Local.UDP,
-		TCP:			config[name].Local.TCP,
-		ID:				config[name].Local.ID,
-		NetworkType:	config[name].NetworkType,
+	return &Cfg4UdpNgbManager{
+		IP:             config[name].Local.IP,
+		UDP:            config[name].Local.UDP,
+		TCP:            config[name].Local.TCP,
+		ID:             config[name].Local.ID,
+		NetworkType:    config[name].NetworkType,
 		SubNetNodeList: config[name].SubNetNodeList,
-		SubNetIdList:	config[name].SubNetIdList,
+		SubNetIdList:   config[name].SubNetIdList,
 	}
 }
 
 // Get configuration of neighbor discovering listener
 func P2pConfig4UdpNgbListener(name string) *Cfg4UdpNgbListener {
-	return &Cfg4UdpNgbListener {
-		IP:			config[name].Local.IP,
-		UDP:		config[name].Local.UDP,
-		TCP:		config[name].Local.TCP,
-		ID:			config[name].Local.ID,
-		CheckAddr:	config[name].CheckAddress,
+	return &Cfg4UdpNgbListener{
+		IP:        config[name].Local.IP,
+		UDP:       config[name].Local.UDP,
+		TCP:       config[name].Local.TCP,
+		ID:        config[name].Local.ID,
+		CheckAddr: config[name].CheckAddress,
 	}
 }
 
 // Get configuration of peer listener
 func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
-	return &Cfg4PeerListener {
-		IP:			config[name].Local.IP,
-		Port:		config[name].Local.TCP,
-		ID:			config[name].Local.ID,
+	return &Cfg4PeerListener{
+		IP:   config[name].Local.IP,
+		Port: config[name].Local.TCP,
+		ID:   config[name].Local.ID,
 	}
 }
 
 // Get configuration of peer manager
 func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
-	return &Cfg4PeerManager {
-		CfgName:			name,
-		NetworkType:		config[name].NetworkType,
-		IP:					config[name].Local.IP,
-		Port:				config[name].Local.TCP,
-		UDP:				config[name].Local.UDP,
-		ID:					config[name].Local.ID,
-		StaticMaxPeers:		config[name].StaticMaxPeers,
-		StaticMaxOutbounds:	config[name].StaticMaxOutbounds,
-		StaticMaxInBounds:	config[name].StaticMaxInbounds,
-		StaticNodes:		config[name].StaticNodes,
-		StaticNetId:		config[name].StaticNetId,
-		NoDial:				config[name].NoDial,
-		NoAccept:			config[name].NoAccept,
-		ProtoNum:			config[name].ProtoNum,
-		Protocols:			config[name].Protocols,
-		SubNetKeyList:		config[name].SubNetKeyList,
-		SubNetNodeList:		config[name].SubNetNodeList,
-		SubNetMaxPeers:		config[name].SubNetMaxPeers,
-		SubNetMaxOutbounds:	config[name].SubNetMaxOutbounds,
-		SubNetMaxInBounds:	config[name].SubNetMaxInBounds,
-		SubNetIdList:		config[name].SubNetIdList,
+	return &Cfg4PeerManager{
+		CfgName:            name,
+		NetworkType:        config[name].NetworkType,
+		IP:                 config[name].Local.IP,
+		Port:               config[name].Local.TCP,
+		UDP:                config[name].Local.UDP,
+		ID:                 config[name].Local.ID,
+		StaticMaxPeers:     config[name].StaticMaxPeers,
+		StaticMaxOutbounds: config[name].StaticMaxOutbounds,
+		StaticMaxInBounds:  config[name].StaticMaxInbounds,
+		StaticNodes:        config[name].StaticNodes,
+		StaticNetId:        config[name].StaticNetId,
+		NoDial:             config[name].NoDial,
+		NoAccept:           config[name].NoAccept,
+		ProtoNum:           config[name].ProtoNum,
+		Protocols:          config[name].Protocols,
+		SubNetKeyList:      config[name].SubNetKeyList,
+		SubNetNodeList:     config[name].SubNetNodeList,
+		SubNetMaxPeers:     config[name].SubNetMaxPeers,
+		SubNetMaxOutbounds: config[name].SubNetMaxOutbounds,
+		SubNetMaxInBounds:  config[name].SubNetMaxInBounds,
+		SubNetIdList:       config[name].SubNetIdList,
 	}
 }
 
 // Get configuration of table manager
 func P2pConfig4TabManager(name string) *Cfg4TabManager {
-	return &Cfg4TabManager {
-		Local:			config[name].Local,
-		BootstrapNodes:	config[name].BootstrapNodes,
-		DataDir:		config[name].NodeDataDir,
-		Name:			config[name].Name,
-		NodeDB:			config[name].NodeDatabase,
-		NoHistory:		config[name].NoNdbHistory,
-		BootstrapNode:	config[name].BootstrapNode,
-		NetworkType:	config[name].NetworkType,
-		SnidMaskBits:	config[name].SnidMaskBits,
-		SubNetNodeList:	config[name].SubNetNodeList,
-		SubNetIdList:	config[name].SubNetIdList,
+	return &Cfg4TabManager{
+		Local:          config[name].Local,
+		BootstrapNodes: config[name].BootstrapNodes,
+		DataDir:        config[name].NodeDataDir,
+		Name:           config[name].Name,
+		NodeDB:         config[name].NodeDatabase,
+		NoHistory:      config[name].NoNdbHistory,
+		BootstrapNode:  config[name].BootstrapNode,
+		NetworkType:    config[name].NetworkType,
+		SnidMaskBits:   config[name].SnidMaskBits,
+		SubNetNodeList: config[name].SubNetNodeList,
+		SubNetIdList:   config[name].SubNetIdList,
 	}
 }
 
 // Get protocols
 func P2pConfig4Protocols(name string) *Cfg4Protocols {
-	return &Cfg4Protocols {
-		ProtoNum: config[name].ProtoNum,
+	return &Cfg4Protocols{
+		ProtoNum:  config[name].ProtoNum,
 		Protocols: config[name].Protocols,
 	}
 }
@@ -1086,10 +1089,10 @@ func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
 
 // Get configuration for dht listener manager
 func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
-	return &Cfg4DhtLsnManager {
-		IP:			config[name].DhtLocal.IP,
-		PortTcp:	config[name].DhtLocal.TCP,
-		PortUdp:	config[name].DhtLocal.UDP,
+	return &Cfg4DhtLsnManager{
+		IP:      config[name].DhtLocal.IP,
+		PortTcp: config[name].DhtLocal.TCP,
+		PortUdp: config[name].DhtLocal.UDP,
 	}
 }
 
