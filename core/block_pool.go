@@ -31,6 +31,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -46,12 +47,30 @@ var (
 	ErrBlockTooFarForChain = errors.New("block too far for chain head")
 )
 
+type sealRequest struct {
+	h   uint64
+	t   uint64
+	txs Transactions
+}
+
+func (sr *sealRequest) String() string {
+	return fmt.Sprintf("sealReq{H %d txs %d}", sr.h, len(sr.txs))
+}
+
 type BlockPool struct {
-	core       *Core
-	chain      *BlockChain
+	core  *Core
+	chain *BlockChain
+
 	subscriber *p2p.Subscriber
 
-	requestMap map[uint64]*Block
+	// chan for block with valid signature(maybe not enough)
+	blockChan chan *Block
+	// chan for consensus engine seal request
+	sealChan chan *sealRequest
+
+	// pending block / request
+	blockMap map[uint64]*Block
+	sealMap  map[uint64]*sealRequest
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -61,10 +80,13 @@ type BlockPool struct {
 func NewBlockPool(core *Core) (*BlockPool, error) {
 	log.Info("Create New BlockPool")
 	bp := &BlockPool{
-		core:       core,
-		chain:      core.blockChain,
-		requestMap: make(map[uint64]*Block),
-		quitCh:     make(chan struct{}),
+		core:      core,
+		chain:     core.blockChain,
+		blockChan: make(chan *Block),
+		sealChan:  make(chan *sealRequest, 10),
+		blockMap:  make(map[uint64]*Block),
+		sealMap:   make(map[uint64]*sealRequest),
+		quitCh:    make(chan struct{}),
 	}
 	return bp, nil
 }
@@ -91,6 +113,14 @@ func (bp *BlockPool) Stop() {
 	bp.wg.Wait()
 }
 
+func (bp *BlockPool) AddSealRequest(h, t uint64, txs Transactions) {
+	req := &sealRequest{
+		h:   h,
+		txs: txs,
+	}
+	bp.sealChan <- req
+}
+
 func (bp *BlockPool) loop() {
 	log.Trace("BlockPool loop...")
 	bp.wg.Add(1)
@@ -103,60 +133,75 @@ func (bp *BlockPool) loop() {
 			return
 		case msg := <-bp.subscriber.MsgChan:
 			log.Trace("block pool receive ", "type", msg.MsgType, "from", msg.From)
-			bp.processMsg(msg)
+			switch msg.MsgType {
+			case p2p.MessageTypeBlock:
+				go bp.processMsgBlock(msg)
+			case p2p.MessageTypeBlockHeader:
+				go bp.processMsgHeader(msg)
+			default:
+				log.Crit("unhandled msg sent to blockPool", "msg", msg)
+			}
+		case b := <-bp.blockChan:
+			bp.processBlock(b)
+		case sealRequest := <-bp.sealChan:
+			log.Info("BlockBuilder prepares to seal", "request", sealRequest)
+			bp.handleSealRequest(sealRequest)
 		}
 	}
 }
 
-func (bp *BlockPool) processMsg(msg p2p.Message) {
-	switch msg.MsgType {
-	case p2p.MessageTypeBlockHeader:
-		var h = new(corepb.SignedBlockHeader)
-		if err := proto.Unmarshal(msg.Data, h); err != nil {
-			bp.markBadPeer(msg)
-			break
-		}
-		// TODO:
-	case p2p.MessageTypeBlock:
-		var b = new(Block)
-		if err := b.setBytes(msg.Data); err != nil {
-			log.Warn("block decode failure", "msg", msg)
-			bp.markBadPeer(msg)
-			break
-		}
-		bp.processBlock(b)
-	default:
-		log.Crit("unhandled msg sent to blockPool", "msg", msg)
+func (bp *BlockPool) processMsgHeader(msg p2p.Message) {
+	bp.wg.Add(1)
+	defer bp.wg.Done()
+
+	var h = new(corepb.SignedBlockHeader)
+	if err := proto.Unmarshal(msg.Data, h); err != nil {
+		bp.markBadPeer(msg)
+		return
 	}
+	// TODO:
 }
 
-func (bp *BlockPool) processBlock(blk *Block) {
-	sigMap, err := bp.chain.verifyBlock(blk, false)
+func (bp *BlockPool) processMsgBlock(msg p2p.Message) {
+	bp.wg.Add(1)
+	defer bp.wg.Done()
+
+	var b = new(Block)
+	if err := b.setBytes(msg.Data); err != nil {
+		log.Warn("block decode failure", "msg", msg)
+		bp.markBadPeer(msg)
+		return
+	}
+	signatureMap, err := bp.chain.verifyBlock(b, false)
 	if err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?
 		return
 	}
+	b.signatureMap = signatureMap
+	bp.blockChan <- b
+}
+
+func (bp *BlockPool) processBlock(blk *Block) {
 	currHeight := bp.chain.CurrentBlockHeight()
 	if blk.Number() <= currHeight {
 		// TODO: refresh in chain block signature
 		return
 	}
-	if knownBlock, ok := bp.requestMap[blk.Number()]; ok {
+	if knownBlock, ok := bp.blockMap[blk.Number()]; ok {
 		if blk.Hash() != knownBlock.Hash() {
 			// TODO:
 			log.Crit("fork block!!!")
 			return
 		}
-		err := knownBlock.mergeSignature(sigMap)
+		err := knownBlock.mergeSignature(blk.signatureMap)
 		if err != nil {
 			log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
 			return
 		}
 		blk = knownBlock
 	} else {
-		blk.signatureMap = sigMap
-		bp.requestMap[blk.Number()] = blk
+		bp.blockMap[blk.Number()] = blk
 	}
 
 	if blk.Number() > currHeight+1 {
@@ -181,11 +226,72 @@ func (bp *BlockPool) processBlock(blk *Block) {
 			log.Warn("processBlock() add fail", "err", err)
 			return
 		}
-		delete(bp.requestMap, blk.Number())
+		delete(bp.blockMap, blk.Number())
 
 		currHeight++
 		var ok bool
-		blk, ok = bp.requestMap[currHeight+1]
+		blk, ok = bp.blockMap[currHeight+1]
+		if !ok {
+			break
+		}
+	}
+}
+
+func (bp *BlockPool) handleSealRequest(req *sealRequest) {
+	currHeight := bp.chain.CurrentBlockHeight()
+	switch {
+	case req.h <= currHeight:
+		// already had this block, ignore
+		return
+	case req.h > currHeight+1:
+		// not next block, maybe tx fetch pending
+		// record and wait
+		bp.sealMap[req.h] = req
+		return
+	}
+
+	// req.h == currentHeight + 1 : build next block and any pending req
+	for {
+		if req.h != currHeight+1 {
+			log.Crit("wrong request height", "req", req, "chain", bp.chain)
+		}
+		currBlock := bp.chain.GetBlockByNumber(currHeight)
+		currState, err := bp.chain.StateAt(currBlock.StateRoot())
+		if err != nil {
+			log.Crit("failed to get state of current block", "err", err)
+			break
+		}
+		// engine output not ordered by nonce
+		txs := organizeTxs(currState, req.txs)
+		// build next block
+		nextBlock, err := bp.chain.BuildNextBlock(currBlock, req.t, txs)
+		if err != nil {
+			log.Crit("failed to build next block", "parent", currBlock,
+				"err", err)
+		}
+		if err := bp.core.signBlock(nextBlock); err != nil {
+			log.Crit("failed to sign block", "err", err)
+		}
+		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
+		// insert chain
+		if err := bp.chain.AddBlock(nextBlock); err != nil {
+			log.Warn("failed to seal block", "err", err)
+			break
+		}
+		delete(bp.sealMap, currHeight)
+		// broadcast block
+		if encoded, err := nextBlock.ToBytes(); err != nil {
+			log.Warn("failed to encode block", "block", nextBlock, "err", err)
+		} else {
+			_ = bp.core.node.P2pService().BroadcastMessage(p2p.Message{
+				MsgType: p2p.MessageTypeBlock,
+				Data:    encoded,
+			})
+		}
+
+		currHeight++
+		var ok bool
+		req, ok = bp.sealMap[currHeight+1]
 		if !ok {
 			break
 		}

@@ -77,7 +77,6 @@ type Core struct {
 	blockChain   *BlockChain
 	blockPool    *BlockPool
 	txPool       *TransactionPool
-	blockBuilder *BlockBuilder
 
 	yvm        yvm.YVM
 	subscriber *p2p.Subscriber
@@ -139,10 +138,6 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 		if err := core.prepareCoinbase(); err != nil {
 			return nil, err
 		}
-		core.blockBuilder, err = NewBlockBuilder(core, core.blockChain)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return core, nil
@@ -196,10 +191,6 @@ func (c *Core) Stop() error {
 
 	// unsubscribe from p2p net
 	c.node.P2pService().UnRegister(c.subscriber)
-
-	if bb := c.blockBuilder; bb != nil {
-		bb.Stop()
-	}
 
 	// stop tx pool and wait
 	c.txPool.Stop()
@@ -321,7 +312,7 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 			}
 			txs = append(txs, tx)
 		}
-		c.blockBuilder.AddSealRequest(o.H,
+		c.blockPool.AddSealRequest(o.H,
 			uint64(o.T.UTC().UnixNano()/int64(time.Millisecond/time.Nanosecond)),
 			txs)
 	}(o)

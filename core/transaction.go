@@ -81,9 +81,7 @@ func NewTransactionFromProto(msg proto.Message) (*Transaction, error) {
 }
 
 func (t *Transaction) String() string {
-	var sb strings.Builder
-	_, _ = fmt.Fprint(&sb, "tx{f:[", t.from, "] t:[", t.to, "] a:", t.amount, "}")
-	return sb.String()
+	return fmt.Sprintf("tx{f:[%v] t:[%v] a:%v}", t.from, t.to, t.amount)
 }
 
 func (t *Transaction) ChainID() uint32 {
