@@ -131,20 +131,36 @@ func (bp *BlockPool) processMsg(msg p2p.Message) {
 }
 
 func (bp *BlockPool) processBlock(blk *Block) {
-	_, err := bp.chain.verifyBlock(blk, false)
+	sigMap, err := bp.chain.verifyBlock(blk, false)
 	if err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?
 		return
 	}
 	currHeight := bp.chain.CurrentBlockHeight()
-	switch {
-	case blk.Number() <= currHeight:
-		// TODO: refresh block signature
+	if blk.Number() <= currHeight {
+		// TODO: refresh in chain block signature
 		return
-	case blk.Number() > currHeight+1:
-		// not next block, record and wait
+	}
+	if knownBlock, ok := bp.requestMap[blk.Number()]; ok {
+		if blk.Hash() != knownBlock.Hash() {
+			// TODO:
+			log.Crit("fork block!!!")
+			return
+		}
+		err := knownBlock.mergeSignature(sigMap)
+		if err != nil {
+			log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
+			return
+		}
+		blk = knownBlock
+	} else {
+		blk.signatureMap = sigMap
 		bp.requestMap[blk.Number()] = blk
+	}
+
+	if blk.Number() > currHeight+1 {
+		// not next block, wait
 		return
 	}
 
@@ -153,6 +169,14 @@ func (bp *BlockPool) processBlock(blk *Block) {
 		if blk.Number() != currHeight+1 {
 			log.Crit("wrong block height", "blk", blk.Number(), "chain", bp.chain)
 		}
+		sigCount := len(blk.signatureMap)
+		validatorCount := len(bp.chain.LastBlock().ValidatorAddr())
+		if sigCount*3 < validatorCount*2 {
+			// not enough signature, wait
+			break
+		}
+		log.Info("signature count reached", "H", blk.Number(), "hash", blk.Hash(),
+			"sCnt", sigCount, "vCnt", validatorCount)
 		if err := bp.core.blockChain.AddBlock(blk); err != nil {
 			log.Warn("processBlock() add fail", "err", err)
 			return

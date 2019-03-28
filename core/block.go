@@ -98,8 +98,8 @@ func (bh *BlockHeader) toSignedProto() (*corepb.SignedBlockHeader, error) {
 // In-memory representative for the block concept
 type Block struct {
 	// header
-	header    *BlockHeader
-	signature *corepb.SignedBlockHeader
+	header   *BlockHeader
+	pbHeader *corepb.SignedBlockHeader
 
 	// body
 	body *corepb.BlockBody
@@ -110,8 +110,9 @@ type Block struct {
 	// TODO: receipts
 
 	// cache
-	hash       atomic.Value
-	validators atomic.Value
+	hash         atomic.Value
+	validators   atomic.Value
+	signatureMap map[common.Address]crypto.Signature
 }
 
 func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
@@ -169,10 +170,10 @@ func (b *Block) updateHeader() error {
 		return err
 	}
 	b.header.TxsRoot = DeriveHash(b.transactions)
-	if b.signature != nil {
+	if b.pbHeader != nil {
 		log.Crit("update signed header")
 	}
-	b.signature, err = b.header.toSignedProto()
+	b.pbHeader, err = b.header.toSignedProto()
 	return err
 }
 
@@ -194,12 +195,39 @@ func (b *Block) updateBody() error {
 	return nil
 }
 
+func (b *Block) mergeSignature(sigs map[common.Address]crypto.Signature) error {
+	var err error
+	// prepare cache if not exist
+	if b.signatureMap == nil {
+		b.signatureMap, err = b.Signers()
+		if err != nil {
+			return err
+		}
+	}
+	// handle income
+	for addr, sig := range sigs {
+		if _, ok := b.signatureMap[addr]; ok {
+			// signature exists, ignore
+			continue
+		}
+		// add new signature
+		pbSig := &corepb.Signature{
+			SigAlgorithm: uint32(sig.Algorithm),
+			Signature:    sig.Signature,
+		}
+		b.pbHeader.Signatures = append(b.pbHeader.Signatures, pbSig)
+		b.signatureMap[addr] = sig
+	}
+	// TODO:
+	return nil
+}
+
 func (b *Block) Sign(signer crypto.Signer) error {
 	sig, err := signer.Sign(b.Hash().Copy()[:])
 	if err != nil {
 		return err
 	}
-	for _, s := range b.signature.Signatures {
+	for _, s := range b.pbHeader.Signatures {
 		if s.SigAlgorithm == uint32(sig.Algorithm) && bytes.Equal(s.Signature, sig.Signature) {
 			// signature already exists
 			return nil
@@ -209,14 +237,14 @@ func (b *Block) Sign(signer crypto.Signer) error {
 		SigAlgorithm: uint32(sig.Algorithm),
 		Signature:    sig.Signature,
 	}
-	b.signature.Signatures = append(b.signature.Signatures, pbSig)
+	b.pbHeader.Signatures = append(b.pbHeader.Signatures, pbSig)
 	return nil
 }
 
 func (b *Block) Signers() (map[common.Address]crypto.Signature, error) {
 	result := make(map[common.Address]crypto.Signature)
 	signer := secp256k1.NewSecp256k1Signer()
-	for _, sig := range b.signature.Signatures {
+	for _, sig := range b.pbHeader.Signatures {
 		sig := crypto.Signature{
 			Algorithm: crypto.Algorithm(sig.SigAlgorithm),
 			Signature: sig.Signature,
@@ -277,7 +305,7 @@ func (b *Block) VerifyBody() error {
 
 func (b *Block) ToBytes() ([]byte, error) {
 	pbBlock := &corepb.Block{
-		Header: b.signature,
+		Header: b.pbHeader,
 		Body:   b.body,
 	}
 	enc, err := proto.Marshal(pbBlock)
@@ -297,7 +325,7 @@ func (b *Block) setBytes(enc []byte) error {
 		return err
 	}
 	b.header = header
-	b.signature = pbBlock.Header
+	b.pbHeader = pbBlock.Header
 	b.body = pbBlock.Body
 	b.transactions = make(Transactions, 0, len(b.body.RawTransactions))
 	for _, raw := range b.body.RawTransactions {

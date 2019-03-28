@@ -296,9 +296,9 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 		return nil
 	}
 	b := &Block{
-		header:    header,
-		signature: signedHeader,
-		body:      body,
+		header:   header,
+		pbHeader: signedHeader,
+		body:     body,
 	}
 	if err := b.prepareTrie(bc.stateDB); err != nil {
 		return nil
@@ -418,6 +418,9 @@ func (bc *BlockChain) verifySignature(b *Block, next bool) (map[common.Address]c
 		}
 	} else {
 		checkBlock = bc.LastBlock()
+		if checkBlock.Number()+TooFarBlocks < b.Number() {
+			return nil, ErrBlockTooFarForChain
+		}
 	}
 	validatorList := checkBlock.ValidatorAddr()
 	// prepare validator set
