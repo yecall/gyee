@@ -172,13 +172,11 @@ func (bp *BlockPool) processMsgBlock(msg p2p.Message) {
 		bp.markBadPeer(msg)
 		return
 	}
-	signatureMap, err := bp.chain.verifyBlock(b, false)
-	if err != nil {
+	if err := bp.chain.verifyBlock(b, false); err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?
 		return
 	}
-	b.signatureMap = signatureMap
 	bp.blockChan <- b
 }
 
@@ -194,7 +192,7 @@ func (bp *BlockPool) processBlock(blk *Block) {
 			log.Crit("fork block!!!")
 			return
 		}
-		err := knownBlock.mergeSignature(blk.signatureMap)
+		err := knownBlock.mergeSignature(blk)
 		if err != nil {
 			log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
 			return
@@ -214,6 +212,15 @@ func (bp *BlockPool) processBlock(blk *Block) {
 		if blk.Number() != currHeight+1 {
 			log.Crit("wrong block height", "blk", blk.Number(), "chain", bp.chain)
 		}
+		// block signatures may be checked against lastBlock when received
+		if !blk.checkAgainstParent {
+			err := bp.chain.verifySignature(blk, true)
+			if err != nil {
+				log.Warn("verifySignature() verify fails", "blk", blk, "err", err)
+				break
+			}
+		}
+		// if signature was enouth
 		sigCount := len(blk.signatureMap)
 		validatorCount := len(bp.chain.LastBlock().ValidatorAddr())
 		if sigCount*3 < validatorCount*2 {
@@ -280,7 +287,7 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 				log.Crit("fork block!!!")
 				return
 			}
-			if err := nextBlock.mergeSignature(knownBlock.signatureMap); err != nil {
+			if err := nextBlock.mergeSignature(knownBlock); err != nil {
 				log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
 			}
 		}

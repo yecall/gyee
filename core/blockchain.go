@@ -409,18 +409,23 @@ func (bc *BlockChain) verifyHeader(h *BlockHeader) error {
 
 // check block header signature, return matched validator count
 //   signature is check against prev block if param:next is true, or bc.lastBlock if false
-func (bc *BlockChain) verifySignature(b *Block, next bool) (map[common.Address]crypto.Signature, error) {
-	var checkBlock *Block
+func (bc *BlockChain) verifySignature(b *Block, next bool) error {
+	var (
+		checkBlock *Block
+		isParent   bool
+	)
 	if next {
 		checkBlock = bc.GetBlockByNumber(b.Number() - 1)
 		if checkBlock == nil {
-			return nil, ErrBlockParentMissing
+			return ErrBlockParentMissing
 		}
+		isParent = true
 	} else {
 		checkBlock = bc.LastBlock()
 		if checkBlock.Number()+TooFarBlocks < b.Number() {
-			return nil, ErrBlockTooFarForChain
+			return ErrBlockTooFarForChain
 		}
+		isParent = checkBlock.Number()+1 == b.Number()
 	}
 	validatorList := checkBlock.ValidatorAddr()
 	// prepare validator set
@@ -431,7 +436,7 @@ func (bc *BlockChain) verifySignature(b *Block, next bool) (map[common.Address]c
 	// get block signer info
 	signers, err := b.Signers()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// count valid signatures
 	var (
@@ -452,20 +457,22 @@ func (bc *BlockChain) verifySignature(b *Block, next bool) (map[common.Address]c
 	if len(matched) == 0 {
 		log.Warn("no valid block signature found", "block", b, "unknown", unknown,
 			"validators", validators)
-		return nil, ErrBlockSignatureMismatch
+		return ErrBlockSignatureMismatch
 	}
-	return matched, nil
+	b.checkAgainstParent = isParent
+	b.signatureMap = matched
+	return nil
 }
 
 // check if block is valid and belongs to chain
-func (bc *BlockChain) verifyBlock(b *Block, next bool) (map[common.Address]crypto.Signature, error) {
+func (bc *BlockChain) verifyBlock(b *Block, next bool) error {
 	// verify block header
 	if err := bc.verifyHeader(b.header); err != nil {
-		return nil, err
+		return err
 	}
 	// verify block body matches header
 	if err := b.VerifyBody(); err != nil {
-		return nil, err
+		return err
 	}
 	// verify block signature
 	return bc.verifySignature(b, next)

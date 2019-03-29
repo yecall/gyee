@@ -110,9 +110,11 @@ type Block struct {
 	// TODO: receipts
 
 	// cache
-	hash         atomic.Value
-	validators   atomic.Value
-	signatureMap map[common.Address]crypto.Signature
+	hash       atomic.Value
+	validators atomic.Value
+	// cache for block pool, accessed from single goroutine
+	checkAgainstParent bool                                // if signature were checked against parent block
+	signatureMap       map[common.Address]crypto.Signature // signature cache
 }
 
 func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
@@ -195,7 +197,7 @@ func (b *Block) updateBody() error {
 	return nil
 }
 
-func (b *Block) mergeSignature(sigs map[common.Address]crypto.Signature) error {
+func (b *Block) mergeSignature(from *Block) error {
 	var err error
 	// prepare cache if not exist
 	if b.signatureMap == nil {
@@ -205,7 +207,7 @@ func (b *Block) mergeSignature(sigs map[common.Address]crypto.Signature) error {
 		}
 	}
 	// handle income
-	for addr, sig := range sigs {
+	for addr, sig := range from.signatureMap {
 		if _, ok := b.signatureMap[addr]; ok {
 			// signature exists, ignore
 			continue
