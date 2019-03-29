@@ -1,8 +1,8 @@
 # Docker ignore config file
 
 # git
-**/.git
-.git
+#/*/**/.git
+#/.git
 
 # go tests
 **/*_test.go

@@ -1,4 +1,4 @@
-FROM golang:1.11-alpine as builder
+FROM golang:1.12-alpine as builder
 
 RUN apk add --no-cache gcc git linux-headers make musl-dev
 
@@ -11,4 +11,4 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /gyee/build/bin/* /usr/local/bin/
 
-ENTRYPOINT ["gyee"]
+CMD ["gyee"]
