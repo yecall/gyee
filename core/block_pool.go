@@ -273,6 +273,17 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 			log.Crit("failed to sign block", "err", err)
 		}
 		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
+		// merge with received signatures
+		if knownBlock, ok := bp.blockMap[nextBlock.Number()]; ok {
+			if knownBlock.Hash() != nextBlock.Hash() {
+				// TODO:
+				log.Crit("fork block!!!")
+				return
+			}
+			if err := nextBlock.mergeSignature(knownBlock.signatureMap); err != nil {
+				log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
+			}
+		}
 		// insert chain
 		if err := bp.chain.AddBlock(nextBlock); err != nil {
 			log.Warn("failed to seal block", "err", err)
