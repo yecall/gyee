@@ -74,9 +74,9 @@ type Core struct {
 	engine  consensus.Engine
 	storage persistent.Storage
 
-	blockChain   *BlockChain
-	blockPool    *BlockPool
-	txPool       *TransactionPool
+	blockChain *BlockChain
+	blockPool  *BlockPool
+	txPool     *TransactionPool
 
 	yvm        yvm.YVM
 	subscriber *p2p.Subscriber
@@ -238,7 +238,7 @@ func (c *Core) loop() {
 			go c.handleEngineEventSend(event)
 		case req := <-chanEventReq:
 			log.Trace("engine req event", "hash", req)
-			c.handleEngineEventReq(req)
+			go c.handleEngineEventReq(req)
 		case output := <-outputChan:
 			log.Info("core receive engine output", "output", output)
 			c.handleEngineOutput(output)
@@ -246,12 +246,11 @@ func (c *Core) loop() {
 			log.Trace("core receive ", msg.MsgType, " ", msg.From)
 			switch msg.MsgType {
 			case p2p.MessageTypeEvent:
-				c.engine.SendEvent(msg.Data)
+				go c.engine.SendEvent(msg.Data)
 			default:
 				log.Crit("wrong msg", "msg", msg)
 			}
 		}
-
 	}
 }
 
@@ -271,15 +270,13 @@ func (c *Core) handleEngineEventSend(event []byte) {
 	}
 }
 
-func (c *Core) handleEngineEventReq(req common.Hash) {
-	go func(hash common.Hash) {
-		data, err := c.node.P2pService().DhtGetValue(hash[:])
-		if err != nil {
-			log.Warn("engine req event failed", "hash", hash, "err", err)
-		} else {
-			c.engine.SendParentEvent(data)
-		}
-	}(req)
+func (c *Core) handleEngineEventReq(hash common.Hash) {
+	data, err := c.node.P2pService().DhtGetValue(hash[:])
+	if err != nil {
+		log.Warn("engine req event failed", "hash", hash, "err", err)
+	} else {
+		c.engine.SendParentEvent(data)
+	}
 }
 
 func (c *Core) handleEngineOutput(o *consensus.Output) {
@@ -293,7 +290,10 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 		log.Warn("engine height too high", "engineH", o.H, "chainH", currentHeight)
 		// TODO: block chain too far behind, should reSync
 	}
-	go func(o *consensus.Output) {
+	go func() {
+		c.wg.Add(1)
+		defer c.wg.Done()
+
 		txs := make(Transactions, 0, len(o.Txs))
 		for _, hash := range o.Txs {
 			enc, err := c.node.P2pService().DhtGetValue(hash[:])
@@ -315,7 +315,7 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 		c.blockPool.AddSealRequest(o.H,
 			uint64(o.T.UTC().UnixNano()/int64(time.Millisecond/time.Nanosecond)),
 			txs)
-	}(o)
+	}()
 }
 
 func (c *Core) loadCoinbaseKey() error {
