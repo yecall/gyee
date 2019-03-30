@@ -182,15 +182,16 @@ func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
 		log.Error("TxBroadcast encode", "err", err)
 		return
 	}
-	msg := p2p.Message{
+	go func(msg p2p.Message) {
+		err = tp.core.node.P2pService().BroadcastMessage(msg)
+		if err != nil {
+			log.Error("TxBroadcast", "err", err)
+		}
+	}(p2p.Message{
 		MsgType: p2p.MessageTypeTx,
 		From:    "node1",
 		Data:    data,
-	}
-	err = tp.core.node.P2pService().BroadcastMessage(msg)
-	if err != nil {
-		log.Error("TxBroadcast", "err", err)
-	}
+	})
 }
 
 func (tp *TransactionPool) markBadPeer(msg p2p.Message) {

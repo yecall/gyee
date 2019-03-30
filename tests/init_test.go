@@ -71,6 +71,7 @@ func genTestTxs(t *testing.T,
 	}
 	time.Sleep(30 * time.Second)
 	ticker := time.NewTicker(10 * time.Millisecond)
+	log.Info("send tx start")
 Exit:
 	for {
 		for i, fn := range nodes {
@@ -98,17 +99,20 @@ Exit:
 					continue
 				}
 				nonces[i]++
-				msg := &p2p.Message{
-					MsgType: p2p.MessageTypeTx,
-					Data:    data,
-				}
-				_ = fn.P2pService().DhtSetValue(tx.Hash()[:], data)
-				_ = fn.P2pService().BroadcastMessage(*msg)
-				fn.Core().FakeP2pRecv(msg)
-				tn.Core().FakeP2pRecv(msg)
+				go func(hash *common.Hash, data []byte) {
+					msg := &p2p.Message{
+						MsgType: p2p.MessageTypeTx,
+						Data:    data,
+					}
+					_ = fn.P2pService().DhtSetValue(hash[:], data)
+					_ = fn.P2pService().BroadcastMessage(*msg)
+					fn.Core().FakeP2pRecv(msg)
+					tn.Core().FakeP2pRecv(msg)
+				}(tx.Hash(), data)
 				totalTxs++
 			}
 		}
+		log.Info("Total txs sent", totalTxs)
 	}
 	log.Info("Total txs sent", totalTxs)
 }

@@ -235,7 +235,7 @@ func (c *Core) loop() {
 			return
 		case event := <-chanEventSend:
 			log.Trace("engine send event")
-			c.handleEngineEventSend(event)
+			go c.handleEngineEventSend(event)
 		case req := <-chanEventReq:
 			log.Trace("engine req event", "hash", req)
 			c.handleEngineEventReq(req)

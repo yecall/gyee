@@ -301,7 +301,9 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 		if encoded, err := nextBlock.ToBytes(); err != nil {
 			log.Warn("failed to encode block", "block", nextBlock, "err", err)
 		} else {
-			_ = bp.core.node.P2pService().BroadcastMessage(p2p.Message{
+			go func(msg p2p.Message) {
+				_ = bp.core.node.P2pService().BroadcastMessage(msg)
+			}(p2p.Message{
 				MsgType: p2p.MessageTypeBlock,
 				Data:    encoded,
 			})
