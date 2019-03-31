@@ -121,7 +121,7 @@ type YeShellManager struct {
 	ddtChan        chan bool                        // deduplication ticker channel
 	bsTicker       *time.Ticker                     // bootstrap ticker
 	dhtBsChan      chan bool                        // bootstrap ticker channel
-	cp             ChainProvider
+	cp             ChainProvider					// interface registered to p2p for "get chain data" message
 }
 
 const MaxSubNetMaskBits = 15 // max number of mask bits for sub network identity
@@ -484,8 +484,10 @@ func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
 }
 
 func (yeShMgr *YeShellManager) BroadcastMessage(message Message) error {
-	// Notice: the function is not supported in fact, see handler function
-	// in each case please.
+	// 按字面的定义：“BroadcastMessage”是全网广播，“BroadcastMessageOsn”是子网结构下的广播。
+	// 但是目前实际上这两个接口无法区分的：首先从输入的参数来看，P2P就无法区分这两个有何区别；其次
+	// 这两个接口的定义不明确。本来是不打算支持这个接口的，但为以后的扩充方便（比如，如果在接口函数
+	// BroadcastMessageOsn的输入参数中指定广播的子网号），暂时直接调用“OSN"接口的函数。
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
@@ -1054,19 +1056,23 @@ func (yeShMgr *YeShellManager) dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) 
 }
 
 func (yeShMgr *YeShellManager) broadcastTx(msg *Message) error {
-	return errors.New("broadcastTx: not supported")
+	//return errors.New("broadcastTx: not supported")
+	return yeShMgr.broadcastTxOsn(msg, nil)
 }
 
 func (yeShMgr *YeShellManager) broadcastEv(msg *Message) error {
-	return errors.New("broadcastEv: not supported")
+	//return errors.New("broadcastEv: not supported")
+	return yeShMgr.broadcastEvOsn(msg, nil, true)
 }
 
 func (yeShMgr *YeShellManager) broadcastBh(msg *Message) error {
-	return errors.New("broadcastBh: not supported")
+	//return errors.New("broadcastBh: not supported")
+	return yeShMgr.broadcastBhOsn(msg, nil)
 }
 
 func (yeShMgr *YeShellManager) broadcastBk(msg *Message) error {
-	return errors.New("broadcastBk: not supported")
+	//return errors.New("broadcastBk: not supported")
+	return yeShMgr.broadcastBkOsn(msg, nil)
 }
 
 func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
