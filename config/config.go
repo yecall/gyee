@@ -142,7 +142,7 @@ func GetDefaultConfig() *Config {
 	var config Config
 	config.NodeDir = utils.DefaultNodeDir()
 
-	cdata, err := res.Asset("config/config.toml")
+	cdata, err := res.Asset("config/config_test.toml")
 	if err != nil {
 		logging.Logger.WithFields(logrus.Fields{
 			"err": err,
