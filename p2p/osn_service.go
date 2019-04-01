@@ -25,6 +25,7 @@
 package p2p
 
 import (
+	"time"
 	"github.com/pkg/errors"
 	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"
@@ -93,17 +94,43 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	// 可以用任何方法构造合理的YeShellConfig结构，然后调用NewOsnService得到服务实例。
 	//
 
-	_ = cfg
-	_ = cfgFromFie
-
+	// TODO: 对参数进行检查
+	yc, ok := cfgFromFie.(*yeeCfg.Config)
+	if !ok {
+		panic("OsnServiceConfig: invalid configuration type")
+	}
+	p2p := yc.P2p
+	factor := int64(time.Second / time.Nanosecond)
+	cfg.AppType = config.P2pAppType(p2p.AppType)
+	cfg.Name = p2p.Name
+	cfg.Validator = p2p.Validator
+	cfg.BootstrapNode = p2p.BootstrapNode
+	cfg.BootstrapNodes = make([]string, 0)
+	cfg.BootstrapNodes = append(cfg.BootstrapNodes, p2p.BootstrapNodes...)
+	cfg.DhtBootstrapNodes = make([]string, 0)
+	cfg.DhtBootstrapNodes = append(cfg.DhtBootstrapNodes, p2p.DhtBootstrapNodes...)
+	cfg.LocalNodeIp = p2p.LocalNodeIp
+	cfg.LocalUdpPort = p2p.LocalUdpPort
+	cfg.LocalTcpPort = p2p.LocalTcpPort
+	cfg.LocalDhtIp = p2p.LocalDhtIp
+	cfg.LocalDhtPort = p2p.LocalDhtPort
+	cfg.NodeDataDir = p2p.NodeDataDir
+	cfg.NodeDatabase = p2p.NodeDatabase
+	cfg.SubNetMaskBits = p2p.SubNetMaskBits
+	cfg.EvKeepTime = time.Duration(int64(p2p.EvKeepTime) * factor)
+	cfg.DedupTime = time.Duration(int64(p2p.DedupTime) * factor)
+	cfg.BootstrapTime = time.Duration(int64(p2p.BootstrapTime) * factor)
+	cfg.NatType = p2p.NatType
+	cfg.GatewayIp = p2p.GatewayIp
 	return nil
 }
 
-var _ = OsnServiceConfig
-
 func NewOsnServiceWithCfg(cfg *yeeCfg.Config) (*OsnService, error) {
-	// TODO:
-	return nil, nil
+	yeShellCfg := DefaultYeShellConfig
+	if err := OsnServiceConfig(&yeShellCfg, cfg); err != nil {
+		return nil, err
+	}
+	return NewOsnService(&yeShellCfg)
 }
 
 func NewOsnService(cfg *YeShellConfig) (*OsnService, error) {
