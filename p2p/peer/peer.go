@@ -1152,6 +1152,8 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 	}
 
+	// bug: the following sch.EvPeEstablishedInd message contains a channel for the
+	// receiver task to confirm us, might cause "deadlock" issues in "poweroff".
 	schMsg := new(sch.SchMessage)
 	cfmCh := make(chan int)
 	peMgr.sdl.SchMakeMessage(schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, &cfmCh)

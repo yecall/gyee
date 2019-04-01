@@ -70,11 +70,13 @@ const (
 const (
 
 	// internal MID for PID_P2P
-	MID_HANDSHAKE = pb.MessageId_MID_HANDSHAKE // handshake
-	MID_PING      = pb.MessageId_MID_PING      // ping
-	MID_PONG      = pb.MessageId_MID_PONG      // pong
-	MID_CHKK      = pb.MessageId_MID_CHKK      // check key
-	MID_RPTK      = pb.MessageId_MID_RPTK      // report key
+	MID_HANDSHAKE	= pb.MessageId_MID_HANDSHAKE	// handshake
+	MID_PING		= pb.MessageId_MID_PING			// ping
+	MID_PONG		= pb.MessageId_MID_PONG			// pong
+	MID_CHKK		= pb.MessageId_MID_CHKK			// check key
+	MID_RPTK		= pb.MessageId_MID_RPTK			// report key
+	MID_GCD			= pb.MessageId_MID_GCD			// get chain data
+	MID_PCD			= pb.MessageId_MID_PCD			// put chain data
 
 	// external MID for PID_EXT
 	MID_TX          = pb.MessageId_MID_TX

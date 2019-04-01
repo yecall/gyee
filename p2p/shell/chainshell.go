@@ -101,10 +101,12 @@ type deDupVal struct {
 }
 
 const (
-	chkkTime = time.Second * 8
-	keyTime  = time.Second * 8
-	MID_CHKK = peer.MID_CHKK
-	MID_RPTK = peer.MID_RPTK
+	chkkTime	= time.Second * 8
+	keyTime		= time.Second * 8
+	MID_CHKK	= peer.MID_CHKK
+	MID_RPTK	= peer.MID_RPTK
+	MID_GCD		= peer.MID_GCD
+	MID_PCD		= peer.MID_PCD
 )
 
 type ShellManager struct {
@@ -273,6 +275,14 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 				} else if rxPkg.MsgId == int(MID_RPTK) {
 
 					shMgr.reportKeyFromPeer(rxPkg)
+
+				} else if rxPkg.MsgId == int(MID_GCD){
+
+					shMgr.getChainData(rxPkg)
+
+				} else if rxPkg.MsgId == int(MID_PCD) {
+
+					shMgr.putChainData(rxPkg)
 
 				} else {
 
@@ -650,6 +660,14 @@ func (shMgr *ShellManager) reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchEr
 		return shMgr.send2Peer(pai, ddv.bcReq)
 	}
 
+	return sch.SchEnoNone
+}
+
+func (shMgr *ShellManager)getChainData(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	return sch.SchEnoNone
+}
+
+func (shMgr *ShellManager)putChainData(rxPkg *peer.P2pPackageRx) sch.SchErrno {
 	return sch.SchEnoNone
 }
 

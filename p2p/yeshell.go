@@ -876,7 +876,6 @@ _rxLoop:
 			msgType := yesMidItoa[pkg.MsgId]
 			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 				subList.(*sync.Map).Range(func(key, value interface{}) bool {
-
 					msg := Message{
 						MsgType: msgType,
 						From:    fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
@@ -899,7 +898,6 @@ _rxLoop:
 					default:
 						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
 					}
-
 					return err == nil
 				})
 			}
