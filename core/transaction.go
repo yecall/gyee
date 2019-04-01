@@ -81,7 +81,7 @@ func NewTransactionFromProto(msg proto.Message) (*Transaction, error) {
 }
 
 func (t *Transaction) String() string {
-	return fmt.Sprintf("tx{f:[%v] t:[%v] a:%v}", t.from, t.to, t.amount)
+	return fmt.Sprintf("tx{f:[%v] n:[%d] t:[%v] a:%v}", t.from, t.nonce, t.to, t.amount)
 }
 
 func (t *Transaction) ChainID() uint32 {

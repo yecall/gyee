@@ -26,6 +26,7 @@ package p2p
 
 import (
 	"github.com/pkg/errors"
+	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"
 )
 
@@ -99,6 +100,11 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 }
 
 var _ = OsnServiceConfig
+
+func NewOsnServiceWithCfg(cfg *yeeCfg.Config) (*OsnService, error) {
+	// TODO:
+	return nil, nil
+}
 
 func NewOsnService(cfg *YeShellConfig) (*OsnService, error) {
 	osns := OsnService{

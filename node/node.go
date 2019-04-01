@@ -71,10 +71,10 @@ type Node struct {
 }
 
 func NewNode(conf *config.Config) (*Node, error) {
-	return NewNodeWithGenesis(conf, nil)
+	return NewNodeWithGenesis(conf, nil, nil)
 }
 
-func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis) (*Node, error) {
+func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis, p2pSvc p2p.Service) (*Node, error) {
 	log.Info("Create new node")
 	if conf.NodeDir != "" {
 		absdatadir, err := filepath.Abs(conf.NodeDir)
@@ -99,10 +99,12 @@ func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis) (*Node, erro
 		log.Crit("node: core: ", err)
 	}
 
-	node.p2p, err = p2p.NewInmemService()
-	if err != nil {
-		log.Crit("node: p2p: ", err)
+	if p2pSvc == nil {
+		if p2pSvc, err = p2p.NewOsnServiceWithCfg(conf); err != nil {
+			log.Crit("node: p2p: ", err)
+		}
 	}
+	node.p2p = p2pSvc
 
 	node.stop = make(chan struct{})
 	return node, nil

@@ -70,7 +70,7 @@ func genTestTxs(t *testing.T,
 		}
 	}
 	time.Sleep(30 * time.Second)
-	ticker := time.NewTicker(10 * time.Millisecond)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	log.Info("send tx start")
 Exit:
 	for {
@@ -131,14 +131,10 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 	genesis := genGenesis(t, keys)
 	nodes := make([]*node.Node, 0, numNodes)
 	for i, key := range keys {
-		cfg := dftConfig()
-		cfg.NodeDir = filepath.Join(tmpDir, strconv.Itoa(i))
+		cfg := dftConfig(filepath.Join(tmpDir, strconv.Itoa(i)))
 		cfg.Chain.Key = key
 
-		n, err := node.NewNodeWithGenesis(cfg, genesis)
-		if err != nil {
-			t.Fatalf("newNode() %v", err)
-		}
+		n := genNode(t, cfg, genesis)
 		if err := n.Start(); err != nil {
 			t.Fatalf("node start %v", err)
 		}
@@ -150,14 +146,10 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 	const numViewers = 2
 	viewers := make([]*node.Node, 0, numViewers)
 	for i := 0; i < numViewers; i++ {
-		cfg := dftConfig()
-		cfg.NodeDir = filepath.Join(tmpDir, "v"+strconv.Itoa(i))
+		cfg := dftConfig(filepath.Join(tmpDir, "v"+strconv.Itoa(i)))
 		cfg.Chain.Mine = false
 
-		n, err := node.NewNodeWithGenesis(cfg, genesis)
-		if err != nil {
-			t.Fatalf("newNode() %v", err)
-		}
+		n := genNode(t, cfg, genesis)
 		if err := n.Start(); err != nil {
 			t.Fatalf("node start %v", err)
 		}
@@ -212,6 +204,18 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 	}
 }
 
+func genNode(t *testing.T, cfg *config.Config, genesis *core.Genesis) *node.Node {
+	p2pSvc, err := p2p.NewInmemService()
+	if err != nil {
+		t.Fatalf("newP2P %v", err)
+	}
+	n, err := node.NewNodeWithGenesis(cfg, genesis, p2pSvc)
+	if err != nil {
+		t.Fatalf("newNode() %v", err)
+	}
+	return n
+}
+
 func genKeys(count uint) [][]byte {
 	ret := make([][]byte, 0, count)
 	for i := uint(0); i < count; i++ {
@@ -247,7 +251,7 @@ func genGenesis(t *testing.T, keys [][]byte) *core.Genesis {
 	return genesis
 }
 
-func dftConfig() *config.Config {
+func dftConfig(nodeDir string) *config.Config {
 	cfg := &config.Config{
 		Chain: &config.ChainConfig{
 			ChainID: testChainID,
@@ -255,6 +259,7 @@ func dftConfig() *config.Config {
 		},
 		Rpc: &config.RpcConfig{},
 	}
+	cfg.NodeDir = nodeDir
 
 	return cfg
 }
