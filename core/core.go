@@ -134,11 +134,6 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 	if err != nil {
 		return nil, err
 	}
-	if conf.Chain.Mine {
-		if err := core.prepareCoinbase(); err != nil {
-			return nil, err
-		}
-	}
 
 	return core, nil
 }
@@ -157,6 +152,10 @@ func (c *Core) Start() error {
 
 	//如果开启挖矿
 	if c.config.Chain.Mine {
+		if err := c.prepareCoinbase(); err != nil {
+			return err
+		}
+
 		members := c.blockChain.GetValidators()
 		blockHeight := c.blockChain.CurrentBlockHeight()
 		tetris, err := tetris2.NewTetris(c, c.minerAddr.String(), members, blockHeight)

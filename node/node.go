@@ -82,6 +82,7 @@ func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis, p2pSvc p2p.S
 			log.Crit("node: config path: ", err)
 		}
 		conf.NodeDir = absdatadir
+		conf.P2p.NodeDataDir = filepath.Join(absdatadir, "p2p")
 	}
 
 	node := &Node{

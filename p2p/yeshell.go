@@ -226,7 +226,9 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	chainCfg.AppType = config.P2P_TYPE_CHAIN
 	chainCfg.Name = yesCfg.Name
 	chainCfg.NodeDataDir = yesCfg.NodeDataDir
-	chainCfg.NodeDatabase = yesCfg.NodeDatabase
+	if yesCfg.NodeDatabase != "" {
+		chainCfg.NodeDatabase = yesCfg.NodeDatabase
+	}
 
 	p2plog.Debug("YeShellConfigToP2pCfg: LocalNodeIp: %s, LocalUdpPort: %d, LocalTcpPort: %d",
 		yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort)

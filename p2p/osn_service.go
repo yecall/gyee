@@ -102,7 +102,8 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	}
 	p2p := yc.P2p
 	factor := int64(time.Second / time.Nanosecond)
-	cfg.AppType = config.P2pAppType(p2p.AppType)
+	// FIXME:
+	cfg.AppType = config.P2P_TYPE_ALL
 	cfg.Name = p2p.Name
 	cfg.Validator = p2p.Validator
 	cfg.BootstrapNode = p2p.BootstrapNode
@@ -111,6 +112,9 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	cfg.DhtBootstrapNodes = make([]string, 0)
 	cfg.DhtBootstrapNodes = append(cfg.DhtBootstrapNodes, p2p.DhtBootstrapNodes...)
 	cfg.LocalNodeIp = p2p.LocalNodeIp
+	if len(cfg.LocalNodeIp) == 0 {
+		cfg.LocalNodeIp = "0.0.0.0"
+	}
 	cfg.LocalUdpPort = p2p.LocalUdpPort
 	cfg.LocalTcpPort = p2p.LocalTcpPort
 	cfg.LocalDhtIp = p2p.LocalDhtIp
