@@ -26,6 +26,7 @@ package p2p
 
 import (
 	"time"
+
 	"github.com/pkg/errors"
 	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"

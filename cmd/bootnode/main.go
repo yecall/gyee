@@ -37,9 +37,9 @@ func main() {
 		nodeDataDir = flag.String("nodeDataDir", "", "node data directory")
 		nodeName    = flag.String("nodeName", "", "node name")
 		chainIp     = flag.String("cip", "", "chain ip(b1.b2.b3.b4)")
-		chainPort	= flag.Int("cport", 0, "chain port")
+		chainPort   = flag.Int("cport", 0, "chain port")
 		dhtIp       = flag.String("dip", "", "dht ip(b1.b2.b3.b4)")
-		dhtPort		= flag.Int("dport", 0, "dht port")
+		dhtPort     = flag.Int("dport", 0, "dht port")
 		nodeKey     *ecdsa.PrivateKey
 		err         error
 	)

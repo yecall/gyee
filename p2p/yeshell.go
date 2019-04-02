@@ -121,7 +121,7 @@ type YeShellManager struct {
 	ddtChan        chan bool                        // deduplication ticker channel
 	bsTicker       *time.Ticker                     // bootstrap ticker
 	dhtBsChan      chan bool                        // bootstrap ticker channel
-	cp             ChainProvider					// interface registered to p2p for "get chain data" message
+	cp             ChainProvider                    // interface registered to p2p for "get chain data" message
 }
 
 const MaxSubNetMaskBits = 15 // max number of mask bits for sub network identity
