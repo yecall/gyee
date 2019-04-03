@@ -29,10 +29,10 @@ import (
 	"sync"
 	"time"
 
-	config "github.com/yeeco/gyee/p2p/config"
-	dht "github.com/yeeco/gyee/p2p/dht"
+	"github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/p2p/dht"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
-	peer "github.com/yeeco/gyee/p2p/peer"
+	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
 )
@@ -283,9 +283,17 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	var eno sch.SchErrno
 	yeShMgr := YeShellManager{
-		name:       yesCfg.Name,
-		inStopping: false,
-		putValKey:  make([]byte, 0),
+		name:           yesCfg.Name,
+		inStopping:     false,
+		putValKey:      make([]byte, 0),
+		getValChan:     make(chan []byte, 0),
+		putValChan:     make(chan bool, 0),
+		findNodeMap:    make(map[yesKey]chan interface{}, yesMaxFindNode),
+		getProviderMap: make(map[yesKey]chan interface{}, yesMaxGetProvider),
+		putProviderMap: make(map[yesKey]chan interface{}, yesMaxPutProvider),
+		subscribers:    new(sync.Map),
+		deDupMap:       make(map[[yesKeyBytes]byte]bool, 0),
+		ddtChan:        make(chan bool, 1),
 	}
 
 	cfg := YeShellConfigToP2pCfg(yesCfg)
@@ -356,19 +364,11 @@ func (yeShMgr *YeShellManager) Start() error {
 		return nil
 	}
 
-	yeShMgr.getValChan = make(chan []byte, 0)
-	yeShMgr.putValChan = make(chan bool, 0)
-	yeShMgr.findNodeMap = make(map[yesKey]chan interface{}, yesMaxFindNode)
-	yeShMgr.getProviderMap = make(map[yesKey]chan interface{}, yesMaxGetProvider)
-	yeShMgr.putProviderMap = make(map[yesKey]chan interface{}, yesMaxPutProvider)
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
-	yeShMgr.subscribers = new(sync.Map)
 	yeShMgr.chainRxChan = yeShMgr.ptChainShMgr.GetRxChan()
 	yeShMgr.tmDedup = dht.NewTimerManager()
-	yeShMgr.deDupMap = make(map[[yesKeyBytes]byte]bool, 0)
 	yeShMgr.deDupTiker = time.NewTicker(dht.OneTick)
-	yeShMgr.ddtChan = make(chan bool, 1)
 
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
