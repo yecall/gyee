@@ -26,9 +26,11 @@ package p2p
 
 import (
 	"time"
-
+	"strings"
 	"github.com/pkg/errors"
+
 	yeeCfg "github.com/yeeco/gyee/config"
+	yeelog "github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/p2p/config"
 )
 
@@ -100,33 +102,95 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	if !ok {
 		panic("OsnServiceConfig: invalid configuration type")
 	}
+
 	p2p := yc.P2p
-	factor := int64(time.Second / time.Nanosecond)
-	// FIXME:
-	cfg.AppType = config.P2P_TYPE_ALL
-	cfg.Name = p2p.Name
+	if p2p.AppType != int(config.P2P_TYPE_ALL) {
+		panic("OsnServiceConfig: must be P2P_TYPE_ALL")
+	}
+	cfg.AppType = config.P2pAppType(p2p.AppType)
+
+	if len(p2p.Name) != 0 {
+		cfg.Name = p2p.Name
+	} else {
+		yeelog.Logger.Info("OsnServiceConfig: default Name: %s", cfg.Name)
+	}
+
 	cfg.Validator = p2p.Validator
 	cfg.BootstrapNode = p2p.BootstrapNode
 	cfg.BootstrapNodes = make([]string, 0)
 	cfg.BootstrapNodes = append(cfg.BootstrapNodes, p2p.BootstrapNodes...)
 	cfg.DhtBootstrapNodes = make([]string, 0)
 	cfg.DhtBootstrapNodes = append(cfg.DhtBootstrapNodes, p2p.DhtBootstrapNodes...)
-	cfg.LocalNodeIp = p2p.LocalNodeIp
-	if len(cfg.LocalNodeIp) == 0 {
-		cfg.LocalNodeIp = "0.0.0.0"
+
+	if len(p2p.LocalNodeIp) == 0 || strings.Compare(p2p.LocalNodeIp, "0.0.0.0") == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default LocalNodeIp: %s", cfg.LocalNodeIp)
+	} else {
+		cfg.LocalNodeIp = p2p.LocalNodeIp
 	}
-	cfg.LocalUdpPort = p2p.LocalUdpPort
-	cfg.LocalTcpPort = p2p.LocalTcpPort
-	cfg.LocalDhtIp = p2p.LocalDhtIp
-	cfg.LocalDhtPort = p2p.LocalDhtPort
-	cfg.NodeDataDir = p2p.NodeDataDir
-	cfg.NodeDatabase = p2p.NodeDatabase
+
+	if p2p.LocalUdpPort == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default LocalUdpPort: %s", cfg.LocalUdpPort)
+	} else {
+		cfg.LocalUdpPort = p2p.LocalUdpPort
+	}
+
+	if p2p.LocalTcpPort == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default LocalTcpPort: %s", cfg.LocalTcpPort)
+	} else {
+		cfg.LocalTcpPort = p2p.LocalTcpPort
+	}
+
+	if len(p2p.LocalDhtIp) == 0 || strings.Compare(p2p.LocalDhtIp, "0.0.0.0") == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default LocalDhtIp: %s", cfg.LocalDhtIp)
+	} else {
+		cfg.LocalDhtIp = p2p.LocalDhtIp
+	}
+
+	if p2p.LocalDhtPort == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default LocalDhtPort: %s", cfg.LocalDhtPort)
+	} else {
+		cfg.LocalDhtPort = p2p.LocalDhtPort
+	}
+
+	if len(p2p.NodeDataDir) == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default NodeDataDir: %s", cfg.NodeDataDir)
+	} else {
+		cfg.NodeDataDir = p2p.NodeDataDir
+	}
+
+	if len(p2p.NodeDatabase) == 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default NodeDatabase: %s", cfg.NodeDatabase)
+	} else {
+		cfg.NodeDatabase = p2p.NodeDatabase
+	}
+
 	cfg.SubNetMaskBits = p2p.SubNetMaskBits
-	cfg.EvKeepTime = time.Duration(int64(p2p.EvKeepTime) * factor)
-	cfg.DedupTime = time.Duration(int64(p2p.DedupTime) * factor)
-	cfg.BootstrapTime = time.Duration(int64(p2p.BootstrapTime) * factor)
+	if cfg.SubNetMaskBits < 0 {
+		cfg.SubNetMaskBits = 0
+	}
+
+	factor := int64(time.Second / time.Nanosecond)
+	if p2p.EvKeepTime <= 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default EvKeepTime: %s", cfg.EvKeepTime)
+	} else {
+		cfg.EvKeepTime = time.Duration(int64(p2p.EvKeepTime) * factor)
+	}
+
+	if p2p.DedupTime <= 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default DedupTime: %s", cfg.DedupTime)
+	} else {
+		cfg.DedupTime = time.Duration(int64(p2p.DedupTime) * factor)
+	}
+
+	if p2p.BootstrapTime <= 0 {
+		yeelog.Logger.Info("OsnServiceConfig: default BootstrapTime: %s", cfg.BootstrapTime)
+	} else {
+		cfg.BootstrapTime = time.Duration(int64(p2p.BootstrapTime) * factor)
+	}
+
 	cfg.NatType = p2p.NatType
 	cfg.GatewayIp = p2p.GatewayIp
+
 	return nil
 }
 
