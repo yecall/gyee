@@ -257,6 +257,7 @@ func dftConfig(nodeDir string) *config.Config {
 			ChainID: testChainID,
 			Mine:    true,
 		},
+		P2p: &config.P2pConfig{},
 		Rpc: &config.RpcConfig{},
 	}
 	cfg.NodeDir = nodeDir

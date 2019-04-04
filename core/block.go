@@ -107,7 +107,7 @@ type Block struct {
 	stateTrie     state.AccountTrie
 	consensusTrie state.ConsensusTrie
 	transactions  Transactions
-	// TODO: receipts
+	receipts      Receipts
 
 	// cache
 	hash       atomic.Value
@@ -172,6 +172,7 @@ func (b *Block) updateHeader() error {
 		return err
 	}
 	b.header.TxsRoot = DeriveHash(b.transactions)
+	b.header.ReceiptsRoot = DeriveHash(b.receipts)
 	if b.pbHeader != nil {
 		log.Crit("update signed header")
 	}
