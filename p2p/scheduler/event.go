@@ -83,6 +83,8 @@ const (
 	EvShellReconfigReq       = EvShellBase + 5
 	EvShellBroadcastReq      = EvShellBase + 6
 	EvShellSubnetUpdateReq   = EvShellBase + 7
+	EvShellGetChainInfoReq   = EvShellBase + 8
+	EvShellGetChainInfoRsp   = EvShellBase + 9
 )
 
 // EvShellPeerActiveInd
@@ -148,6 +150,22 @@ type MsgShellBroadcastReq struct {
 	Data      []byte          // payload bytes
 	LocalSnid []config.NodeID // local sut network identity
 	Exclude   *config.NodeID  // node to be excluded
+}
+
+// EvShellGetChainInfoReq
+type MsgShellGetChainInfoReq struct {
+	Seq			uint64		// sequence
+	Kind		string		// kind
+	Key			[]byte		// key
+}
+
+// EvShellGetChainInfoRsp
+type MsgShellGetChainInfoRsp struct {
+	Peer		interface{}	// peer info pointer
+	Seq			uint64		// sequence
+	Kind		string		// kind
+	Key			[]byte		// key
+	Data		[]byte		// data
 }
 
 //

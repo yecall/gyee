@@ -190,6 +190,10 @@ func (shMgr *ShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = shMgr.broadcastReq(msg.Body.(*sch.MsgShellBroadcastReq))
 	case sch.EvShellSubnetUpdateReq:
 		eno = shMgr.updateLocalSubnetInfo()
+	case sch.EvShellGetChainInfoReq:
+		eno = shMgr.getChainInfoReq(msg.Body.(*sch.MsgShellGetChainInfoReq))
+	case sch.EvShellGetChainInfoRsp:
+		eno = shMgr.getChainInfoRsp(msg.Body.(*sch.MsgShellGetChainInfoRsp))
 	default:
 		chainLog.Debug("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
@@ -278,11 +282,19 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 				} else if rxPkg.MsgId == int(MID_GCD) {
 
-					shMgr.getChainData(rxPkg)
+					if eno := shMgr.getChainDataFromPeer(rxPkg); eno != sch.SchEnoNone {
+						chainLog.Debug("approc: GCD from peer discarded, eno: %d", eno)
+					} else {
+						shMgr.rxChan <- rxPkg
+					}
 
 				} else if rxPkg.MsgId == int(MID_PCD) {
 
-					shMgr.putChainData(rxPkg)
+					if eno := shMgr.putChainDataFromPeer(rxPkg); eno != sch.SchEnoNone {
+						chainLog.Debug("approc: PCD from peer discarded, eno: %d", eno)
+					} else {
+						shMgr.rxChan <- rxPkg
+					}
 
 				} else {
 
@@ -663,11 +675,46 @@ func (shMgr *ShellManager) reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchEr
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager) getChainData(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+func (shMgr *ShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	// check if the peer is active currently
+	upkg := new(peer.P2pPackage)
+	upkg.Pid = uint32(rxPkg.ProtoId)
+	upkg.Mid = uint32(rxPkg.MsgId)
+	upkg.Key = rxPkg.Key
+	upkg.PayloadLength = uint32(rxPkg.PayloadLength)
+	upkg.Payload = rxPkg.Payload
+	msg := peer.ExtMessage{}
+	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("getChainDataFromPeer: GetExtMessage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+	if msg.Mid != uint32(MID_GCD) {
+		chainLog.Debug("getChainDataFromPeer: message type mismatched, mid: %d", msg.Mid)
+		return sch.SchEnoUserTask
+	}
+
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+
+	spid := shellPeerID{
+		snid:   rxPkg.PeerInfo.Snid,
+		dir:    rxPkg.PeerInfo.Dir,
+		nodeId: rxPkg.PeerInfo.NodeId,
+	}
+	pai, ok := shMgr.peerActived[spid]
+	if !ok {
+		chainLog.Debug("getChainDataFromPeer: active peer not found, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
+	if pai.status != pisActive {
+		chainLog.Debug("getChainDataFromPeer: peer not active, spid: %+v", spid)
+		return sch.SchEnoNotFound
+	}
 	return sch.SchEnoNone
 }
 
-func (shMgr *ShellManager) putChainData(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+func (shMgr *ShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	// nothing to do
 	return sch.SchEnoNone
 }
 
@@ -734,6 +781,55 @@ func (shMgr *ShellManager) reportKey2Peer(spi *shellPeerInst, key *config.DsKey,
 	return nil
 }
 
+func (shMgr *ShellManager) getChainData2Peer(spi *shellPeerInst, req *sch.MsgShellGetChainInfoReq) error {
+	if len(spi.txChan) >= cap(spi.txChan) {
+		chainLog.Debug("getChainData2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
+			spi.snid, spi.dir, spi.nodeId)
+		if spi.txDiscrd += 1; spi.txDiscrd&0x1f == 0 {
+			chainLog.Debug("getChainData2Peer：sind: %x, dir: %d, txDiscrd: %d",
+				spi.snid, spi.dir, spi.txDiscrd)
+		}
+		return sch.SchEnoResource
+	}
+	gcd := peer.GetChainData {
+		Seq: req.Seq,
+		Name: req.Kind,
+		Key: req.Key,
+	}
+	upkg := new(peer.P2pPackage)
+	if eno := upkg.GetChainData(spi.pi, &gcd, false); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("getChainData2Peer: CheckKey failed, eno: %d", eno)
+		return errors.New("getChainData2Peer: ReportKey failed")
+	}
+	spi.txChan <- upkg
+	return nil
+}
+
+func (shMgr *ShellManager) putChainData2Peer(spi *shellPeerInst, rsp *sch.MsgShellGetChainInfoRsp) error {
+	if len(spi.txChan) >= cap(spi.txChan) {
+		chainLog.Debug("putChainData2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
+			spi.snid, spi.dir, spi.nodeId)
+		if spi.txDiscrd += 1; spi.txDiscrd&0x1f == 0 {
+			chainLog.Debug("putChainData2Peer：sind: %x, dir: %d, txDiscrd: %d",
+				spi.snid, spi.dir, spi.txDiscrd)
+		}
+		return sch.SchEnoResource
+	}
+	pcd := peer.PutChainData {
+		Seq: rsp.Seq,
+		Name: rsp.Kind,
+		Key: rsp.Key,
+		Data: rsp.Data,
+	}
+	upkg := new(peer.P2pPackage)
+	if eno := upkg.PutChainData(spi.pi, &pcd, false); eno != peer.PeMgrEnoNone {
+		chainLog.Debug("putChainData2Peer: CheckKey failed, eno: %d", eno)
+		return errors.New("putChainData2Peer: ReportKey failed")
+	}
+	spi.txChan <- upkg
+	return nil
+}
+
 func (shMgr *ShellManager) updateLocalSubnetInfo() sch.SchErrno {
 _update_again:
 	snids, nodes := shMgr.ptrPeMgr.GetLocalSubnetInfo()
@@ -744,6 +840,48 @@ _update_again:
 	}
 	shMgr.localSnid = snids
 	shMgr.localNode = nodes
+	return sch.SchEnoNone
+}
+
+func (shMgr *ShellManager)getChainInfoReq(msg *sch.MsgShellGetChainInfoReq) sch.SchErrno {
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+	failCount := 0
+	for _, pe := range shMgr.peerActived {
+		if pe.status == pisActive {
+			if err := shMgr.getChainData2Peer(pe, msg); err != nil {
+				chainLog.Debug("getChainInfoReq: getChainData2Peer failed, error: %s", err.Error())
+				failCount += 1
+			}
+		}
+	}
+	if failCount == len(shMgr.peerActived) {
+		return sch.SchEnoResource
+	}
+	return sch.SchEnoNone
+}
+
+func (shMgr *ShellManager)getChainInfoRsp(msg *sch.MsgShellGetChainInfoRsp) sch.SchErrno {
+	peerInfo, ok := msg.Peer.(*peer.PeerInfo)
+	if !ok {
+		panic("getChainInfoRsp: invalid peer info pointer")
+	}
+	pid := shellPeerID {
+		snid: peerInfo.Snid,
+		dir: peerInfo.Dir,
+		nodeId: peerInfo.NodeId,
+	}
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+	pai, ok := shMgr.peerActived[pid]
+	if !ok || pai == nil {
+		chainLog.Debug("getChainInfoRsp: peer not found: %+v", *peerInfo)
+		return sch.SchEnoNotFound
+	}
+	if err := shMgr.putChainData2Peer(pai, msg); err != nil {
+		chainLog.Debug("getChainInfoRsp: putChainData2Peer failed, error: %s", err.Error())
+		return sch.SchEnoResource
+	}
 	return sch.SchEnoNone
 }
 

@@ -148,14 +148,16 @@ message ExtMessage {
     }
 
     message GetChainData {
-        required bytes      Kind        = 1;    // kind
-        required bytes      Key         = 2;    // key
+        required uint64     Seq         = 1;    // sequence number
+        required bytes      Kind        = 2;    // kind
+        required bytes      Key         = 3;    // key
     }
 
     message PutChainData {
-        required bytes      Kind        = 1;    // kind
-        required bytes      Key         = 2;    // key
-        required bytes      data        = 3;    // chain data
+        required uint64     Seq         = 1;    // sequence number
+        required bytes      Kind        = 2;    // kind
+        required bytes      Key         = 3;    // key
+        required bytes      data        = 4;    // chain data
     }
 
     required MessageId      mid             = 1;    // message identity

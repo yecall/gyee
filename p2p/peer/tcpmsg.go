@@ -144,6 +144,25 @@ type ReportKey struct {
 }
 
 //
+// Get chain data
+//
+type GetChainData struct {
+	Seq		uint64	// sequence number
+	Name	string	// name
+	Key		[]byte	// key
+}
+
+//
+// Put chain data
+//
+type PutChainData struct {
+	Seq		uint64	// sequence number
+	Name	string	// name
+	Key		[]byte	// key
+	Data	[]byte	// data
+}
+
+//
 // Package for TCP message
 //
 type P2pPackage struct {
@@ -170,9 +189,11 @@ type P2pMessage struct {
 // Message for external TCP message
 //
 type ExtMessage struct {
-	Mid  uint32     // message identity
-	Chkk *CheckKey  // check key message
-	Rptk *ReportKey // report key message
+	Mid		uint32     		// message identity
+	Chkk	*CheckKey  		// check key message
+	Rptk	*ReportKey		// report key message
+	Gcd		*GetChainData	// get chain data
+	Pcd		*PutChainData	// put chain data
 }
 
 //
@@ -471,11 +492,13 @@ func (upkg *P2pPackage) CheckKey(inst *PeerInstance, chkk *CheckKey, write bool)
 	}
 
 	if !write {
+
 		upkg.Pid = uint32(PID_EXT)
 		upkg.Mid = uint32(*pbChkk.Mid)
 		upkg.Key = append(upkg.Key, chkk.Key...)
 		upkg.PayloadLength = uint32(len(payload))
 		upkg.Payload = append(upkg.Payload, payload...)
+
 	} else {
 
 		pbPkg := pb.P2PPackage{
@@ -565,6 +588,20 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 }
 
 //
+// Get chain data
+//
+func (upkg *P2pPackage) GetChainData(inst *PeerInstance, rptk *GetChainData, write bool) PeMgrErrno {
+	return PeMgrEnoNone
+}
+
+//
+// Put chain data
+//
+func (upkg *P2pPackage) PutChainData(inst *PeerInstance, rptk *PutChainData, write bool) PeMgrErrno {
+	return PeMgrEnoNone
+}
+
+//
 // Send user packege
 //
 
@@ -638,7 +675,11 @@ func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 	upkg.PayloadLength = *pkg.PayloadLength
 	if upkg.Pid == uint32(PID_EXT) {
 		upkg.Mid = uint32(*pkg.ExtMid)
-		upkg.Key = append(upkg.Key[0:], pkg.ExtKey...)
+		if len(pkg.ExtKey) > 0 {
+			upkg.Key = append(upkg.Key[0:], pkg.ExtKey...)
+		} else {
+			upkg.Key = make([]byte, 0)
+		}
 	}
 	if upkg.PayloadLength > 0 {
 		upkg.Payload = append(upkg.Payload, pkg.Payload...)

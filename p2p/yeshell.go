@@ -35,6 +35,7 @@ import (
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
+	"strings"
 )
 
 //
@@ -63,6 +64,7 @@ const (
 	yesMaxFindNode    = 4                   // max find node commands in pending
 	yesMaxGetProvider = 4                   // max get provider commands in pending
 	yesMaxPutProvider = 4                   // max put provider commands in pending
+	yesGetChainDataTm = time.Second * 8		// duration for get chain data
 )
 
 var yesMtAtoi = map[string]int{
@@ -122,6 +124,12 @@ type YeShellManager struct {
 	bsTicker       *time.Ticker                     // bootstrap ticker
 	dhtBsChan      chan bool                        // bootstrap ticker channel
 	cp             ChainProvider                    // interface registered to p2p for "get chain data" message
+	gcdLock		   sync.Mutex						// get chain data lock
+	gcdChan        chan []byte						// get chain data channel
+	gcdTimer       *time.Timer						// get chain data timer
+	gcdSeq         uint64							// get chain data sequence number
+	gcdName        string							// get chain data name
+	gcdKey         []byte							// get chain data key
 }
 
 const MaxSubNetMaskBits = 15 // max number of mask bits for sub network identity
@@ -631,8 +639,69 @@ func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
 }
 
 func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, error) {
-	// TODO:
-	return nil, nil
+	if yeShMgr.gcdTimer != nil || yeShMgr.gcdChan != nil {
+		return nil, errors.New("GetChainInfo: previous GCD exist")
+	}
+	yeShMgr.gcdChan = make(chan []byte, 0)
+	yeShMgr.gcdTimer = time.NewTimer(yesGetChainDataTm)
+	defer yeShMgr.gcdTimer.Stop()
+
+	gcdCleanUp := func() {
+		yeShMgr.gcdSeq = 0
+		yeShMgr.gcdName = ""
+		yeShMgr.gcdKey = make([]byte, 0)
+	}
+	defer gcdCleanUp()
+
+	yeShMgr.gcdSeq = uint64(time.Now().UnixNano())
+	yeShMgr.gcdName = kind
+	yeShMgr.gcdKey = key
+
+	msg := new(sch.SchMessage)
+	req := sch.MsgShellGetChainInfoReq {
+		Seq: yeShMgr.gcdSeq,
+		Kind: yeShMgr.gcdName,
+		Key: yeShMgr.gcdKey,
+	}
+	yeShMgr.chainInst.SchMakeMessage(msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
+	if eno := yeShMgr.chainInst.SchSendMessage(msg); eno != sch.SchEnoNone {
+		yesLog.Debug("GetChainInfo: SchSendMessage failed, eno: %d", eno)
+		return nil, eno
+	}
+
+	chainData := ([]byte)(nil)
+	gcdOk := false
+
+	select {
+	case <-yeShMgr.gcdTimer.C:
+
+		yeShMgr.gcdLock.Lock()
+
+		close(yeShMgr.gcdChan)
+		yeShMgr.gcdChan = nil
+
+		yeShMgr.gcdLock.Unlock()
+		return nil, errors.New("GetChainInfo: timeout")
+
+	case chainData, gcdOk = <-yeShMgr.gcdChan:
+
+		yeShMgr.gcdLock.Lock()
+
+		if gcdOk {
+			close(yeShMgr.gcdChan)
+		}
+		yeShMgr.gcdChan = nil
+
+		yeShMgr.gcdLock.Unlock()
+	}
+
+	if !gcdOk{
+		return nil, errors.New("GetChainInfo: channel closed")
+	}
+	if  len(chainData) == 0 {
+		return nil, errors.New("GetChainInfo: empty")
+	}
+	return chainData, nil
 }
 
 func (yeShMgr *YeShellManager) DhtFindNode(target *config.NodeID, done chan interface{}) error {
@@ -867,41 +936,50 @@ _rxLoop:
 				continue
 			}
 
-			k := [yesKeyBytes]byte{}
-			copy(k[0:], pkg.Key)
-			if yeShMgr.checkDupKey(k) {
-				continue
-			}
+			if pkg.MsgId == int(p2psh.MID_GCD) {
 
-			//yesLog.Debug("chainRxProc: peer info: %+v, pkg: %+v", *pkg.PeerInfo, *pkg)
+				yeShMgr.getChainDataFromPeer(pkg)
 
-			msgType := yesMidItoa[pkg.MsgId]
-			if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
-				subList.(*sync.Map).Range(func(key, value interface{}) bool {
-					msg := Message{
-						MsgType: msgType,
-						From:    fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
-						Key:     pkg.Key,
-						Data:    pkg.Payload,
-					}
+			} else if pkg.MsgId == int(p2psh.MID_PCD) {
 
-					sub, _ := key.(*Subscriber)
-					sub.MsgChan <- msg
-					exclude := pkg.PeerInfo.NodeId
+				yeShMgr.putChainDataFromPeer(pkg)
 
-					err := error(nil)
-					switch msg.MsgType {
-					case MessageTypeTx:
-						err = yeShMgr.broadcastTxOsn(&msg, &exclude)
-					case MessageTypeEvent:
-						err = yeShMgr.broadcastEvOsn(&msg, &exclude, false)
-					case MessageTypeBlockHeader:
-						err = yeShMgr.broadcastBhOsn(&msg, &exclude)
-					default:
-						err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
-					}
-					return err == nil
-				})
+			} else {
+
+				k := [yesKeyBytes]byte{}
+				copy(k[0:], pkg.Key)
+				if yeShMgr.checkDupKey(k) {
+					continue
+				}
+
+				msgType := yesMidItoa[pkg.MsgId]
+				if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
+					subList.(*sync.Map).Range(func(key, value interface{}) bool {
+						msg := Message{
+							MsgType: msgType,
+							From:    fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
+							Key:     pkg.Key,
+							Data:    pkg.Payload,
+						}
+
+						sub, _ := key.(*Subscriber)
+						sub.MsgChan <- msg
+						exclude := pkg.PeerInfo.NodeId
+
+						err := error(nil)
+						switch msg.MsgType {
+						case MessageTypeTx:
+							err = yeShMgr.broadcastTxOsn(&msg, &exclude)
+						case MessageTypeEvent:
+							err = yeShMgr.broadcastEvOsn(&msg, &exclude, false)
+						case MessageTypeBlockHeader:
+							err = yeShMgr.broadcastBhOsn(&msg, &exclude)
+						default:
+							err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
+						}
+						return err == nil
+					})
+				}
 			}
 		}
 	}
@@ -1308,6 +1386,71 @@ func (yeShMgr *YeShellManager) checkDupKey(k yesKey) bool {
 	return dup
 }
 
+func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	upkg := new(peer.P2pPackage)
+	upkg.Pid = uint32(rxPkg.ProtoId)
+	upkg.Mid = uint32(rxPkg.MsgId)
+	upkg.Key = rxPkg.Key
+	upkg.PayloadLength = uint32(rxPkg.PayloadLength)
+	upkg.Payload = rxPkg.Payload
+
+	msg := peer.ExtMessage{}
+	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
+		yesLog.Debug("getChainDataFromPeer: GetExtMessage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
+	if yeShMgr.cp != nil {
+		data := yeShMgr.cp.GetChainData(msg.Gcd.Name, msg.Gcd.Key)
+		if len(data) > 0 {
+			rsp := sch.MsgShellGetChainInfoRsp {
+				Peer: rxPkg.PeerInfo,
+				Seq: msg.Gcd.Seq,
+				Kind: msg.Gcd.Name,
+				Key: msg.Gcd.Key,
+			}
+			schMsg := new(sch.SchMessage)
+			yeShMgr.chainInst.SchMakeMessage(schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell,
+				sch.EvShellGetChainInfoRsp, &rsp)
+			yeShMgr.chainInst.SchSendMessage(schMsg)
+			return sch.SchEnoNone
+		}
+	}
+	return sch.SchEnoResource
+}
+
+func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
+	yeShMgr.gcdLock.Lock()
+	defer yeShMgr.gcdLock.Unlock()
+
+	upkg := new(peer.P2pPackage)
+	upkg.Pid = uint32(rxPkg.ProtoId)
+	upkg.Mid = uint32(rxPkg.MsgId)
+	upkg.Key = rxPkg.Key
+	upkg.PayloadLength = uint32(rxPkg.PayloadLength)
+	upkg.Payload = rxPkg.Payload
+
+	msg := peer.ExtMessage{}
+	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
+		yesLog.Debug("putChainDataFromPeer: GetExtMessage failed, eno: %d", eno)
+		return sch.SchEnoUserTask
+	}
+
+	if msg.Pcd.Seq == yeShMgr.gcdSeq &&
+		bytes.Compare(msg.Pcd.Key, yeShMgr.gcdKey) == 0 &&
+		strings.Compare(msg.Pcd.Name, yeShMgr.gcdName) == 0 {
+		if yeShMgr.gcdChan != nil {
+			yeShMgr.gcdChan <- msg.Pcd.Data
+			return sch.SchEnoNone
+		}
+	}
+
+	yesLog.Debug("putChainDataFromPeer: discarded, seq: %d, name: %s, key: %x",
+		msg.Pcd.Seq, msg.Pcd.Name, msg.Pcd.Key)
+
+	return sch.SchEnoNone
+}
+
 func Snid2Int(snid config.SubNetworkID) int {
 	return (int(snid[0]) << 8) + int(snid[1])
 }
@@ -1442,3 +1585,4 @@ func (snd *SubnetDescriptor) GetSubnetDescriptorList() *[]SingleSubnetDescriptor
 	}
 	return &ssdl
 }
+
