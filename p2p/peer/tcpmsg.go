@@ -487,7 +487,7 @@ func (upkg *P2pPackage) CheckKey(inst *PeerInstance, chkk *CheckKey, write bool)
 	pbChkk.CheckKey.Extra = append(pbChkk.CheckKey.Extra, chkk.Extra...)
 	payload, err := proto.Marshal(&pbChkk)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("chkk: empty payload")
+		tcpmsgLog.Debug("CheckKey: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -522,7 +522,7 @@ func (upkg *P2pPackage) CheckKey(inst *PeerInstance, chkk *CheckKey, write bool)
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("chkk: Write failed, err: %s", err.Error())
+			tcpmsgLog.Debug("CheckKey: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -548,11 +548,12 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 
 	payload, err := proto.Marshal(&pbRptk)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("rptk: empty payload")
+		tcpmsgLog.Debug("ReportKey: empty payload")
 		return PeMgrEnoMessage
 	}
 
 	if !write {
+
 		upkg.Pid = uint32(PID_EXT)
 		upkg.Mid = uint32(*pbRptk.Mid)
 		upkg.Key = append(upkg.Key, rptk.Key...)
@@ -560,6 +561,7 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 		upkg.Payload = append(upkg.Payload, payload...)
 
 	} else {
+
 		pbPkg := pb.P2PPackage{
 			Pid:           new(pb.ProtocolId),
 			ExtMid:        new(pb.MessageId),
@@ -579,7 +581,7 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("rptk: Write failed, err: %s", err.Error())
+			tcpmsgLog.Debug("ReportKey: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -590,14 +592,121 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 //
 // Get chain data
 //
-func (upkg *P2pPackage) GetChainData(inst *PeerInstance, rptk *GetChainData, write bool) PeMgrErrno {
+func (upkg *P2pPackage) GetChainData(inst *PeerInstance, gcd *GetChainData, write bool) PeMgrErrno {
+	pbGcd := pb.ExtMessage{
+		Mid: new(pb.MessageId),
+		GetChainData: &pb.ExtMessage_GetChainData{
+			Seq: new(uint64),
+			Kind: []byte(gcd.Name),
+			Key: make([]byte, 0),
+		},
+	}
+	*pbGcd.Mid = MID_RPTK
+	*pbGcd.GetChainData.Seq = gcd.Seq
+	pbGcd.GetChainData.Key = append(pbGcd.GetChainData.Key, gcd.Key...)
+
+	payload, err := proto.Marshal(&pbGcd)
+	if len(payload) == 0 || err != nil {
+		tcpmsgLog.Debug("GetChainData: empty payload")
+		return PeMgrEnoMessage
+	}
+
+	if !write {
+
+		upkg.Pid = uint32(PID_EXT)
+		upkg.Mid = uint32(*pbGcd.Mid)
+		upkg.Key = nil
+		upkg.PayloadLength = uint32(len(payload))
+		upkg.Payload = append(upkg.Payload, payload...)
+
+	} else {
+
+		pbPkg := pb.P2PPackage{
+			Pid:           new(pb.ProtocolId),
+			ExtMid:        new(pb.MessageId),
+			PayloadLength: new(uint32),
+			Payload:       make([]byte, 0),
+		}
+		*pbPkg.Pid = PID_EXT
+		*pbPkg.ExtMid = *pbGcd.Mid
+		pbPkg.ExtKey = nil
+		pbPkg.Payload = append(pbPkg.Payload, payload...)
+		*pbPkg.PayloadLength = uint32(len(payload))
+
+		if inst.ato != time.Duration(0) {
+			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		} else {
+			inst.conn.SetWriteDeadline(time.Time{})
+		}
+
+		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+			tcpmsgLog.Debug("GetChainData: Write failed, err: %s", err.Error())
+			return PeMgrEnoOs
+		}
+	}
+
 	return PeMgrEnoNone
 }
 
 //
 // Put chain data
 //
-func (upkg *P2pPackage) PutChainData(inst *PeerInstance, rptk *PutChainData, write bool) PeMgrErrno {
+func (upkg *P2pPackage) PutChainData(inst *PeerInstance, pcd *PutChainData, write bool) PeMgrErrno {
+	
+	pbPcd := pb.ExtMessage{
+		Mid: new(pb.MessageId),
+		PutChainData: &pb.ExtMessage_PutChainData{
+			Seq: new(uint64),
+			Kind: []byte(pcd.Name),
+			Key: make([]byte, 0),
+			Data: make([]byte, 0),
+		},
+	}
+	*pbPcd.Mid = MID_RPTK
+	*pbPcd.PutChainData.Seq = pcd.Seq
+	pbPcd.PutChainData.Key = append(pbPcd.PutChainData.Key, pcd.Key...)
+	pbPcd.PutChainData.Data = append(pbPcd.PutChainData.Data, pcd.Data...)
+
+	payload, err := proto.Marshal(&pbPcd)
+	if len(payload) == 0 || err != nil {
+		tcpmsgLog.Debug("PutChainData: empty payload")
+		return PeMgrEnoMessage
+	}
+
+	if !write {
+
+		upkg.Pid = uint32(PID_EXT)
+		upkg.Mid = uint32(*pbPcd.Mid)
+		upkg.Key = nil
+		upkg.PayloadLength = uint32(len(payload))
+		upkg.Payload = append(upkg.Payload, payload...)
+
+	} else {
+
+		pbPkg := pb.P2PPackage{
+			Pid:           new(pb.ProtocolId),
+			ExtMid:        new(pb.MessageId),
+			PayloadLength: new(uint32),
+			Payload:       make([]byte, 0),
+		}
+		*pbPkg.Pid = PID_EXT
+		*pbPkg.ExtMid = *pbPcd.Mid
+		pbPkg.ExtKey = nil
+		pbPkg.Payload = append(pbPkg.Payload, payload...)
+		*pbPkg.PayloadLength = uint32(len(payload))
+
+		if inst.ato != time.Duration(0) {
+			inst.conn.SetWriteDeadline(time.Now().Add(inst.ato))
+		} else {
+			inst.conn.SetWriteDeadline(time.Time{})
+		}
+
+		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
+			tcpmsgLog.Debug("PutChainData: Write failed, err: %s", err.Error())
+			return PeMgrEnoOs
+		}
+	}
+
 	return PeMgrEnoNone
 }
 
@@ -751,6 +860,8 @@ func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 	extMsg.Mid = uint32(*pbMsg.Mid)
 	extMsg.Chkk = nil
 	extMsg.Rptk = nil
+	extMsg.Gcd = nil
+	extMsg.Pcd = nil
 	if extMsg.Mid == uint32(MID_CHKK) {
 		chkk := new(CheckKey)
 		chkk.Key = append(chkk.Key, upkg.Key...)
@@ -760,6 +871,19 @@ func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 		rptk.Key = append(rptk.Key, upkg.Key...)
 		rptk.Status = int32(*pbMsg.ReportKey.Status)
 		extMsg.Rptk = rptk
+	} else if extMsg.Mid == uint32(MID_GCD) {
+		gcd := new(GetChainData)
+		gcd.Seq = *pbMsg.GetChainData.Seq
+		gcd.Name = string(pbMsg.GetChainData.Kind[:])
+		gcd.Key = append(gcd.Key, pbMsg.GetChainData.Key...)
+		extMsg.Gcd = gcd
+	} else if extMsg.Mid == uint32(MID_PCD) {
+		pcd := new(PutChainData)
+		pcd.Seq = *pbMsg.PutChainData.Seq
+		pcd.Name = string(pbMsg.PutChainData.Kind[:])
+		pcd.Key = append(pcd.Key, pbMsg.PutChainData.Key...)
+		pcd.Data = append(pcd.Data, pbMsg.PutChainData.Data...)
+		extMsg.Pcd = pcd
 	} else {
 		tcpmsgLog.Debug("GetExtMessage: "+
 			"unknown message identity: %d",
@@ -809,6 +933,14 @@ func (ck *CheckKey) String() string {
 
 func (rk *ReportKey) String() string {
 	return fmt.Sprintf("ReportKey: status: %d, key: %x", rk.Status, rk.Key)
+}
+
+func (gcd *GetChainData) String() string {
+	return fmt.Sprintf("GetChainData: seq: %d, name: %s, key: %x", gcd.Seq, gcd.Name, gcd.Key)
+}
+
+func (pcd *PutChainData) String() string {
+	return fmt.Sprintf("PutChainData: seq: %d, name: %s, key: %x, data: %x", pcd.Seq, pcd.Name, pcd.Key, pcd.Data)
 }
 
 func (upkg *P2pPackage) DebugPeerPackage() {
