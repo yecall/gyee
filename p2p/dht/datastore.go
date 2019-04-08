@@ -801,7 +801,7 @@ func (dsMgr *DsMgr) getFileDatastoreConfig(fdc *FileDatastoreConfig) DhtErrno {
 // get levelDB data store configuration
 //
 func (dsMgr *DsMgr) getLeveldbDatastoreConfig(ldc *LeveldbDatastoreConfig) DhtErrno {
-
+	// currently use the same parent dir as that file datastore.
 	cfg := config.P2pConfig4DhtFileDatastore(dsMgr.sdl.SchGetP2pCfgName())
 	dsMgr.ldsCfg = LeveldbDatastoreConfig{
 		Path:                   path.Join(cfg.Path, "lds"),

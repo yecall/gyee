@@ -1083,7 +1083,7 @@ func P2pConfig4DhtQryManager(name string) *Cfg4DhtQryManager {
 func P2pConfig4DhtFileDatastore(name string) *Cfg4DhtFileDatastore {
 	dir := config[name].DhtFdsCfg.Path
 	inst := config[name].Name
-	config[name].DhtFdsCfg.Path = filepath.Join(dir, inst, "fds")
+	config[name].DhtFdsCfg.Path = filepath.Join(dir, inst)
 	return &config[name].DhtFdsCfg
 }
 

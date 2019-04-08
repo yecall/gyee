@@ -234,13 +234,17 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	chainCfg.AppType = config.P2P_TYPE_CHAIN
 	chainCfg.Name = yesCfg.Name
 	chainCfg.NodeDataDir = yesCfg.NodeDataDir
+	chainCfg.DhtFdsCfg.Path = yesCfg.NodeDataDir
 	if yesCfg.NodeDatabase != "" {
 		chainCfg.NodeDatabase = yesCfg.NodeDatabase
 	}
 
-	p2plog.Debug("YeShellConfigToP2pCfg: LocalNodeIp: %s, LocalUdpPort: %d, LocalTcpPort: %d",
-		yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort)
-	if config.P2pSetLocalIpAddr(chainCfg, yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort) != config.P2pCfgEnoNone {
+	p2plog.Debug("YeShellConfigToP2pCfg: local addr: chain[%s:%d:%d], dht[%s:%d]",
+		yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort,
+		yesCfg.LocalDhtIp, yesCfg.LocalDhtPort)
+
+	if config.P2pSetLocalIpAddr(chainCfg, yesCfg.LocalNodeIp, yesCfg.LocalUdpPort,
+		yesCfg.LocalTcpPort) != config.P2pCfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalIpAddr failed")
 		return nil
 	}

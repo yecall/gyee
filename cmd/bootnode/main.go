@@ -59,6 +59,7 @@ func main() {
 			log.Crit("failed to save nodekey", "err", err)
 			os.Exit(-1)
 		}
+		fmt.Printf("key saved ok to %s", kf)
 		os.Exit(0)
 	}
 
@@ -78,7 +79,7 @@ func main() {
 			log.Crit("failed to parse nodeID")
 			os.Exit(-1)
 		}
-		fmt.Printf("%x\n", *nodeID)
+		fmt.Printf("\n\t%x\n", *nodeID)
 		os.Exit(0)
 	}
 
