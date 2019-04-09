@@ -363,13 +363,23 @@ _loop:
 	// for details pls.
 	// If it's an abnormal case that the reader task still in running, we
 	// need to make it done.
-	if udpReader.lsnMgr.conn == nil {
-		udpReader.sdl.SchTaskDone(udpReader.ptnMe, eno)
-	} else {
-		eno = udpReader.lsnMgr.procStop()
+	if udpReader.sdl.SchGetPoweroffStage() {
+		eno = udpReader.sdl.SchTaskDone(udpReader.ptnMe, eno)
+		goto _udpReaderLoop_exit
 	}
+
+	udpReader.lsnMgr.lock.Lock()
+	if udpReader.lsnMgr.conn == nil {
+		eno = udpReader.sdl.SchTaskDone(udpReader.ptnMe, eno)
+		udpReader.lsnMgr.lock.Unlock()
+		goto _udpReaderLoop_exit
+	}
+
+	udpReader.lsnMgr.lock.Unlock()
+	eno = udpReader.lsnMgr.procStop()
+
+_udpReaderLoop_exit:
 	lsnLog.Debug("udpReaderLoop: exit ...")
-	udpReader.conn = nil
 	return eno
 }
 
