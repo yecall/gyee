@@ -276,7 +276,6 @@ func liyy() {
 	cfg := config.GetDefaultConfig()
 	cfg.P2p.NatType = "upnp"
 	cfg.P2p.GatewayIp = "192.168.1.1"
-	cfg.P2p.LocalDhtPort = 40405
 	p2p, err := p2p.NewOsnServiceWithCfg(cfg)
 	if err != nil {
 		log.Debug("liyy: NewOsnServiceWithCfg failed")
