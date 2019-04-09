@@ -44,7 +44,7 @@ type P2pLogger struct {
 }
 
 var (
-	GyeeProject                 = false // is playing in github.com/yeeco/gyee project
+	GyeeProject                 = true // is playing in github.com/yeeco/gyee project
 	GlobalLogger *logrus.Logger = nil   // the global logger
 	Level                       = logrus.DebugLevel
 	Skip                        = 2
@@ -103,14 +103,14 @@ func (p2pLog *P2pLogger) Debug(format string, args ...interface{}) {
 
 func Debug(format string, args ...interface{}) {
 	if !LogPosition {
-		GlobalLogger.Debugf(format, args...)
-		//log.Printf(format, args...)
+		//GlobalLogger.Debugf(format, args...)
+		log.Printf(format, args...)
 	} else {
 		_, file, line, _ := runtime.Caller(Skip)
 		text := fmt.Sprintf(format, args...)
 		fileLine := fmt.Sprintf("file: %s, line: %d", file, line)
-		GlobalLogger.Debugf("%s\n%s", text, fileLine)
-		//log.Printf("%s\n%s", text, fileLine)
+		//GlobalLogger.Debugf("%s\n%s", text, fileLine)
+		log.Printf("%s\n%s", text, fileLine)
 	}
 }
 

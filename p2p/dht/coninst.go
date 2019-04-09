@@ -44,8 +44,8 @@ type coninstLogger struct {
 }
 
 var ciLog = coninstLogger{
-	debug__:      false,
-	debugForce__: false,
+	debug__:      true,
+	debugForce__: true,
 }
 
 func (log coninstLogger) Debug(fmt string, args ...interface{}) {
@@ -938,7 +938,7 @@ func (conInst *ConInst) connect2Peer() DhtErrno {
 
 	if conn, err = dialer.Dial("tcp", addr.String()); err != nil {
 		ciLog.Debug("connect2Peer: "+
-			"dial failed, inst: %s, local: %s, to: %s, err: %s",
+			"dial failed, inst: %s, dir: %d, local: %s, to: %s, err: %s",
 			conInst.name, conInst.dir, conInst.local.IP.String(),
 			addr.String(), err.Error())
 		return DhtEnoOs

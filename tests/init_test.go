@@ -25,6 +25,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"os/signal"
 
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
@@ -35,6 +36,7 @@ import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/p2p"
+	"os"
 )
 
 const testChainID = uint32(1)
@@ -263,4 +265,30 @@ func dftConfig(nodeDir string) *config.Config {
 	cfg.NodeDir = nodeDir
 
 	return cfg
+}
+
+// for debug by liyy, 20190409
+func TestLiyy(t *testing.T) {
+	liyy()
+}
+
+func liyy() {
+	cfg := config.GetDefaultConfig()
+	cfg.P2p.NatType = "upnp"
+	cfg.P2p.GatewayIp = "192.168.1.1"
+	cfg.P2p.LocalDhtPort = 40405
+	p2p, err := p2p.NewOsnServiceWithCfg(cfg)
+	if err != nil {
+		log.Debug("liyy: NewOsnServiceWithCfg failed")
+		return
+	}
+
+	p2p.Start()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	defer signal.Stop(sig)
+	<-sig
+
+	p2p.Stop()
 }

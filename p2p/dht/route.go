@@ -22,13 +22,13 @@ package dht
 
 import (
 	"bytes"
+	"time"
+	"fmt"
 	"container/list"
 	"crypto/rand"
 	"crypto/sha256"
-	"fmt"
 	golog "log"
 	mrand "math/rand"
-	"time"
 
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
@@ -1406,7 +1406,7 @@ func (rutMgr *RutMgr) rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 // Just for debug to show the route table
 //
 func (rutMgr *RutMgr) showRoute(tag string) {
-	if false {
+	if true {
 		dht := rutMgr.sdl.SchGetP2pCfgName()
 		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
 		rt := rutMgr.rutTab
