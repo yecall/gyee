@@ -233,3 +233,18 @@ func (ih *InmemHub) SetValue(key []byte, value []byte) error {
 	//ih.dht[string(key)] = value
 	return nil
 }
+
+func (ih *InmemHub) getChainInfo(node *InmemService, kind string, key []byte) ([]byte, error) {
+	ih.lock.RLock()
+	defer ih.lock.RUnlock()
+	for n := range ih.nodes {
+		if node == n {
+			continue
+		}
+		value := n.cp.GetChainData(kind, key)
+		if len(value) > 0 {
+			return value, nil
+		}
+	}
+	return nil, errors.New("not found")
+}
