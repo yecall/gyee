@@ -89,6 +89,8 @@ func main() {
 	}
 
 	nodeCfg := p2p.DefaultYeShellConfig
+	nodeCfg.LocalNodeIp = "0.0.0.0"
+	nodeCfg.LocalDhtIp = "0.0.0.0"
 	if *nodeDataDir != "" && *nodeName != "" {
 		nodeCfg.NodeDataDir = *nodeDataDir
 		nodeCfg.Name = *nodeName
