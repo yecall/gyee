@@ -31,7 +31,7 @@ chain_id = 1
 data_dir = "data"
 key_dir = "keystore"
 genesis = "genesis.toml"
-mine = true
+mine = false
 
 [rpc]
 ipc_path = "gyee.ipc"

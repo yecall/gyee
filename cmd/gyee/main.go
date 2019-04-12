@@ -87,13 +87,16 @@ func gyee(ctx *cli.Context) error {
 	//create and start the node
 	//logging.Logger.SetLevel(logrus.WarnLevel)
 
-	config := config.GetConfig(ctx)
-	node, err := node.NewNode(config)
+	conf := config.GetConfig(ctx)
+	n, err := node.NewNode(conf)
 	if err != nil {
 		logging.Logger.Fatal(err)
 	}
 
-	node.Start()
-	node.WaitForShutdown()
+	if err := n.Start(); err != nil {
+		return err
+	}
+
+	n.WaitForShutdown()
 	return nil
 }

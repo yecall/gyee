@@ -121,15 +121,6 @@ func (n *Node) Start() (err error) {
 		return err
 	}
 
-	// defer stop if anything failed to start
-	defer func() {
-		if err != nil {
-			if errStop := n.Stop(); errStop != nil {
-				log.Error("node: stop for failed start:", errStop)
-			}
-		}
-	}()
-
 	//依次启动p2p，rpc, ipc, blockchain, sync service, consensus
 	if err = n.core.Start(); err != nil {
 		return err
