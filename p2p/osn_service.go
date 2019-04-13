@@ -26,12 +26,11 @@ package p2p
 
 import (
 	"time"
-	"strings"
-	"github.com/pkg/errors"
 
+	"github.com/pkg/errors"
 	yeeCfg "github.com/yeeco/gyee/config"
-	yeelog "github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/p2p/config"
+	yeelog "github.com/yeeco/gyee/utils/logging"
 )
 
 type OsnService struct {
@@ -122,7 +121,7 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	cfg.DhtBootstrapNodes = make([]string, 0)
 	cfg.DhtBootstrapNodes = append(cfg.DhtBootstrapNodes, p2p.DhtBootstrapNodes...)
 
-	if len(p2p.LocalNodeIp) == 0 || strings.Compare(p2p.LocalNodeIp, "0.0.0.0") == 0 {
+	if len(p2p.LocalNodeIp) == 0 {
 		yeelog.Logger.Info("OsnServiceConfig: default LocalNodeIp: %s", cfg.LocalNodeIp)
 	} else {
 		cfg.LocalNodeIp = p2p.LocalNodeIp
@@ -140,7 +139,7 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 		cfg.LocalTcpPort = p2p.LocalTcpPort
 	}
 
-	if len(p2p.LocalDhtIp) == 0 || strings.Compare(p2p.LocalDhtIp, "0.0.0.0") == 0 {
+	if len(p2p.LocalDhtIp) == 0 {
 		yeelog.Logger.Info("OsnServiceConfig: default LocalDhtIp: %s", cfg.LocalDhtIp)
 	} else {
 		cfg.LocalDhtIp = p2p.LocalDhtIp
