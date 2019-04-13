@@ -18,37 +18,35 @@
 package tests
 
 import (
-	"os"
-	"os/signal"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/yeeco/gyee/config"
-	"github.com/yeeco/gyee/log"
-	"github.com/yeeco/gyee/p2p"
+	"github.com/yeeco/gyee/node"
 )
 
-// for debug by liyy, 20190409
-func TestLiyy(t *testing.T) {
-	t.Skip()
-	liyy()
+func TestLocalBootstrapNoTx(t *testing.T) {
+	numNodes := uint(16)
+	doTest(t, numNodes, 60*time.Second, genInMemNode, nil)
 }
 
-func liyy() {
-	cfg := config.GetDefaultConfig()
-	cfg.P2p.NatType = "upnp"
-	cfg.P2p.GatewayIp = "192.168.1.1"
-	p2p, err := p2p.NewOsnServiceWithCfg(cfg)
-	if err != nil {
-		log.Debug("liyy: NewOsnServiceWithCfg failed")
-		return
-	}
+func TestLocalBootstrapWithTx(t *testing.T) {
+	numNodes := uint(16)
+	doTest(t, numNodes, 300*time.Second, genInMemNode,
+		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+			genTestTxs(t, quitCh, wg, nodes, numNodes)
+		})
+}
 
-	p2p.Start()
+func TestBootstrapNoTx(t *testing.T) {
+	numNodes := uint(16)
+	doTest(t, numNodes, 60*time.Second, genDefaultNode, nil)
+}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-	defer signal.Stop(sig)
-	<-sig
-
-	p2p.Stop()
+func TestBootstrapWithTx(t *testing.T) {
+	numNodes := uint(16)
+	doTest(t, numNodes, 300*time.Second, genDefaultNode,
+		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+			genTestTxs(t, quitCh, wg, nodes, numNodes)
+		})
 }
