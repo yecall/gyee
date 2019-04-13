@@ -121,7 +121,7 @@ func GetConfig(ctx *cli.Context) *Config {
 		config.Name = ctx.GlobalString(FlagName(NodeNameFlag.Name))
 	}
 
-	if ctx.GlobalIsSet(NodeDirFlag.Name) {
+	if ctx.GlobalIsSet(FlagName(NodeDirFlag.Name)) {
 		config.NodeDir = ctx.GlobalString(FlagName(NodeDirFlag.Name))
 	}
 

@@ -84,11 +84,14 @@ func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis, p2pSvc p2p.S
 		conf.NodeDir = absdatadir
 		conf.P2p.NodeDataDir = filepath.Join(absdatadir, "p2p")
 	}
+	err := os.MkdirAll(conf.NodeDir, 0755)
+	if err != nil {
+		return nil, err
+	}
 
 	node := &Node{
 		config: conf,
 	}
-	var err error
 
 	node.accountManager, err = accounts.NewAccountManager(conf)
 	if err != nil {
