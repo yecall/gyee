@@ -148,8 +148,7 @@ func (is *InmemService) RegChainProvider(cp ChainProvider) {
 }
 
 func (is *InmemService) GetChainInfo(kind string, key []byte) ([]byte, error) {
-	// TODO:
-	return nil, nil
+	return is.hub.getChainInfo(is, kind, key)
 }
 
 //Inmem Hub for all InmemService

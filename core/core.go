@@ -42,7 +42,9 @@ package core
 import (
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"math/big"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -149,6 +151,7 @@ func (c *Core) Start() error {
 
 	c.blockPool.Start()
 	c.txPool.Start()
+	c.node.P2pService().RegChainProvider(c)
 
 	//如果开启挖矿
 	if c.config.Chain.Mine {
@@ -436,4 +439,71 @@ func getSigner(algorithm crypto.Algorithm) crypto.Signer {
 		log.Warn("wrong crypto algorithm", "algorithm", algorithm)
 		return nil
 	}
+}
+
+func (c *Core) GetChainData(kind string, key []byte) []byte {
+	bc := c.blockChain
+	switch kind {
+	case ChainDataTypeLatestH:
+		return bc.LastBlock().Hash().Bytes()
+	case ChainDataTypeLatestN:
+		return new(big.Int).SetUint64(bc.LastBlock().Number()).Bytes()
+	case ChainDataTypeBlockH:
+		b := bc.GetBlockByHash(common.BytesToHash(key))
+		if b != nil {
+			enc, err := b.ToBytes()
+			if err != nil {
+				log.Warn("block encode failed", "blk", b, "err", err)
+			}
+			return enc
+		}
+	case ChainDataTypeBlockN:
+		n := new(big.Int).SetBytes(key).Uint64()
+		b := bc.GetBlockByNumber(n)
+		if b != nil {
+			enc, err := b.ToBytes()
+			if err != nil {
+				log.Warn("block encode failed", "blk", b, "err", err)
+			}
+			return enc
+		}
+	}
+	return nil
+}
+
+func (c *Core) GetRemoteLatestHash() (*common.Hash, error) {
+	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestH, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(encoded) != common.HashLength {
+		return nil, errors.New(fmt.Sprintf("latest hash length mismatch, got %v", encoded))
+	}
+	return new(common.Hash).SetBytes(encoded), nil
+}
+
+func (c *Core) GetRemoteLatestNumber() (uint64, error) {
+	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestN, nil)
+	if err != nil {
+		return 0, err
+	}
+	n := new(big.Int).SetBytes(encoded).Uint64()
+	return n, nil
+}
+
+func (c *Core) GetRemoteBlockByHash(hash common.Hash) (*Block, error) {
+	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeBlockH, hash[:])
+	if err != nil {
+		return nil, err
+	}
+	return ParseBlock(encoded)
+}
+
+func (c *Core) GetRemoteBlockByNumber(n uint64) (*Block, error) {
+	key := new(big.Int).SetUint64(n).Bytes()
+	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeBlockN, key)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBlock(encoded)
 }

@@ -355,12 +355,15 @@ func (b *Block) Write(putter persistent.Putter) error {
 			return ErrBlockStateTrieMismatch
 		}
 	}
+	var err error
 	// add block header to storage
-	pbHeader, err := b.header.toSignedProto()
-	if err != nil {
-		return err
+	if b.pbHeader == nil {
+		b.pbHeader, err = b.header.toSignedProto()
+		if err != nil {
+			return err
+		}
 	}
-	hashHeader := putHeader(putter, pbHeader)
+	hashHeader := putHeader(putter, b.pbHeader)
 	// add block body to storage
 	body := b.getBody()
 	if body == nil {

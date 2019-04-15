@@ -106,7 +106,7 @@ Exit:
 	log.Info("Total txs sent", totalTxs)
 }
 
-func doTest(t *testing.T, numNodes uint, duration time.Duration,
+func doTest(t *testing.T, numNodes uint, duration time.Duration, viewerDelay time.Duration,
 	genNode func(*config.Config, *core.Genesis) (*node.Node, error),
 	coroutine func(chan struct{}, sync.WaitGroup, []*node.Node)) {
 	var (
@@ -139,6 +139,12 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 	for i, n := range nodes {
 		log.Info("validator", "index", i, "addr", n.Core().MinerAddr())
 	}
+	if coroutine != nil {
+		go coroutine(quitCh, wg, nodes)
+	}
+	if viewerDelay > 0 {
+		time.Sleep(viewerDelay)
+	}
 	const numViewers = 2
 	viewers := make([]*node.Node, 0, numViewers)
 	for i := uint(0); i < numViewers; i++ {
@@ -154,10 +160,7 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration,
 		}
 		viewers = append(viewers, n)
 	}
-	if coroutine != nil {
-		go coroutine(quitCh, wg, nodes)
-	}
-	time.Sleep(duration)
+	time.Sleep(duration - viewerDelay)
 	close(quitCh)
 	wg.Wait()
 	// check node chains

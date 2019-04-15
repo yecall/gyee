@@ -115,8 +115,7 @@ func (t *Transaction) Hash() *common.Hash {
 		if err != nil {
 			log.Crit("wrong tx hash")
 		}
-		t.hash = new(common.Hash)
-		t.hash.SetBytes(sha3.Sha3256(enc))
+		t.hash = new(common.Hash).SetBytes(sha3.Sha3256(enc))
 	}
 	return t.hash
 }

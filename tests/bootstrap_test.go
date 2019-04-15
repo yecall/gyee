@@ -27,12 +27,20 @@ import (
 
 func TestLocalBootstrapNoTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 60*time.Second, genInMemNode, nil)
+	doTest(t, numNodes, 60*time.Second, 0, genInMemNode, nil)
 }
 
 func TestLocalBootstrapWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 300*time.Second, genInMemNode,
+	doTest(t, numNodes, 300*time.Second, 0, genInMemNode,
+		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
+			genTestTxs(t, quitCh, wg, nodes, numNodes)
+		})
+}
+
+func TestLocalBootstrapFullSync(t *testing.T) {
+	numNodes := uint(16)
+	doTest(t, numNodes, 300*time.Second, 90*time.Second, genInMemNode,
 		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
 			genTestTxs(t, quitCh, wg, nodes, numNodes)
 		})
@@ -40,12 +48,12 @@ func TestLocalBootstrapWithTx(t *testing.T) {
 
 func TestBootstrapNoTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 60*time.Second, genDefaultNode, nil)
+	doTest(t, numNodes, 60*time.Second, 0, genDefaultNode, nil)
 }
 
 func TestBootstrapWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 300*time.Second, genDefaultNode,
+	doTest(t, numNodes, 300*time.Second, 0, genDefaultNode,
 		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
 			genTestTxs(t, quitCh, wg, nodes, numNodes)
 		})

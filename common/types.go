@@ -68,19 +68,18 @@ func (h Hash) Equals(b Hash) bool {
 }
 
 func (h Hash) Copy() *Hash {
-	ret := new(Hash)
-	ret.SetBytes(h[:])
-	return ret
+	return new(Hash).SetBytes(h[:])
 }
 
 // SetBytes sets the hash to the value of b.
 // If b is larger than len(h), b will be cropped from the left.
-func (h *Hash) SetBytes(b []byte) {
+func (h *Hash) SetBytes(b []byte) *Hash {
 	if len(b) > len(h) {
 		b = b[len(b)-HashLength:]
 	}
 
 	copy(h[HashLength-len(b):], b)
+	return h
 }
 
 type Address [AddressLength]byte

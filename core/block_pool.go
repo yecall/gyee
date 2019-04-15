@@ -33,6 +33,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/core/pb"
@@ -71,6 +72,8 @@ type BlockPool struct {
 	// pending block / request
 	blockMap map[uint64]*Block
 	sealMap  map[uint64]*sealRequest
+
+	syncing int32 // full sync in progress
 
 	lock   sync.RWMutex
 	quitCh chan struct{}
@@ -142,7 +145,7 @@ func (bp *BlockPool) loop() {
 				log.Crit("unhandled msg sent to blockPool", "msg", msg)
 			}
 		case b := <-bp.blockChan:
-			bp.processBlock(b)
+			bp.processVerifiedBlock(b)
 		case sealRequest := <-bp.sealChan:
 			log.Info("BlockBuilder prepares to seal", "request", sealRequest)
 			bp.handleSealRequest(sealRequest)
@@ -172,19 +175,26 @@ func (bp *BlockPool) processMsgBlock(msg p2p.Message) {
 		bp.markBadPeer(msg)
 		return
 	}
-	if err := bp.chain.verifyBlock(b, false); err != nil {
+	bp.processBlock(b)
+}
+
+func (bp *BlockPool) processBlock(blk *Block) {
+	if err := bp.chain.verifyBlock(blk, false); err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
 		// TODO: mark bad peer?
 		return
 	}
-	bp.blockChan <- b
+	bp.blockChan <- blk
 }
 
-func (bp *BlockPool) processBlock(blk *Block) {
+func (bp *BlockPool) processVerifiedBlock(blk *Block) {
 	currHeight := bp.chain.CurrentBlockHeight()
 	if blk.Number() <= currHeight {
 		// TODO: refresh in chain block signature
 		return
+	}
+	if blk.Number() > currHeight + 3 {
+		bp.startFullSync()
 	}
 	if knownBlock, ok := bp.blockMap[blk.Number()]; ok {
 		if blk.Hash() != knownBlock.Hash() {
@@ -320,4 +330,41 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 
 func (bp *BlockPool) markBadPeer(msg p2p.Message) {
 	// TODO: inform bad peed msg.From to p2p module
+}
+
+func (bp *BlockPool) startFullSync() {
+	if atomic.LoadInt32(&bp.syncing) != 0 {
+		// already syncing
+		return
+	}
+	go bp.syncLoop()
+}
+
+func (bp *BlockPool) syncLoop() {
+	bp.wg.Add(1)
+	defer bp.wg.Done()
+
+	if !atomic.CompareAndSwapInt32(&bp.syncing, 0, 1) {
+		// lock not acquired
+		return
+	}
+	defer atomic.StoreInt32(&bp.syncing, 0)
+	log.Info("block pool sync started")
+
+	remoteHeight, err := bp.core.GetRemoteLatestNumber()
+	if err != nil {
+		log.Warn("failed to get remote height", "err", err)
+		return
+	}
+	h := bp.chain.CurrentBlockHeight() + 1
+	for h <= remoteHeight {
+		b, err := bp.core.GetRemoteBlockByNumber(h)
+		if err != nil {
+			log.Warn("failed to get remote block", "err", err)
+			return
+		}
+		bp.processBlock(b)
+		h++
+	}
+	log.Info("block pool sync finished")
 }

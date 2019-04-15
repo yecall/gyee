@@ -38,8 +38,10 @@ import (
 
 // chainData types used to query from peers
 const (
-	ChainDataTypeLatest = "latest" // latest block hash
-	ChainDataTypeBlock  = "block"  // block for given hash
+	ChainDataTypeLatestH = "latestH" // latest block hash
+	ChainDataTypeLatestN = "latestN" // latest block number
+	ChainDataTypeBlockH  = "blkH"    // block for given hash
+	ChainDataTypeBlockN  = "blkN"    // block for given number
 )
 
 var (
@@ -498,24 +500,6 @@ func GetStateDB(storage persistent.Storage) state.Database {
 		persistent.NewTable(storage, KeyPrefixStateTrie),
 		0)
 	return stateDB
-}
-
-func (bc *BlockChain) GetChainData(kind string, key []byte) []byte {
-	switch kind {
-	case ChainDataTypeLatest:
-		return bc.LastBlock().Hash().Bytes()
-	case ChainDataTypeBlock:
-		b := bc.GetBlockByHash(common.BytesToHash(key))
-		if b == nil {
-			return nil
-		}
-		enc, err := b.ToBytes()
-		if err != nil {
-			log.Warn("block encode failed", "blk", b, "err", err)
-		}
-		return enc
-	}
-	return nil
 }
 
 //非验证节点，是否需要启txPool?
