@@ -95,6 +95,15 @@ func (bh *BlockHeader) toSignedProto() (*corepb.SignedBlockHeader, error) {
 	}, nil
 }
 
+func copySignedHeader(sh *corepb.SignedBlockHeader) *corepb.SignedBlockHeader {
+	if sh == nil {
+		return nil
+	}
+	ret := new(corepb.SignedBlockHeader)
+	*ret = *sh
+	return ret
+}
+
 // In-memory representative for the block concept
 type Block struct {
 	// header
@@ -115,6 +124,14 @@ type Block struct {
 	// cache for block pool, accessed from single goroutine
 	checkAgainstParent bool                                // if signature were checked against parent block
 	signatureMap       map[common.Address]crypto.Signature // signature cache
+}
+
+func CopyBlock(b *Block) *Block {
+	cpy := new(Block)
+	*cpy = *b
+	cpy.header = CopyHeader(b.header)
+	cpy.pbHeader = copySignedHeader(b.pbHeader)
+	return cpy
 }
 
 func NewBlock(header *BlockHeader, txs []*Transaction) *Block {
@@ -198,13 +215,12 @@ func (b *Block) updateBody() error {
 	return nil
 }
 
-func (b *Block) mergeSignature(from *Block) error {
-	var err error
+func (b *Block) mergeSignature(from *Block) (changed bool, err error) {
 	// prepare cache if not exist
 	if b.signatureMap == nil {
 		b.signatureMap, err = b.Signers()
 		if err != nil {
-			return err
+			return
 		}
 	}
 	// handle income
@@ -220,9 +236,10 @@ func (b *Block) mergeSignature(from *Block) error {
 		}
 		b.pbHeader.Signatures = append(b.pbHeader.Signatures, pbSig)
 		b.signatureMap[addr] = sig
+		changed = true
 	}
 	// TODO:
-	return nil
+	return
 }
 
 func (b *Block) Sign(signer crypto.Signer) error {

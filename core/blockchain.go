@@ -314,6 +314,14 @@ func (bc *BlockChain) GetBlockByHash(hash common.Hash) *Block {
 	return b
 }
 
+func (bc *BlockChain) GetBlockNum2Hash(number uint64) *common.Hash {
+	hash := getBlockNum2Hash(bc.storage, number)
+	if hash == common.EmptyHash {
+		return nil
+	}
+	return &hash
+}
+
 // Build Next block from parent block, with transactions
 func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) (*Block, error) {
 	var err error

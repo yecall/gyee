@@ -442,14 +442,13 @@ func getSigner(algorithm crypto.Algorithm) crypto.Signer {
 }
 
 func (c *Core) GetChainData(kind string, key []byte) []byte {
-	bc := c.blockChain
 	switch kind {
 	case ChainDataTypeLatestH:
-		return bc.LastBlock().Hash().Bytes()
+		return c.blockChain.LastBlock().Hash().Bytes()
 	case ChainDataTypeLatestN:
-		return new(big.Int).SetUint64(bc.LastBlock().Number()).Bytes()
+		return new(big.Int).SetUint64(c.blockChain.CurrentBlockHeight()).Bytes()
 	case ChainDataTypeBlockH:
-		b := bc.GetBlockByHash(common.BytesToHash(key))
+		b := c.blockPool.GetBlockByHash(common.BytesToHash(key))
 		if b != nil {
 			enc, err := b.ToBytes()
 			if err != nil {
@@ -459,7 +458,7 @@ func (c *Core) GetChainData(kind string, key []byte) []byte {
 		}
 	case ChainDataTypeBlockN:
 		n := new(big.Int).SetBytes(key).Uint64()
-		b := bc.GetBlockByNumber(n)
+		b := c.blockPool.GetBlockByNumber(n)
 		if b != nil {
 			enc, err := b.ToBytes()
 			if err != nil {

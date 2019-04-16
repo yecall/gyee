@@ -23,6 +23,7 @@ package core
 import (
 	"errors"
 
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/p2p"
 )
 
@@ -33,4 +34,10 @@ var (
 type INode interface {
 	NodeID() string
 	P2pService() p2p.Service
+}
+
+type ChainReader interface {
+	GetBlockByNumber(number uint64) *Block
+	GetBlockByHash(hash common.Hash) *Block
+	GetBlockNum2Hash(number uint64) *common.Hash
 }

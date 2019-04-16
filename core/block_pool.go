@@ -36,6 +36,8 @@ import (
 	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/hashicorp/golang-lru"
+	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/pb"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
@@ -69,6 +71,10 @@ type BlockPool struct {
 	// chan for consensus engine seal request
 	sealChan chan *sealRequest
 
+	// cache for confirmed blocks
+	cacheNum2Hash *lru.Cache
+	cacheHash2Blk *lru.Cache
+
 	// pending block / request
 	blockMap map[uint64]*Block
 	sealMap  map[uint64]*sealRequest
@@ -91,6 +97,8 @@ func NewBlockPool(core *Core) (*BlockPool, error) {
 		sealMap:   make(map[uint64]*sealRequest),
 		quitCh:    make(chan struct{}),
 	}
+	bp.cacheNum2Hash, _ = lru.New(1024)
+	bp.cacheHash2Blk, _ = lru.New(1024)
 	return bp, nil
 }
 
@@ -190,10 +198,10 @@ func (bp *BlockPool) processBlock(blk *Block) {
 func (bp *BlockPool) processVerifiedBlock(blk *Block) {
 	currHeight := bp.chain.CurrentBlockHeight()
 	if blk.Number() <= currHeight {
-		// TODO: refresh in chain block signature
+		bp.handleNewSignature(blk)
 		return
 	}
-	if blk.Number() > currHeight + 3 {
+	if blk.Number() > currHeight+3 {
 		bp.startFullSync()
 	}
 	if knownBlock, ok := bp.blockMap[blk.Number()]; ok {
@@ -202,7 +210,7 @@ func (bp *BlockPool) processVerifiedBlock(blk *Block) {
 			log.Crit("fork block!!!")
 			return
 		}
-		err := knownBlock.mergeSignature(blk)
+		_, err := knownBlock.mergeSignature(blk)
 		if err != nil {
 			log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
 			return
@@ -243,6 +251,8 @@ func (bp *BlockPool) processVerifiedBlock(blk *Block) {
 			log.Warn("processBlock() add fail", "err", err)
 			return
 		}
+		bp.cacheNum2Hash.Add(blk.Number(), blk.Hash())
+		bp.cacheHash2Blk.Add(blk.Hash(), blk)
 		delete(bp.blockMap, blk.Number())
 
 		currHeight++
@@ -289,7 +299,7 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 		if err := bp.core.signBlock(nextBlock); err != nil {
 			log.Crit("failed to sign block", "err", err)
 		}
-		log.Info("block sealed", "txs", len(req.txs), "hash", nextBlock.Hash())
+		log.Info("block sealed", "txs", len(nextBlock.transactions), "hash", nextBlock.Hash())
 		// merge with received signatures
 		if knownBlock, ok := bp.blockMap[nextBlock.Number()]; ok {
 			if knownBlock.Hash() != nextBlock.Hash() {
@@ -297,7 +307,7 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 				log.Crit("fork block!!!")
 				return
 			}
-			if err := nextBlock.mergeSignature(knownBlock); err != nil {
+			if _, err := nextBlock.mergeSignature(knownBlock); err != nil {
 				log.Warn("failed to merge signature", "blk", knownBlock, "err", err)
 			}
 		}
@@ -306,6 +316,8 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 			log.Warn("failed to seal block", "err", err)
 			break
 		}
+		bp.cacheNum2Hash.Add(nextBlock.Number(), nextBlock.Hash())
+		bp.cacheHash2Blk.Add(nextBlock.Hash(), nextBlock)
 		delete(bp.sealMap, currHeight)
 		// broadcast block
 		if encoded, err := nextBlock.ToBytes(); err != nil {
@@ -325,6 +337,31 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 		if !ok {
 			break
 		}
+	}
+}
+
+func (bp *BlockPool) handleNewSignature(blk *Block) {
+	h := blk.Hash()
+	var currBlock *Block
+	if cached, ok := bp.cacheHash2Blk.Get(h); ok {
+		currBlock = CopyBlock(cached.(*Block))
+	} else {
+		currBlock = bp.chain.GetBlockByHash(h)
+	}
+	if currBlock == nil {
+		// TODO:
+		log.Crit("fork block")
+		return
+	}
+	changed, err := currBlock.mergeSignature(blk)
+	if err != nil {
+		log.Warn("failed to merge signature", "err", err)
+		return
+	}
+	if changed {
+		bp.cacheHash2Blk.Add(currBlock.Hash(), currBlock)
+		// TODO: less disk write
+		putHeader(bp.chain.storage, currBlock.pbHeader)
 	}
 }
 
@@ -367,4 +404,28 @@ func (bp *BlockPool) syncLoop() {
 		h++
 	}
 	log.Info("block pool sync finished")
+}
+
+func (bp *BlockPool) GetBlockByNumber(number uint64) *Block {
+	hash := bp.GetBlockNum2Hash(number)
+	if hash == nil {
+		return nil
+	}
+	return bp.GetBlockByHash(*hash)
+}
+
+func (bp *BlockPool) GetBlockByHash(hash common.Hash) *Block {
+	if cached, ok := bp.cacheHash2Blk.Get(hash); ok {
+		b := new(Block)
+		*b = *cached.(*Block)
+		return b
+	}
+	return bp.chain.GetBlockByHash(hash)
+}
+
+func (bp *BlockPool) GetBlockNum2Hash(number uint64) *common.Hash {
+	if cached, ok := bp.cacheNum2Hash.Get(number); ok {
+		return cached.(common.Hash).Copy()
+	}
+	return bp.chain.GetBlockNum2Hash(number)
 }
