@@ -273,11 +273,19 @@ func (c *Core) handleEngineEventSend(event []byte) {
 }
 
 func (c *Core) handleEngineEventReq(hash common.Hash) {
-	data, err := c.node.P2pService().DhtGetValue(hash[:])
-	if err != nil {
-		log.Warn("engine req event failed", "hash", hash, "err", err)
-	} else {
-		c.engine.SendParentEvent(data)
+	retry := 60
+	for {
+		data, err := c.node.P2pService().DhtGetValue(hash[:])
+		if err == nil {
+			c.engine.SendParentEvent(data)
+			return
+		}
+		retry--
+		if retry <= 0 {
+			log.Warn("engine req event failed", "hash", hash, "err", err)
+			break
+		}
+		time.Sleep(time.Second)
 	}
 }
 
