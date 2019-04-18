@@ -929,15 +929,29 @@ func (tabMgr *TableManager) tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno 
 		}
 	}
 
+	// if the local is a bootstrap node and the peer reported itself with a private address, then
+	// the "BOUNDING" procedure should not invoked. seems can just for debug or test.
+	if mgr.cfg.bootstrapNode {
+		if TabCheckPrivateIp(findNode.From.IP) {
+			if eno := mgr.tabUpdateBootstarpNode(&findNode.From); eno != TabMgrEnoNone {
+				tabLog.Debug("tabMgrQueriedInd: tabUpdateBootstarpNode failed, eno: %d", eno)
+				return eno
+			}
+			return TabMgrEnoNone
+		}
+	}
+
 	if mgr.tabShouldBound(NodeID(findNode.From.NodeId)) != true {
 		return TabMgrEnoNone
 	}
 
 	if eno := mgr.tabAddPendingBoundInst(&findNode.From); eno != TabMgrEnoNone {
+		tabLog.Debug("tabMgrQueriedInd: tabAddPendingBoundInst failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabActiveBoundInst(); eno != TabMgrEnoNone {
+		tabLog.Debug("tabMgrQueriedInd: tabActiveBoundInst failed, eno: %d", eno)
 		return eno
 	}
 
@@ -2677,4 +2691,22 @@ func (tabMgr *TableManager) subnetPubAddrSwitchPrepare() TabMgrErrno {
 		}
 	}
 	return TabMgrEnoNone
+}
+
+/*
+ * kinds of private ip address are listed as bellow. when nat type "pmp" is configured
+ * but no gateway ip is set, we had to guess the gatway ip as: b1.b2.b3.1 or b1.b2.1.1
+ * see bellow please.
+ *
+ *	type	IP								CIDR
+ * ==========================================================
+ * 	A		10.0.0.0~10.255.255.255			10.0.0.0/8
+ * 	B		172.16.0.0~172.31.255.255		172.16.0.0/12
+ * 	C		192.168.0.0~192.168.255.255		192.168.0.0/16
+ */
+var _, privateCidrA, _ = net.ParseCIDR("10.0.0.0/8")
+var _, privateCidrB, _ = net.ParseCIDR("172.16.0.0/12")
+var _, privateCidrC, _ = net.ParseCIDR("192.168.0.0/16")
+func TabCheckPrivateIp(ip net.IP) bool {
+	return privateCidrA.Contains(ip) || privateCidrB.Contains(ip) || privateCidrC.Contains(ip)
 }
