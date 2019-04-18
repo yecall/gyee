@@ -696,6 +696,6 @@ func (dhtMgr *DhtMgr) DhtCommand(cmd int, msg interface{}) sch.SchErrno {
 //
 // dht ready
 //
-func DhtReady() bool {
-	return ConMgrReady()
+func DhtReady(inst string) bool {
+	return ConMgrReady(inst)
 }

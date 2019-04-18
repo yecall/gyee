@@ -143,7 +143,6 @@ func NewConMgr() *ConMgr {
 		instInClosing: make(map[conInstIdentity]*ConInst, 0),
 	}
 	conMgr.tep = conMgr.conMgrProc
-	chConMgrReady = make(chan bool, 1)
 	return &conMgr
 }
 
@@ -264,6 +263,8 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 		conMgr.tidMonitor = tid
 	}
 
+	mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()] = make(chan bool, 1)
+
 	return sch.SchEnoNone
 }
 
@@ -274,7 +275,7 @@ func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
 	connLog.ForceDebug("poweroff: task will be done ...")
 
 	po := sch.SchMessage{}
-	close(chConMgrReady)
+	close(mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()])
 	for _, ci := range conMgr.ciTab {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
 			ci.name, ci.dir, ci.status)
@@ -1022,7 +1023,7 @@ func (conMgr *ConMgr) natReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		conMgr.natTcpResult = true
 		conMgr.pubTcpIp = conMgr.cfg.local.IP
 		conMgr.pubTcpPort = int(conMgr.cfg.local.TCP)
-		chConMgrReady <- true
+		mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()] <- true
 	}
 	return sch.SchEnoNone
 }
@@ -1046,7 +1047,7 @@ func (conMgr *ConMgr) natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 				connLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
-			chConMgrReady <- true
+			mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()] <- true
 		} else {
 			conMgr.pubTcpIp = net.IPv4zero
 			conMgr.pubTcpPort = 0
@@ -1452,9 +1453,9 @@ func (conMgr *ConMgr) natMapSwitchEnd() DhtErrno {
 //
 // Signal connection manager ready
 //
-var chConMgrReady chan bool
+var mapChConMgrReady map[string]chan bool = make(map[string]chan bool, 0)
 
-func ConMgrReady() bool {
-	r, ok := <-chConMgrReady
+func ConMgrReady(inst string) bool {
+	r, ok := <- mapChConMgrReady[inst]
 	return r && ok
 }

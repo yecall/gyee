@@ -1013,20 +1013,3 @@ func (ngbMgr *NeighborManager) natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchI
 	return NgbMgrEnoNone
 }
 
-/*
- * kinds of private ip address are listed as bellow. when nat type "pmp" is configured
- * but no gateway ip is set, we had to guess the gatway ip as: b1.b2.b3.1 or b1.b2.1.1
- * see bellow please.
- *
- *	type	IP								CIDR
- * ==========================================================
- * 	A		10.0.0.0~10.255.255.255			10.0.0.0/8
- * 	B		172.16.0.0~172.31.255.255		172.16.0.0/12
- * 	C		192.168.0.0~192.168.255.255		192.168.0.0/16
- */
-var _, privateCidrA, _ = net.ParseCIDR("10.0.0.0/8")
-var _, privateCidrB, _ = net.ParseCIDR("172.16.0.0/12")
-var _, privateCidrC, _ = net.ParseCIDR("192.168.0.0/16")
-func checkPrivateIp(ip net.IP) bool {
-	return privateCidrA.Contains(ip) || privateCidrB.Contains(ip) || privateCidrC.Contains(ip)
-}

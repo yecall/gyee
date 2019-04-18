@@ -23,11 +23,13 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
 	"time"
+	"strings"
 
 	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p/dht"
@@ -35,7 +37,6 @@ import (
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
-	"strings"
 )
 
 //
@@ -387,7 +388,7 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	if thisCfg.BootstrapNode == false {
-		if dht.DhtReady() {
+		if dht.DhtReady(yeShMgr.dhtInst.SchGetP2pCfgName()) {
 			yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
 			yeShMgr.dhtBsChan = make(chan bool, 1)
 			go yeShMgr.dhtBootstrapProc()
@@ -1196,7 +1197,12 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 	// to chain shell manager and DHT shell manager.
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	k := yesKey{}
-	copy(k[0:], msg.Key)
+	if len(msg.Key) == 0 {
+		k = sha256.Sum256(msg.Data)
+	} else {
+		copy(k[0:], msg.Key)
+	}
+
 	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastEvOsn: duplicated")
 	}
