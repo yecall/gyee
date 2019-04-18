@@ -301,6 +301,7 @@ type UdpReaderTask struct {
 type UdpMsgInd struct {
 	msgType umsg.UdpMsgType // message type
 	msgBody interface{}     // message body, like Ping, Pong, ... see udpmsg.go
+	from *net.UDPAddr		// underlying address
 }
 
 func NewUdpReader() *UdpReaderTask {
@@ -410,6 +411,7 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 	udpMsgInd := UdpMsgInd{
 		msgType: udpReader.udpMsg.GetDecodedMsgType(),
 		msgBody: udpReader.udpMsg.GetDecodedMsg(),
+		from: from,
 	}
 	if eno = udpReader.udpMsg.CheckUdpMsgFromPeer(from, udpReader.chkAddr); eno != umsg.UdpMsgEnoNone {
 		lsnLog.Debug("msgHandler: CheckUdpMsgFromPeer failed, eno: %d", eno)

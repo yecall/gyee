@@ -445,13 +445,13 @@ func (ngbMgr *NeighborManager) UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 	var eno NgbMgrErrno
 	switch msg.msgType {
 	case um.UdpMsgTypePing:
-		eno = ngbMgr.PingHandler(msg.msgBody.(*um.Ping))
+		eno = ngbMgr.PingHandler(msg.msgBody.(*um.Ping), msg.from)
 	case um.UdpMsgTypePong:
-		eno = ngbMgr.PongHandler(msg.msgBody.(*um.Pong))
+		eno = ngbMgr.PongHandler(msg.msgBody.(*um.Pong), msg.from)
 	case um.UdpMsgTypeFindNode:
-		eno = ngbMgr.FindNodeHandler(msg.msgBody.(*um.FindNode))
+		eno = ngbMgr.FindNodeHandler(msg.msgBody.(*um.FindNode), msg.from)
 	case um.UdpMsgTypeNeighbors:
-		eno = ngbMgr.NeighborsHandler(msg.msgBody.(*um.Neighbors))
+		eno = ngbMgr.NeighborsHandler(msg.msgBody.(*um.Neighbors), msg.from)
 	default:
 		ngbLog.Debug("NgbMgrUdpMsgHandler: invalid udp message type: %d", msg.msgType)
 		eno = NgbMgrEnoParameter
@@ -459,7 +459,7 @@ func (ngbMgr *NeighborManager) UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 	return eno
 }
 
-func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping) NgbMgrErrno {
+func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping, from *net.UDPAddr) NgbMgrErrno {
 	if ngbMgr.checkDestNode(&ping.To, ping.SubNetId) == false {
 		ngbLog.Debug("PingHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -491,10 +491,16 @@ func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping) NgbMgrErrno {
 		Expiration:   0,
 		Extra:        nil,
 	}
-	toAddr := net.UDPAddr{
-		IP:   ping.From.IP,
-		Port: int(ping.From.UDP),
-		Zone: "",
+
+	var toAddr net.UDPAddr
+	if from != nil {
+		toAddr = *from
+	} else {
+		toAddr = net.UDPAddr{
+			IP:   ping.From.IP,
+			Port: int(ping.From.UDP),
+			Zone: "",
+		}
 	}
 
 	pum := new(um.UdpMsg)
@@ -529,7 +535,8 @@ func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager) PongHandler(pong *um.Pong) NgbMgrErrno {
+func (ngbMgr *NeighborManager) PongHandler(pong *um.Pong, from *net.UDPAddr) NgbMgrErrno {
+	_ = from
 	if ngbMgr.checkDestNode(&pong.To, pong.SubNetId) == false {
 		ngbLog.Debug("PongHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -560,7 +567,7 @@ func (ngbMgr *NeighborManager) PongHandler(pong *um.Pong) NgbMgrErrno {
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode) NgbMgrErrno {
+func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode, from *net.UDPAddr) NgbMgrErrno {
 	if ngbMgr.checkDestNode(&findNode.To, findNode.SubNetId) == false {
 		ngbLog.Debug("FindNodeHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -652,10 +659,15 @@ func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode) NgbMgrErrn
 		Extra:        nil,
 	}
 
-	toAddr := net.UDPAddr{
-		IP:   findNode.From.IP,
-		Port: int(findNode.From.UDP),
-		Zone: "",
+	var toAddr net.UDPAddr
+	if from != nil {
+		toAddr = *from
+	} else {
+		toAddr = net.UDPAddr{
+			IP:   findNode.From.IP,
+			Port: int(findNode.From.UDP),
+			Zone: "",
+		}
 	}
 
 	pum := new(um.UdpMsg)
@@ -689,7 +701,8 @@ func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode) NgbMgrErrn
 	return NgbMgrEnoNone
 }
 
-func (ngbMgr *NeighborManager) NeighborsHandler(nbs *um.Neighbors) NgbMgrErrno {
+func (ngbMgr *NeighborManager) NeighborsHandler(nbs *um.Neighbors, from *net.UDPAddr) NgbMgrErrno {
+	_ = from
 	if ngbMgr.checkDestNode(&nbs.To, nbs.SubNetId) == false {
 		ngbLog.Debug("NeighborsHandler: node identity mismatched")
 		return NgbMgrEnoParameter
@@ -998,4 +1011,22 @@ func (ngbMgr *NeighborManager) natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchI
 	ngbMgr.cfg.UDP = uint16(msg.PubPort)
 	ngbMgr.cfg.TCP = uint16(msg.PubPort)
 	return NgbMgrEnoNone
+}
+
+/*
+ * kinds of private ip address are listed as bellow. when nat type "pmp" is configured
+ * but no gateway ip is set, we had to guess the gatway ip as: b1.b2.b3.1 or b1.b2.1.1
+ * see bellow please.
+ *
+ *	type	IP								CIDR
+ * ==========================================================
+ * 	A		10.0.0.0~10.255.255.255			10.0.0.0/8
+ * 	B		172.16.0.0~172.31.255.255		172.16.0.0/12
+ * 	C		192.168.0.0~192.168.255.255		192.168.0.0/16
+ */
+var _, privateCidrA, _ = net.ParseCIDR("10.0.0.0/8")
+var _, privateCidrB, _ = net.ParseCIDR("172.16.0.0/12")
+var _, privateCidrC, _ = net.ParseCIDR("192.168.0.0/16")
+func checkPrivateIp(ip net.IP) bool {
+	return privateCidrA.Contains(ip) || privateCidrB.Contains(ip) || privateCidrC.Contains(ip)
 }

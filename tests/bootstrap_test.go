@@ -47,7 +47,8 @@ func TestLocalBootstrapFullSync(t *testing.T) {
 }
 
 func TestBootstrapNoTx(t *testing.T) {
-	numNodes := uint(16)
+	//numNodes := uint(16)
+	numNodes := uint(1)
 	doTest(t, numNodes, 60*time.Second, 0, genDefaultNode, nil)
 }
 

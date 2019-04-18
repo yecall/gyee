@@ -36,6 +36,7 @@ import (
 	"github.com/yeeco/gyee/node"
 	"github.com/yeeco/gyee/p2p"
 	p2pCfg "github.com/yeeco/gyee/p2p/config"
+	"fmt"
 )
 
 const testChainID = uint32(1)
@@ -266,15 +267,17 @@ func dftConfig(nodeDir string, portShift uint16) *config.Config {
 		},
 		P2p: &config.P2pConfig{
 			AppType: int(p2pCfg.P2P_TYPE_ALL),
-			BootNode: []string{
+			Name: fmt.Sprintf("inst%d", portShift),
+			Validator: true,
+			BootstrapNodes: []string{
 				"E1E6B370C9BDA28A7420DD9BC577ACFDBB335EF7AA38CA43998C921AFBC13834AF1F809C43C524D13A6E7454AA97BADA72EE36A2389A1177630207F04C9B3F8B@13.230.176.195:30304:30304",
 			},
 			DhtBootstrapNodes: []string{
 				"E1E6B370C9BDA28A7420DD9BC577ACFDBB335EF7AA38CA43998C921AFBC13834AF1F809C43C524D13A6E7454AA97BADA72EE36A2389A1177630207F04C9B3F8B@13.230.176.195:40405:40405",
 			},
 			NodeDataDir:  filepath.Join(nodeDir, "p2p"),
-			LocalNodeIp:  "0.0.0.0",
-			LocalDhtIp:   "0.0.0.0",
+			LocalNodeIp:  "172.16.1.97",
+			LocalDhtIp:   "172.16.1.97",
 			LocalTcpPort: p2pCfg.DftTcpPort + portShift,
 			LocalUdpPort: p2pCfg.DftUdpPort + portShift,
 			LocalDhtPort: p2pCfg.DftDhtPort + portShift,
