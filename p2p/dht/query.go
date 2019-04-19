@@ -650,9 +650,16 @@ func (qryMgr *QryMgr) instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrn
 
 		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0 {
 			qryLog.Debug("instStatusInd: query done: %x", qcb.target)
-			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-				qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
-				return sch.SchEnoUserTask
+			if qcb.forWhat == MID_PUTVALUE || qcb.forWhat == MID_PUTPROVIDER {
+				if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+					qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+					return sch.SchEnoUserTask
+				}
+			} else {
+				if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
+					qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+					return sch.SchEnoUserTask
+				}
 			}
 			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
 				qryLog.Debug("instStatusInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)

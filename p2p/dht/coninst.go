@@ -385,7 +385,10 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	}
 
 	//
-	// handshake
+	// handshake: in practice, we find that it might be blocked for ever in this procedure when reading
+	// or writing data to the connection, even dead line is set. following statements invoke the "Close"
+	// interface of ggio.WriteCloser and ggio.ReadCloser to force the procedure to get out when timer
+	// expired. 
 	//
 
 	conInst.updateStatus(CisInHandshaking)
@@ -395,28 +398,61 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
-	if conInst.dir == ConInstDirOutbound {
-		if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
-			peer := conInst.hsInfo.peer
-			hsInfo := conInst.hsInfo
-			rsp.Eno = int(eno)
-			rsp.Peer = &peer
-			rsp.Inst = conInst
-			rsp.HsInfo = &hsInfo
-			return rsp2ConMgr()
+	const HSTO = time.Second * 8
+	hsTm := time.NewTimer(HSTO)
+	defer hsTm.Stop()
+	hsCh := make(chan bool, 0)
+	hsEno := sch.SchEnoNone
+
+	go func() {
+		closeNeeded := false
+		if conInst.dir == ConInstDirOutbound {
+			if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
+				peer := conInst.hsInfo.peer
+				hsInfo := conInst.hsInfo
+				rsp.Eno = int(eno)
+				rsp.Peer = &peer
+				rsp.Inst = conInst
+				rsp.HsInfo = &hsInfo
+				hsEno = rsp2ConMgr()
+				closeNeeded = true
+			}
+		} else if conInst.dir == ConInstDirInbound {
+			if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
+				rsp.Eno = int(eno)
+				rsp.Peer = nil
+				rsp.HsInfo = nil
+				rsp.Inst = conInst
+				hsEno = rsp2ConMgr()
+				closeNeeded = true
+			}
+		} else {
+			ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+				conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+			panic("handshakeReq: invalid direction")
 		}
-	} else if conInst.dir == ConInstDirInbound {
-		if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
-			rsp.Eno = int(eno)
-			rsp.Peer = nil
-			rsp.HsInfo = nil
-			rsp.Inst = conInst
-			return rsp2ConMgr()
+		if closeNeeded {
+			close(hsCh)
+		} else {
+			hsCh <- true
 		}
-	} else {
-		ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
-		panic("handshakeReq: invalid direction")
+	}()
+
+	select {
+	case <-hsTm.C:
+		conInst.iow.Close()
+		conInst.ior.Close()
+		<-hsCh
+		rsp.Eno = DhtEnoTimeout.GetEno()
+		return rsp2ConMgr()
+	case result, ok := <-hsCh:
+		if !ok {
+			return hsEno
+		}
+		if !result {
+			panic("handshakeReq: impossible result")
+		}
+		close(hsCh)
 	}
 
 	conInst.updateStatus(CisHandshook)
@@ -437,6 +473,7 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	conInst.updateStatus(CisInService)
+	conInst.con.SetDeadline(time.Time{})
 	conInst.statusReport()
 	conInst.txTaskStart()
 	conInst.rxTaskStart()
@@ -842,6 +879,7 @@ func (conInst *ConInst) txTaskStop(why int) DhtErrno {
 
 		ciLog.Debug("txTaskStop: inst: %s, try to close txDone", conInst.name)
 		close(conInst.txDone)
+		conInst.txDone = nil
 
 		ciLog.Debug("txTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
@@ -877,6 +915,7 @@ func (conInst *ConInst) rxTaskStop(why int) DhtErrno {
 
 		ciLog.Debug("rxTaskStop: inst: %s, try to get feedback from signal rxDone", conInst.name)
 		close(conInst.rxDone)
+		conInst.rxDone = nil
 
 		ciLog.Debug("rxTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
@@ -1018,6 +1057,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	}
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
+	conInst.iow.Close()
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 		ciLog.Debug("outboundHandshake: WriteMsg failed, "+
 			"inst: %s, dir: %d, local: %s, remote: %s, err: %s",
@@ -1273,13 +1313,6 @@ _txLoop:
 			}
 		}
 
-		if err := conInst.con.SetDeadline(time.Time{}); err != nil {
-			ciLog.Debug("txProc: SetDeadline failed, inst: %s, dir: %d, err: %s",
-				conInst.name, conInst.dir, err.Error())
-			errUnderlying = true
-			break _txLoop
-		}
-
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 			ciLog.Debug("txProc: WriteMsg failed, inst: %s, dir: %d, err: %s",
 				conInst.name, conInst.dir, err.Error())
@@ -1382,13 +1415,6 @@ _rxLoop:
 		var msg *DhtMessage = nil
 		pbPkg := new(pb.DhtPackage)
 		pkg := new(DhtPackage)
-
-		if err := conInst.con.SetDeadline(time.Time{}); err != nil {
-			ciLog.Debug("rxProc: SetDeadline failed, inst: %s, dir: %d, err: %s",
-				conInst.name, conInst.dir, err.Error())
-			errUnderlying = true
-			break _rxLoop
-		}
 
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
 			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, dir: %d, err: %s",
