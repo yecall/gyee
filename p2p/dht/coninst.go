@@ -1942,7 +1942,7 @@ func (dtm *DiffTimerManager) delTimer(tid interface{}) error {
 }
 
 func (dtm *DiffTimerManager) scan() error {
-	if dtm.tmq.Len() <= 0 {
+	if dtm.tmq == nil || dtm.tmq.Len() <= 0 {
 		return nil
 	}
 	for dtm.tmq.Len() > 0 {

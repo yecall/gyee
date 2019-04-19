@@ -958,6 +958,22 @@ _rxLoop:
 				}
 
 				msgType := yesMidItoa[pkg.MsgId]
+
+				txCount := 0
+				evCount := 0
+				bhCount := 0
+				xxCount := 0
+				switch msgType {
+				case MessageTypeTx:
+					txCount++
+				case MessageTypeEvent:
+					evCount++
+				case MessageTypeBlockHeader:
+					bhCount++
+				default:
+					xxCount++
+				}
+
 				if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 					subList.(*sync.Map).Range(func(key, value interface{}) bool {
 						msg := Message{
@@ -969,8 +985,8 @@ _rxLoop:
 
 						sub, _ := key.(*Subscriber)
 						sub.MsgChan <- msg
-						exclude := pkg.PeerInfo.NodeId
 
+						exclude := pkg.PeerInfo.NodeId
 						err := error(nil)
 						switch msg.MsgType {
 						case MessageTypeTx:
@@ -1164,7 +1180,13 @@ func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.Node
 	// subnet. this is done in chain shell manager, and the message here
 	// would be dispatched to chain shell manager.
 	k := yesKey{}
-	copy(k[0:], msg.Key)
+	if len(msg.Key) == 0 {
+		k = sha256.Sum256(msg.Data)
+		msg.Key = append(msg.Key, k[0:]...)
+	} else {
+		copy(k[0:], msg.Key)
+	}
+
 	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastTxOsn: duplicated")
 	}
@@ -1199,6 +1221,7 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 	k := yesKey{}
 	if len(msg.Key) == 0 {
 		k = sha256.Sum256(msg.Data)
+		msg.Key = append(msg.Key, k[0:]...)
 	} else {
 		copy(k[0:], msg.Key)
 	}
@@ -1246,7 +1269,13 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 	// the Bh should be broadcast over the any-subnet. the message here
 	// would be dispatched to chain shell manager.
 	k := yesKey{}
-	copy(k[0:], msg.Key)
+	if len(msg.Key) == 0 {
+		k = sha256.Sum256(msg.Data)
+		msg.Key = append(msg.Key, k[0:]...)
+	} else {
+		copy(k[0:], msg.Key)
+	}
+
 	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastBhOsn: duplicated")
 	}
@@ -1276,7 +1305,13 @@ func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.Node
 	// the Bk should be stored by DHT and no broadcasting over any subnet.
 	// the message here would be dispatched to DHT shell manager.
 	k := yesKey{}
-	copy(k[0:], msg.Key)
+	if len(msg.Key) == 0 {
+		k = sha256.Sum256(msg.Data)
+		msg.Key = append(msg.Key, k[0:]...)
+	} else {
+		copy(k[0:], msg.Key)
+	}
+
 	if yeShMgr.checkDupKey(k) {
 		return errors.New("broadcastBkOsn: duplicated")
 	}

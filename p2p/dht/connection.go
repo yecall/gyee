@@ -499,8 +499,10 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		}
 		conMgr.ciTab[cid] = ci
 	} else if inst := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != inst {
-		connLog.Debug("handshakeRsp: mismatched, inst: %s, dir: %d", ci.name, msg.Dir)
-		panic("handshakeRsp: internal errors")
+		// this is possible: the peer with the same ip address had change its' node identity, but we
+		// got an old version from somewhere. just done it.
+		connLog.ForceDebug("handshakeRsp: mismatched, inst: %s, dir: %d", ci.name, msg.Dir)
+		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 	}
 
 	//
