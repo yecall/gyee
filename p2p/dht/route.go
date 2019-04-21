@@ -347,7 +347,7 @@ func (rutMgr *RutMgr) bootstarpTimerHandler() sch.SchErrno {
 			Target:  *key,
 			Msg:     nil,
 			ForWhat: MID_FINDNODE,
-			Seq:     GetQuerySeqNo(),
+			Seq:     GetQuerySeqNo(rutMgr.sdl.SchGetP2pCfgName()),
 		}
 
 		rutMgr.bsTargets[*key] = target
@@ -428,7 +428,7 @@ func (rutMgr *RutMgr) queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sc
 			Target:  *key,
 			Msg:     nil,
 			ForWhat: MID_FINDNODE,
-			Seq:     GetQuerySeqNo(),
+			Seq:     GetQuerySeqNo(rutMgr.sdl.SchGetP2pCfgName()),
 		}
 
 		rutMgr.bsTargets[*key] = target

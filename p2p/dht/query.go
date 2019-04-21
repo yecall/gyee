@@ -301,6 +301,7 @@ func (qryMgr *QryMgr) poweron(ptn interface{}) sch.SchErrno {
 		qryLog.Debug("poweron: qryMgrGetConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
+	mapQrySeqLock[qryMgr.sdl.SchGetP2pCfgName()] = sync.Mutex{}
 	return sch.SchEnoNone
 }
 
@@ -1428,9 +1429,13 @@ func (qryMgr *QryMgr) natMapSwitch() DhtErrno {
 //
 // get unique sequence number all query
 //
-var qrySeqLock sync.Mutex
+var mapQrySeqLock = make(map[string]sync.Mutex, 0)
 
-func GetQuerySeqNo() int64 {
+func GetQuerySeqNo(name string) int64 {
+	qrySeqLock, ok := mapQrySeqLock[name]
+	if !ok {
+		panic("GetQuerySeqNo: internal error! seems system not ready")
+	}
 	qrySeqLock.Lock()
 	defer qrySeqLock.Unlock()
 	return time.Now().UnixNano()

@@ -173,6 +173,9 @@ func (dhtMgr *DhtMgr) dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 	case sch.EvDhtMgrPutValueReq:
 		eno = dhtMgr.putValueReq(msg.Body.(*sch.MsgDhtMgrPutValueReq))
 
+	case sch.EvDhtMgrPutValueLocalRsp:
+		eno = dhtMgr.putValueLocalRsp(msg.Body.(*sch.MsgDhtMgrPutValueLocalRsp))
+
 	case sch.EvDhtMgrPutValueRsp:
 		eno = dhtMgr.putValueRsp(msg.Body.(*sch.MsgDhtMgrPutValueRsp))
 
@@ -487,6 +490,25 @@ func (dhtMgr *DhtMgr) putValueReq(msg *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
 		KT:  msg.KeepTime,
 	}
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtDsMgrAddValReq, &req)
+}
+
+//
+// put value local response handler
+//
+func (dhtMgr *DhtMgr)putValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
+	if dhtMgr.ptnShMgr != nil {
+		ind := sch.MsgDhtShEventInd{
+			Evt: sch.EvDhtMgrPutValueLocalRsp,
+			Msg: msg,
+		}
+		schMsg := sch.SchMessage{}
+		dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dhtMgr.ptnShMgr, sch.EvDhtShEventInd, &ind)
+		dhtMgr.sdl.SchSendMessage(&schMsg)
+	} else if dhtMgr.cbf != nil {
+		rc := dhtMgr.cbf(dhtMgr, sch.EvDhtMgrPutValueLocalRsp, msg)
+		dhtLog.Debug("putValueLocalRsp: callback return: %d", rc)
+	}
+	return sch.SchEnoNone
 }
 
 //

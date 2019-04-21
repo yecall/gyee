@@ -128,14 +128,17 @@ func (n *Node) Start() (err error) {
 	if err = n.core.Start(); err != nil {
 		return err
 	}
+	log.Info("Node Started")
 
 	if err = n.p2p.Start(); err != nil {
 		return err
 	}
+	log.Info("p2p Started")
 
 	if err = n.startIPC(); err != nil {
 		return err
 	}
+	log.Info("IPC Started")
 
 	return nil
 }

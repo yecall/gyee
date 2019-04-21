@@ -429,8 +429,11 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	if eno := dsMgr.store(&k, msg.Val, msg.KT); eno != DhtEnoNone {
 		dsLog.Debug("localAddValReq: store failed, eno: %d", eno)
-		dsMgr.localAddValRsp(k[0:], nil, eno)
+		dsMgr.localAddValRsp(sch.EvDhtMgrPutValueRsp, k[0:], nil, eno)
 		return sch.SchEnoUserTask
+	} else {
+		dsLog.Debug("localAddValReq: store ok, eno: %d", eno)
+		dsMgr.localAddValRsp(sch.EvDhtMgrPutValueLocalRsp, k[0:], nil, eno)
 	}
 
 	//
@@ -441,7 +444,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 		Target:  k,
 		Msg:     msg,
 		ForWhat: MID_PUTVALUE,
-		Seq:     GetQuerySeqNo(),
+		Seq:     GetQuerySeqNo(dsMgr.sdl.SchGetP2pCfgName()),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -480,7 +483,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 		Target:  k,
 		Msg:     msg,
 		ForWhat: MID_GETVALUE_REQ,
-		Seq:     GetQuerySeqNo(),
+		Seq:     GetQuerySeqNo(dsMgr.sdl.SchGetP2pCfgName()),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -495,7 +498,7 @@ func (dsMgr *DsMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sc
 
 	if msg.ForWhat == MID_PUTVALUE {
 
-		return dsMgr.localAddValRsp(msg.Target[0:], msg.Peers, DhtErrno(msg.Eno))
+		return dsMgr.localAddValRsp(sch.EvDhtMgrPutValueRsp, msg.Target[0:], msg.Peers, DhtErrno(msg.Eno))
 
 	} else if msg.ForWhat == MID_GETVALUE_REQ {
 
@@ -750,16 +753,27 @@ func (dsMgr *DsMgr) store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 //
 // response the add-value request sender task
 //
-func (dsMgr *DsMgr) localAddValRsp(key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
+func (dsMgr *DsMgr) localAddValRsp(ev int, key []byte, peers []*config.Node, eno DhtErrno) sch.SchErrno {
 
-	rsp := sch.MsgDhtMgrPutValueRsp{
-		Eno:   int(eno),
-		Key:   key,
-		Peers: peers,
+	rsp := interface{}(nil)
+	if ev == sch.EvDhtMgrPutValueRsp {
+		rsp = &sch.MsgDhtMgrPutValueRsp{
+			Eno:   int(eno),
+			Key:   key,
+			Peers: peers,
+		}
+	} else if ev == sch.EvDhtMgrPutValueLocalRsp {
+		rsp = &sch.MsgDhtMgrPutValueLocalRsp {
+			Eno:   int(eno),
+			Key:   key,
+		}
+	} else {
+		dsLog.Debug("localAddValRsp: invalid event: %d", ev)
+		return sch.SchEnoMismatched
 	}
 
 	msg := sch.SchMessage{}
-	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, sch.EvDhtMgrPutValueRsp, &rsp)
+	dsMgr.sdl.SchMakeMessage(&msg, dsMgr.ptnMe, dsMgr.ptnDhtMgr, ev, rsp)
 	return dsMgr.sdl.SchSendMessage(&msg)
 }
 

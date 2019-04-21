@@ -200,6 +200,7 @@ const (
 	ciTxTimerDuration       = time.Second * 8 // tx timer duration
 	ciTxDtmTick             = time.Second * 1 // tx difference timer mananger tick
 	ciTxMaxWaitResponseSize = 512             // tx max wait peer response queue size
+	ciHandshakeTimeout	= time.Second * 8	// handshake timeout
 )
 
 //
@@ -388,7 +389,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	// handshake: in practice, we find that it might be blocked for ever in this procedure when reading
 	// or writing data to the connection, even dead line is set. following statements invoke the "Close"
 	// interface of ggio.WriteCloser and ggio.ReadCloser to force the procedure to get out when timer
-	// expired. 
+	// expired.
 	//
 
 	conInst.updateStatus(CisInHandshaking)
@@ -398,8 +399,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
-	const HSTO = time.Second * 8
-	hsTm := time.NewTimer(HSTO)
+	hsTm := time.NewTimer(ciHandshakeTimeout)
 	defer hsTm.Stop()
 	hsCh := make(chan bool, 0)
 	hsEno := sch.SchEnoNone

@@ -392,11 +392,12 @@ const (
 	EvDhtMgrGetProviderRsp = EvDhtMgrBase + 6
 	EvDhtMgrPutValueReq    = EvDhtMgrBase + 7
 	EvDhtMgrPutValueRsp    = EvDhtMgrBase + 8
-	EvDhtMgrGetValueReq    = EvDhtMgrBase + 9
-	EvDhtMgrGetValueRsp    = EvDhtMgrBase + 10
-	EvDhtMgrQueryStopReq   = EvDhtMgrBase + 11
-	EvDhtBlindConnectReq   = EvDhtMgrBase + 12
-	EvDhtBlindConnectRsp   = EvDhtMgrBase + 13
+	EvDhtMgrPutValueLocalRsp = EvDhtMgrBase + 9
+	EvDhtMgrGetValueReq    = EvDhtMgrBase + 10
+	EvDhtMgrGetValueRsp    = EvDhtMgrBase + 11
+	EvDhtMgrQueryStopReq   = EvDhtMgrBase + 12
+	EvDhtBlindConnectReq   = EvDhtMgrBase + 13
+	EvDhtBlindConnectRsp   = EvDhtMgrBase + 14
 )
 
 // EvDhtMgrGetProviderReq
@@ -423,6 +424,12 @@ type MsgDhtMgrPutValueRsp struct {
 	Eno   int            // result code
 	Key   []byte         // key wanted
 	Peers []*config.Node // extren peers where the value put beside local
+}
+
+// EvDhtMgrPutValueLocalRsp
+type MsgDhtMgrPutValueLocalRsp struct {
+	Eno   int            // result code
+	Key   []byte         // key wanted
 }
 
 // EvDhtMgrGetValueReq

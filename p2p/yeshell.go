@@ -341,14 +341,17 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	yeShMgr.inStopping = false
 
+	p2plog.Debug("yeShMgr: start...")
+
+	dht.SetChConMgrReady(yeShMgr.dhtInst.SchGetP2pCfgName(), make(chan bool, 0))
 	if eno = p2psh.P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
-		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
-		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
@@ -360,22 +363,24 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	if eno := p2psh.P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
 		stopCh := make(chan bool, 0)
-		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
 
 	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
-		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*p2psh.ShellManager)
 	if !ok || yeShMgr.ptChainShMgr == nil {
-		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
+
+	p2plog.Debug("Start: go shell routines...")
 
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
@@ -388,6 +393,7 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	if thisCfg.BootstrapNode == false {
+		p2plog.Debug("Start: wait dht ready, inst: %s", yeShMgr.dhtInst.SchGetP2pCfgName())
 		if dht.DhtReady(yeShMgr.dhtInst.SchGetP2pCfgName()) {
 			yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
 			yeShMgr.dhtBsChan = make(chan bool, 1)
@@ -397,6 +403,8 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	go yeShMgr.chainRxProc()
 	go yeShMgr.deDupTickerProc()
+
+	p2plog.Debug("Start: shell ok")
 
 	return nil
 }
@@ -531,7 +539,7 @@ func (yeShMgr *YeShellManager) BroadcastMessageOsn(message Message) error {
 	case MessageTypeTx:
 		err = yeShMgr.broadcastTxOsn(&message, nil)
 	case MessageTypeEvent:
-		err = yeShMgr.broadcastEvOsn(&message, nil, true)
+		err = yeShMgr.broadcastEvOsn(&message, nil, false)
 	case MessageTypeBlockHeader:
 		err = yeShMgr.broadcastBhOsn(&message, nil)
 	case MessageTypeBlock:
@@ -730,7 +738,7 @@ func (yeShMgr *YeShellManager) DhtFindNode(target *config.NodeID, done chan inte
 		Target:  key,
 		Msg:     nil,
 		ForWhat: dht.MID_FINDNODE,
-		Seq:     dht.GetQuerySeqNo(),
+		Seq:     dht.GetQuerySeqNo(yeShMgr.dhtInst.SchGetP2pCfgName()),
 	}
 
 	msg := sch.SchMessage{}
@@ -838,6 +846,9 @@ func (yeShMgr *YeShellManager) dhtEvProc() {
 
 		case sch.EvDhtMgrGetProviderRsp:
 			eno = yeShMgr.dhtMgrGetProviderRsp(evi.Msg.(*sch.MsgDhtMgrGetProviderRsp))
+
+		case sch.EvDhtMgrPutValueLocalRsp:
+			eno = yeShMgr.dhtMgrPutValueLocalRsp(evi.Msg.(*sch.MsgDhtMgrPutValueLocalRsp))
 
 		case sch.EvDhtMgrPutValueRsp:
 			eno = yeShMgr.dhtMgrPutValueRsp(evi.Msg.(*sch.MsgDhtMgrPutValueRsp))
@@ -1117,13 +1128,13 @@ func (yeShMgr *YeShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvide
 	return sch.SchEnoNone
 }
 
-func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+func (yeShMgr *YeShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
 	// Notice: only when function DhtSetValue called, yeShMgr.putValKey would be set
 	// and would play in a blocked mode, we check this case to feed the signal into
 	// the channel which the caller is pending for, else nothing done.
 	if yeShMgr.putValKey != nil && len(yeShMgr.putValKey) == yesKeyBytes {
 		if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
-			yesLog.Debug("dhtMgrPutValueRsp: key mismatched")
+			yesLog.Debug("dhtMgrPutValueLocalRsp: key mismatched")
 			return sch.SchEnoMismatched
 		}
 		if msg.Eno == dht.DhtEnoNone.GetEno() {
@@ -1132,6 +1143,13 @@ func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) 
 			yeShMgr.putValChan <- false
 		}
 	}
+	return sch.SchEnoNone
+}
+
+func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
+	// see function dhtMgrPutValueLocalRsp for more please, an event EvDhtMgrPutValueLocalRsp should
+	// had received before this EvDhtMgrPutValueRsp.
+	yesLog.Debug("dhtMgrPutValueRsp: eno: %d, key: %x, peers: %d", msg.Eno, msg.Key, len(msg.Peers))
 	return sch.SchEnoNone
 }
 
@@ -1155,22 +1173,18 @@ func (yeShMgr *YeShellManager) dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) 
 }
 
 func (yeShMgr *YeShellManager) broadcastTx(msg *Message) error {
-	//return errors.New("broadcastTx: not supported")
 	return yeShMgr.broadcastTxOsn(msg, nil)
 }
 
 func (yeShMgr *YeShellManager) broadcastEv(msg *Message) error {
-	//return errors.New("broadcastEv: not supported")
-	return yeShMgr.broadcastEvOsn(msg, nil, true)
+	return yeShMgr.broadcastEvOsn(msg, nil, false)
 }
 
 func (yeShMgr *YeShellManager) broadcastBh(msg *Message) error {
-	//return errors.New("broadcastBh: not supported")
 	return yeShMgr.broadcastBhOsn(msg, nil)
 }
 
 func (yeShMgr *YeShellManager) broadcastBk(msg *Message) error {
-	//return errors.New("broadcastBk: not supported")
 	return yeShMgr.broadcastBkOsn(msg, nil)
 }
 

@@ -263,8 +263,6 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 		conMgr.tidMonitor = tid
 	}
 
-	mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()] = make(chan bool, 1)
-
 	return sch.SchEnoNone
 }
 
@@ -1455,9 +1453,16 @@ func (conMgr *ConMgr) natMapSwitchEnd() DhtErrno {
 //
 // Signal connection manager ready
 //
-var mapChConMgrReady map[string]chan bool = make(map[string]chan bool, 0)
+var mapChConMgrReady = make(map[string]chan bool, 0)
 
-func ConMgrReady(inst string) bool {
-	r, ok := <- mapChConMgrReady[inst]
+func SetChConMgrReady(name string, ch chan bool) {
+	mapChConMgrReady[name] = ch
+}
+
+func ConMgrReady(name string) bool {
+	r, ok := <- mapChConMgrReady[name]
+	if !ok {
+		panic(fmt.Sprintf("ConMgrReady: internal error, not found: %s", name))
+	}
 	return r && ok
 }

@@ -383,8 +383,13 @@ func (peMgr *PeerManager) peMgrPoweron(ptn interface{}) PeMgrErrno {
 	peMgr.sdl = sch.SchGetScheduler(ptn)
 	_, peMgr.ptnLsn = peMgr.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 
+
+	p2plog.Debug("peMgrPoweron: inst: %s", peMgr.sdl.SchGetP2pCfgName())
+
+
 	var cfg *config.Cfg4PeerManager
 	if cfg = config.P2pConfig4PeerManager(peMgr.sdl.SchGetP2pCfgName()); cfg == nil {
+		p2plog.Debug("peMgrPoweron: inited, inst: %s", peMgr.sdl.SchGetP2pCfgName())
 		peMgr.inited <- PeMgrEnoConfig
 		return PeMgrEnoConfig
 	}
@@ -498,6 +503,7 @@ func (peMgr *PeerManager) peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	// tell initialization result, and EvPeMgrStartReq would be sent to us
 	// some moment later.
+	p2plog.Debug("peMgrPoweron: inited, inst: %s", peMgr.sdl.SchGetP2pCfgName())
 	peMgr.isInited = true
 	peMgr.inited <- PeMgrEnoNone
 

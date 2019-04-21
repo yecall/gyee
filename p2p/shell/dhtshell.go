@@ -178,6 +178,9 @@ func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchEr
 	case sch.EvDhtMgrGetProviderRsp:
 		eno = shMgr.dhtMgrGetProviderRsp(msg.(*sch.MsgDhtMgrGetProviderRsp))
 
+	case sch.EvDhtMgrPutValueLocalRsp:
+		eno = shMgr.dhtMgrPutValueLocalRsp(msg.(*sch.MsgDhtMgrPutValueLocalRsp))
+
 	case sch.EvDhtMgrPutValueRsp:
 		eno = shMgr.dhtMgrPutValueRsp(msg.(*sch.MsgDhtMgrPutValueRsp))
 
@@ -236,6 +239,11 @@ func (shMgr *DhtShellManager) dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProvi
 
 func (shMgr *DhtShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
 	dhtLog.Debug("dhtMgrGetProviderRsp: eno: %d", msg.Eno)
+	return sch.SchEnoNone
+}
+
+func (shMgr *DhtShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
+	dhtLog.Debug("dhtMgrPutValueLocalRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 

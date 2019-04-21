@@ -195,6 +195,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 	var eno sch.SchErrno
 
 	what := P2pType(sdl.SchGetAppType())
+	p2plog.Debug("P2pStart: what: %d, inst: %s", what, sdl.SchGetP2pCfgName())
 
 	switch what {
 
@@ -228,10 +229,12 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		var pmEno peer.PeMgrErrno
 
 		peMgr := sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
+		p2plog.Debug("P2pStart: wait peer manager inited, inst: %s", sdl.SchGetP2pCfgName())
 		pmEno = peMgr.PeMgrInited()
+		p2plog.Debug("P2pStart: get out, peEno: %d, inst: %s", pmEno, sdl.SchGetP2pCfgName())
 
 		if pmEno != peer.PeMgrEnoNone {
-			stLog.Debug("P2pStart: pmEno: %d", pmEno)
+			p2plog.Debug("P2pStart: pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 
@@ -242,7 +245,7 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 		pmEno = peMgr.PeMgrStart()
 
 		if pmEno != peer.PeMgrEnoNone {
-			stLog.Debug("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
+			p2plog.Debug("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 	}

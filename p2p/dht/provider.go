@@ -294,7 +294,7 @@ func (prdMgr *PrdMgr) localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) s
 		Target:  k,
 		Msg:     msg,
 		ForWhat: MID_PUTPROVIDER,
-		Seq:     GetQuerySeqNo(),
+		Seq:     GetQuerySeqNo(prdMgr.sdl.SchGetP2pCfgName()),
 	}
 
 	schMsg := sch.SchMessage{}
@@ -355,7 +355,7 @@ func (prdMgr *PrdMgr) localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.
 		Target:  dsk,
 		Msg:     nil,
 		ForWhat: MID_GETPROVIDER_REQ,
-		Seq:     GetQuerySeqNo(),
+		Seq:     GetQuerySeqNo(prdMgr.sdl.SchGetP2pCfgName()),
 	}
 
 	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
