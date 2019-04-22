@@ -218,6 +218,8 @@ func (c *Core) Stop() error {
 func (c *Core) loop() {
 	c.wg.Add(1)
 	defer c.wg.Done()
+	defer func() { c.running = false }()
+
 	log.Trace("Core loop...")
 	for {
 		var (
@@ -257,6 +259,12 @@ func (c *Core) loop() {
 }
 
 func (c *Core) handleEngineEventSend(event []byte) {
+	c.wg.Add(1)
+	defer c.wg.Done()
+
+	if !c.running {
+		return
+	}
 	h := sha256.Sum256(event)
 	err := c.node.P2pService().DhtSetValue(h[:], event)
 	if err != nil {
@@ -273,8 +281,14 @@ func (c *Core) handleEngineEventSend(event []byte) {
 }
 
 func (c *Core) handleEngineEventReq(hash common.Hash) {
+	c.wg.Add(1)
+	defer c.wg.Done()
 	retry := 60
 	for {
+		if !c.running {
+			return
+		}
+
 		data, err := c.node.P2pService().DhtGetValue(hash[:])
 		if err == nil {
 			c.engine.SendParentEvent(data)
