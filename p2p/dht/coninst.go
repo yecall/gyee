@@ -401,58 +401,59 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 
 	hsTm := time.NewTimer(ciHandshakeTimeout)
 	defer hsTm.Stop()
-	hsCh := make(chan bool, 0)
-	hsEno := sch.SchEnoNone
+	hsCh := make(chan DhtErrno, 1)
 
 	go func() {
-		closeNeeded := false
 		if conInst.dir == ConInstDirOutbound {
 			if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
-				peer := conInst.hsInfo.peer
-				hsInfo := conInst.hsInfo
-				rsp.Eno = int(eno)
-				rsp.Peer = &peer
-				rsp.Inst = conInst
-				rsp.HsInfo = &hsInfo
-				hsEno = rsp2ConMgr()
-				closeNeeded = true
+				hsCh<-eno
 			}
 		} else if conInst.dir == ConInstDirInbound {
 			if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
-				rsp.Eno = int(eno)
-				rsp.Peer = nil
-				rsp.HsInfo = nil
-				rsp.Inst = conInst
-				hsEno = rsp2ConMgr()
-				closeNeeded = true
+				hsCh<-eno
 			}
 		} else {
 			ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 				conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 			panic("handshakeReq: invalid direction")
 		}
-		if closeNeeded {
-			close(hsCh)
-		} else {
-			hsCh <- true
-		}
+		hsCh<-DhtEnoNone
 	}()
 
 	select {
 	case <-hsTm.C:
 		conInst.iow.Close()
 		conInst.ior.Close()
-		<-hsCh
 		rsp.Eno = DhtEnoTimeout.GetEno()
-		return rsp2ConMgr()
-	case result, ok := <-hsCh:
-		if !ok {
-			return hsEno
+		if conInst.dir == ConInstDirOutbound {
+			peer := conInst.hsInfo.peer
+			hsInfo := conInst.hsInfo
+			rsp.Peer = &peer
+			rsp.Inst = conInst
+			rsp.HsInfo = &hsInfo
 		}
-		if !result {
+		return rsp2ConMgr()
+	case hsEno, ok := <-hsCh:
+		if !ok {
 			panic("handshakeReq: impossible result")
 		}
-		close(hsCh)
+		if hsEno != DhtEnoNone {
+			if conInst.dir == ConInstDirOutbound {
+				peer := conInst.hsInfo.peer
+				hsInfo := conInst.hsInfo
+				rsp.Eno = int(hsEno)
+				rsp.Peer = &peer
+				rsp.Inst = conInst
+				rsp.HsInfo = &hsInfo
+				return rsp2ConMgr()
+			} else if conInst.dir == ConInstDirInbound {
+				rsp.Eno = int(hsEno)
+				rsp.Peer = nil
+				rsp.HsInfo = nil
+				rsp.Inst = conInst
+				return rsp2ConMgr()
+			}
+		}
 	}
 
 	conInst.updateStatus(CisHandshook)
@@ -1057,7 +1058,6 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	}
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
-	conInst.iow.Close()
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 		ciLog.Debug("outboundHandshake: WriteMsg failed, "+
 			"inst: %s, dir: %d, local: %s, remote: %s, err: %s",
