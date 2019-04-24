@@ -343,7 +343,7 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	p2plog.Debug("yeShMgr: start...")
 
-	dht.SetChConMgrReady(yeShMgr.dhtInst.SchGetP2pCfgName(), make(chan bool, 0))
+	dht.SetChConMgrReady(yeShMgr.dhtInst.SchGetP2pCfgName(), make(chan bool, 1))
 	if eno = p2psh.P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
 		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno

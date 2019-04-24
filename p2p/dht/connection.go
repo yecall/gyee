@@ -272,8 +272,9 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
 	connLog.ForceDebug("poweroff: task will be done ...")
 
+	CloseChConMgrReady(conMgr.sdl.SchGetP2pCfgName())
+
 	po := sch.SchMessage{}
-	close(mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()])
 	for _, ci := range conMgr.ciTab {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
 			ci.name, ci.dir, ci.status)
@@ -1457,6 +1458,12 @@ var mapChConMgrReady = make(map[string]chan bool, 0)
 
 func SetChConMgrReady(name string, ch chan bool) {
 	mapChConMgrReady[name] = ch
+}
+
+func CloseChConMgrReady(name string) {
+	if ch, ok := mapChConMgrReady[name]; ok && ch != nil {
+		close(ch)
+	}
 }
 
 func ConMgrReady(name string) bool {
