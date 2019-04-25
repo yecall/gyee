@@ -3398,6 +3398,8 @@ func (pi *PeerInstance) stopRxTx() {
 	if pi.rxtxRuning {
 		pi.rxtxRuning = false
 		if pi.conn != nil {
+			pi.ior.Close()
+			pi.iow.Close()
 			pi.conn.Close()
 			pi.conn = nil
 		}
@@ -3415,6 +3417,8 @@ func (pi *PeerInstance) stopRxTx() {
 			close(pi.rxChan)
 		}
 	} else if pi.conn != nil {
+		pi.ior.Close()
+		pi.iow.Close()
 		pi.conn.Close()
 		pi.conn = nil
 	}

@@ -91,25 +91,55 @@ type SubnetDescriptor struct {
 	SubNetIdList       []config.SubNetworkID                    // sub network identity list
 }
 
+const (
+	yesNull	= iota	// null
+	yesDhtStart		// dht startup
+	yesDhtReady		// dht ready
+	yesChainReady	// all ready
+)
+
+const (
+	GVTO = time.Second * 4	// get value timeout
+	GVBS = 64				// get value buffer size
+	PVTO = time.Second * 8	// put value timeout
+	PVBS = 64				// put value buffer size
+)
+
 type SingleSubnetDescriptor = sch.SingleSubnetDescriptor // single subnet descriptor
 
-type yesKey = config.DsKey // key type
+type yesKey = config.DsKey
+
+type getValueResult struct {
+	eno		int
+	key		[]byte
+	value	[]byte
+}
+
+type putValueResult struct {
+	eno		int
+	key		[]byte
+}
 
 var yesInStopping = errors.New("yesmgr: in stopping")
 
 type YeShellManager struct {
 	name           string                           // unique name of the shell manager
 	inStopping     bool                             // in stopping procedure
+	status			int
 	chainInst      *sch.Scheduler                   // chain scheduler pointer
 	ptnChainShell  interface{}                      // chain shell manager task node pointer
 	ptChainShMgr   *p2psh.ShellManager              // chain shell manager object
 	dhtInst        *sch.Scheduler                   // dht scheduler pointer
 	ptnDhtShell    interface{}                      // dht shell manager task node pointer
 	ptDhtShMgr     *p2psh.DhtShellManager           // dht shell manager object
-	getValKey      yesKey                           // key of value to get
-	getValChan     chan []byte                      // get value channel
-	putValKey      []byte                           // key of value to put
-	putValChan     chan bool                        // put value channel
+	gvk2DurMap     map[yesKey]time.Duration			// remain time to wait
+	gvk2ChMap      map[yesKey]chan []byte			// channel for get value
+	getValChan     chan *getValueResult             // get value channel
+	getValLock     sync.Mutex						// lock for get value
+	pvk2DurMap     map[yesKey]time.Duration			// remain time to wait
+	pvk2ChMap      map[yesKey]chan bool				// channel for put value
+	putValChan     chan *putValueResult             // put value channel
+	putValLock     sync.Mutex						// lock for put value
 	findNodeMap    map[yesKey]chan interface{}      // find node command map to channel
 	getProviderMap map[yesKey]chan interface{}      // find node command map to channel
 	putProviderMap map[yesKey]chan interface{}      // find node command map to channel
@@ -298,9 +328,12 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	yeShMgr := YeShellManager{
 		name:           yesCfg.Name,
 		inStopping:     false,
-		putValKey:      make([]byte, 0),
-		getValChan:     make(chan []byte, 0),
-		putValChan:     make(chan bool, 0),
+		getValChan:     make(chan *getValueResult, 0),
+		gvk2DurMap:		make(map[yesKey]time.Duration, 0),
+		gvk2ChMap:		make(map[yesKey]chan []byte, 0),
+		putValChan:     make(chan *putValueResult, 0),
+		pvk2DurMap:		make(map[yesKey]time.Duration, 0),
+		pvk2ChMap:		make(map[yesKey]chan bool, 0),
 		findNodeMap:    make(map[yesKey]chan interface{}, yesMaxFindNode),
 		getProviderMap: make(map[yesKey]chan interface{}, yesMaxGetProvider),
 		putProviderMap: make(map[yesKey]chan interface{}, yesMaxPutProvider),
@@ -340,6 +373,7 @@ func (yeShMgr *YeShellManager) Start() error {
 	var ok bool
 
 	yeShMgr.inStopping = false
+	yeShMgr.status = yesNull
 
 	p2plog.Debug("yeShMgr: start...")
 
@@ -367,6 +401,8 @@ func (yeShMgr *YeShellManager) Start() error {
 		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
+
+	yeShMgr.status = yesDhtStart
 
 	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
@@ -398,15 +434,25 @@ func (yeShMgr *YeShellManager) Start() error {
 			yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
 			yeShMgr.dhtBsChan = make(chan bool, 1)
 			go yeShMgr.dhtBootstrapProc()
+			go yeShMgr.dhtPutValProc()
+			go yeShMgr.dhtGetValProc()
 		}
 	}
+
+	yeShMgr.status = yesDhtReady
 
 	go yeShMgr.chainRxProc()
 	go yeShMgr.deDupTickerProc()
 
+	yeShMgr.status = yesChainReady
+
 	p2plog.Debug("Start: shell ok")
 
 	return nil
+}
+
+func (yeShMgr *YeShellManager)getStatus() int {
+	return yeShMgr.status
 }
 
 func (yeShMgr *YeShellManager) Stop() {
@@ -418,6 +464,8 @@ func (yeShMgr *YeShellManager) Stop() {
 	yesLog.Debug("Stop: stop dht")
 	p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 	<-stopCh
+	close(yeShMgr.getValChan)
+	close(yeShMgr.putValChan)
 	yesLog.Debug("Stop: dht stopped")
 
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
@@ -572,14 +620,16 @@ func (yeShMgr *YeShellManager) UnRegister(subscriber *Subscriber) {
 }
 
 func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
+	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
 	if yeShMgr.inStopping {
 		return nil, yesInStopping
 	}
-
 	if len(key) != yesKeyBytes {
 		yesLog.Debug("DhtGetValue: invalid key: %x", key)
 		return nil, sch.SchEnoParameter
 	}
+
+	yesLog.Debug("DhtGetValue: sdl: %s, key: %x", sdl, key)
 
 	req := sch.MsgDhtMgrGetValueReq{
 		Key: key,
@@ -587,36 +637,41 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		yesLog.Debug("DhtGetValue: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtGetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
 		return nil, eno
 	}
 
-	yesLog.Debug("DhtGetValue: to pend on getValChan")
+	ch := make(chan []byte, 1)
+	if err := yeShMgr.dhtGetValMapKey(key, GVTO, ch); err != nil {
+		yesLog.Debug("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		return nil, err
+	}
 
-	copy(yeShMgr.getValKey[0:], key)
-	val, ok := <-yeShMgr.getValChan
-	yeShMgr.getValKey = yesKey{0x00, 0x00}
-
-	yesLog.Debug("DhtGetValue: get out from getValChan, ok: %t, val: %x", ok, val)
-
+	yesLog.Debug("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+	val, ok := <-ch
 	if !ok {
+		yesLog.Debug("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
 		return nil, errors.New("DhtGetValue: failed, channel closed")
 	} else if len(val) <= 0 {
+		yesLog.Debug("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
 		return nil, errors.New("DhtGetValue: empty value")
 	}
+	yesLog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
 
 	return val, nil
 }
 
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
+	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
-
 	if len(key) != yesKeyBytes || len(value) == 0 {
-		yesLog.Debug("DhtSetValue: invalid (key, value) pair, key: %x, length of value: %d", key, len(value))
+		yesLog.Debug("DhtSetValue: invalid pair, sdl: %s, key: %x, length of value: %d", sdl, key, len(value))
 		return sch.SchEnoParameter
 	}
+
+	yesLog.Debug("DhtSetValue: sdl: %s, key: %x", sdl, key)
 
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:      key,
@@ -626,24 +681,28 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		yesLog.Debug("DhtSetValue: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("DhtSetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
 		return eno
 	}
 
-	yesLog.Debug("DhtSetValue: to pend on putValChan")
+	ch := make(chan bool, 1)
+	if err := yeShMgr.dhtPutValMapKey(key, PVTO, ch); err != nil {
+		yesLog.Debug("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		return err
+	}
 
-	yeShMgr.putValKey = append(yeShMgr.putValKey, key...)
-	result, ok := <-yeShMgr.putValChan
-	yeShMgr.putValKey = make([]byte, 0)
-
-	yesLog.Debug("DhtSetValue: get out from putValChan, result: %t, ok: %t", result, ok)
-
+	yesLog.Debug("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
+	result, ok := <-ch
 	if !ok {
+		yesLog.Debug("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
 		return errors.New("DhtSetValue: failed, channel closed")
 	}
 	if result == false {
+		yesLog.Debug("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
 		return errors.New("DhtSetValue: failed")
 	}
+	yesLog.Debug("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+
 	return nil
 }
 
@@ -1048,6 +1107,163 @@ _bootstarp:
 	yesLog.Debug("dhtBootstrapProc: exit")
 }
 
+func (yeShMgr *YeShellManager)dhtPutValMapKey(key []byte, to time.Duration, ch chan bool) error {
+	yeShMgr.putValLock.Lock()
+	defer yeShMgr.putValLock.Unlock()
+	if len(yeShMgr.pvk2ChMap) >= PVBS {
+		yesLog.Debug("dhtPutValMapKey: too much, max: %d", PVBS)
+		return errors.New("too much")
+	}
+	yk := yesKey{}
+	if len(key) != yesKeyBytes {
+		yesLog.Debug("dhtPutValMapKey: invalid key")
+		return errors.New("dhtPutValMapKey: invalid key")
+	}
+	copy(yk[0:], key)
+	if _, dup := yeShMgr.pvk2ChMap[yk]; dup {
+		yesLog.Debug("dhtPutValMapKey: duplicated")
+		return errors.New("dhtPutValMapKey: duplicated")
+	}
+	yeShMgr.pvk2ChMap[yk] = ch
+	yeShMgr.pvk2DurMap[yk] = to
+	return nil
+}
+
+func (yeShMgr *YeShellManager)dhtPutValProc() {
+	const period = time.Second
+	yk := yesKey{}
+	tm := time.NewTimer(period)
+	defer tm.Stop()
+
+_pvpLoop:
+	for {
+		select {
+		case <-tm.C:
+			yeShMgr.putValLock.Lock()
+			for key, dur := range yeShMgr.pvk2DurMap {
+				dur = dur - period
+				if dur <= 0 {
+					close(yeShMgr.pvk2ChMap[key])
+					delete(yeShMgr.pvk2ChMap, key)
+					delete(yeShMgr.pvk2DurMap, key)
+				} else {
+					yeShMgr.pvk2DurMap[key] = dur
+				}
+			}
+			yeShMgr.putValLock.Unlock()
+		case result, ok := <-yeShMgr.putValChan:
+			if !ok {
+				break _pvpLoop
+			}
+			key := result.key
+			if len(key) != yesKeyBytes {
+				yesLog.Debug("dhtPutValProc: invalid key")
+			} else {
+				copy(yk[0:], key)
+				yeShMgr.putValLock.Lock()
+				if ch, ok := yeShMgr.pvk2ChMap[yk]; ok {
+					ch<-result.eno == dht.DhtEnoNone.GetEno()
+					close(ch)
+					delete(yeShMgr.pvk2ChMap, yk)
+					delete(yeShMgr.pvk2DurMap, yk)
+				}
+				yeShMgr.putValLock.Unlock()
+			}
+		}
+	}
+
+	yeShMgr.putValLock.Lock()
+	for k, ch := range yeShMgr.pvk2ChMap {
+		close(ch)
+		delete(yeShMgr.pvk2ChMap, k)
+		delete(yeShMgr.pvk2DurMap, k)
+	}
+	yeShMgr.putValLock.Unlock()
+
+	yesLog.Debug("dhtPutValProc: exit")
+}
+
+func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch chan []byte) error {
+	yeShMgr.getValLock.Lock()
+	defer yeShMgr.getValLock.Unlock()
+	if len(yeShMgr.gvk2ChMap) >= GVBS {
+		yesLog.Debug("dhtGetValMapKey: too much, max: %d", GVBS)
+		return errors.New("dhtGetValMapKey: too much")
+	}
+	yk := yesKey{}
+	if len(key) != yesKeyBytes {
+		yesLog.Debug("dhtGetValMapKey: invalid key")
+		return errors.New("dhtGetValMapKey: invalid key")
+	}
+	copy(yk[0:], key)
+	if _, dup := yeShMgr.gvk2ChMap[yk]; dup {
+		yesLog.Debug("dhtGetValMapKey: duplicated")
+		return errors.New("dhtGetValMapKey: duplicated")
+	}
+	yeShMgr.gvk2ChMap[yk] = ch
+	yeShMgr.gvk2DurMap[yk] = to
+	return nil
+}
+
+func (yeShMgr *YeShellManager)dhtGetValProc() {
+	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	const period = time.Second
+	yk := yesKey{}
+	tm := time.NewTimer(period)
+	defer tm.Stop()
+
+_gvpLoop:
+	for {
+		select {
+		case <-tm.C:
+			yeShMgr.getValLock.Lock()
+			for key, dur := range yeShMgr.gvk2DurMap {
+				dur = dur - period
+				if dur <= 0 {
+					yesLog.Debug("dhtGetValProc: timeout, sdl: %s, key: %x", sdl, key)
+					close(yeShMgr.gvk2ChMap[key])
+					delete(yeShMgr.gvk2ChMap, key)
+					delete(yeShMgr.gvk2DurMap, key)
+				} else {
+					yeShMgr.gvk2DurMap[key] = dur
+				}
+			}
+			yeShMgr.getValLock.Unlock()
+		case result, ok := <-yeShMgr.getValChan:
+			if !ok {
+				break _gvpLoop
+			}
+			key := result.key
+			if len(key) != yesKeyBytes {
+				yesLog.Debug("dhtGetValProc: invalid key, sdl: %s", sdl)
+			} else {
+				copy(yk[0:], key)
+				yeShMgr.getValLock.Lock()
+				if ch, ok := yeShMgr.gvk2ChMap[yk]; ok {
+					yesLog.Debug("dhtGetValProc: sdl: %s, eno: %d, key: %x", sdl, key, result.eno)
+					if result.eno == dht.DhtEnoNone.GetEno() {
+						ch <- result.value
+					}
+					close(ch)
+					delete(yeShMgr.gvk2ChMap, yk)
+					delete(yeShMgr.gvk2DurMap, yk)
+				}
+				yeShMgr.getValLock.Unlock()
+			}
+		}
+	}
+
+	yeShMgr.getValLock.Lock()
+	for k, ch := range yeShMgr.gvk2ChMap {
+		close(ch)
+		delete(yeShMgr.gvk2ChMap, k)
+		delete(yeShMgr.gvk2DurMap, k)
+	}
+	yeShMgr.getValLock.Unlock()
+
+	yesLog.Debug("dhtGetValProc: exit")
+}
+
 func (yeShMgr *YeShellManager) dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
@@ -1129,41 +1345,33 @@ func (yeShMgr *YeShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvide
 }
 
 func (yeShMgr *YeShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
-	// Notice: only when function DhtSetValue called, yeShMgr.putValKey would be set
-	// and would play in a blocked mode, we check this case to feed the signal into
-	// the channel which the caller is pending for, else nothing done.
-	if yeShMgr.putValKey != nil && len(yeShMgr.putValKey) == yesKeyBytes {
-		if bytes.Compare(yeShMgr.putValKey[0:], msg.Key) != 0 {
-			yesLog.Debug("dhtMgrPutValueLocalRsp: key mismatched")
-			return sch.SchEnoMismatched
-		}
-		if msg.Eno == dht.DhtEnoNone.GetEno() {
-			yeShMgr.putValChan <- true
-		} else {
-			yeShMgr.putValChan <- false
-		}
+	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	yesLog.Debug("dhtMgrPutValueLocalRsp: sdl: %s, msg: %+v", sdl, *msg)
+	pvr := putValueResult {
+		eno: msg.Eno,
+		key: msg.Key,
 	}
+	yeShMgr.putValChan<-&pvr
 	return sch.SchEnoNone
 }
 
 func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 	// see function dhtMgrPutValueLocalRsp for more please, an event EvDhtMgrPutValueLocalRsp should
 	// had received before this EvDhtMgrPutValueRsp.
-	yesLog.Debug("dhtMgrPutValueRsp: eno: %d, key: %x, peers: %d", msg.Eno, msg.Key, len(msg.Peers))
+	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	yesLog.Debug("dhtMgrPutValueRsp: sdl: %s, eno: %d, key: %x, peers: %d",
+		sdl, msg.Eno, msg.Key, len(msg.Peers))
 	return sch.SchEnoNone
 }
 
 func (yeShMgr *YeShellManager) dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 	yesLog.Debug("dhtMgrGetValueRsp: msg: %+v", *msg)
-	if bytes.Compare(yeShMgr.getValKey[0:], msg.Key) != 0 {
-		yesLog.Debug("dhtMgrGetValueRsp: key mismatched")
-		return sch.SchEnoMismatched
+	gvr := getValueResult{
+		eno: msg.Eno,
+		key: msg.Key,
+		value: msg.Val,
 	}
-	if msg.Eno == dht.DhtEnoNone.GetEno() {
-		yeShMgr.getValChan <- msg.Val
-	} else {
-		yeShMgr.getValChan <- []byte{}
-	}
+	yeShMgr.getValChan<-&gvr
 	return sch.SchEnoNone
 }
 

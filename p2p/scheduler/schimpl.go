@@ -1361,12 +1361,14 @@ func (sdl *scheduler) schDeleteTask(name string) SchErrno {
 //
 func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 
+	sdlName := sdl.p2pCfg.CfgName
+
 	//
 	// check the message to be sent
 	//
 
 	if msg == nil {
-		schLog.Debug("schSendMsg: invalid message")
+		schLog.ForceDebug("schSendMsg: invalid message, sdl: %s", sdlName)
 		return SchEnoParameter
 	}
 
@@ -1380,19 +1382,19 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		case EvSchDone:
 		default:
 			if schLog.debug__ {
-				schLog.Debug("schSendMsg: in power off stage")
+				schLog.ForceDebug("schSendMsg: in power off stage, sdl: %s", sdlName)
 			}
 			return SchEnoPowerOff
 		}
 	}
 
 	if msg.sender == nil {
-		schLog.Debug("schSendMsg: invalid sender")
+		schLog.ForceDebug("schSendMsg: invalid sender, sdl: %s", sdlName)
 		return SchEnoParameter
 	}
 
 	if msg.recver == nil {
-		schLog.Debug("schSendMsg: invalid receiver")
+		schLog.ForceDebug("schSendMsg: invalid receiver, sdl: %s", sdlName)
 		return SchEnoParameter
 	}
 
@@ -1402,8 +1404,8 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	if schLog.debug__ && false {
 		_, file, line, _ := runtime.Caller(2)
-		schLog.Debug("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
-			sdl.p2pCfg.CfgName,
+		schLog.ForceDebug("schSendMsg: sdl: %s, from: %s, to: %s, mid: %d, fbt2: %s, lbt2: %d",
+			sdlName,
 			sdl.schGetTaskName(msg.sender),
 			sdl.schGetTaskName(msg.recver),
 			msg.Id,
@@ -1429,19 +1431,19 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		if target.mailbox.que == nil {
 			// not found, target had been killed
 			schLog.ForceDebug("schSendMsg: mailbox empty, sdl: %s, src: %s, ev: %d",
-				sdl.p2pCfg.CfgName, source.name, msg.Id)
+				sdlName, source.name, msg.Id)
 			return SchEnoInternal
 		}
 
 		if len(*target.mailbox.que)+mbReserved >= cap(*target.mailbox.que) {
 
 			schLog.ForceDebug("schSendMsg: mailbox full, sdl: %s, src: %s, dst: %s, ev: %d",
-				sdl.p2pCfg.CfgName, source.name, target.name, msg.Id)
+				sdlName, source.name, target.name, msg.Id)
 
 			target.discardMessages += 1
 			if target.discardMessages&(0x1f) == 0 {
-				p2plog.Debug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
-					sdl.p2pCfg.CfgName, target.name, target.discardMessages)
+				schLog.ForceDebug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
+					sdlName, target.name, target.discardMessages)
 			}
 
 		} else {
@@ -1489,7 +1491,7 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		return msg2MailBox(msg)
 	}
 
-	panic("schSendMsg: would never come here!!!")
+	panic(fmt.Sprintf("schSendMsg: would never come here!!! sdl: %s", sdlName))
 }
 
 //

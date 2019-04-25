@@ -45,7 +45,7 @@ type coninstLogger struct {
 
 var ciLog = coninstLogger{
 	debug__:      false,
-	debugForce__: false,
+	debugForce__: true,
 }
 
 func (log coninstLogger) Debug(fmt string, args ...interface{}) {
@@ -72,6 +72,7 @@ type txPkgId struct {
 //
 type ConInst struct {
 	sdl           *sch.Scheduler    // pointer to scheduler
+	sdlName       string            // scheduler name
 	name          string            // task name
 	bootstrapNode bool              // bootstrap node flag
 	tep           sch.SchUserTaskEp // task entry
@@ -238,7 +239,9 @@ func (conInst *ConInst) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage)
 //
 func (conInst *ConInst) conInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	ciLog.ForceDebug("conInstProc: inst: %s, msg.Id: %d", conInst.name, msg.Id)
+	if msg.Id != sch.EvDhtConInstTxDataReq && msg.Id != sch.EvDhtQryInstProtoMsgInd {
+		ciLog.ForceDebug("conInstProc: sdl: %s, inst: %s, msg.Id: %d", conInst.sdlName, conInst.name, msg.Id)
+	}
 
 	var eno = sch.SchEnoUnknown
 
@@ -273,7 +276,9 @@ func (conInst *ConInst) conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = sch.SchEnoParameter
 	}
 
-	ciLog.ForceDebug("conInstProc: get out, inst: %s, msg.Id: %d", conInst.name, msg.Id)
+	if msg.Id != sch.EvDhtConInstTxDataReq && msg.Id != sch.EvDhtQryInstProtoMsgInd {
+		ciLog.ForceDebug("conInstProc: get out, sdl: %s, inst: %s, msg.Id: %d", conInst.sdlName, conInst.name, msg.Id)
+	}
 
 	return eno
 }
@@ -283,11 +288,13 @@ func (conInst *ConInst) conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 //
 func (conInst *ConInst) poweron(ptn interface{}) sch.SchErrno {
 	if conInst.ptnMe != ptn {
-		ciLog.ForceDebug("poweron: inst: %s, dir: %d, task mismatched", conInst.name, conInst.dir)
+		ciLog.ForceDebug("poweron: sdl: %s, inst: %s, dir: %d, task mismatched",
+			conInst.sdlName, conInst.name, conInst.dir)
 		return sch.SchEnoMismatched
 	}
 
-	ciLog.ForceDebug("poweron: inst: %s, dir: %d", conInst.name, conInst.dir)
+	ciLog.ForceDebug("poweron: sdl: %s, inst: %s, dir: %d",
+		conInst.sdlName, conInst.name, conInst.dir)
 
 	conInst.txDtm.setCallback(conInst.txTimerHandler)
 	conInst.txTmCycle, _ = conInst.txDtm.dur2Ticks(ciTxTimerDuration)
@@ -315,7 +322,8 @@ func (conInst *ConInst) poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (conInst *ConInst) poweroff(ptn interface{}) sch.SchErrno {
-	ciLog.ForceDebug("poweroff: inst: %s, dir: %d, task will be done ...", conInst.name, conInst.dir)
+	ciLog.ForceDebug("poweroff: sdl: %s, inst: %s, dir: %d, task will be done ...",
+		conInst.sdlName, conInst.name, conInst.dir)
 	conInst.cleanUp(DhtEnoScheduler.GetEno())
 	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
 }
@@ -330,7 +338,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	// response message to connection manager task.
 	//
 
-	connLog.ForceDebug("handshakeReq: inst: %s, dir: %d", conInst.name, conInst.dir)
+	connLog.ForceDebug("handshakeReq: sdl: %s, inst: %s, dir: %d",
+		conInst.sdlName, conInst.name, conInst.dir)
 
 	rsp := sch.MsgDhtConInstHandshakeRsp{
 		Eno:    DhtEnoUnknown.GetEno(),
@@ -344,13 +353,13 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	rsp2ConMgr := func() sch.SchErrno {
 		if conInst.con != nil {
 			ciLog.ForceDebug("handshakeReq: rsp2ConMgr, "+
-				"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, en: %d",
-				conInst.name, conInst.dir, conInst.con.LocalAddr().String(),
+				"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, eno: %d",
+				conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(),
 				conInst.con.RemoteAddr().String(), rsp.Eno)
 		} else {
 			ciLog.ForceDebug("handshakeReq: rsp2ConMgr, "+
-				"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, eno: %d",
-				conInst.name, conInst.dir, "none", "none", rsp.Eno)
+				"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, eno: %d",
+				conInst.sdlName, conInst.name, conInst.dir, "none", "none", rsp.Eno)
 		}
 		schMsg := new(sch.SchMessage)
 		conInst.sdl.SchMakeMessage(schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
@@ -378,8 +387,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 			return rsp2ConMgr()
 		}
 
-		ciLog.ForceDebug("handshakeReq: connect ok, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+		ciLog.ForceDebug("handshakeReq: connect ok, sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+			conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 		conInst.updateStatus(CisConnected)
 		conInst.statusReport()
@@ -396,8 +405,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	conInst.hsTimeout = msg.DurHs
 	conInst.statusReport()
 
-	ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+	ciLog.ForceDebug("handshakeReq: sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	hsTm := time.NewTimer(ciHandshakeTimeout)
 	defer hsTm.Stop()
@@ -413,8 +422,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 				hsCh<-eno
 			}
 		} else {
-			ciLog.ForceDebug("handshakeReq: inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-				conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+			ciLog.ForceDebug("handshakeReq: sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+				conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 			panic("handshakeReq: invalid direction")
 		}
 		hsCh<-DhtEnoNone
@@ -470,8 +479,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 //
 func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno {
 	ciLog.ForceDebug("startUpReq: enter, start rx/tx and confrim peMgr, "+
-		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+		"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	conInst.updateStatus(CisInService)
 	conInst.con.SetDeadline(time.Time{})
@@ -481,8 +490,8 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 	msg.EnoCh <- DhtEnoNone.GetEno()
 
 	ciLog.ForceDebug("startUpReq: ok, exit, "+
-		"inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
-		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
+		"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
+		conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	return sch.SchEnoNone
 }
@@ -492,25 +501,26 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 //
 func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	if status := conInst.getStatus(); status >= CisClosed {
-		ciLog.ForceDebug("closeReq: inst: %s, dir: %d, why: %d, status mismatched: %d",
-			conInst.name, conInst.dir, msg.Why, status)
+		ciLog.ForceDebug("closeReq: sdl: %s, inst: %s, dir: %d, why: %d, status mismatched: %d",
+			conInst.sdlName, conInst.name, conInst.dir, msg.Why, status)
 		return sch.SchEnoMismatched
 	}
 
-	ciLog.ForceDebug("closeReq: inst: %s, dir: %d, why: %d, status: %d",
-		conInst.name, conInst.dir, msg.Why, conInst.getStatus())
+	ciLog.ForceDebug("closeReq: sdl: %s, inst: %s, dir: %d, why: %d, status: %d",
+		conInst.sdlName, conInst.name, conInst.dir, msg.Why, conInst.getStatus())
 
 	if *msg.Peer != conInst.hsInfo.peer.ID {
-		ciLog.ForceDebug("closeReq: inst: %s, peer node identity mismatched", conInst.name)
+		ciLog.ForceDebug("closeReq: sdl: %s, inst: %s, peer node identity mismatched",
+			conInst.sdlName, conInst.name)
 		return sch.SchEnoMismatched
 	}
 
-	conInst.cleanUp(DhtEnoNone.GetEno())
+	conInst.cleanUp(msg.Why)
 	conInst.updateStatus(CisClosed)
 	conInst.statusReport()
 
-	ciLog.ForceDebug("closeReq: send EvDhtConInstCloseRsp, inst: %s, dir: %d, why: %d, status: %d, peer: %x",
-		conInst.name, conInst.dir, msg.Why, conInst.getStatus(), conInst.hsInfo.peer.ID)
+	ciLog.ForceDebug("closeReq: send EvDhtConInstCloseRsp, sdl: %s, inst: %s, dir: %d, why: %d, status: %d, peer: %x",
+		conInst.sdlName, conInst.name, conInst.dir, msg.Why, conInst.getStatus(), conInst.hsInfo.peer.ID)
 
 	schMsg := sch.SchMessage{}
 	rsp := sch.MsgDhtConInstCloseRsp{
@@ -759,6 +769,13 @@ func (conInst *ConInst) txTimerHandler(userData interface{}) error {
 		return sch.SchEnoMismatched
 	}
 
+	pkgId := txPkgId{txSeq: txPkg.waitSeq}
+	_, ok = conInst.txWaitRsp[pkgId]
+	if !ok {
+		ciLog.Debug("txTimerHandler: not found, seq: %d", txPkg.waitSeq)
+		return sch.SchEnoMismatched
+	}
+
 	eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
 	if eno == sch.SchEnoNone && ptn != nil && ptn == txPkg.task {
 		if txPkg.task != nil {
@@ -776,8 +793,8 @@ func (conInst *ConInst) txTimerHandler(userData interface{}) error {
 	if txPkg.responsed != nil {
 		close(txPkg.responsed)
 	}
-	pkgId := txPkgId{txSeq: txPkg.waitSeq}
 	delete(conInst.txWaitRsp, pkgId)
+
 	return sch.SchEnoNone
 }
 
@@ -859,37 +876,41 @@ func (conInst *ConInst) rxTaskStart() DhtErrno {
 //
 func (conInst *ConInst) txTaskStop(why int) DhtErrno {
 
+	// notic: conInst.iow.Close() should be called or the rx task might be blocked
+	// in writing so deadlock produced.
+
 	if conInst.txDone != nil {
 
-		ciLog.Debug("cleanUp: inst: %s, try to close txChan", conInst.name)
 		close(conInst.txChan)
+		ciLog.ForceDebug("txTaskStop: txChan closed, sdl: %s, inst: %s, ", conInst.sdlName, conInst.name)
 
 		conInst.lock.Lock()
 		if conInst.con != nil {
-			ciLog.Debug("txTaskStop: inst: %s, try to close con", conInst.name)
+			conInst.iow.Close()
 			conInst.con.Close()
 			conInst.con = nil
+			ciLog.ForceDebug("txTaskStop: iow&con closed, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 		}
 		conInst.lock.Unlock()
 
-		ciLog.Debug("txTaskStop: inst: %s, try to signal txDone", conInst.name)
 		conInst.txDone <- why
+		ciLog.ForceDebug("txTaskStop: txDone signaled, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
-		ciLog.Debug("txTaskStop: inst: %s, try to get feedback from signal txDone", conInst.name)
 		done := <-conInst.txDone
+		ciLog.ForceDebug("txTaskStop: txDone feedback, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
-		ciLog.Debug("txTaskStop: inst: %s, try to close txDone", conInst.name)
 		close(conInst.txDone)
 		conInst.txDone = nil
+		ciLog.ForceDebug("txTaskStop: txDone closed: sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
-		ciLog.Debug("txTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
 
 	} else if conInst.con != nil {
 
-		ciLog.Debug("txTaskStop: inst: %s, try to close con", conInst.name)
+		conInst.iow.Close()
 		conInst.con.Close()
 		conInst.con = nil
+		ciLog.ForceDebug("txTaskStop: iow&con closed, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 	}
 
 	return DhtEnoNone
@@ -900,32 +921,38 @@ func (conInst *ConInst) txTaskStop(why int) DhtErrno {
 //
 func (conInst *ConInst) rxTaskStop(why int) DhtErrno {
 
+	// notic: conInst.ior.Close() should be called or the rx task might be blocked
+	// in reading so deadlock produced.
+
 	if conInst.rxDone != nil {
 
+		conInst.lock.Lock()
 		if conInst.con != nil {
-			ciLog.Debug("rxTaskStop: inst: %s, close con", conInst.name)
+			conInst.ior.Close()
 			conInst.con.Close()
 			conInst.con = nil
+			ciLog.ForceDebug("rxTaskStop: ior&con closed, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 		}
+		conInst.lock.Unlock()
 
-		ciLog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
 		conInst.rxDone <- why
+		ciLog.ForceDebug("rxTaskStop: rxDone signaled, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
-		ciLog.Debug("rxTaskStop: inst: %s, try to signal rxDone", conInst.name)
 		done := <-conInst.rxDone
+		ciLog.ForceDebug("rxTaskStop: rxDone feedback, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
-		ciLog.Debug("rxTaskStop: inst: %s, try to get feedback from signal rxDone", conInst.name)
 		close(conInst.rxDone)
 		conInst.rxDone = nil
+		ciLog.ForceDebug("rxTaskStop: rxDone closed: sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
-		ciLog.Debug("rxTaskStop: inst: %s, it's ok", conInst.name)
 		return DhtErrno(done)
 
 	} else if conInst.con != nil {
 
-		ciLog.Debug("rxTaskStop: inst: %s, try to close con", conInst.name)
+		conInst.ior.Close()
 		conInst.con.Close()
 		conInst.con = nil
+		ciLog.ForceDebug("rxTaskStop: ior&con closed, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 	}
 
 	return DhtEnoNone
@@ -935,19 +962,17 @@ func (conInst *ConInst) rxTaskStop(why int) DhtErrno {
 // Cleanup the instance
 //
 func (conInst *ConInst) cleanUp(why int) DhtErrno {
-	ciLog.ForceDebug("cleanUp: inst: %s, why: %d", conInst.name, why)
-	conInst.txDtm.lock.Lock()
-	defer conInst.txDtm.lock.Unlock()
+
+	ciLog.ForceDebug("cleanUp: sdl: %s, inst: %s, why: %d",	conInst.sdlName, conInst.name, why)
 
 	conInst.txTaskStop(why)
-	ciLog.ForceDebug("cleanUp: inst: %s, tx done", conInst.name)
+	ciLog.ForceDebug("cleanUp: tx done, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
 	conInst.rxTaskStop(why)
-	ciLog.ForceDebug("cleanUp: inst: %s, rx done", conInst.name)
+	ciLog.ForceDebug("cleanUp: rx done, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
 	close(conInst.dtmDone)
-	conInst.txDtm.reset()
-	conInst.txWaitRsp = make(map[txPkgId]*conInstTxPkg, 0)
+	ciLog.ForceDebug("cleanUp: dtmDone signaled, sdl: %s, inst: %s", conInst.sdlName, conInst.name)
 
 	return DhtEnoNone
 }
@@ -1245,7 +1270,7 @@ func (conInst *ConInst) txProc() {
 	// exception handler for debug
 	defer func() {
 		if err := recover(); err != nil {
-			ciLog.Debug("txProc: inst: %s, dir: %d, exception raised, wait done...",
+			ciLog.ForceDebug("txProc: inst: %s, dir: %d, exception raised, wait done...",
 				conInst.name, conInst.dir)
 		}
 	}()
@@ -1269,9 +1294,16 @@ func (conInst *ConInst) txProc() {
 				conInst.txDtm.lock.Unlock()
 			}
 		}
+
 		ticker.Stop()
-		connLog.Debug("txProc:dtm exit, inst: %s, dir: %d",
-			conInst.name, conInst.dir)
+
+		conInst.txDtm.lock.Lock()
+		conInst.txDtm.reset()
+		conInst.txWaitRsp = make(map[txPkgId]*conInstTxPkg, 0)
+		conInst.txDtm.lock.Unlock()
+
+		connLog.ForceDebug("txProc:dtm exit, sdl: %s, inst: %s, dir: %d",
+			conInst.sdlName, conInst.name, conInst.dir)
 	}()
 
 	//
@@ -1292,9 +1324,9 @@ _txLoop:
 
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			ciLog.Debug("txProc: mismatched type, inst: %s, dir: %d",
-				conInst.name, conInst.dir)
-			goto _checkDone
+			ciLog.ForceDebug("txProc: mismatched type, sdl: %s, inst: %s, dir: %d",
+				conInst.sdlName, conInst.name, conInst.dir)
+			panic("txProc: internal errors")
 		}
 
 		pbPkg = new(pb.DhtPackage)
@@ -1302,34 +1334,34 @@ _txLoop:
 		txPkg.txTid = nil
 		if txPkg.responsed != nil {
 			if eno := conInst.txSetPending(txPkg); eno != DhtEnoNone {
-				ciLog.Debug("txProc: txSetPending failed, inst: %s, dir: %d, eno: %d",
-					conInst.name, conInst.dir, eno)
+				ciLog.ForceDebug("txProc: txSetPending failed, sdl: %s, inst: %s, dir: %d, eno: %d",
+					conInst.sdlName, conInst.name, conInst.dir, eno)
 				goto _checkDone
 			}
 			if eno := conInst.txSetPkgTimer(txPkg); eno != DhtEnoNone {
-				ciLog.Debug("txProc: txSetPending failed, inst: %s, dir: %d, eno: %d",
-					conInst.name, conInst.dir, eno)
+				ciLog.ForceDebug("txProc: txSetPending failed, sdl: %s, inst: %s, dir: %d, eno: %d",
+					conInst.sdlName, conInst.name, conInst.dir, eno)
 				goto _checkDone
 			}
 		}
 
 		if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-			ciLog.Debug("txProc: WriteMsg failed, inst: %s, dir: %d, err: %s",
-				conInst.name, conInst.dir, err.Error())
+			ciLog.ForceDebug("txProc: WriteMsg failed, sdl: %s, inst: %s, dir: %d, err: %s",
+				conInst.sdlName, conInst.name, conInst.dir, err.Error())
 			errUnderlying = true
 			break _txLoop
 		}
 
 		if conInst.txPkgCnt++; conInst.txPkgCnt&0xff == 0 {
-			ciLog.Debug("txProc: inst: %s, dir: %d, txPkgCnt: %d",
-				conInst.name, conInst.dir, conInst.txPkgCnt)
+			ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, txPkgCnt: %d",
+				conInst.sdlName, conInst.name, conInst.dir, conInst.txPkgCnt)
 		}
 
 	_checkDone:
 		select {
 		case done := <-conInst.txDone:
-			ciLog.Debug("txProc: inst: %s, dir: %d, done by: %d",
-				conInst.name, conInst.dir, done)
+			ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, done by: %d",
+				conInst.sdlName, conInst.name, conInst.dir, done)
 			isDone = true
 			break _txLoop
 		default:
@@ -1346,27 +1378,30 @@ _txLoop:
 		//
 		// the 1) case: report the status and then wait singal done
 		//
-		ciLog.Debug("txProc: underlying error, inst: %s, dir: %d",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("txProc: underlying error, sdl: %s, inst: %s, dir: %d",
+			conInst.sdlName, conInst.name, conInst.dir)
 
 		if status := conInst.getStatus(); status < CisOutOfService {
-			ciLog.Debug("txProc: CisOutOfService, inst: %s, dir: %d, status: %d",
-				conInst.name, conInst.dir, status)
+			ciLog.ForceDebug("txProc: CisOutOfService, sdl: %s, inst: %s, dir: %d, status: %d",
+				conInst.sdlName, conInst.name, conInst.dir, status)
 			conInst.updateStatus(CisOutOfService)
 			if eno := conInst.statusReport(); eno != DhtEnoNone {
-				ciLog.Debug("txProc: statusReport failed, eno: %d", eno)
+				ciLog.ForceDebug("txProc: statusReport failed, sdl: %s, inst: %s, dir: %d, eno: %d",
+					conInst.sdlName, conInst.name, conInst.dir, eno)
 			}
 		}
 
-		ciLog.Debug("txProc: inst: %s, dir: %d, try to get signal from txDone",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, try to get signal from txDone",
+			conInst.sdlName, conInst.name, conInst.dir)
 		<-conInst.txDone
 
-		ciLog.Debug("txProc: inst: %s, dir: %d, try to feedback signal to txDone",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, try to feedback signal to txDone",
+			conInst.sdlName, conInst.name, conInst.dir)
 		conInst.txDone <- DhtEnoNone.GetEno()
 
-		ciLog.Debug("txProc: inst: %s, dir: %d, done", conInst.name, conInst.dir)
+		ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, done",
+			conInst.sdlName, conInst.name, conInst.dir)
+
 		return
 	}
 
@@ -1375,17 +1410,19 @@ _txLoop:
 		//
 		// the 2) case: signal the done
 		//
-		ciLog.Debug("txProc: inst: %s, dir: %d, we are done, try to feedback signal to txDone",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, done, feedback signal to txDone",
+			conInst.sdlName, conInst.name, conInst.dir)
 
 		conInst.txDone <- DhtEnoNone.GetEno()
 
-		ciLog.Debug("txProc: inst: %s, dir: %d, done", conInst.name, conInst.dir)
+		ciLog.ForceDebug("txProc: sdl: %s, inst: %s, dir: %d, done",
+			conInst.sdlName, conInst.name, conInst.dir)
+
 		return
 	}
 
-	ciLog.Debug("txProc: wow! impossible errors, inst: %s, dir: %d",
-		conInst.name, conInst.dir)
+	ciLog.ForceDebug("txProc: wow! impossible errors, sdl: %s, inst: %s, dir: %d",
+		conInst.sdlName, conInst.name, conInst.dir)
 }
 
 //
@@ -1396,8 +1433,8 @@ func (conInst *ConInst) rxProc() {
 	// exception handler for debug
 	defer func() {
 		if err := recover(); err != nil {
-			ciLog.Debug("rxProc: inst: %s, dir: %d, exception raised, wait done...",
-				conInst.name, conInst.dir)
+			ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, exception raised, wait done...",
+				conInst.sdlName, conInst.name, conInst.dir)
 		}
 	}()
 
@@ -1417,15 +1454,15 @@ _rxLoop:
 		pkg := new(DhtPackage)
 
 		if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-			ciLog.Debug("rxProc: ReadMsg failed, inst: %s, dir: %d, err: %s",
-				conInst.name, conInst.dir, err.Error())
+			ciLog.ForceDebug("rxProc: ReadMsg failed, sdl: %s, inst: %s, dir: %d, err: %s",
+				conInst.sdlName, conInst.name, conInst.dir, err.Error())
 			errUnderlying = true
 			break _rxLoop
 		}
 
 		if conInst.rxPkgCnt++; conInst.rxPkgCnt&0xff == 0 {
-			ciLog.Debug("rxProc: inst: %s, dir: %d, rxPkgCnt: %d",
-				conInst.name, conInst.dir, conInst.rxPkgCnt)
+			ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, rxPkgCnt: %d",
+				conInst.sdlName, conInst.name, conInst.dir, conInst.rxPkgCnt)
 		}
 
 		pkg.FromPbPackage(pbPkg)
@@ -1440,14 +1477,14 @@ _rxLoop:
 
 		msg = new(DhtMessage)
 		if eno := pkg.GetMessage(msg); eno != DhtEnoNone {
-			ciLog.Debug("rxProc: inst: %s, dir: %d, eno: %d, GetMessage failed",
-				conInst.name, conInst.dir, eno)
+			ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, eno: %d, GetMessage failed",
+				conInst.sdlName, conInst.name, conInst.dir, eno)
 			goto _checkDone
 		}
 
 		if eno := conInst.dispatch(msg); eno != DhtEnoNone {
-			ciLog.Debug("rxProc: inst: %s, dir: %d, eno: %d, dispatch failed",
-				conInst.name, conInst.dir, eno)
+			ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, eno: %d, dispatch failed",
+				conInst.sdlName, conInst.name, conInst.dir, eno)
 		}
 
 	_checkDone:
@@ -1455,8 +1492,8 @@ _rxLoop:
 		select {
 		case done := <-conInst.rxDone:
 			isDone = true
-			ciLog.Debug("rxProc: inst: %s, dir: %d, done by: %d",
-				conInst.name, conInst.dir, done)
+			ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, done by: %d",
+				conInst.sdlName, conInst.name, conInst.dir, done)
 			break _rxLoop
 		default:
 		}
@@ -1473,28 +1510,30 @@ _rxLoop:
 		//
 		// the 1) case: report the status and then wait and then signal done
 		//
-		ciLog.Debug("rxProc: inst: %s, dir: %d, underlying error",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, underlying error",
+			conInst.sdlName, conInst.name, conInst.dir)
 
 		if status := conInst.getStatus(); status < CisOutOfService {
-			ciLog.Debug("rxProc: CisOutOfService, inst: %s, dir: %d, status: %d",
-				conInst.name, conInst.dir, status)
+			ciLog.ForceDebug("rxProc: CisOutOfService, sdl: %s, inst: %s, dir: %d, status: %d",
+				conInst.sdlName, conInst.name, conInst.dir, status)
 			conInst.updateStatus(CisOutOfService)
 			if eno := conInst.statusReport(); eno != DhtEnoNone {
-				ciLog.Debug("rxProc: statusReport failed, inst: %s, dir: %d, eno: %d",
-					conInst.name, conInst.dir, eno)
+				ciLog.ForceDebug("rxProc: statusReport failed, sdl: %s, inst: %s, dir: %d, eno: %d",
+					conInst.sdlName, conInst.name, conInst.dir, eno)
 			}
 		}
 
-		ciLog.Debug("rxProc: inst: %s, dir: %d, try to get signal from rxDone",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, try to get signal from rxDone",
+			conInst.sdlName, conInst.name, conInst.dir)
 		<-conInst.rxDone
 
-		ciLog.Debug("rxProc: inst: %s, dir: %d, try to get feedback signal to rxDone",
-			conInst.name, conInst.dir)
+		ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, try to get feedback signal to rxDone",
+			conInst.sdlName, conInst.name, conInst.dir)
 		conInst.rxDone <- DhtEnoNone.GetEno()
 
-		ciLog.Debug("rxProc: inst: %s, dir: %d, done", conInst.name, conInst.dir)
+		ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, done",
+			conInst.sdlName, conInst.name, conInst.dir)
+
 		return
 	}
 
@@ -1503,17 +1542,18 @@ _rxLoop:
 		//
 		// the 2) case: signal the done
 		//
-		ciLog.Debug("rxProc: inst: %s, dir: %d, we are done, try to feedback signal to rxDone",
+		ciLog.ForceDebug("rxProc: inst: %s, dir: %d, we are done, try to feedback signal to rxDone",
 			conInst.name, conInst.dir)
 
 		conInst.rxDone <- DhtEnoNone.GetEno()
 
-		ciLog.Debug("rxProc: inst: %s, dir: %d, done", conInst.name, conInst.dir)
+		ciLog.ForceDebug("rxProc: inst: %s, dir: %d, done", conInst.name, conInst.dir)
+
 		return
 	}
 
-	ciLog.Debug("rxProc: wow! impossible errors, inst: %s, dir: %d",
-		conInst.name, conInst.dir)
+	ciLog.ForceDebug("rxProc: wow! impossible errors, sdl: %s, inst: %s, dir: %d",
+		conInst.sdlName, conInst.name, conInst.dir)
 }
 
 //
@@ -1536,128 +1576,98 @@ func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_HANDSHAKE:
 
-		ciLog.Debug("dispatch: re-handshake is not supported now, "+
-			"inst: %s, local: %+v", conInst.name, *conInst.local)
-
+		ciLog.Debug("dispatch: MID_HANDSHAKE is not supported now")
 		eno = DhtEnoProtocol
 
 	case MID_FINDNODE:
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_FINDNODE from peer: %+v",
-			conInst.name, *conInst.local, *msg.FindNode)
-
+		ciLog.Debug("dispatch: MID_FINDNODE, inst: %s", conInst.name)
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_NEIGHBORS from peer: %+v",
-			conInst.name, *conInst.local, *msg.Neighbors)
-
+		ciLog.Debug("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
 		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_PUTVALUE discarded, inst: %s, local: %+v, MID_PUTVALUE from peer: %+v",
-				conInst.name, *conInst.local, *msg.PutValue)
+			ciLog.Debug("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_PUTVALUE from peer: %+v",
-			conInst.name, *conInst.local, *msg.PutValue)
-
+		ciLog.Debug("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETVALUE_REQ discarded, inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
-				conInst.name, *conInst.local, *msg.GetValueReq)
+			ciLog.Debug("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_GETVALUE_REQ from peer: %+v",
-			conInst.name, *conInst.local, *msg.GetValueReq)
-
+		ciLog.Debug("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
 		eno = conInst.getValueReq(msg.GetValueReq)
 
 	case MID_GETVALUE_RSP:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETVALUE_RSP discarded, inst: %s, local: %+v, MID_GETVALUE_RSP from peer: %+v",
-				conInst.name, *conInst.local, *msg.GetValueRsp)
+			ciLog.Debug("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch:  inst: local: %+v, %s, MID_GETVALUE_RSP from peer: %+v",
-			conInst.name, *conInst.local, *msg.GetValueRsp)
-
+		ciLog.Debug("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_PUTPROVIDER discarded, inst: %s, local: %+v, MID_PUTPROVIDER from peer: %+v",
-				conInst.name, *conInst.local, *msg.PutProvider)
+			ciLog.Debug("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_PUTPROVIDER from peer: %+v",
-			conInst.name, *conInst.local, *msg.PutProvider)
-
+		ciLog.Debug("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
 		eno = conInst.putProvider(msg.PutProvider)
 
 	case MID_GETPROVIDER_REQ:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s, local: %+v, MID_GETPROVIDER_REQ from peer: %+v",
-				conInst.name, *conInst.local, *msg.GetProviderReq)
+			ciLog.Debug("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_GETPROVIDER_REQ from peer: %+v",
-			conInst.name, *conInst.local, *msg.GetProviderReq)
-
+		ciLog.Debug("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s, local: %+v, MID_GETPROVIDER_RSP from peer: %+v",
-				conInst.name, *conInst.local, *msg.GetProviderRsp)
+			ciLog.Debug("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_GETPROVIDER_RSP from peer: %+v",
-			conInst.name, *conInst.local, *msg.GetProviderRsp)
-
+		ciLog.Debug("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_PING from peer: %+v",
-			conInst.name, *conInst.local, *msg.Ping)
-
+		ciLog.Debug("dispatch: MID_PING, inst: %s", conInst.name)
 		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, MID_PONG from peer: %+v",
-			conInst.name, *conInst.local, *msg.Pong)
-
+		ciLog.Debug("dispatch: MID_PONG, inst: %s", conInst.name)
 		eno = conInst.getPong(msg.Pong)
 
 	default:
 
-		ciLog.Debug("dispatch: inst: %s, local: %+v, invalid message identity: %d",
-			conInst.name, *conInst.local, msg.Mid)
-
+		ciLog.Debug("dispatch: unknown: %d, inst: %s", msg.Mid, conInst.name)
 		eno = DhtEnoProtocol
 	}
 
@@ -1828,7 +1838,6 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 		txPkg.responsed <- true
 		close(txPkg.responsed)
 	}
-	delete(conInst.txWaitRsp, pkgId)
 
 	ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 	if txPkg.responsed != nil && txPkg.txTid != nil {
@@ -1850,6 +1859,7 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 		}
 	}
 
+	delete(conInst.txWaitRsp, pkgId)
 	return DhtEnoNone, txPkg
 }
 

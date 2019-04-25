@@ -46,7 +46,7 @@ type connLogger struct {
 
 var connLog = connLogger{
 	debug__:      false,
-	debugForce__: false,
+	debugForce__: true,
 }
 
 func (log connLogger) Debug(fmt string, args ...interface{}) {
@@ -107,6 +107,7 @@ const (
 
 type ConMgr struct {
 	sdl           *sch.Scheduler               // pointer to scheduler
+	sdlName       string                       // scheduler name
 	name          string                       // my name
 	cfg           conMgrCfg                    // configuration
 	tep           sch.SchUserTaskEp            // task entry
@@ -226,6 +227,7 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 	sdl := sch.SchGetScheduler(ptn)
 
 	conMgr.sdl = sdl
+	conMgr.sdlName = sdl.SchGetP2pCfgName()
 	conMgr.ptnMe = ptn
 
 	_, conMgr.ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName)
@@ -270,20 +272,20 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
-	connLog.ForceDebug("poweroff: task will be done ...")
+	connLog.ForceDebug("poweroff: task will be done, sdl: %s", conMgr.sdlName)
 
 	CloseChConMgrReady(conMgr.sdl.SchGetP2pCfgName())
 
 	po := sch.SchMessage{}
 	for _, ci := range conMgr.ciTab {
-		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
-			ci.name, ci.dir, ci.status)
+		connLog.ForceDebug("poweroff: sent EvSchPoweroff to sdl: %s, inst: %s, dir: %d, statue: %d",
+			conMgr.sdlName, ci.name, ci.dir, ci.status)
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
 	for _, ci := range conMgr.ibInstTemp {
-		connLog.ForceDebug("poweroff: sent EvSchPoweroff to inst: %s, dir: %d, statue: %d",
-			ci.name, ci.dir, ci.status)
+		connLog.ForceDebug("poweroff: sent EvSchPoweroff to sdl: %s, inst: %s, dir: %d, statue: %d",
+			conMgr.sdlName, ci.name, ci.dir, ci.status)
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
@@ -305,7 +307,7 @@ func (conMgr *ConMgr) acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	sdl := conMgr.sdl
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), false)
 	if dhtEno := conMgr.setupConInst(ci, conMgr.ptnLsnMgr, nil, msg); dhtEno != DhtEnoNone {
-		connLog.ForceDebug("acceptInd: setupConInst failed, eno: %d", dhtEno)
+		connLog.ForceDebug("acceptInd: setupConInst failed, sdl: %s, eno: %d", conMgr.sdlName, dhtEno)
 		return sch.SchEnoUserTask
 	}
 	conMgr.ciSeq++
@@ -320,12 +322,12 @@ func (conMgr *ConMgr) acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 		UserDa: nil,
 	}
 
-	connLog.ForceDebug("acceptInd: inbound inst: %s, peer: %s",
-		ci.name, msg.Con.RemoteAddr().String())
+	connLog.ForceDebug("acceptInd: inbound sdl: %s, inst: %s, peer: %s",
+		conMgr.sdlName, ci.name, msg.Con.RemoteAddr().String())
 
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		connLog.ForceDebug("acceptInd: SchCreateTask failed, eno: %d", eno)
+		connLog.ForceDebug("acceptInd: SchCreateTask failed, sdl: %s, eno: %d", conMgr.sdlName, eno)
 		return eno
 	}
 
@@ -366,8 +368,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		rsp := (interface{})(nil)
 		ev := sch.EvDhtConMgrConnectRsp
 		if eno, ptn := ci.sdl.SchGetUserTaskNode(ci.srcTaskName); eno != sch.SchEnoNone || ptn == nil || ptn != ci.ptnSrcTsk {
-			ciLog.ForceDebug("handshakeRsp: source task not found, inst: %s, dir: %d, src: %s",
-				ci.name, ci.dir, ci.srcTaskName)
+			ciLog.ForceDebug("handshakeRsp: source task not found, sdl: %s, inst: %s, dir: %d, src: %s",
+				conMgr.sdlName, ci.name, ci.dir, ci.srcTaskName)
 		} else {
 			if ci.isBlind {
 				rsp = &sch.MsgDhtBlindConnectRsp{
@@ -384,8 +386,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 					Dir:  ci.dir,
 				}
 			}
-			connLog.ForceDebug("rsp2TasksPending: inst: %s, dir: %d, src: %s, ev: %d, ",
-				ci.name, ci.dir, ci.srcTaskName, ev)
+			connLog.ForceDebug("rsp2TasksPending: sdl: %s, inst: %s, dir: %d, src: %s, ev: %d, ",
+				conMgr.sdlName, ci.name, ci.dir, ci.srcTaskName, ev)
 			schMsg := new(sch.SchMessage)
 			conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ci.ptnSrcTsk, ev, rsp)
 			conMgr.sdl.SchSendMessage(schMsg)
@@ -410,8 +412,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 						Dir:  ci.dir,
 					}
 				}
-				connLog.ForceDebug("rsp2TasksPending: inst: %s, dir: %d, src: %s, name: %s, ev: %d, ",
-					ci.name, ci.dir, ci.srcTaskName, name, ev)
+				connLog.ForceDebug("rsp2TasksPending: sdl: %s, inst: %s, dir: %d, src: %s, name: %s, ev: %d, ",
+					conMgr.sdlName, ci.name, ci.dir, ci.srcTaskName, name, ev)
 				schMsg := new(sch.SchMessage)
 				conMgr.sdl.SchMakeMessage(schMsg, conMgr.ptnMe, ptn, ev, rsp)
 				conMgr.sdl.SchSendMessage(schMsg)
@@ -423,7 +425,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 
 	if msg.Eno != DhtEnoNone.GetEno() {
 
-		connLog.ForceDebug("handshakeRsp: failed reported, inst: %s, dir: %d", ci.name, ci.dir)
+		connLog.ForceDebug("handshakeRsp: failed reported, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, ci.dir)
 
 		//
 		// remove temp map for inbound connection instance, and for outbounds,
@@ -470,14 +473,16 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 	}
 
-	connLog.ForceDebug("handshakeRsp: ok reported, inst: %s, dir: %d", ci.name, ci.dir)
+	connLog.ForceDebug("handshakeRsp: ok reported, sdl: %s, inst: %s, dir: %d",
+		conMgr.sdlName, ci.name, ci.dir)
 
 	cid := conInstIdentity{
 		nid: msg.Peer.ID,
 		dir: ConInstDir(msg.Dir),
 	}
 	if msg.Dir != ConInstDirInbound && msg.Dir != ConInstDirOutbound {
-		connLog.ForceDebug("handshakeRsp: invalid direction, inst: %s, dir: %d", ci.name, msg.Dir)
+		connLog.ForceDebug("handshakeRsp: invalid direction, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, msg.Dir)
 		panic("handshakeRsp: invalid direction")
 	}
 
@@ -486,21 +491,34 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	}
 
 	if conMgr.instInClosing[cid] != nil {
-		connLog.ForceDebug("handshakeRsp: in closing, inst: %s, dir: %d", ci.name, ci.dir)
+		connLog.ForceDebug("handshakeRsp: in closing, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, ci.dir)
+		// notice: here if it's an inbound instance, we must done it at once, since
+		// two tasks for the same peer are exist, the old one in closing, the new one
+		// is this reported.
+		if msg.Dir == ConInstDirInbound {
+			inst, ok := msg.Inst.(*ConInst)
+			if !ok {
+				panic(fmt.Sprintf("handshakeRsp: internal error, sdl: %s, inst: %s, dir: %d",
+					conMgr.sdlName, ci.name, ci.dir))
+			}
+			conMgr.sdl.SchTaskDone(inst.ptnMe, sch.SchEnoKilled)
+		}
 		return sch.SchEnoNone
 	}
 
 	if msg.Dir == ConInstDirInbound {
 		if duped, dup := conMgr.ciTab[cid]; dup {
-			connLog.ForceDebug("handshakeRsp: duplicated, inst: %s, dir: %d, duped: %s, dupdir: %d",
-				ci.name, msg.Dir, duped.name, duped.dir)
+			connLog.ForceDebug("handshakeRsp: duplicated, sdl: %s, inst: %s, dir: %d, duped: %s, dupdir: %d",
+				conMgr.sdlName, ci.name, msg.Dir, duped.name, duped.dir)
 			return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 		}
 		conMgr.ciTab[cid] = ci
 	} else if inst := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != inst {
 		// this is possible: the peer with the same ip address had change its' node identity, but we
 		// got an old version from somewhere. just done it.
-		connLog.ForceDebug("handshakeRsp: mismatched, inst: %s, dir: %d", ci.name, msg.Dir)
+		connLog.ForceDebug("handshakeRsp: mismatched, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, msg.Dir)
 		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
 	}
 
@@ -517,8 +535,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	// update the route manager
 	//
 	connLog.ForceDebug("handshakeRsp: all ok, update router and send EvDhtConInstStartupReq, "+
-		"inst: %s, dir: %d, local: %s, remote: %s",
-		ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+		"sdl: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		conMgr.sdlName, ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
 	update := sch.MsgDhtRutMgrUpdateReq{
 		Why: rutMgrUpdate4Handshake,
@@ -552,8 +570,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	}
 
 	connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confirmed ok, "+
-		"inst: %s, dir: %d, local: %s, remote: %s",
-		ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+		"sdl: %s, inst: %s, dir: %d, local: %s, remote: %s",
+		conMgr.sdlName, ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
 
 	return rsp2TasksPending(ci, msg, DhtEnoNone)
 }
@@ -686,12 +704,13 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 	eno, ptn := conMgr.sdl.SchCreateTask(&td)
 	if eno != sch.SchEnoNone || ptn == nil {
-		connLog.ForceDebug("connctReq: SchCreateTask failed, eno: %d", eno)
+		connLog.ForceDebug("connctReq: SchCreateTask failed, sdl: %s, inst: %s, dir: %d, eno: %d",
+			conMgr.sdlName, ci.name, ci.dir, eno)
 		return rsp2Sender(DhtErrno(DhtEnoScheduler), ci.dir)
 	}
 
-	connLog.ForceDebug("connctReq: outbound instance, inst: %s, dir: %d, owner: %s, ip: %s",
-		ci.name, ci.dir, msg.Name, msg.Peer.IP.String())
+	connLog.ForceDebug("connctReq: outbound instance, sdl: %s, inst: %s, dir: %d, owner: %s, ip: %s",
+		conMgr.sdlName, ci.name, ci.dir, msg.Name, msg.Peer.IP.String())
 
 	ci.ptnMe = ptn
 	po := sch.SchMessage{}
@@ -718,14 +737,16 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 //
 func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 
-	connLog.ForceDebug("closeReq: task: %s, id: %x, dir: %d", msg.Task, msg.Peer.ID, msg.Dir)
+	connLog.ForceDebug("closeReq: sdl: %s, task: %s, id: %x, dir: %d",
+		conMgr.sdlName, msg.Task, msg.Peer.ID, msg.Dir)
 
 	cid := conInstIdentity{
 		nid: msg.Peer.ID,
 		dir: ConInstDir(msg.Dir),
 	}
 	if cid.dir != ConInstDirInbound && cid.dir != ConInstDirOutbound {
-		connLog.ForceDebug("closeReq: invalid direction: inst: %s, %d", msg.Task, cid.dir)
+		connLog.ForceDebug("closeReq: invalid direction: sdl: %s, inst: %s, %d",
+			conMgr.sdlName, msg.Task, cid.dir)
 		panic("closeReq: invalid direction")
 	}
 
@@ -734,7 +755,7 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno {
 		schMsg := new(sch.SchMessage)
 		if sender == nil {
-			connLog.ForceDebug("closeReq: rsp2Sender: nil sender")
+			connLog.ForceDebug("closeReq: rsp2Sender: nil sender, sdl: %s", conMgr.sdlName)
 			return sch.SchEnoMismatched
 		}
 		rsp := sch.MsgDhtConMgrCloseRsp{
@@ -746,7 +767,8 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		return sdl.SchSendMessage(schMsg)
 	}
 	req2Inst := func(inst *ConInst) sch.SchErrno {
-		connLog.ForceDebug("closeReq: req2Inst: inst: %s, dir: %d", inst.name, inst.dir)
+		connLog.ForceDebug("closeReq: req2Inst: sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, inst.name, inst.dir)
 		schMsg := new(sch.SchMessage)
 		conMgr.instInClosing[cid] = inst
 		delete(conMgr.ciTab, cid)
@@ -766,9 +788,11 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		for _, ci := range cis {
 			if ci != nil {
 				found = true
-				connLog.ForceDebug("closeReq: found, inst: %s, dir: %d", ci.name, ci.dir)
+				connLog.ForceDebug("closeReq: found, sdl: %s, inst: %s, dir: %d",
+					conMgr.sdlName, ci.name, ci.dir)
 				if status := ci.getStatus(); status > CisOutOfService {
-					connLog.ForceDebug("closeReq: mismatched, inst: %s, dir: %d, status: %d", ci.name, ci.dir, status)
+					connLog.ForceDebug("closeReq: mismatched, sdl: %s, inst: %s, dir: %d, status: %d",
+						conMgr.sdlName, ci.name, ci.dir, status)
 					dup = true
 				} else if req2Inst(ci) != sch.SchEnoNone {
 					err = true
@@ -777,7 +801,8 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 		}
 	}
 
-	connLog.ForceDebug("closeReq: found: %t, err: %t, dup: %t", found, err, dup)
+	connLog.ForceDebug("closeReq: sdl: %s, found: %t, err: %t, dup: %t",
+		conMgr.sdlName, found, err, dup)
 
 	if !found {
 		return rsp2Sender(DhtEnoNotFound)
@@ -825,7 +850,9 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		return sch.SchEnoResource
 	}
 
-	connLog.Debug("sendReq: connection instance found: %+v", *ci)
+	connLog.Debug("sendReq: connection instance found: inst: %s, dir: %d, peer: %s",
+		ci.name, ci.dir, ci.hsInfo.peer.IP.String())
+
 	if curStat := ci.getStatus(); curStat != CisInService {
 		connLog.Debug("sendReq: can't send in status: %d", curStat)
 		return sch.SchEnoResource
@@ -937,14 +964,15 @@ func (conMgr *ConMgr) instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno 
 		return sdl.SchSendMessage(schMsg)
 	}
 
-	connLog.ForceDebug("instCloseRsp: cid: %+v", cid)
+	connLog.ForceDebug("instCloseRsp: sdl: %s, cid: %+v", conMgr.sdlName, cid)
 
 	found := false
 	err := false
 
 	if ci := conMgr.instInClosing[cid]; ci != nil {
 
-		connLog.ForceDebug("instCloseRsp: inst: %s, current status: %d", ci.name, ci.getStatus())
+		connLog.ForceDebug("instCloseRsp: sdl: %s, inst: %s, current status: %d",
+			conMgr.sdlName, ci.name, ci.getStatus())
 
 		found = true
 		delete(conMgr.instInClosing, cid)
@@ -959,11 +987,11 @@ func (conMgr *ConMgr) instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno 
 	}
 
 	if !found {
-		connLog.ForceDebug("instCloseRsp: not found")
+		connLog.ForceDebug("instCloseRsp: not found, sdl: %s", conMgr.sdlName)
 		return sch.SchEnoNotFound
 	}
 	if err {
-		connLog.ForceDebug("instCloseRsp: seems some errors")
+		connLog.ForceDebug("instCloseRsp: seems some errors, sdl: %s", conMgr.sdlName)
 		return sch.SchEnoUserTask
 	}
 
@@ -981,7 +1009,8 @@ func (conMgr *ConMgr) rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.Sch
 	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
 	req2Inst := func(inst *ConInst) sch.SchErrno {
-		connLog.ForceDebug("rutPeerRemoveInd: req2Inst: inst: %s, dir: %d", inst.name, inst.dir)
+		connLog.ForceDebug("rutPeerRemoveInd: req2Inst: sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, inst.name, inst.dir)
 		cid.dir = inst.dir
 		conMgr.instInClosing[cid] = inst
 		delete(conMgr.ciTab, cid)
@@ -997,7 +1026,8 @@ func (conMgr *ConMgr) rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.Sch
 		dup = false
 		err = false
 		if status := ci.getStatus(); status > CisOutOfService {
-			connLog.ForceDebug("rutPeerRemoveInd: mismatched, status: %d", status)
+			connLog.ForceDebug("rutPeerRemoveInd: mismatched, sdl: %s, status: %d",
+				conMgr.sdlName, status)
 			dup = true
 		} else if req2Inst(ci) != sch.SchEnoNone {
 			err = true
@@ -1009,7 +1039,8 @@ func (conMgr *ConMgr) rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.Sch
 		for _, ci := range cis {
 			if ci != nil {
 				f, d, e := closeInst(ci)
-				connLog.ForceDebug("rutPeerRemoveInd: found: %t, dup: %t, err: %t", f, d, e)
+				connLog.ForceDebug("rutPeerRemoveInd: sdl: %s, found: %t, dup: %t, err: %t",
+					conMgr.sdlName, f, d, e)
 			}
 		}
 	}
@@ -1183,6 +1214,7 @@ func (conMgr *ConMgr) lookupInboundConInst(nid *config.NodeID) *ConInst {
 func (conMgr *ConMgr) setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node, msg interface{}) DhtErrno {
 
 	ci.sdl = conMgr.sdl
+	ci.sdlName = conMgr.sdl.SchGetP2pCfgName()
 	ci.bootstrapNode = conMgr.cfg.bootstarpNode
 	ci.ptnSrcTsk = srcTask
 	if ci.srcTaskName = ci.sdl.SchGetTaskName(srcTask); len(ci.srcTaskName) == 0 {
@@ -1313,19 +1345,21 @@ func (conMgr *ConMgr) instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.S
 	}
 	if cis, _ := conMgr.lookupConInst(&cid); cis != nil {
 		if len(cis) > 1 {
-			connLog.ForceDebug("instOutOfServiceInd: invalid cid: %+v", cid)
+			connLog.ForceDebug("instOutOfServiceInd: sdl: %s, invalid cid: %+v", conMgr.sdlName, cid)
 			panic("instOutOfServiceInd: invalid cid")
 		}
 		for _, ci := range cis {
 			if ci != nil {
 				if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-					connLog.ForceDebug("instOutOfServiceInd: rutUpdate failed, eno: %d", eno)
+					connLog.ForceDebug("instOutOfServiceInd: rutUpdate failed, sdl: %s, eno: %d",
+						conMgr.sdlName, eno)
 				}
 				if status := ci.getStatus(); status > CisOutOfService {
-					connLog.ForceDebug("instOutOfServiceInd: mismatched, status: %d", status)
+					connLog.ForceDebug("instOutOfServiceInd: mismatched, sdl: %s, status: %d",
+						conMgr.sdlName, status)
 				} else {
-					connLog.ForceDebug("instOutOfServiceInd: inst: %s, dir: %d, current satus: %d",
-						ci.name, ci.dir, status)
+					connLog.ForceDebug("instOutOfServiceInd: sdl: %s, inst: %s, dir: %d, current status: %d",
+						conMgr.sdlName, ci.name, ci.dir, status)
 					cid.dir = ci.dir
 					conMgr.instInClosing[cid] = ci
 					delete(conMgr.ciTab, cid)
@@ -1359,8 +1393,8 @@ func (conMgr *ConMgr) onInstEvicted(key interface{}, value interface{}) {
 		connLog.Debug("onInstEvicted: invalid key or value")
 		return
 	}
-	connLog.ForceDebug("onInstEvicted: send EvDhtConMgrCloseReq, inst: %s, dir: %d",
-		ci.name, ci.dir)
+	connLog.ForceDebug("onInstEvicted: send EvDhtConMgrCloseReq, sdl: %s, inst: %s, dir: %d",
+		conMgr.sdlName, ci.name, ci.dir)
 	req := sch.MsgDhtConMgrCloseReq{
 		Task: ConMgrName,
 		Peer: &ci.hsInfo.peer,
@@ -1408,14 +1442,16 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 	for _, ci := range conMgr.ciTab {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
-		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, inst: %s, dir: %d", ci.name, ci.dir)
+		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, ci.dir)
 	}
 	conMgr.ciTab = make(map[conInstIdentity]*ConInst, 0)
 
 	for _, ci := range conMgr.ibInstTemp {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
-		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, inst: %s, dir: %d", ci.name, ci.dir)
+		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, ci.dir)
 	}
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 
