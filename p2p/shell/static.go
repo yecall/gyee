@@ -317,6 +317,12 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 		tkNames := sdl.SchShowTaskName()
 		stLog.Debug("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
 			seconds, p2pInstName, appType, tasks, tkNames)
+
+		// show what is waiting for
+		if !stLog.debug__ {
+			p2plog.Debug("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
+				seconds, p2pInstName, appType, tasks, tkNames)
+		}
 	}
 
 	ch <- true
