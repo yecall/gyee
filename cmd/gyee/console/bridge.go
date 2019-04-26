@@ -22,6 +22,7 @@ package console
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,8 +30,9 @@ import (
 	"net/http"
 	"strings"
 
-	//"github.com/nebulasio/go-nebulas/neblet/pb"
 	"github.com/robertkrimen/otto"
+	rpcpb "github.com/yeeco/gyee/rpc/pb"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -39,10 +41,13 @@ const (
 )
 
 type jsBridge struct {
-
 	// js request host
 	//TODO:这儿改为rpc.client
 	host string
+
+	conn     *grpc.ClientConn
+	svcAdmin rpcpb.AdminServiceClient
+	svcApi   rpcpb.ApiServiceClient
 
 	// terminal input prompter
 	prompter UserPrompter
@@ -51,8 +56,13 @@ type jsBridge struct {
 }
 
 // newBirdge create a new jsbridge with given prompter and writer
-func newBridge( /*config *nebletpb.Config*/ host string, prompter UserPrompter, writer io.Writer) *jsBridge {
-	bridge := &jsBridge{prompter: prompter, writer: writer}
+func newBridge(conn *grpc.ClientConn, prompter UserPrompter, writer io.Writer) *jsBridge {
+	bridge := &jsBridge{
+		conn:     conn,
+		svcAdmin: rpcpb.NewAdminServiceClient(conn),
+		svcApi:   rpcpb.NewApiServiceClient(conn),
+		prompter: prompter,
+		writer:   writer}
 	//if config.GetRpc() != nil {
 	//	bridge.host = config.GetRpc().HttpListen[0]
 	//	if !strings.HasPrefix(bridge.host, "http") {
@@ -82,6 +92,16 @@ func (b *jsBridge) setHost(call otto.FunctionCall) otto.Value {
 	}
 	b.host = host.String()
 	return otto.NullValue()
+}
+
+func (b *jsBridge) nodeInfo(call otto.FunctionCall) otto.Value {
+	response, err := b.svcApi.NodeInfo(context.Background(), nil)
+	if err != nil {
+		ret, _ := otto.ToValue(fmt.Errorf("nodeInfo err: %v", err))
+		return ret
+	}
+	result, _ := otto.ToValue(fmt.Sprintf("nodeInfo: %v", response))
+	return result
 }
 
 // request handle http request
