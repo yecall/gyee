@@ -52,7 +52,7 @@ type cfgLogger struct {
 }
 
 var cfgLog = cfgLogger{
-	debug__: true,
+	debug__: false,
 }
 
 func (log cfgLogger) Debug(fmt string, args ...interface{}) {

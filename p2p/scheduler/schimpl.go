@@ -265,7 +265,7 @@ taskLoop:
 
 		var msg schMessage
 
-		if sdl.powerOff == true {
+		if sdl.powerOff == true || task.killing {
 
 			//
 			// drain until EvSchDone or EvSchPoweroff event met
@@ -940,9 +940,9 @@ func (sdl *scheduler) schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 		Body:   ptm.tmcb.extra,
 	}
 
-	if len(*task.mailbox.que)+mbReserved >= cap(*task.mailbox.que) {
+	if len(*task.mailbox.que) + mbReserved >= cap(*task.mailbox.que) {
 		schLog.Debug("schSendTimerEvent: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name)
-		panic(fmt.Sprintf("system overload, task: %s", task.name))
+		panic(fmt.Sprintf("system overload, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name))
 	}
 
 	task.evTotal += 1
@@ -1017,6 +1017,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 	mq := make(chan schMessage, taskDesc.MbSize)
 	ptn.task.mailbox.que = &mq
 	ptn.task.mailbox.size = taskDesc.MbSize
+	ptn.task.killing = false
 	ptn.task.done = make(chan SchErrno, 1)
 	ptn.task.stopped = make(chan bool, 1)
 	ptn.task.dog = *taskDesc.Wd
@@ -1737,6 +1738,7 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 	// see function schCommonTask for more please
 	//
 
+	ptn.task.killing = true
 	ptn.task.done <- eno
 
 	//

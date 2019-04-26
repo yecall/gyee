@@ -31,9 +31,10 @@ import (
 	"time"
 	"strings"
 
+	log "github.com/yeeco/gyee/log"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p/dht"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
@@ -270,7 +271,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		chainCfg.NodeDatabase = yesCfg.NodeDatabase
 	}
 
-	p2plog.Debug("YeShellConfigToP2pCfg: local addr: chain[%s:%d:%d], dht[%s:%d]",
+	yesLog.Debug("YeShellConfigToP2pCfg: local addr: chain[%s:%d:%d], dht[%s:%d]",
 		yesCfg.LocalNodeIp, yesCfg.LocalUdpPort, yesCfg.LocalTcpPort,
 		yesCfg.LocalDhtIp, yesCfg.LocalDhtPort)
 
@@ -292,10 +293,10 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		thisCfg.localNode[snid] = chainCfg.SubNetNodeList[snid]
 	}
 
-	p2plog.Debug("YeShellConfigToP2pCfg: NatType: %s, GatewayIp: %s", yesCfg.NatType, yesCfg.GatewayIp)
+	yesLog.Debug("YeShellConfigToP2pCfg: NatType: %s, GatewayIp: %s", yesCfg.NatType, yesCfg.GatewayIp)
 	config.P2pSetupNatType(chainCfg, yesCfg.NatType, yesCfg.GatewayIp)
 
-	p2plog.Debug("YeShellConfigToP2pCfg: LocalDhtIp: %s, LocalDhtPort: %d",
+	yesLog.Debug("YeShellConfigToP2pCfg: LocalDhtIp: %s, LocalDhtPort: %d",
 		yesCfg.LocalDhtIp, yesCfg.LocalDhtPort)
 	if config.P2pSetLocalDhtIpAddr(chainCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.P2pCfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
@@ -375,17 +376,17 @@ func (yeShMgr *YeShellManager) Start() error {
 	yeShMgr.inStopping = false
 	yeShMgr.status = yesNull
 
-	p2plog.Debug("yeShMgr: start...")
+	yesLog.Debug("yeShMgr: start...")
 
 	dht.SetChConMgrReady(yeShMgr.dhtInst.SchGetP2pCfgName(), make(chan bool, 1))
 	if eno = p2psh.P2pStart(yeShMgr.dhtInst); eno != sch.SchEnoNone {
-		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
 
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
-		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
@@ -397,7 +398,7 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	if eno := p2psh.P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
 		stopCh := make(chan bool, 0)
-		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
@@ -406,17 +407,17 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	eno, yeShMgr.ptnChainShell = yeShMgr.chainInst.SchGetUserTaskNode(sch.ShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnChainShell == nil {
-		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
 	yeShMgr.ptChainShMgr, ok = yeShMgr.chainInst.SchGetTaskObject(sch.ShMgrName).(*p2psh.ShellManager)
 	if !ok || yeShMgr.ptChainShMgr == nil {
-		p2plog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
 
-	p2plog.Debug("Start: go shell routines...")
+	yesLog.Debug("Start: go shell routines...")
 
 	yeShMgr.dhtEvChan = yeShMgr.ptDhtShMgr.GetEventChan()
 	yeShMgr.dhtCsChan = yeShMgr.ptDhtShMgr.GetConnStatusChan()
@@ -429,7 +430,7 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	if thisCfg.BootstrapNode == false {
-		p2plog.Debug("Start: wait dht ready, inst: %s", yeShMgr.dhtInst.SchGetP2pCfgName())
+		yesLog.Debug("Start: wait dht ready, inst: %s", yeShMgr.dhtInst.SchGetP2pCfgName())
 		if dht.DhtReady(yeShMgr.dhtInst.SchGetP2pCfgName()) {
 			yeShMgr.bsTicker = time.NewTicker(thisCfg.BootstrapTime)
 			yeShMgr.dhtBsChan = make(chan bool, 1)
@@ -446,7 +447,7 @@ func (yeShMgr *YeShellManager) Start() error {
 
 	yeShMgr.status = yesChainReady
 
-	p2plog.Debug("Start: shell ok")
+	yesLog.Debug("Start: shell ok")
 
 	return nil
 }
@@ -468,6 +469,8 @@ func (yeShMgr *YeShellManager) Stop() {
 	close(yeShMgr.putValChan)
 	yesLog.Debug("Stop: dht stopped")
 
+	log.Info("Stop: dht done", yeShMgr.dhtInst.SchGetP2pCfgName())
+
 	thisCfg, _ := YeShellCfg[yeShMgr.name]
 	if thisCfg.BootstrapNode == false {
 		yesLog.Debug("Stop: close dht bootstrap timer")
@@ -478,6 +481,8 @@ func (yeShMgr *YeShellManager) Stop() {
 	p2psh.P2pStop(yeShMgr.chainInst, stopCh)
 	<-stopCh
 	yesLog.Debug("Stop: chain stopped")
+
+	log.Info("Stop: chain done", yeShMgr.chainInst.SchGetP2pCfgName())
 }
 
 func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {

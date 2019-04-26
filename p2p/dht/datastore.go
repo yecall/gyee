@@ -349,20 +349,20 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 		}
 
 		if runtime.GOOS == "windows" {
-			p2plog.Debug("poweron: dht datastore path: %s",
+			dsLog.Debug("poweron: dht datastore path: %s",
 				strings.Replace(ldc.Path, "/", "\\", -1))
 		} else {
-			p2plog.Debug("poweron: dht datastore path: %s", ldc.Path)
+			dsLog.Debug("poweron: dht datastore path: %s", ldc.Path)
 		}
 		dsMgr.ds = NewLeveldbDatastore(&ldc)
 
 		ldcExp := ldc
 		ldcExp.Path = path.Join(ldcExp.Path, "expired")
 		if runtime.GOOS == "windows" {
-			p2plog.Debug("poweron: dht expiration datastore path: %s",
+			dsLog.Debug("poweron: dht expiration datastore path: %s",
 				strings.Replace(ldcExp.Path, "/", "\\", -1))
 		} else {
-			p2plog.Debug("poweron: dht expiration datastore path: %s", ldcExp.Path)
+			dsLog.Debug("poweron: dht expiration datastore path: %s", ldcExp.Path)
 		}
 		dsMgr.dsExp = NewLeveldbDatastore(&ldcExp)
 
