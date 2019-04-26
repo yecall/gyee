@@ -21,16 +21,17 @@
 package console
 
 import (
-	"io"
-
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/peterh/liner"
-	"github.com/yeeco/gyee/res"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
+
+	"github.com/peterh/liner"
+	"github.com/yeeco/gyee/res"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -52,14 +53,14 @@ type Console struct {
 }
 
 // New a console by Config, neb.config params is need
-func NewConsole() *Console {
+func NewConsole(conn *grpc.ClientConn) *Console {
 	c := Console{
 		prompter: Stdin,
 		promptCh: make(chan string),
 		writer:   os.Stdout,
 	}
 
-	c.bridge = newBridge("", c.prompter, c.writer)
+	c.bridge = newBridge(conn, c.prompter, c.writer)
 	c.jsre = newJSRE()
 
 	if err := c.loadLibraryScripts(); err != nil {
@@ -93,7 +94,9 @@ func (c *Console) methodSwizzling() error {
 	bridgeObj, _ := c.jsre.Get("bridge")
 	bridgeObj.Object().Set("request", c.bridge.request)
 	bridgeObj.Object().Set("asyncRequest", c.bridge.request)
+	bridgeObj.Object().Set("nodeInfo", c.bridge.nodeInfo)
 
+	/*
 	if _, err := c.jsre.Run("var Neb = require('neb');"); err != nil {
 		return fmt.Errorf("neb require: %v", err)
 	}
@@ -138,6 +141,7 @@ func (c *Console) methodSwizzling() error {
 			obj.Set("signTransactionWithPassphrase", c.bridge.signTransactionWithPassphrase)
 		}
 	}
+	*/
 	return nil
 }
 

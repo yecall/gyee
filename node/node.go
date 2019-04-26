@@ -39,8 +39,6 @@ package node
 
 import (
 	"errors"
-	"net"
-	"net/rpc"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -53,7 +51,7 @@ import (
 	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
-	grpc "github.com/yeeco/gyee/rpc"
+	"github.com/yeeco/gyee/rpc"
 )
 
 type Node struct {
@@ -62,7 +60,7 @@ type Node struct {
 	core           *core.Core
 	accountManager *accounts.AccountManager
 	p2p            p2p.Service
-	rpc            grpc.RPCServer
+	rpc            rpc.RPCServer
 
 	lock        sync.RWMutex
 	filelock    *flock.Flock
@@ -206,30 +204,17 @@ func (n *Node) startIPC() error {
 		return nil
 	}
 
-	handler := rpc.NewServer()
-	jsService := new(JSService)
-	handler.Register(jsService)
-
 	endpoint := n.config.IPCEndpoint()
-	if err := os.MkdirAll(filepath.Dir(endpoint), 0751); err != nil {
-		return err
-	}
-	os.Remove(endpoint) //TODO:?为什么？确定目录在，但把文件删掉
-	listener, err := net.Listen("unix", endpoint)
+	listener, err := ipcListen(endpoint)
 	if err != nil {
 		return err
 	}
 
-	os.Chmod(endpoint, 0600)
+	n.rpc = rpc.NewServer(n.config, n)
 
 	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Error("IPC loop: %v", err)
-				continue
-			}
-			go handler.ServeConn(conn)
+		if err := n.rpc.Serve(listener); err != nil {
+			log.Error("IPC exited", "err", err)
 		}
 	}()
 
@@ -259,16 +244,4 @@ func (n *Node) Core() *core.Core {
 
 func (n *Node) P2pService() p2p.Service {
 	return n.p2p
-}
-
-//TODO:for test, remove later
-type JSService int
-type Args struct {
-	S string
-}
-
-func (js *JSService) Hello(args *Args, reply *string) error {
-	log.Info(args.S)
-	*reply = args.S + "how are you"
-	return nil
 }

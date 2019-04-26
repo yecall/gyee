@@ -24,6 +24,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/cmd/gyee/console"
 	"github.com/yeeco/gyee/config"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -46,7 +47,7 @@ var (
 
 func consoleStart(ctx *cli.Context) error {
 	//node := makeNode(ctx)
-	console := console.NewConsole()
+	console := console.NewConsole(nil)
 	console.Setup()
 	console.Interactive()
 	defer console.Stop()
@@ -55,8 +56,17 @@ func consoleStart(ctx *cli.Context) error {
 }
 
 func consoleAttach(ctx *cli.Context) error {
-	//conf := config.GetConfig(ctx)
-	c := console.NewConsole()
+	conf := config.GetConfig(ctx)
+	target := conf.IPCEndpoint()
+
+	// grpc connection
+	conn, err := grpc.Dial(target, grpc.WithInsecure())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	c := console.NewConsole(conn)
 	c.Setup()
 	defer c.Stop()
 
