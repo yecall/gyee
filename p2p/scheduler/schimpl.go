@@ -265,7 +265,7 @@ taskLoop:
 
 		var msg schMessage
 
-		if sdl.powerOff == true || task.killing {
+		if sdl.powerOff || task.killing {
 
 			//
 			// drain until EvSchDone or EvSchPoweroff event met
@@ -1228,6 +1228,7 @@ func (sdl *scheduler) schStopTask(name string) SchErrno {
 	// done with "killed" signal and then wait "stopped"
 	//
 
+	ptn.task.killing = true
 	ptn.task.done <- SchEnoKilled
 	<-ptn.task.stopped
 
