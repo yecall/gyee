@@ -34,6 +34,14 @@ var (
 		Description: "",
 		Action:      config.MergeFlags(consoleStart),
 	}
+
+	attachCommand = cli.Command{
+		Name:        "attach",
+		Usage:       "Start an interactive JavaScript console to running node",
+		Category:    "CONSOLE COMMANDS",
+		Description: "",
+		Action:      config.MergeFlags(consoleAttach),
+	}
 )
 
 func consoleStart(ctx *cli.Context) error {
@@ -43,6 +51,18 @@ func consoleStart(ctx *cli.Context) error {
 	console.Interactive()
 	defer console.Stop()
 
+	return nil
+}
+
+func consoleAttach(ctx *cli.Context) error {
+	//conf := config.GetConfig(ctx)
+	c := console.NewConsole()
+	c.Setup()
+	defer c.Stop()
+
+	c.Interactive()
+
+	// TODO:
 	return nil
 }
 

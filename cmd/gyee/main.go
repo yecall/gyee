@@ -58,6 +58,7 @@ func init() {
 
 	app.Commands = []cli.Command{
 		consoleCommand,
+		attachCommand,
 		configCommand,
 		accountCommand,
 		licenseCommand,
