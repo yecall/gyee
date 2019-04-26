@@ -20,7 +20,17 @@
 
 package rpc
 
+import (
+	"net"
+
+	"github.com/yeeco/gyee/core"
+)
+
 type RPCServer interface {
+	Node() core.INode
+	Core() *core.Core
+	Serve(lis net.Listener) error
+
 	Start() error
 	Stop()
 }

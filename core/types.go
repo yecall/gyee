@@ -33,6 +33,7 @@ var (
 
 type INode interface {
 	NodeID() string
+	Core() *Core
 	P2pService() p2p.Service
 }
 

@@ -21,6 +21,12 @@
 package rpc
 
 import (
+	"net"
+	"sync"
+
+	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/rpc/pb"
 	"google.golang.org/grpc"
 )
@@ -30,12 +36,22 @@ import (
 //All the service function related to other YeeChain modules, using Yeelet to organize.
 
 type Server struct {
+	conf      *config.Config
+	node      core.INode
+	core      *core.Core
 	rpcServer *grpc.Server
+
+	lock sync.RWMutex
 }
 
-func NewServer() *Server {
+func NewServer(conf *config.Config, node core.INode) *Server {
 	rpc := grpc.NewServer()
-	srv := &Server{rpcServer: rpc}
+	srv := &Server{
+		conf:      conf,
+		node:      node,
+		core:      node.Core(),
+		rpcServer: rpc,
+	}
 	admin := &AdminService{server: srv}
 	api := &APIService{server: srv}
 	rpcpb.RegisterAdminServiceServer(rpc, admin)
@@ -44,11 +60,30 @@ func NewServer() *Server {
 	return srv
 }
 
+func (s *Server) Node() core.INode {
+	return s.node
+}
+
+func (s *Server) Core() *core.Core {
+	return s.core
+}
+
+func (s *Server) Serve(lis net.Listener) error {
+	return s.rpcServer.Serve(lis)
+}
+
 func (s *Server) Start() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	log.Info("RPC start...")
 
 	return nil
 }
 
 func (s *Server) Stop() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	log.Info("RPC stop...")
 
+	s.rpcServer.Stop()
 }

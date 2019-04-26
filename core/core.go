@@ -207,12 +207,16 @@ func (c *Core) Stop() error {
 	}
 
 	// stop tetris
-	err := c.engine.Stop()
+	if c.engine != nil {
+		if err := c.engine.Stop(); err != nil {
+			log.Error("core: engine.Stop", "err", err)
+		}
+	}
 
 	// notify loop and wait
 	close(c.quitCh)
 	c.wg.Wait()
-	return err
+	return nil
 }
 
 func (c *Core) loop() {

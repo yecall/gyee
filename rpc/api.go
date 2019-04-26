@@ -31,6 +31,6 @@ type APIService struct {
 }
 
 func (s *APIService) NodeInfo(ctx context.Context, req *rpcpb.NonParamsRequest) (*rpcpb.NodeInfoResponse, error) {
-
-	return &rpcpb.NodeInfoResponse{Id: "123", Version: 1}, nil
+	nodeId := s.server.Node().NodeID()
+	return &rpcpb.NodeInfoResponse{Id: nodeId, Version: 1}, nil
 }
