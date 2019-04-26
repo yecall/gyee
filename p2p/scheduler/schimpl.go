@@ -41,7 +41,7 @@ type schLogger struct {
 
 var schLog = schLogger{
 	debug__:      false,
-	debugForce__: true,
+	debugForce__: false,
 }
 
 func (log schLogger) Debug(fmt string, args ...interface{}) {
@@ -1692,15 +1692,19 @@ func (sdl *scheduler) schGetTaskNodeByName(name string) (SchErrno, *schTaskNode)
 	sdl.lock.Lock()
 	defer sdl.lock.Unlock()
 
+	if len(name) == 0 {
+		return SchEnoNotFound, nil
+	}
+
 	if name == RawSchTaskName {
 		return SchEnoNone, &rawSchTsk
 	}
 
-	if ptn, err := sdl.tkMap[name]; ptn == nil || !err {
-		return SchEnoNotFound, nil
+	if ptn, err := sdl.tkMap[name]; ptn != nil && err {
+		return SchEnoNone, ptn
 	}
 
-	return SchEnoNone, sdl.tkMap[name]
+	return SchEnoNotFound, nil
 }
 
 //

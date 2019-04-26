@@ -46,7 +46,7 @@ type connLogger struct {
 
 var connLog = connLogger{
 	debug__:      false,
-	debugForce__: true,
+	debugForce__: false,
 }
 
 func (log connLogger) Debug(fmt string, args ...interface{}) {
@@ -535,8 +535,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	// update the route manager
 	//
 	connLog.ForceDebug("handshakeRsp: all ok, update router and send EvDhtConInstStartupReq, "+
-		"sdl: %s, inst: %s, dir: %d, local: %s, remote: %s",
-		conMgr.sdlName, ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+		"sdl: %s, inst: %s, dir: %d",
+		conMgr.sdlName, ci.name, ci.dir)
 
 	update := sch.MsgDhtRutMgrUpdateReq{
 		Why: rutMgrUpdate4Handshake,
@@ -570,8 +570,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	}
 
 	connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confirmed ok, "+
-		"sdl: %s, inst: %s, dir: %d, local: %s, remote: %s",
-		conMgr.sdlName, ci.name, ci.dir, ci.con.LocalAddr().String(), ci.con.RemoteAddr().String())
+		"sdl: %s, inst: %s, dir: %d",
+		conMgr.sdlName, ci.name, ci.dir)
 
 	return rsp2TasksPending(ci, msg, DhtEnoNone)
 }
