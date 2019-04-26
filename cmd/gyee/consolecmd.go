@@ -21,6 +21,9 @@
 package main
 
 import (
+	"context"
+	"net"
+
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/cmd/gyee/console"
 	"github.com/yeeco/gyee/config"
@@ -60,7 +63,12 @@ func consoleAttach(ctx *cli.Context) error {
 	target := conf.IPCEndpoint()
 
 	// grpc connection
-	conn, err := grpc.Dial(target, grpc.WithInsecure())
+	conn, err := grpc.Dial(target, grpc.WithInsecure(),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (conn net.Conn, e error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, "unix", addr)
+		}),
+	)
 	if err != nil {
 		return err
 	}

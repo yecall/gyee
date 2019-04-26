@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/robertkrimen/otto"
+	"github.com/yeeco/gyee/log"
 	rpcpb "github.com/yeeco/gyee/rpc/pb"
 	"google.golang.org/grpc"
 )
@@ -95,10 +96,10 @@ func (b *jsBridge) setHost(call otto.FunctionCall) otto.Value {
 }
 
 func (b *jsBridge) nodeInfo(call otto.FunctionCall) otto.Value {
-	response, err := b.svcApi.NodeInfo(context.Background(), nil)
+	response, err := b.svcApi.NodeInfo(context.Background(), &rpcpb.NonParamsRequest{})
 	if err != nil {
-		ret, _ := otto.ToValue(fmt.Errorf("nodeInfo err: %v", err))
-		return ret
+		log.Error("nodeInfo()", "err", err)
+		return otto.NullValue()
 	}
 	result, _ := otto.ToValue(fmt.Sprintf("nodeInfo: %v", response))
 	return result
