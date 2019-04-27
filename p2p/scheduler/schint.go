@@ -143,7 +143,7 @@ type schTaskNode struct {
 // internal mode ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
-const schTaskNodePoolSize = 1024 // task node pool size, must be (2^n)
+const schTaskNodePoolSize = 1024 * 4 // task node pool size, must be (2^n)
 
 type scheduler struct {
 
@@ -160,6 +160,7 @@ type scheduler struct {
 	freeSize         int                               // number of nodes in free
 	tkBusy           *schTaskNode                      // busy task queue in scheduling
 	tkMap            map[string]*schTaskNode           // map task name to pointer of running task node
+	tnMap			 map[*schTaskNode]string
 	busySize         int                               // number of nodes in busy
 	tmFree           *schTmcbNode                      // free timer node queue
 	tmFreeSize       int                               // free timer node queue size

@@ -361,9 +361,9 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 				"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s, eno: %d",
 				conInst.sdlName, conInst.name, conInst.dir, "none", "none", rsp.Eno)
 		}
-		schMsg := new(sch.SchMessage)
-		conInst.sdl.SchMakeMessage(schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
-		return conInst.sdl.SchSendMessage(schMsg)
+		schMsg := sch.SchMessage{}
+		conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstHandshakeRsp, &rsp)
+		return conInst.sdl.SchSendMessage(&schMsg)
 	}
 
 	//
@@ -396,9 +396,9 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 
 	//
 	// handshake: in practice, we find that it might be blocked for ever in this procedure when reading
-	// or writing data to the connection, even dead line is set. following statements invoke the "Close"
-	// interface of ggio.WriteCloser and ggio.ReadCloser to force the procedure to get out when timer
-	// expired.
+	// from or writing data to the connection, even dead line is set. following statements invoke the
+	// "Close" interface of ggio.WriteCloser and ggio.ReadCloser to force the procedure to get out when
+	// timer expired.
 	//
 
 	conInst.updateStatus(CisInHandshaking)
@@ -411,6 +411,13 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 	hsTm := time.NewTimer(ciHandshakeTimeout)
 	defer hsTm.Stop()
 	hsCh := make(chan DhtErrno, 1)
+
+	cleanUp := func() {
+		conInst.iow.Close()
+		conInst.ior.Close()
+		conInst.con.Close()
+		conInst.con = nil
+	}
 
 	go func() {
 		if conInst.dir == ConInstDirOutbound {
@@ -431,8 +438,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 
 	select {
 	case <-hsTm.C:
-		conInst.iow.Close()
-		conInst.ior.Close()
+		cleanUp()
 		rsp.Eno = DhtEnoTimeout.GetEno()
 		if conInst.dir == ConInstDirOutbound {
 			peer := conInst.hsInfo.peer
@@ -447,6 +453,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 			panic("handshakeReq: impossible result")
 		}
 		if hsEno != DhtEnoNone {
+			cleanUp()
 			if conInst.dir == ConInstDirOutbound {
 				peer := conInst.hsInfo.peer
 				hsInfo := conInst.hsInfo
@@ -1085,9 +1092,8 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 		ciLog.Debug("outboundHandshake: WriteMsg failed, "+
-			"inst: %s, dir: %d, local: %s, remote: %s, err: %s",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
-			"err: %s", err.Error())
+			"inst: %s, dir: %d, err: %s",
+			conInst.name, conInst.dir, err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1095,9 +1101,8 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pbPkg); err != nil {
 		ciLog.Debug("outboundHandshake: ReadMsg failed, "+
-			"inst: %s, dir: %d, local: %s, remote: %s, err: %s",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
-			err.Error())
+			"inst: %s, dir: %d, err: %s",
+			conInst.name, conInst.dir, err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1523,11 +1528,11 @@ _rxLoop:
 			}
 		}
 
-		ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, try to get signal from rxDone",
+		ciLog.ForceDebug("rxProc: get signal from rxDone, sdl: %s, inst: %s, dir: %d",
 			conInst.sdlName, conInst.name, conInst.dir)
 		<-conInst.rxDone
 
-		ciLog.ForceDebug("rxProc: sdl: %s, inst: %s, dir: %d, try to get feedback signal to rxDone",
+		ciLog.ForceDebug("rxProc: feedback signal to rxDone, sdl: %s, inst: %s, dir: %d",
 			conInst.sdlName, conInst.name, conInst.dir)
 		conInst.rxDone <- DhtEnoNone.GetEno()
 
@@ -1542,12 +1547,12 @@ _rxLoop:
 		//
 		// the 2) case: signal the done
 		//
-		ciLog.ForceDebug("rxProc: inst: %s, dir: %d, we are done, try to feedback signal to rxDone",
+		ciLog.ForceDebug("rxProc: feedback signal to rxDone, inst: %s, dir: %d",
 			conInst.name, conInst.dir)
 
 		conInst.rxDone <- DhtEnoNone.GetEno()
 
-		ciLog.ForceDebug("rxProc: inst: %s, dir: %d, done", conInst.name, conInst.dir)
+		ciLog.ForceDebug("rxProc: done, inst: %s, dir: %d", conInst.name, conInst.dir)
 
 		return
 	}

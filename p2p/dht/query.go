@@ -1058,13 +1058,13 @@ func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	}
 
 	if qcb.rutNtfFlag == true {
-		msg := new(sch.SchMessage)
+		msg := sch.SchMessage{}
 		req := sch.MsgDhtRutMgrStopNofiyReq{
 			Task:   qryMgr.ptnMe,
 			Target: qcb.target,
 		}
-		qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
-		qryMgr.sdl.SchSendMessage(msg)
+		qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
+		qryMgr.sdl.SchSendMessage(&msg)
 	}
 
 	delete(qryMgr.qcbTab, target)
@@ -1093,7 +1093,7 @@ func (qryMgr *QryMgr) qryMgrDelIcb(why int, target *config.DsKey, peer *config.N
 		return DhtEnoNotFound
 	}
 
-	qryLog.Debug("qryMgrDelIcb: icb: %x", icb.name)
+	qryLog.Debug("qryMgrDelIcb: icb: %s", icb.name)
 
 	if why == delQcb4QryInstResultInd {
 		eno, ptn := icb.sdl.SchGetUserTaskNode(icb.name)
@@ -1239,19 +1239,20 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			UserDa: &icb,
 		}
 
-		qcb.qryActived[icb.to.ID] = &icb
-		qcb.qryHistory[icb.to.ID] = pending
-		cnt++
-
 		eno, ptn := qryMgr.sdl.SchCreateTask(&td)
 		if eno != sch.SchEnoNone || ptn == nil {
 
 			qryLog.Debug("qryMgrQcbPutActived: "+
-				"SchCreateTask failed, eno: %d, ptn: %p", eno, ptn)
+				"SchCreateTask failed, eno: %d", eno)
 
 			dhtEno = DhtEnoScheduler
 			break
 		}
+
+		qcb.qryActived[icb.to.ID] = &icb
+		qcb.qryHistory[icb.to.ID] = pending
+		cnt++
+
 		icb.ptnInst = ptn
 		qcb.icbSeq++
 
@@ -1418,9 +1419,9 @@ func (qryMgr *QryMgr) natMapSwitch() DhtErrno {
 	qryLog.Debug("natMapSwitch: call switch2NatAddr")
 	qryMgr.switch2NatAddr(nat.NATP_TCP)
 
-	msg := new(sch.SchMessage)
-	qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnDhtMgr, sch.EvDhtQryMgrPubAddrSwitchInd, nil)
-	qryMgr.sdl.SchSendMessage(msg)
+	msg := sch.SchMessage{}
+	qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qryMgr.ptnDhtMgr, sch.EvDhtQryMgrPubAddrSwitchInd, nil)
+	qryMgr.sdl.SchSendMessage(&msg)
 	qryLog.Debug("natMapSwitch: EvDhtQryMgrPubAddrSwitchInd sent")
 
 	return DhtEnoNone

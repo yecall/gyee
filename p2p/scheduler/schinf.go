@@ -198,13 +198,18 @@ func (sdl *Scheduler) SchStartTaskEx(ptn interface{}) SchErrno {
 	return sdl.schStartTaskEx(ptn.(*schTaskNode))
 }
 
-// Stop a single task by task node pointer
+// Stop caller task or other task in async
 func (sdl *Scheduler) SchStopTask(ptn interface{}) SchErrno {
 	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
 		schLog.Debug("SchStopTask: SchTaskDone failed, eno: %d", eno)
 		return eno
 	}
 	return SchEnoNone
+}
+
+// Stop other task than the caller in sync
+func (sdl *Scheduler) SchStopTaskSync(ptn interface{}) SchErrno {
+	return sdl.schStopTask(ptn.(*schTaskNode))
 }
 
 // Get user task node pointer
@@ -266,6 +271,7 @@ func (sdl *Scheduler) SchMakeMessage(msg *SchMessage, s, r interface{}, id int, 
 	// to access the body again after this function called, or the body will be
 	// modified(corrupted).
 	if msg == nil || s == nil || r == nil {
+		panic(fmt.Sprintf("SchMakeMessage: invalid message, sdl: %s", sdl.p2pCfg.CfgName))
 		return SchEnoParameter
 	}
 	msg.sender = s.(*schTaskNode)
@@ -285,7 +291,7 @@ func (sdl *Scheduler) SchKillTimer(ptn interface{}, tid int) SchErrno {
 	return sdl.schKillTimer(ptn.(*schTaskNode), tid)
 }
 
-// Done task
+// Done caller task or other task in async
 func (sdl *Scheduler) SchTaskDone(ptn interface{}, eno SchErrno) SchErrno {
 	return sdl.schTaskDone(ptn.(*schTaskNode), eno)
 }
@@ -370,4 +376,11 @@ func (sdl *Scheduler) SchSetAppType(appType int) SchErrno {
 // Get application type
 func (sdl *Scheduler) SchGetAppType() int {
 	return sdl.appType
+}
+
+//
+// Get task mailbox space
+//
+func (sdl *scheduler) SchGetTaskMailboxSpace(ptn interface{}) int {
+	return sdl.schGetTaskMailboxSpace(ptn.(*schTaskNode))
 }

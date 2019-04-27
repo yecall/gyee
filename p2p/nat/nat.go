@@ -734,9 +734,9 @@ func (natMgr *NatManager) debugTimer() sch.SchErrno {
 			PubPort:  inst.pubPort,
 		}
 		natLog.Debug("debugTimer: send to %s with ind: %v", natMgr.sdl.SchGetTaskName(inst.owner), ind)
-		msg := new(sch.SchMessage)
-		natMgr.sdl.SchMakeMessage(msg, natMgr.ptnMe, inst.owner, sch.EvNatMgrPubAddrUpdateInd, &ind)
-		natMgr.sdl.SchSendMessage(msg)
+		msg := sch.SchMessage{}
+		natMgr.sdl.SchMakeMessage(&msg, natMgr.ptnMe, inst.owner, sch.EvNatMgrPubAddrUpdateInd, &ind)
+		natMgr.sdl.SchSendMessage(&msg)
 	}
 	return sch.SchEnoNone
 }

@@ -292,7 +292,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 	// if we are waiting connection to be established, we request the connection manager
 	// to abandon the connect-procedure. when this request received, the connection manager
-	// should check if the connection had been established and route talbe updated, if ture,
+	// should check if the connection had been established and route table updated, if ture,
 	// then do not care this request, else it should close the connection and free all
 	// resources had been allocated to the connection instance.
 	// notice0:

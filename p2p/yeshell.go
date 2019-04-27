@@ -133,6 +133,7 @@ type YeShellManager struct {
 	dhtInst        *sch.Scheduler                   // dht scheduler pointer
 	ptnDhtShell    interface{}                      // dht shell manager task node pointer
 	ptDhtShMgr     *p2psh.DhtShellManager           // dht shell manager object
+	ptDhtConMgr    *dht.ConMgr					    // dht connection manager object
 	gvk2DurMap     map[yesKey]time.Duration			// remain time to wait
 	gvk2ChMap      map[yesKey]chan []byte			// channel for get value
 	getValChan     chan *getValueResult             // get value channel
@@ -396,6 +397,12 @@ func (yeShMgr *YeShellManager) Start() error {
 		return nil
 	}
 
+	yeShMgr.ptDhtConMgr, ok = yeShMgr.dhtInst.SchGetTaskObject(sch.DhtConMgrName).(*dht.ConMgr)
+	if !ok || yeShMgr.ptDhtConMgr == nil {
+		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
+		return nil
+	}
+
 	if eno := p2psh.P2pStart(yeShMgr.chainInst); eno != sch.SchEnoNone {
 		stopCh := make(chan bool, 0)
 		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
@@ -636,6 +643,10 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 
 	yesLog.Debug("DhtGetValue: sdl: %s, key: %x", sdl, key)
 
+	for yeShMgr.ptDhtConMgr.IsBusy() {
+		time.Sleep(time.Millisecond * 100)
+	}
+
 	req := sch.MsgDhtMgrGetValueReq{
 		Key: key,
 	}
@@ -653,6 +664,8 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	}
 
 	yesLog.Debug("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+	//p2plog.Debug("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+
 	val, ok := <-ch
 	if !ok {
 		yesLog.Debug("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
@@ -662,6 +675,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		return nil, errors.New("DhtGetValue: empty value")
 	}
 	yesLog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+	//p2plog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
 
 	return val, nil
 }
@@ -678,6 +692,10 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 
 	yesLog.Debug("DhtSetValue: sdl: %s, key: %x", sdl, key)
 
+	for yeShMgr.ptDhtConMgr.IsBusy() {
+		time.Sleep(time.Millisecond * 100)
+	}
+
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:      key,
 		Val:      value,
@@ -693,10 +711,12 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	ch := make(chan bool, 1)
 	if err := yeShMgr.dhtPutValMapKey(key, PVTO, ch); err != nil {
 		yesLog.Debug("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		//p2plog.Debug("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
 		return err
 	}
 
 	yesLog.Debug("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
+	//p2plog.Debug("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
 		yesLog.Debug("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
@@ -707,6 +727,7 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 		return errors.New("DhtSetValue: failed")
 	}
 	yesLog.Debug("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+	//p2plog.Debug("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
 
 	return nil
 }
@@ -734,14 +755,14 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	yeShMgr.gcdName = kind
 	yeShMgr.gcdKey = key
 
-	msg := new(sch.SchMessage)
+	msg := sch.SchMessage{}
 	req := sch.MsgShellGetChainInfoReq {
 		Seq: yeShMgr.gcdSeq,
 		Kind: yeShMgr.gcdName,
 		Key: yeShMgr.gcdKey,
 	}
-	yeShMgr.chainInst.SchMakeMessage(msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
-	if eno := yeShMgr.chainInst.SchSendMessage(msg); eno != sch.SchEnoNone {
+	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
+	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.Debug("GetChainInfo: SchSendMessage failed, eno: %d", eno)
 		return nil, eno
 	}
@@ -1681,10 +1702,10 @@ func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 				Kind: msg.Gcd.Name,
 				Key: msg.Gcd.Key,
 			}
-			schMsg := new(sch.SchMessage)
-			yeShMgr.chainInst.SchMakeMessage(schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell,
+			schMsg := sch.SchMessage{}
+			yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell,
 				sch.EvShellGetChainInfoRsp, &rsp)
-			yeShMgr.chainInst.SchSendMessage(schMsg)
+			yeShMgr.chainInst.SchSendMessage(&schMsg)
 			return sch.SchEnoNone
 		}
 	}
