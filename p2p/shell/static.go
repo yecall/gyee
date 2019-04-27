@@ -42,7 +42,7 @@ type staticTaskLogger struct {
 }
 
 var stLog = staticTaskLogger{
-	debug__: true,
+	debug__: false,
 }
 
 func (log staticTaskLogger) Debug(fmt string, args ...interface{}) {
@@ -319,10 +319,10 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 			stLog.Debug("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
 				seconds, p2pInstName, appType, tasks, tkNames)
 
-			if !stLog.debug__ {
-				p2plog.Debug("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
-					seconds, p2pInstName, appType, tasks, tkNames)
-			}
+			//if !stLog.debug__ {
+			//	p2plog.Debug("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
+			//		seconds, p2pInstName, appType, tasks, tkNames)
+			//}
 		}
 	} else {
 		time.Sleep(time.Second * 2)

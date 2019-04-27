@@ -112,6 +112,7 @@ type schTask struct {
 	utep            schUserTaskProc               // user task entry point
 	mailbox         schMailBox                    // mail box
 	killing			bool						  // in killing
+	doneGot			bool						  // if EvSchDone got
 	done            chan SchErrno                 // done with errno
 	stopped         chan bool                     // stopped signal
 	tmTab           [schMaxTaskTimer]*schTmcbNode // timer node table

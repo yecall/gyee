@@ -971,7 +971,7 @@ func testCase17(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.Validator = true
 	yesCfg.BootstrapNode = false
-	yesCfg.SubNetMaskBits = 4
+	yesCfg.SubNetMaskBits = 0
 
 	yesCfg.NatType = config.NATT_NONE
 	//yesCfg.NatType = config.NATT_PMP
@@ -997,7 +997,11 @@ func testCase17(tc *testCase) {
 		waitInterruptWithCallback(yeShMgr, yeChainProc, yeChainStop)
 	} else if true {
 		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
-		waitInterrupt()
+		//waitInterrupt()
+		for loop := 0; loop < 60; loop++ {
+			time.Sleep(time.Second * 1)
+			fmt.Printf("wait: %d\n", loop)
+		}
 		yeChainStopEx(yeShMgr, subEv, subTx, subBh, done)
 	} else {
 		go yeChainProc(yeShMgr, ev, tx, bh, bk)

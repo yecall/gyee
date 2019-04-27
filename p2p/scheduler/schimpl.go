@@ -41,7 +41,7 @@ type schLogger struct {
 
 var schLog = schLogger{
 	debug__:      false,
-	debugForce__: true,
+	debugForce__: false,
 }
 
 func (log schLogger) Debug(fmt string, args ...interface{}) {
@@ -1021,6 +1021,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 	ptn.task.mailbox.que = &mq
 	ptn.task.mailbox.size = taskDesc.MbSize
 	ptn.task.killing = false
+	ptn.task.doneGot = false
 	ptn.task.done = make(chan SchErrno, 1)
 	ptn.task.stopped = make(chan bool, 1)
 	ptn.task.dog = *taskDesc.Wd
@@ -1240,9 +1241,25 @@ func (sdl *scheduler) schStopTask(ptn *schTaskNode) SchErrno {
 	// done with "killed" signal and then wait "stopped"
 	//
 
-	ptn.task.killing = true
+	ptn.task.lock.Lock()
+	if ptn.task.killing == false {
+
+		ptn.task.killing = true
+
+	} else {
+
+		schLog.ForceDebug("schStopTask: "+
+			"duplicated, sdl: %s, task: %s",
+			sdl.p2pCfg.CfgName, ptn.task.name)
+
+		ptn.task.lock.Unlock()
+		return SchEnoDuplicated
+	}
+	ptn.task.lock.Unlock()
+
 	ptn.task.done <- SchEnoKilled
 	<-ptn.task.stopped
+
 	return SchEnoNone
 }
 
@@ -1376,17 +1393,14 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	sdlName := sdl.p2pCfg.CfgName
 
-	//
-	// check the message to be sent
-	//
-
 	if msg == nil {
 		schLog.ForceDebug("schSendMsg: invalid message, sdl: %s", sdlName)
 		return SchEnoParameter
 	}
 
 	//
-	// failed if in power off stage
+	// lock total SDL(do not use defer), filter out messages than EvSchPoweroff
+	// or EvSchDone if currently in power off stage.
 	//
 
 	sdl.lock.Lock()
@@ -1418,11 +1432,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	//
 	// put message to receiver mailbox.
-	// notice: here we do not invoke any "lock" to ensure the integrity of the target task
+	// notice1: unlock SDL before try to lock target task;
+	// notice2: filter out message than EvSchDone if in killing, see schCommonTask for more;
+	// notice3: here we do not invoke any "lock" to ensure the integrity of the target task
 	// pointer, this require the following conditions fulfilled: 1) after task is created,
 	// the task pointer is always effective until it's done; 2) after task is done, any other
 	// tasks should never reference to this stale pointer, this means that any other tasks
-	// should remove the pointer(if then have)to a task will be done.
+	// should remove the pointer(if then have)to a task will be done;
 	//
 
 	source := msg.sender.task
@@ -1441,17 +1457,25 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 
 	if target.killing {
 		switch msg.Id {
+		case EvSchDone:
+			if !target.doneGot {
+				target.doneGot = true
+			} else {
+				if schLog.debug__ {
+					schLog.ForceDebug("schSendMsg: duplicated, sdl: %s, mid: %d", sdlName, msg.Id)
+				}
+				return SchEnoDuplicated
+			}
 		default:
 			if schLog.debug__ {
 				schLog.ForceDebug("schSendMsg: target in killing, sdl: %s, mid: %d", sdlName, msg.Id)
 			}
-			return SchEnoPowerOff
+			return SchEnoMismatched
 		}
 	}
 
 	msg2MailBox := func(msg *schMessage) SchErrno {
 		if target.mailbox.que == nil {
-			// not found, target had been killed
 			schLog.ForceDebug("schSendMsg: mailbox empty, sdl: %s, src: %s, ev: %d",
 				sdlName, source.name, msg.Id)
 			return SchEnoInternal
@@ -1480,7 +1504,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		return SchEnoNone
 	}
 
+	//
+	// deal with case that a static target task is sent some messages before
+	// EvSchPoweron message had been sent to it.
+	//
+
 	if target.isStatic {
+
 		if !target.isPoweron {
 
 			if msg.Id != EvSchPoweron {
@@ -1781,7 +1811,21 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 	// see function schCommonTask for more please
 	//
 
-	ptn.task.killing = true
+	ptn.task.lock.Lock()
+	if ptn.task.killing == false {
+
+		ptn.task.killing = true
+
+	} else {
+
+		schLog.ForceDebug("schStopTask: "+
+			"schTaskDone, sdl: %s, task: %s",
+			sdl.p2pCfg.CfgName, ptn.task.name)
+
+		ptn.task.lock.Unlock()
+		return SchEnoDuplicated
+	}
+	ptn.task.lock.Unlock()
 	ptn.task.done <- eno
 
 	//
@@ -1863,6 +1907,14 @@ func (sdl *scheduler) schShowTaskName() []string {
 		names = append(names, n)
 	}
 	return names
+}
+
+//
+// Get task mailbox capacity
+//
+func (sdl *scheduler) schGetTaskMailboxCapicity(ptn *schTaskNode) int {
+	mb := *ptn.task.mailbox.que
+	return cap(mb)
 }
 
 //

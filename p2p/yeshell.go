@@ -211,10 +211,10 @@ var DefaultYeShellConfig = YeShellConfig{
 	Validator:     true,
 	BootstrapNode: false,
 	BootstrapNodes: []string{
-		"3CEF400192372CD94AAE8DCA465A4A48D4FFBF7E7364D5044CD003F07DCBB0D4EEA7E311D9ED0852890C2B72E79893F0CBA5238A09F7B441613218C3A0D4659B@192.168.1.109:30303:30303",
+		"3CEF400192372CD94AAE8DCA465A4A48D4FFBF7E7364D5044CD003F07DCBB0D4EEA7E311D9ED0852890C2B72E79893F0CBA5238A09F7B441613218C3A0D4659B@192.168.1.109:30304:30304",
 	},
 	DhtBootstrapNodes: []string{
-		"3CEF400192372CD94AAE8DCA465A4A48D4FFBF7E7364D5044CD003F07DCBB0D4EEA7E311D9ED0852890C2B72E79893F0CBA5238A09F7B441613218C3A0D4659B@192.168.1.109:40404:40404",
+		"3CEF400192372CD94AAE8DCA465A4A48D4FFBF7E7364D5044CD003F07DCBB0D4EEA7E311D9ED0852890C2B72E79893F0CBA5238A09F7B441613218C3A0D4659B@192.168.1.109:40405:40405",
 	},
 	LocalNodeIp:       config.P2pGetLocalIpAddr().String(),
 	LocalUdpPort:      config.DftUdpPort,
@@ -636,16 +636,15 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	if yeShMgr.inStopping {
 		return nil, yesInStopping
 	}
+	if yeShMgr.ptDhtConMgr.IsBusy(){
+		return nil, sch.SchEnoResource
+	}
 	if len(key) != yesKeyBytes {
 		yesLog.Debug("DhtGetValue: invalid key: %x", key)
 		return nil, sch.SchEnoParameter
 	}
 
 	yesLog.Debug("DhtGetValue: sdl: %s, key: %x", sdl, key)
-
-	for yeShMgr.ptDhtConMgr.IsBusy() {
-		time.Sleep(time.Millisecond * 100)
-	}
 
 	req := sch.MsgDhtMgrGetValueReq{
 		Key: key,
@@ -674,7 +673,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		yesLog.Debug("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
 		return nil, errors.New("DhtGetValue: empty value")
 	}
-	yesLog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+ 	yesLog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
 	//p2plog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
 
 	return val, nil
@@ -685,16 +684,15 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
+	if yeShMgr.ptDhtConMgr.IsBusy(){
+		return sch.SchEnoResource
+	}
 	if len(key) != yesKeyBytes || len(value) == 0 {
 		yesLog.Debug("DhtSetValue: invalid pair, sdl: %s, key: %x, length of value: %d", sdl, key, len(value))
 		return sch.SchEnoParameter
 	}
 
 	yesLog.Debug("DhtSetValue: sdl: %s, key: %x", sdl, key)
-
-	for yeShMgr.ptDhtConMgr.IsBusy() {
-		time.Sleep(time.Millisecond * 100)
-	}
 
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:      key,

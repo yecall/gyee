@@ -163,16 +163,21 @@ func (conMgr *ConMgr) IsBusy() bool {
 	return conMgr.busy
 }
 
+func (conMgr *ConMgr) checkMailBox() {
+	if conMgr.sdl != nil && conMgr.ptnMe != nil {
+		capacity := conMgr.sdl.SchGetTaskMailboxCapacity(conMgr.ptnMe)
+		space := conMgr.sdl.SchGetTaskMailboxSpace(conMgr.ptnMe)
+		conMgr.busy = space < (capacity >> 2)
+	}
+}
+
 func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if msg.Id != sch.EvDhtConMgrConnectReq && msg.Id != sch.EvDhtConMgrSendReq {
 		connLog.Debug("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 	}
 
-	if conMgr.sdl != nil {
-		space := conMgr.sdl.SchGetTaskMailboxSpace(ptn)
-		conMgr.busy = space < 100
-	}
+	conMgr.checkMailBox()
 
 	eno := sch.SchEnoUnknown
 	switch msg.Id {

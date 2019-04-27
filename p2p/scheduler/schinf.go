@@ -379,6 +379,13 @@ func (sdl *Scheduler) SchGetAppType() int {
 }
 
 //
+// Get task mailbox capacity
+//
+func (sdl *scheduler) SchGetTaskMailboxCapacity(ptn interface{}) int {
+	return sdl.schGetTaskMailboxCapicity(ptn.(*schTaskNode))
+}
+
+//
 // Get task mailbox space
 //
 func (sdl *scheduler) SchGetTaskMailboxSpace(ptn interface{}) int {
