@@ -224,7 +224,7 @@ func (shMgr *ShellManager) powerOn(ptn interface{}) sch.SchErrno {
 func (shMgr *ShellManager) powerOff(ptn interface{}) sch.SchErrno {
 	chainLog.Debug("powerOff: task will be done ...")
 	close(shMgr.deDupDone)
-	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
+	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, shMgr.name, sch.SchEnoPowerOff)
 }
 
 func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.SchErrno {

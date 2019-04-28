@@ -378,7 +378,7 @@ func (tabMgr *TableManager) tabMgrPoweron(ptn interface{}) TabMgrErrno {
 
 	if tabMgr.networkType == p2pTypeStatic {
 		tabLog.Debug("tabMgrPoweron: static type, tabMgr is not needed")
-		tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		tabMgr.sdl.SchTaskDone(ptn, tabMgr.name, sch.SchEnoNone)
 		return TabMgrEnoNone
 	}
 
@@ -548,7 +548,7 @@ func (tabMgr *TableManager) tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 		tabMgr.nodeDb.close()
 		tabMgr.nodeDb = nil
 	}
-	if tabMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+	if tabMgr.sdl.SchTaskDone(ptn, tabMgr.name, sch.SchEnoKilled) != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
 
@@ -1191,7 +1191,7 @@ func (ndbc *NodeDbCleaner) ndbcPoweron(ptn interface{}) TabMgrErrno {
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
 		tabLog.Debug("ndbcPoweron: static subnet type, nodeDbCleaner will be done ...")
-		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		sdl.SchTaskDone(ptn, ndbc.name, sch.SchEnoNone)
 		return TabMgrEnoNone
 	}
 
@@ -1229,7 +1229,7 @@ func (ndbc *NodeDbCleaner) ndbcPoweroff(ptn interface{}) TabMgrErrno {
 		ndbc.tid = sch.SchInvalidTid
 	}
 
-	if ndbc.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+	if ndbc.sdl.SchTaskDone(ptn, ndbc.name, sch.SchEnoKilled) != sch.SchEnoNone {
 		return TabMgrEnoScheduler
 	}
 

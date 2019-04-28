@@ -144,7 +144,7 @@ func (shMgr *DhtShellManager) poweroff(ptn interface{}) sch.SchErrno {
 	dhtLog.Debug("poweroff: task will be done...")
 	close(shMgr.evChan)
 	close(shMgr.csChan)
-	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, sch.SchEnoPowerOff)
+	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, shMgr.name, sch.SchEnoPowerOff)
 }
 
 func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {

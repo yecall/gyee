@@ -396,7 +396,7 @@ func (dsMgr *DsMgr) poweroff(ptn interface{}) sch.SchErrno {
 	dsLog.Debug("poweroff: task will be done ...")
 	dsMgr.ds.Close()
 	dsMgr.dsExp.Close()
-	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, sch.SchEnoKilled)
+	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, dsMgr.name, sch.SchEnoKilled)
 }
 
 //

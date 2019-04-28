@@ -105,13 +105,14 @@ func (lsnMgr *ListenerManager) lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchGetP2pConfig().NoAccept == true {
 		lsnLog.Debug("lsnMgrPoweron: do not accept, done ...")
-		return sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return sdl.SchTaskDone(ptn, lsnMgr.name, sch.SchEnoNone)
 	}
 
 	var eno sch.SchErrno
 	lsnMgr.ptn = ptn
 	lsnMgr.sdl = sdl
-	if eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName); eno != sch.SchEnoNone {
+	eno, lsnMgr.ptnPeerMgr = lsnMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName);
+	if eno != sch.SchEnoNone {
 		return eno
 	}
 	if lsnMgr.ptnPeerMgr == nil {
@@ -141,7 +142,7 @@ func (lsnMgr *ListenerManager) lsnMgrSetupListener() sch.SchErrno {
 func (lsnMgr *ListenerManager) lsnMgrPoweroff(ptn interface{}) sch.SchErrno {
 	lsnLog.Debug("lsnMgrPoweroff: task will be done, name: %s", lsnMgr.sdl.SchGetTaskName(ptn))
 	lsnMgr.lsnMgrStop()
-	return lsnMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	return lsnMgr.sdl.SchTaskDone(ptn, lsnMgr.name, sch.SchEnoKilled)
 }
 
 func (lsnMgr *ListenerManager) lsnMgrStart() sch.SchErrno {
@@ -161,13 +162,14 @@ func (lsnMgr *ListenerManager) lsnMgrStart() sch.SchErrno {
 	}
 	var accepter = acceptTskCtrlBlock{
 		sdl:    lsnMgr.sdl,
+		name:	PeerAccepterName,
 		lsnMgr: lsnMgr,
 		stopCh: make(chan bool, 1),
 	}
 	accepter.tep = accepter.peerAcceptProc
 	lsnMgr.accepter = &accepter
 	var tskDesc = sch.SchTaskDescription{
-		Name:   PeerAccepterName,
+		Name:   accepter.name,
 		MbSize: 0,
 		Ep:     &accepter,
 		Wd:     &sch.SchWatchDog{HaveDog: false},
@@ -211,6 +213,7 @@ const PeerAccepterName = sch.PeerAccepterName
 
 type acceptTskCtrlBlock struct {
 	sdl       *sch.Scheduler    // pointer to scheduler
+	name      string			// name
 	tep       sch.SchUserTaskEp // entry
 	lsnMgr    *ListenerManager  // pointer to listener manager
 	ptnPeMgr  interface{}       // pointer to peer manager task node
@@ -233,21 +236,21 @@ func (accepter *acceptTskCtrlBlock) peerAcceptProc(ptn interface{}, _ *sch.SchMe
 	_, accepter.ptnLsnMgr = accepter.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 	if accepter.ptnLsnMgr == nil {
 		lsnLog.Debug("PeerAcceptProc: invalid listener manager task pointer")
-		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
+		accepter.sdl.SchTaskDone(ptn, accepter.name, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	_, accepter.ptnPeMgr = accepter.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	if accepter.ptnPeMgr == nil {
 		lsnLog.Debug("PeerAcceptProc: invalid peer manager task pointer")
-		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
+		accepter.sdl.SchTaskDone(ptn, accepter.name, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 
 	accepter.listener = accepter.lsnMgr.listener
 	if accepter.listener == nil {
 		lsnLog.Debug("PeerAcceptProc: invalid listener, done accepter")
-		accepter.sdl.SchTaskDone(ptn, sch.SchEnoInternal)
+		accepter.sdl.SchTaskDone(ptn, accepter.name, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
 	lsnLog.Debug("PeerAcceptProc: inited ok, tring to accept ...")
@@ -306,5 +309,5 @@ acceptLoop:
 	if !stop {
 		doneFor = sch.SchEnoOS
 	}
-	return accepter.sdl.SchTaskDone(ptn, doneFor)
+	return accepter.sdl.SchTaskDone(ptn, accepter.name, doneFor)
 }

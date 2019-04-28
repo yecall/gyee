@@ -45,6 +45,10 @@ var stLog = staticTaskLogger{
 	debug__: false,
 }
 
+func SwtichStaticDebugFlag(flag bool) {
+	stLog.debug__ = flag
+}
+
 func (log staticTaskLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
 		p2plog.Debug(fmt, args...)
@@ -280,6 +284,7 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 
 	for loop := 0; loop < len(staticTasks); loop++ {
 		taskName := staticTasks[loop]
+		powerOff.TgtName = taskName
 		if sdl.SchTaskExist(taskName) != true {
 			stLog.Debug("P2pStop: inst: %s, type: %d, task not exist: %s", p2pInstName, appType, taskName)
 			continue

@@ -144,6 +144,7 @@ const (
 //
 type qryInstCtrlBlock struct {
 	sdl        *sch.Scheduler                 // pointer to scheduler
+	sdlName    string						  // scheduler name
 	seq        int                            // sequence number
 	qryReq     *sch.MsgDhtQryMgrQueryStartReq // original query request message
 	name       string                         // instance name
@@ -314,10 +315,11 @@ func (qryMgr *QryMgr) poweroff(ptn interface{}) sch.SchErrno {
 	for _, qcb := range qryMgr.qcbTab {
 		for _, qry := range qcb.qryActived {
 			qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, qry.ptnInst, sch.EvSchPoweroff, nil)
+			po.TgtName = qry.name
 			qryMgr.sdl.SchSendMessage(&po)
 		}
 	}
-	return qryMgr.sdl.SchTaskDone(qryMgr.ptnMe, sch.SchEnoKilled)
+	return qryMgr.sdl.SchTaskDone(qryMgr.ptnMe, qryMgr.name, sch.SchEnoKilled)
 }
 
 //
@@ -1054,6 +1056,7 @@ func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	for _, icb := range qcb.qryActived {
 		po := sch.SchMessage{}
 		icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
+		po.TgtName = icb.name
 		icb.sdl.SchSendMessage(&po)
 	}
 
@@ -1100,6 +1103,7 @@ func (qryMgr *QryMgr) qryMgrDelIcb(why int, target *config.DsKey, peer *config.N
 		if eno == sch.SchEnoNone && ptn != nil && ptn == icb.ptnInst {
 			po := sch.SchMessage{}
 			icb.sdl.SchMakeMessage(&po, qryMgr.ptnMe, icb.ptnInst, sch.EvSchPoweroff, nil)
+			po.TgtName = icb.name
 			icb.sdl.SchSendMessage(&po)
 		} else {
 			qryLog.Debug("qryMgrDelIcb: not found, icb: %s", icb.name)

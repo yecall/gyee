@@ -202,7 +202,7 @@ func (lsnMgr *ListenerManager) procPoweron(ptn interface{}) sch.SchErrno {
 
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
 		lsnLog.Debug("procPoweron: static type, lsnMgr is not needed, done it ...")
-		return sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		return sdl.SchTaskDone(ptn, lsnMgr.name, sch.SchEnoNone)
 	}
 
 	lsnMgr.nextState(LmsNull)
@@ -225,7 +225,7 @@ func (lsnMgr *ListenerManager) procPoweroff(ptn interface{}) sch.SchErrno {
 		lsnLog.Debug("procPoweroff: procStop failed, eno: %d", eno)
 		return eno
 	}
-	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, sch.SchEnoKilled)
+	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, lsnMgr.name, sch.SchEnoKilled)
 }
 
 func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
@@ -237,7 +237,7 @@ func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 	var ptnLoop interface{} = nil
 	if eno = lsnMgr.setupUdpConn(); eno != sch.SchEnoNone {
 		lsnLog.Debug("procStart：setupUdpConn failed, eno: %d", eno)
-		lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, eno)
+		lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, lsnMgr.name, eno)
 		return eno
 	}
 	var udpReader = NewUdpReader()
@@ -365,13 +365,13 @@ _loop:
 	// If it's an abnormal case that the reader task still in running, we
 	// need to make it done.
 	if udpReader.sdl.SchGetPoweroffStage() {
-		eno = udpReader.sdl.SchTaskDone(udpReader.ptnMe, eno)
+		eno = udpReader.sdl.SchTaskDone(udpReader.ptnMe, udpReader.name, eno)
 		goto _udpReaderLoop_exit
 	}
 
 	udpReader.lsnMgr.lock.Lock()
 	if udpReader.lsnMgr.conn == nil {
-		eno = udpReader.sdl.SchTaskDone(udpReader.ptnMe, eno)
+		eno = udpReader.sdl.SchTaskDone(udpReader.ptnMe, udpReader.name, eno)
 		udpReader.lsnMgr.lock.Unlock()
 		goto _udpReaderLoop_exit
 	}

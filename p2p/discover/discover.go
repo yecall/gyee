@@ -126,7 +126,7 @@ func (dcvMgr *DiscoverManager) DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 	// if it's a static type, no discover manager needed
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
 		dcvLog.Debug("DcvMgrPoweron: static type, dcvMgr is not needed")
-		sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		sdl.SchTaskDone(ptn, dcvMgr.name, sch.SchEnoNone)
 		return DcvMgrEnoNone
 	}
 
@@ -150,7 +150,7 @@ func (dcvMgr *DiscoverManager) DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 
 func (dcvMgr *DiscoverManager) DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 	dcvLog.Debug("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.name)
-	if dcvMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+	if dcvMgr.sdl.SchTaskDone(ptn, dcvMgr.name, sch.SchEnoKilled) != sch.SchEnoNone {
 		return DcvMgrEnoScheduler
 	}
 	return DcvMgrEnoNone

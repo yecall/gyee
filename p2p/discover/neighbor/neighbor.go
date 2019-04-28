@@ -75,7 +75,8 @@ type neighborInst struct {
 	sdl     *sch.Scheduler    // pointer to scheduler
 	ngbMgr  *NeighborManager  // pointer to neighbor manager
 	ptn     interface{}       // task node pointer
-	name    string            // task instance name
+	name    string            // instance name
+	tskName	string			  // task name
 	tep     sch.SchUserTaskEp // entry
 	msgType um.UdpMsgType     // message type to inited this instance
 	msgBody interface{}       // message body
@@ -145,7 +146,7 @@ func (inst *neighborInst) ngbProtoProc(ptn interface{}, msg *sch.SchMessage) sch
 
 func (inst *neighborInst) NgbProtoPoweroff(ptn interface{}) NgbProtoErrno {
 	ngbLog.Debug("NgbProtoPoweroff: task will be done, name: %s", inst.sdl.SchGetTaskName(inst.ptn))
-	inst.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled)
+	inst.sdl.SchTaskDone(inst.ptn, inst.tskName, sch.SchEnoKilled)
 	return NgbProtoEnoNone
 }
 
@@ -384,7 +385,7 @@ func (ngbMgr *NeighborManager) PoweronHandler(ptn interface{}) sch.SchErrno {
 
 	if ngbMgr.cfg.NetworkType == config.P2pNetworkTypeStatic {
 		ngbLog.Debug("tabMgrPoweron: static subnet, tabMgr is not needed, done it ...")
-		ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoNone)
+		ngbMgr.sdl.SchTaskDone(ptn, ngbMgr.name, sch.SchEnoNone)
 		return sch.SchEnoNone
 	}
 
@@ -400,20 +401,20 @@ func (ngbMgr *NeighborManager) PoweronHandler(ptn interface{}) sch.SchErrno {
 
 func (ngbMgr *NeighborManager) PoweroffHandler(ptn interface{}) sch.SchErrno {
 	ngbLog.Debug("PoweroffHandler: task will be done, name: %s", ngbMgr.sdl.SchGetTaskName(ptn))
-	powerOff := sch.SchMessage{
+	po := sch.SchMessage{
 		Id:   sch.EvSchPoweroff,
-		Body: nil,
 	}
 
 	ngbMgr.lock.Lock()
-	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
+	ngbMgr.sdl.SchSetSender(&po, &sch.RawSchTask)
 	for _, ngbInst := range ngbMgr.ngbMap {
-		ngbMgr.sdl.SchSetRecver(&powerOff, ngbInst.ptn)
-		ngbMgr.sdl.SchSendMessage(&powerOff)
+		ngbMgr.sdl.SchSetRecver(&po, ngbInst.ptn)
+		po.TgtName = ngbInst.tskName
+		ngbMgr.sdl.SchSendMessage(&po)
 	}
 	ngbMgr.lock.Unlock()
 
-	return ngbMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	return ngbMgr.sdl.SchTaskDone(ptn, ngbMgr.name, sch.SchEnoKilled)
 }
 
 func (ngbMgr *NeighborManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) NgbMgrErrno {
@@ -753,6 +754,7 @@ func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 		ngbMgr:  ngbMgr,
 		ptn:     nil,
 		name:    strPeerNodeId,
+		tskName: fmt.Sprintf("FindNode:%d:%s", ngbMgr.fnInstSeq, strPeerNodeId),
 		msgType: um.UdpMsgTypeFindNode,
 		msgBody: findNode,
 		tidFN:   sch.SchInvalidTid,
@@ -764,7 +766,7 @@ func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 		HaveDog: false,
 	}
 	var dc = sch.SchTaskDescription{
-		Name:   fmt.Sprintf("FindNode:%d:%s", ngbMgr.fnInstSeq, strPeerNodeId),
+		Name:   ngbInst.tskName,
 		MbSize: ngbProcMailboxSize,
 		Ep:     &ngbInst,
 		Wd:     &noDog,
@@ -790,7 +792,11 @@ func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	rsp.Result = NgbMgrEnoNone
 	rsp.FindNode = findNode
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode)
-	ngbMgr.sdl.SchSendMessage(&schMsg)
+	if ngbMgr.sdl.SchSendMessage(&schMsg) != sch.SchEnoNone {
+		if ngbMgr.sdl.SchTaskDone(ngbInst.ptn, ngbInst.tskName, sch.SchEnoKilled) != sch.SchEnoNone {
+			panic("FindNodeReq: SchTaskDone failed")
+		}
+	}
 	ngbMgr.setupMap(strPeerNodeId, &ngbInst)
 
 	return NgbMgrEnoNone
@@ -806,7 +812,9 @@ func (ngbMgr *NeighborManager) PingpongReq(ping *um.Ping) NgbMgrErrno {
 	}
 	var funcReq2Inst = func(ptn interface{}) NgbMgrErrno {
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblPingpongReq, ping)
-		ngbMgr.sdl.SchSendMessage(&schMsg)
+		if ngbMgr.sdl.SchSendMessage(&schMsg) != sch.SchEnoNone {
+			return NgbMgrEnoScheduler
+		}
 		return NgbMgrEnoNone
 	}
 
@@ -819,11 +827,14 @@ func (ngbMgr *NeighborManager) PingpongReq(ping *um.Ping) NgbMgrErrno {
 		return funcRsp2Tab()
 	}
 
+	ngbMgr.ppInstSeq++
+
 	var ngbInst = neighborInst{
 		sdl:     ngbMgr.sdl,
 		ngbMgr:  ngbMgr,
 		ptn:     nil,
 		name:    strPeerNodeId,
+		tskName: fmt.Sprintf("Ping:%d:%s", ngbMgr.ppInstSeq, strPeerNodeId),
 		msgType: um.UdpMsgTypePing,
 		msgBody: ping,
 		tidFN:   sch.SchInvalidTid,
@@ -835,10 +846,8 @@ func (ngbMgr *NeighborManager) PingpongReq(ping *um.Ping) NgbMgrErrno {
 		HaveDog: false,
 	}
 
-	ngbMgr.ppInstSeq++
-
 	var dc = sch.SchTaskDescription{
-		Name:   fmt.Sprintf("Ping:%d:%s", ngbMgr.ppInstSeq, strPeerNodeId),
+		Name:   ngbInst.tskName,
 		MbSize: ngbProcMailboxSize,
 		Ep:     &ngbInst,
 		Wd:     &noDog,
@@ -855,14 +864,17 @@ func (ngbMgr *NeighborManager) PingpongReq(ping *um.Ping) NgbMgrErrno {
 	}
 	ngbInst.ptn = ptn
 
-	if eno := funcReq2Inst(ptn); eno != NgbMgrEnoNone {
-		rsp.Result = int(eno)
+	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
+		rsp.Result = NgbMgrEnoScheduler
 		rsp.Ping = ping
 		return funcRsp2Tab()
 	}
 
-	if eno := ngbMgr.sdl.SchStartTaskEx(ngbInst.ptn); eno != sch.SchEnoNone {
-		rsp.Result = NgbMgrEnoScheduler
+	if eno := funcReq2Inst(ngbInst.ptn); eno != NgbMgrEnoNone {
+		if ngbMgr.sdl.SchTaskDone(ngbInst.ptn, ngbInst.tskName, sch.SchEnoKilled) != sch.SchEnoNone {
+			panic("PingpongReq: SchTaskDone failed")
+		}
+		rsp.Result = int(eno)
 		rsp.Ping = ping
 		return funcRsp2Tab()
 	}
@@ -885,7 +897,7 @@ func (ngbMgr *NeighborManager) cleanMap(name string) NgbMgrErrno {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
 	if inst, ok := ngbMgr.ngbMap[name]; ok {
-		ngbMgr.sdl.SchTaskDone(inst.ptn, sch.SchEnoKilled)
+		ngbMgr.sdl.SchTaskDone(inst.ptn, inst.tskName, sch.SchEnoKilled)
 		delete(ngbMgr.ngbMap, name)
 		return NgbMgrEnoNone
 	}
@@ -996,15 +1008,10 @@ func (ngbMgr *NeighborManager) getSubNodeId(snid config.SubNetworkID) *config.No
 func (ngbMgr *NeighborManager) natPubAddrSwitchInd(msg *sch.MsgNatPubAddrSwitchInd) NgbMgrErrno {
 	ngbMgr.lock.Lock()
 	defer ngbMgr.lock.Unlock()
-	powerOff := sch.SchMessage{
-		Id:   sch.EvSchPoweroff,
-		Body: nil,
-	}
 	ngbLog.Debug("natPubAddrSwitchInd: entered")
-	ngbMgr.sdl.SchSetSender(&powerOff, &sch.RawSchTask)
 	for _, ngbInst := range ngbMgr.ngbMap {
 		ngbLog.Debug("natPubAddrSwitchInd: kill inst: %s", ngbInst.name)
-		ngbMgr.sdl.SchTaskDone(ngbInst.ptn, sch.SchEnoKilled)
+		ngbMgr.sdl.SchTaskDone(ngbInst.ptn, ngbInst.tskName, sch.SchEnoKilled)
 		delete(ngbMgr.ngbMap, ngbInst.name)
 	}
 	ngbMgr.cfg.IP = msg.PubIp

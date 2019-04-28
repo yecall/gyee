@@ -31,6 +31,7 @@ import (
 	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"
 	yeelog "github.com/yeeco/gyee/utils/logging"
+	"github.com/yeeco/gyee/p2p/shell"
 )
 
 type OsnService struct {
@@ -205,6 +206,7 @@ func NewOsnService(cfg *YeShellConfig) (*OsnService, error) {
 	osns := OsnService{
 		yeShCfg: *cfg,
 	}
+	shell.SwtichStaticDebugFlag(cfg.BootstrapNode)
 	if osns.yeShMgr = NewYeShellManager(&osns.yeShCfg); osns.yeShMgr == nil {
 		return nil, errors.New("NewOsnService: NewYeShellManager failed")
 	}

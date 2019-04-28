@@ -279,7 +279,7 @@ func (natMgr *NatManager) poweron(ptn interface{}) sch.SchErrno {
 func (natMgr *NatManager) poweroff(msg *sch.SchMessage) sch.SchErrno {
 	natLog.Debug("lsnMgrPoweroff: task will be done, name: %s", natMgr.name)
 	natMgr.stop()
-	return natMgr.sdl.SchTaskDone(natMgr.ptnMe, sch.SchEnoKilled)
+	return natMgr.sdl.SchTaskDone(natMgr.ptnMe, natMgr.name, sch.SchEnoKilled)
 }
 
 func (natMgr *NatManager) discoverReq(msg *sch.SchMessage) sch.SchErrno {

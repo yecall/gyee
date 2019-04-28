@@ -108,10 +108,12 @@ const evHistorySize = 64                // round buffer size fo event history
 type schTask struct {
 	lock            sync.Mutex                    // lock to protect task control block
 	sdl             *scheduler                    // pointer to scheduler
-	name            string                        // task name
+	name            string                        // task name, should be unique in system
 	utep            schUserTaskProc               // user task entry point
 	mailbox         schMailBox                    // mail box
 	killing			bool						  // in killing
+	killed			bool						  // killed
+	scheduling		bool						  // in scheduling
 	doneGot			bool						  // if EvSchDone got
 	done            chan SchErrno                 // done with errno
 	stopped         chan bool                     // stopped signal

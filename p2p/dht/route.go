@@ -315,7 +315,7 @@ func (rutMgr *RutMgr) poweron(ptn interface{}) sch.SchErrno {
 //
 func (rutMgr *RutMgr) poweroff(ptn interface{}) sch.SchErrno {
 	rutLog.Debug("poweroff: task will be done ...")
-	return rutMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	return rutMgr.sdl.SchTaskDone(ptn, rutMgr.name, sch.SchEnoKilled)
 }
 
 //

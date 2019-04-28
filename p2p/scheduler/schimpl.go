@@ -121,6 +121,8 @@ func schSchedulerInit(cfg *config.Config) (*scheduler, SchErrno) {
 		sdl.schTaskNodePool[loop].last = &sdl.schTaskNodePool[(loop-1+schTaskNodePoolSize)&(schTaskNodePoolSize-1)]
 		sdl.schTaskNodePool[loop].next = &sdl.schTaskNodePool[(loop+1)&(schTaskNodePoolSize-1)]
 		sdl.schTaskNodePool[loop].task.tmIdxTab = make(map[*schTmcbNode]int)
+		sdl.schTaskNodePool[loop].task.goStatus = SchCreatedNull
+		sdl.schTaskNodePool[loop].task.killed = true
 	}
 
 	sdl.freeSize = schTaskNodePoolSize
@@ -176,6 +178,9 @@ func (sdl *scheduler) schCommonTask(ptn *schTaskNode) SchErrno {
 	}
 
 	task := &ptn.task
+	task.killing = false
+	task.killed = false
+	task.scheduling = true
 	mailbox := &ptn.task.mailbox
 	queMsg := ptn.task.mailbox.que
 	done := &ptn.task.done
@@ -333,6 +338,7 @@ taskLoop:
 	//
 
 taskDone:
+	ptn.task.scheduling = false
 	ptn.task.stopped <- true
 
 	//
@@ -1059,7 +1065,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 
 	if len(ptn.task.name) <= 0 {
 
-		schLog.Debug("schCreateTask: task with empty name")
+		schLog.Debug("schCreateTask: task without name")
 
 		sdl.schRetTaskNode(ptn)
 		sdl.lock.Unlock()
@@ -1073,10 +1079,19 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 			"sdl: %s, duplicated task: %s, fbt2: %s, lbt2: %d",
 			sdl.p2pCfg.Name, ptn.task.name, file, line)
 
-		sdl.schRetTaskNode(ptn)
-		sdl.lock.Unlock()
+		if true {
 
-		return SchEnoDuplicated, nil
+			panic(fmt.Sprintf("schCreateTask: " +
+				"sdl: %s, duplicated task: %s, fbt2: %s, lbt2: %d",
+				sdl.p2pCfg.Name, ptn.task.name, file, line))
+
+		} else {
+
+			sdl.schRetTaskNode(ptn)
+			sdl.lock.Unlock()
+
+			return SchEnoDuplicated, nil
+		}
 
 	} else {
 
@@ -1236,19 +1251,45 @@ func (sdl *scheduler) schStopTaskByName(name string) SchErrno {
 		return eno
 	}
 
-	return sdl.schStopTask(ptn)
+	return sdl.schStopTask(ptn, name)
 }
 
 //
 // Stop task by node pointer
 //
-func (sdl *scheduler) schStopTask(ptn *schTaskNode) SchErrno {
+func (sdl *scheduler) schStopTask(ptn *schTaskNode, name string) SchErrno {
 
 	//
-	// done with "killed" signal and then wait "stopped"
+	// done with "killed" signal and then wait "stopped", see function
+	// schTaskDone also pls.
 	//
+
+	if ptn == nil || len(name) == 0 {
+		panic("schStopTask: invalid task to stop")
+	}
 
 	ptn.task.lock.Lock()
+
+	if ptn.task.scheduling == false {
+
+		schLog.ForceDebug("schStopTask: "+
+			"no in scheduling, sdl: %s, task: %s",
+			sdl.p2pCfg.CfgName, ptn.task.name)
+
+		ptn.task.lock.Unlock()
+		return SchEnoMismatched
+	}
+
+	if ptn.task.name != name {
+
+		schLog.ForceDebug("schStopTask: "+
+			"name mismatched, sdl: %s, name: %s, dst: %s",
+			sdl.p2pCfg.CfgName, name, ptn.task.name)
+
+		ptn.task.lock.Unlock()
+		return SchEnoMismatched
+	}
+
 	if ptn.task.killing == false {
 
 		ptn.task.killing = true
@@ -1346,6 +1387,11 @@ func (sdl *scheduler) schTcbClean(tcb *schTask) SchErrno {
 
 	tcb.lock.Lock()
 	defer tcb.lock.Unlock()
+	defer func() {
+		tcb.killing = false
+		tcb.killed = true
+		tcb.goStatus = SchCreatedNull
+	}()
 
 	if tcb == nil {
 		schLog.Debug("schTcbClean: invalid task control block pointer")
@@ -1455,22 +1501,42 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 	// should remove the pointer(if then have)to a task will be done;
 	//
 
-	source := msg.sender.task
+	source := &msg.sender.task
 	target := &msg.recver.task
 	targetName := sdl.tnMap[msg.recver]
-	sdl.lock.Unlock()
+
+	if msg.Id == EvSchPoweroff {
+		// must go with target task name
+		if len(msg.TgtName) == 0 {
+			panic("schSendMsg: EvSchPoweroff, target name needed")
+		}
+	}
 
 	if len(targetName) == 0 {
-		schLog.ForceDebug("schSendMsg: receiver not found, sdl: %s, src: %s, ev: %d",
+
+		schLog.ForceDebug("schSendMsg: receiver not found, " +
+			"sdl: %s, src: %s, ev: %d",
 			sdlName, source.name, msg.Id)
+
+		sdl.lock.Unlock()
 		return mscb(msg, SchEnoNotFound)
 	}
 
 	if len(msg.TgtName) > 0 && targetName != msg.TgtName {
-		schLog.ForceDebug("schSendMsg: receiver not found, sdl: %s, src: %s, tgt: %s, ev: %d",
+
+		schLog.ForceDebug("schSendMsg: receiver not found, " +
+			"sdl: %s, src: %s, tgt: %s, ev: %d",
 			sdlName, source.name, msg.TgtName, msg.Id)
+
+		sdl.lock.Unlock()
 		return mscb(msg, SchEnoNotFound)
 	}
+
+	sdl.lock.Unlock()
+
+	//
+	// lock task and continue
+	//
 
 	target.lock.Lock()
 	defer target.lock.Unlock()
@@ -1478,37 +1544,80 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 	if target.killing {
 		switch msg.Id {
 		case EvSchDone:
+
 			if !target.doneGot {
+
 				target.doneGot = true
+
 			} else {
+
 				if schLog.debug__ {
-					schLog.ForceDebug("schSendMsg: duplicated, sdl: %s, mid: %d", sdlName, msg.Id)
+					schLog.ForceDebug("schSendMsg: duplicated, " +
+						"sdl: %s, mid: %d",
+						sdlName, msg.Id)
 				}
+
 				return mscb(msg, SchEnoDuplicated)
 			}
+
 		default:
+
 			if schLog.debug__ {
-				schLog.ForceDebug("schSendMsg: target in killing, sdl: %s, mid: %d", sdlName, msg.Id)
+				schLog.ForceDebug("schSendMsg: target in killing, " +
+					"sdl: %s, mid: %d",
+					sdlName, msg.Id)
 			}
+
+			return mscb(msg, SchEnoMismatched)
+		}
+
+	} else if target.killed {
+
+		if target.goStatus != SchCreatedGo {
+
+			if schLog.debug__ {
+				schLog.ForceDebug("schSendMsg: target had been killed, "+
+					"sdl: %s, mid: %d",
+					sdlName, msg.Id)
+			}
+
 			return mscb(msg, SchEnoMismatched)
 		}
 	}
 
+	//
+	// when coming here, the message should be received by target pointed by
+	// pointer msg.recver later, but we need to know this "target" is really
+	// the target the sender task aiming at.
+	//
+
+	if len(msg.TgtName) > 0 && target.name != msg.TgtName {
+
+		schLog.ForceDebug("schSendMsg: receiver not found, " +
+			"sdl: %s, src: %s, tgt: %s, ev: %d, dst: %s",
+			sdlName, source.name, msg.TgtName, msg.Id, target.name)
+
+		return mscb(msg, SchEnoMismatched)
+	}
+
 	msg2MailBox := func(msg *schMessage) SchErrno {
 		if target.mailbox.que == nil {
-			schLog.ForceDebug("schSendMsg: mailbox empty, sdl: %s, src: %s, ev: %d",
+			schLog.ForceDebug("schSendMsg: mailbox empty, " +
+				"sdl: %s, src: %s, ev: %d",
 				sdlName, source.name, msg.Id)
 			return SchEnoInternal
 		}
 
 		if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
 
-			schLog.ForceDebug("schSendMsg: mailbox full, sdl: %s, src: %s, dst: %s, ev: %d",
+			schLog.ForceDebug("schSendMsg: mailbox full, " +
+				"sdl: %s, src: %s, dst: %s, ev: %d",
 				sdlName, source.name, target.name, msg.Id)
 
 			target.discardMessages += 1
 			if target.discardMessages & 0x1f == 0 {
-				schLog.ForceDebug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
+				schLog.ForceDebug("schSendMsg: " +
+					"sdl: %s, task: %s, discardMessages: %d",
 					sdlName, target.name, target.discardMessages)
 			}
 
@@ -1806,7 +1915,7 @@ func (sdl *scheduler) schGetTaskNameByNode(ptn *schTaskNode) (SchErrno, string) 
 //
 // Done a task
 //
-func (sdl *scheduler) schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
+func (sdl *scheduler) schTaskDone(ptn *schTaskNode, name string, eno SchErrno) SchErrno {
 
 	//
 	// Notice: this function "should" be called inside a task to kill itself, so
@@ -1814,33 +1923,44 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 	// will result in a deadlock.
 	//
 
-	if ptn == nil {
-		schLog.Debug("schTaskDone: invalid task node pointer")
-		return SchEnoParameter
+	if ptn == nil || len(name) == 0 {
+		panic("schTaskDone: invalid task to be done")
 	}
 
 	//
-	// must have name
-	//
-
-	if tskName := sdl.schGetTaskName(ptn); len(tskName) == 0 {
-		schLog.Debug("schTaskDone: done task without name")
-		return SchEnoParameter
-	}
-
-	//
-	// see function schCommonTask for more please
+	// see function schCommonTask, schSendMsg, ... for more please
 	//
 
 	ptn.task.lock.Lock()
+
+	if ptn.task.scheduling == false {
+
+		schLog.ForceDebug("schTaskDone: "+
+			"no in scheduling, sdl: %s, task: %s",
+			sdl.p2pCfg.CfgName, ptn.task.name)
+
+		ptn.task.lock.Unlock()
+		return SchEnoMismatched
+	}
+
+	if ptn.task.name != name {
+
+		schLog.ForceDebug("schTaskDone: "+
+			"name mismatched, sdl: %s, name: %s, dst: %s",
+			sdl.p2pCfg.CfgName, name, ptn.task.name)
+
+		ptn.task.lock.Unlock()
+		return SchEnoMismatched
+	}
+
 	if ptn.task.killing == false {
 
 		ptn.task.killing = true
 
 	} else {
 
-		schLog.ForceDebug("schStopTask: "+
-			"schTaskDone, sdl: %s, task: %s",
+		schLog.ForceDebug("schTaskDone: "+
+			"duplicated, sdl: %s, task: %s",
 			sdl.p2pCfg.CfgName, ptn.task.name)
 
 		ptn.task.lock.Unlock()
@@ -1855,6 +1975,7 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, eno SchErrno) SchErrno {
 	// "stopped" signal here, since we need our task to try the "done" we fired
 	// above, there the "stopped" would be fired, but no one would care it.
 	//
+
 	return SchEnoNone
 }
 
@@ -1968,7 +2089,6 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 			sender: &rawSchTsk,
 			recver: nil,
 			Id:     EvSchPoweron,
-			Body:   nil,
 		}
 
 		ptn interface{} = nil
@@ -2038,12 +2158,8 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		ptn.(*schTaskNode).task.isStatic = true
 
 		//
-		// send poweron event to task created aboved if it is required to be shceduled
-		// at once; if the flag is SchCreatedSuspend, NO poweron sending, for this task
-		// routine is not sleeping on the mailbox, BUT those who had set SchCreatedGo
-		// do sleeping on their mailboxes. and please notice that: those tasks who had
-		// been sent poweron signal to, must not try to interact with those tasks still
-		// not be created.
+		// send poweron event to task created above if it is required to be scheduled
+		// at once; if the flag is SchCreatedSuspend, NO poweron sent.
 		//
 
 		if tsd[loop].Flag == SchCreatedGo {

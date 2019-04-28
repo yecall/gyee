@@ -207,7 +207,7 @@ func (prdMgr *PrdMgr) poweron(ptn interface{}) sch.SchErrno {
 //
 func (prdMgr *PrdMgr) poweroff(ptn interface{}) sch.SchErrno {
 	prdLog.Debug("poweroff: task will be done ...")
-	return prdMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled)
+	return prdMgr.sdl.SchTaskDone(ptn, prdMgr.name, sch.SchEnoKilled)
 }
 
 //

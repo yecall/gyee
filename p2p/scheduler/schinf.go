@@ -135,7 +135,8 @@ type SchWatchDog struct {
 
 // Flag for user just be created
 const (
-	SchCreatedGo      = iota // go at once
+	SchCreatedNull = iota	 // not created
+	SchCreatedGo			 // go at once
 	SchCreatedSuspend        // suspended
 )
 
@@ -207,8 +208,8 @@ func (sdl *Scheduler) SchStartTaskEx(ptn interface{}) SchErrno {
 }
 
 // Stop caller task or other task in async
-func (sdl *Scheduler) SchStopTask(ptn interface{}) SchErrno {
-	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), SchEnoKilled); eno != SchEnoNone {
+func (sdl *Scheduler) SchStopTask(ptn interface{}, name string) SchErrno {
+	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), name, SchEnoKilled); eno != SchEnoNone {
 		schLog.Debug("SchStopTask: SchTaskDone failed, eno: %d", eno)
 		return eno
 	}
@@ -216,8 +217,8 @@ func (sdl *Scheduler) SchStopTask(ptn interface{}) SchErrno {
 }
 
 // Stop other task than the caller in sync
-func (sdl *Scheduler) SchStopTaskSync(ptn interface{}) SchErrno {
-	return sdl.schStopTask(ptn.(*schTaskNode))
+func (sdl *Scheduler) SchStopTaskSync(ptn interface{}, name string) SchErrno {
+	return sdl.schStopTask(ptn.(*schTaskNode), name)
 }
 
 // Get user task node pointer
@@ -314,8 +315,8 @@ func (sdl *Scheduler) SchKillTimer(ptn interface{}, tid int) SchErrno {
 }
 
 // Done caller task or other task in async
-func (sdl *Scheduler) SchTaskDone(ptn interface{}, eno SchErrno) SchErrno {
-	return sdl.schTaskDone(ptn.(*schTaskNode), eno)
+func (sdl *Scheduler) SchTaskDone(ptn interface{}, name string, eno SchErrno) SchErrno {
+	return sdl.schTaskDone(ptn.(*schTaskNode), name, eno)
 }
 
 // Get scheduler by task node

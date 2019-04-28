@@ -197,7 +197,7 @@ func (lsnMgr *LsnMgr) poweron(ptn interface{}) sch.SchErrno {
 //
 func (lsnMgr *LsnMgr) poweroff(ptn interface{}) sch.SchErrno {
 	lsnLog.Debug("poweroff: task will be done ...")
-	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, sch.SchEnoKilled)
+	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, lsnMgr.name, sch.SchEnoKilled)
 }
 
 //

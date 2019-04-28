@@ -45,14 +45,22 @@ import (
 //
 type yesLogger struct {
 	debug__ bool
+	dht__ bool
 }
 
 var yesLog = yesLogger{
 	debug__: false,
+	dht__: false,
 }
 
 func (log yesLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
+		p2plog.Debug(fmt, args...)
+	}
+}
+
+func (log yesLogger) DebugDht(fmt string, args ...interface{}) {
+	if log.dht__ {
 		p2plog.Debug(fmt, args...)
 	}
 }
@@ -640,11 +648,11 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		return nil, sch.SchEnoResource
 	}
 	if len(key) != yesKeyBytes {
-		yesLog.Debug("DhtGetValue: invalid key: %x", key)
+		yesLog.DebugDht("DhtGetValue: invalid key: %x", key)
 		return nil, sch.SchEnoParameter
 	}
 
-	yesLog.Debug("DhtGetValue: sdl: %s, key: %x", sdl, key)
+	yesLog.DebugDht("DhtGetValue: sdl: %s, key: %x", sdl, key)
 
 	req := sch.MsgDhtMgrGetValueReq{
 		Key: key,
@@ -652,29 +660,27 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		yesLog.Debug("DhtGetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
+		yesLog.DebugDht("DhtGetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
 		return nil, eno
 	}
 
 	ch := make(chan []byte, 1)
 	if err := yeShMgr.dhtGetValMapKey(key, GVTO, ch); err != nil {
-		yesLog.Debug("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		yesLog.DebugDht("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
 		return nil, err
 	}
 
-	yesLog.Debug("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
-	//p2plog.Debug("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+	yesLog.DebugDht("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
 
 	val, ok := <-ch
 	if !ok {
-		yesLog.Debug("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+		yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
 		return nil, errors.New("DhtGetValue: failed, channel closed")
 	} else if len(val) <= 0 {
-		yesLog.Debug("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
+		yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
 		return nil, errors.New("DhtGetValue: empty value")
 	}
- 	yesLog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
-	//p2plog.Debug("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+ 	yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
 
 	return val, nil
 }
@@ -688,11 +694,11 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 		return sch.SchEnoResource
 	}
 	if len(key) != yesKeyBytes || len(value) == 0 {
-		yesLog.Debug("DhtSetValue: invalid pair, sdl: %s, key: %x, length of value: %d", sdl, key, len(value))
+		yesLog.DebugDht("DhtSetValue: invalid pair, sdl: %s, key: %x, length of value: %d", sdl, key, len(value))
 		return sch.SchEnoParameter
 	}
 
-	yesLog.Debug("DhtSetValue: sdl: %s, key: %x", sdl, key)
+	yesLog.DebugDht("DhtSetValue: sdl: %s, key: %x", sdl, key)
 
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:      key,
@@ -702,30 +708,27 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	msg := sch.SchMessage{}
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		yesLog.Debug("DhtSetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
+		yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
 		return eno
 	}
 
 	ch := make(chan bool, 1)
 	if err := yeShMgr.dhtPutValMapKey(key, PVTO, ch); err != nil {
-		yesLog.Debug("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
-		//p2plog.Debug("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		yesLog.DebugDht("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
 		return err
 	}
 
-	yesLog.Debug("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
-	//p2plog.Debug("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
+	yesLog.DebugDht("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
-		yesLog.Debug("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+		yesLog.DebugDht("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
 		return errors.New("DhtSetValue: failed, channel closed")
 	}
 	if result == false {
-		yesLog.Debug("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
+		yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
 		return errors.New("DhtSetValue: failed")
 	}
-	yesLog.Debug("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
-	//p2plog.Debug("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+	yesLog.DebugDht("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
 
 	return nil
 }

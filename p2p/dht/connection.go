@@ -296,16 +296,18 @@ func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
 	for _, ci := range conMgr.ciTab {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to sdl: %s, inst: %s, dir: %d, statue: %d",
 			conMgr.sdlName, ci.name, ci.dir, ci.status)
+		po.TgtName = ci.name
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
 	for _, ci := range conMgr.ibInstTemp {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to sdl: %s, inst: %s, dir: %d, statue: %d",
 			conMgr.sdlName, ci.name, ci.dir, ci.status)
+		po.TgtName = ci.name
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
-	conMgr.sdl.SchTaskDone(conMgr.ptnMe, sch.SchEnoKilled)
+	conMgr.sdl.SchTaskDone(conMgr.ptnMe, conMgr.name, sch.SchEnoKilled)
 	return sch.SchEnoNone
 }
 
@@ -454,7 +456,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		if ci.dir == ConInstDirInbound {
 
 			delete(conMgr.ibInstTemp, ci.name)
-			return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
+			return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 
 		} else if msg.Dir == ConInstDirOutbound {
 
@@ -485,7 +487,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 				conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 				conMgr.sdl.SchSendMessage(&schMsg)
 
-				return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
+				return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 			}
 
 			connLog.ForceDebug("handshakeRsp: too late, sdl: %s, inst: %s, dir: %d",
@@ -512,21 +514,33 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		delete(conMgr.ibInstTemp, ci.name)
 	}
 
-	if conMgr.instInClosing[cid] != nil {
-		connLog.ForceDebug("handshakeRsp: in closing, sdl: %s, inst: %s, dir: %d",
-		conMgr.sdlName, ci.name, ci.dir)
-		if !ok {
-			panic(fmt.Sprintf("handshakeRsp: internal error, sdl: %s, inst: %s, dir: %d",
-				conMgr.sdlName, ci.name, ci.dir))
+	if _, dup := conMgr.instInClosing[cid]; dup {
+		// if the instance is an outbound one, then it must have been requested
+		// to be closed and EvDhtConInstCloseReq must have been sent to it, while
+		// the handshake response of this instance comes here just now. in this
+		// case, we discard the handshakeRsp message;
+		// if the instance is an inbound one, this one must be a different instance
+		// than that in closing. this can caused by that the peer connects us for
+		// some reasons while an old instance outgoing from the same peer is in
+		// closing in our side. we done the new one in this case;
+		if ci.dir == ConInstDirInbound {
+			connLog.ForceDebug("handshakeRsp: done inbound duplicated to closing, sdl: %s, inst: %s, dir: %d",
+				conMgr.sdlName, ci.name, ci.dir)
+			return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 		}
-		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
+
+		connLog.ForceDebug("handshakeRsp: ignored for outbound duplicated to closing, sdl: %s, inst: %s, dir: %d",
+			conMgr.sdlName, ci.name, ci.dir)
+		return sch.SchEnoNone
 	}
 
 	if msg.Dir == ConInstDirInbound {
+		// peer connects us for some reasons while an inbound instance for
+		// the peer exist in our side, done the new one reported.
 		if duped, dup := conMgr.ciTab[cid]; dup {
 			connLog.ForceDebug("handshakeRsp: duplicated, sdl: %s, inst: %s, dir: %d, duped: %s, dupdir: %d",
 				conMgr.sdlName, ci.name, msg.Dir, duped.name, duped.dir)
-			return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
+			return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 		}
 		conMgr.ciTab[cid] = ci
 	} else if duped, dup := conMgr.ciTab[cid]; !dup || duped != ci {
@@ -534,7 +548,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		// same ip address and port, we done it
 		connLog.ForceDebug("handshakeRsp: not found, sdl: %s, inst: %s, dir: %d",
 			conMgr.sdlName, ci.name, msg.Dir)
-		return conMgr.sdl.SchTaskDone(ci.ptnMe, sch.SchEnoKilled)
+		return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 	}
 
 	//
@@ -839,6 +853,10 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	err := false
 	dup := false
 	if cis, _ := conMgr.lookupConInst(&cid); cis != nil {
+		if len(cis) > 1 {
+			connLog.ForceDebug("closeReq: sdl: %s, invalid cid: %+v", conMgr.sdlName, cid)
+			panic("closeReq: invalid cid")
+		}
 		for _, ci := range cis {
 			if ci != nil {
 				found = true
@@ -1494,6 +1512,7 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 	po := sch.SchMessage{}
 	for _, ci := range conMgr.ciTab {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		po.TgtName = ci.name
 		conMgr.sdl.SchSendMessage(&po)
 		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, sdl: %s, inst: %s, dir: %d",
 			conMgr.sdlName, ci.name, ci.dir)
@@ -1502,6 +1521,7 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 
 	for _, ci := range conMgr.ibInstTemp {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
+		po.TgtName = ci.name
 		conMgr.sdl.SchSendMessage(&po)
 		connLog.ForceDebug("natMapSwitch: EvSchPoweroff sent, sdl: %s, inst: %s, dir: %d",
 			conMgr.sdlName, ci.name, ci.dir)

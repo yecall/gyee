@@ -276,7 +276,7 @@ func (dhtMgr *DhtMgr) poweron(ptn interface{}) sch.SchErrno {
 //
 func (dhtMgr *DhtMgr) poweroff(ptn interface{}) sch.SchErrno {
 	dhtLog.Debug("poweroff: task will be done ...")
-	return dhtMgr.sdl.SchTaskDone(dhtMgr.ptnMe, sch.SchEnoKilled)
+	return dhtMgr.sdl.SchTaskDone(dhtMgr.ptnMe, dhtMgr.name, sch.SchEnoKilled)
 }
 
 //

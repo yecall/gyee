@@ -526,7 +526,6 @@ func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	peerLog.Debug("peMgrPoweroff: task will be done, name: %s", sch.PeerMgrName)
 	po := sch.SchMessage{
 		Id:   sch.EvSchPoweroff,
-		Body: nil,
 	}
 	close(peMgr.indChan)
 	peMgr.sdl.SchSetSender(&po, &sch.RawSchTask)
@@ -539,9 +538,10 @@ func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
 			continue
 		}
 		peMgr.sdl.SchSetRecver(&po, pi.ptnMe)
+		po.TgtName = pi.name
 		peMgr.sdl.SchSendMessage(&po)
 	}
-	if peMgr.sdl.SchTaskDone(ptn, sch.SchEnoKilled) != sch.SchEnoNone {
+	if peMgr.sdl.SchTaskDone(ptn, peMgr.name, sch.SchEnoKilled) != sch.SchEnoNone {
 		peerLog.ForceDebug("peMgrPoweroff: SchTaskDone faled")
 		return PeMgrEnoScheduler
 	}
@@ -1936,7 +1936,7 @@ func (peMgr *PeerManager) peMgrKillInst(kip *kiParameters, why interface{}) PeMg
 	}
 
 	peInst.state = peInstStateKilled
-	peMgr.sdl.SchStopTask(ptn)
+	peMgr.sdl.SchStopTask(ptn, kip.name)
 	return PeMgrEnoNone
 }
 
@@ -2469,7 +2469,7 @@ func (pi *PeerInstance) piPoweroff(ptn interface{}) PeMgrErrno {
 	if pi.state < peInstStateNull {
 		peerLog.ForceDebug("piPoweroff: already in killing or killed, inst: %s, snid: %x, dir: %d, state: %d",
 			pi.name, pi.snid, pi.dir, pi.state)
-		if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
+		if pi.sdl.SchTaskDone(pi.ptnMe, pi.name, sch.SchEnoKilled) != sch.SchEnoNone {
 			return PeMgrEnoScheduler
 		}
 		return PeMgrEnoNone
@@ -2480,7 +2480,7 @@ func (pi *PeerInstance) piPoweroff(ptn interface{}) PeMgrErrno {
 
 	pi.stopRxTx()
 
-	if pi.sdl.SchTaskDone(pi.ptnMe, sch.SchEnoKilled) != sch.SchEnoNone {
+	if pi.sdl.SchTaskDone(pi.ptnMe, pi.name, sch.SchEnoKilled) != sch.SchEnoNone {
 		return PeMgrEnoScheduler
 	}
 	return PeMgrEnoNone
