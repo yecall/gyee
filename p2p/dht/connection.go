@@ -173,7 +173,7 @@ func (conMgr *ConMgr) checkMailBox() {
 
 func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	connLog.ForceDebug("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
+	connLog.Debug("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	conMgr.checkMailBox()
 
@@ -230,7 +230,7 @@ func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = sch.SchEnoParameter
 	}
 
-	connLog.ForceDebug("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
+	connLog.Debug("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	return eno
 }
@@ -588,6 +588,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 
 	schMsg = sch.SchMessage{
 		Mscb: mscb,
+		TgtName: ci.name,
 	}
 
 	conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstStartupReq, &req)

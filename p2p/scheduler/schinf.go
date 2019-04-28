@@ -105,15 +105,16 @@ type SchUserTaskInterface interface {
 // message type for scheduling between user tasks
 type SchMsgSendCallback func(errno SchErrno)
 type SchMessage struct {
-	sender *schTaskNode			// sender task node pointer
-	recver *schTaskNode			// receiver task node pointer
-	Id     int          		// message identity
-	Body   interface{}  		// message body
+	sender  *schTaskNode		// sender task node pointer
+	recver  *schTaskNode		// receiver task node pointer
+	Id      int          		// message identity
+	Body    interface{}  		// message body
 
 	// callback for sending result.
 	// notice: the user task should try to complete its' work
 	// for message sending result as fast as it could.
-	Mscb   SchMsgSendCallback
+	Mscb    SchMsgSendCallback
+	TgtName	string				// target receiver task name
 }
 
 // Watch dog for a user task

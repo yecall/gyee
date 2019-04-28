@@ -1466,6 +1466,12 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		return mscb(msg, SchEnoNotFound)
 	}
 
+	if len(msg.TgtName) > 0 && targetName != msg.TgtName {
+		schLog.ForceDebug("schSendMsg: receiver not found, sdl: %s, src: %s, tgt: %s, ev: %d",
+			sdlName, source.name, msg.TgtName, msg.Id)
+		return mscb(msg, SchEnoNotFound)
+	}
+
 	target.lock.Lock()
 	defer target.lock.Unlock()
 
@@ -1501,16 +1507,15 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 				sdlName, source.name, target.name, msg.Id)
 
 			target.discardMessages += 1
-			if target.discardMessages&(0x1f) == 0 {
+			if target.discardMessages & 0x1f == 0 {
 				schLog.ForceDebug("schSendMsg: sdl: %s, task: %s, discardMessages: %d",
 					sdlName, target.name, target.discardMessages)
 			}
 
-		} else {
-
-			*target.mailbox.que <- *msg
+			return SchEnoResource
 		}
 
+		*target.mailbox.que <- *msg
 		target.evTotal += 1
 		target.evHistory[target.evhIndex] = *msg
 		target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)
@@ -1535,13 +1540,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 			} else {
 
 				if eno := msg2MailBox(msg); eno != SchEnoNone {
-					return eno
+					return mscb(msg, eno)
 				}
 
 				target.isPoweron = true
 				for idx := 0; idx < len(target.delayMessages); idx++ {
 					if eno := msg2MailBox(target.delayMessages[idx]); eno != SchEnoNone {
-						return eno
+						mscb(target.delayMessages[idx], eno)
 					}
 				}
 
