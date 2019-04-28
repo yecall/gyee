@@ -21,22 +21,27 @@
 package console
 
 import (
-	"github.com/robertkrimen/otto"
+	"io"
 	"sort"
 	"strings"
+
+	"github.com/robertkrimen/otto"
 )
 
 // JSRE javascript runtime environment
 type JSRE struct {
+	output io.Writer
 
 	// the representation of the JavaScript runtime
 	vm *otto.Otto
 }
 
-func newJSRE() *JSRE {
+func newJSRE(output io.Writer) *JSRE {
 	jsre := &JSRE{
-		vm: otto.New(),
+		output: output,
+		vm:     otto.New(),
 	}
+	jsre.Set("inspect", jsre.prettyPrintJS)
 	return jsre
 }
 
