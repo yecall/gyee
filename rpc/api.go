@@ -22,7 +22,10 @@ package rpc
 
 import (
 	"context"
+	"errors"
 
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/rpc/pb"
 )
 
@@ -33,4 +36,33 @@ type APIService struct {
 func (s *APIService) NodeInfo(ctx context.Context, req *rpcpb.NonParamsRequest) (*rpcpb.NodeInfoResponse, error) {
 	nodeId := s.server.Node().NodeID()
 	return &rpcpb.NodeInfoResponse{Id: nodeId, Version: 1}, nil
+}
+
+func (s *APIService) GetBlockByHash(ctx context.Context, req *rpcpb.GetBlockByHashRequest) (*rpcpb.BlockResponse, error) {
+	bhash := common.HexToHash(req.Hash)
+	b := s.server.Core().Chain().GetBlockByHash(bhash)
+	return blockResponse(b)
+}
+
+func (s *APIService) GetBlockByHeight(ctx context.Context, req *rpcpb.GetBlockByHeightRequest) (*rpcpb.BlockResponse, error) {
+	b := s.server.Core().Chain().GetBlockByNumber(req.Height)
+	return blockResponse(b)
+}
+
+func blockResponse(b *core.Block) (*rpcpb.BlockResponse, error) {
+	if b == nil {
+		return nil, errors.New("block not found")
+	}
+	return &rpcpb.BlockResponse{
+		Hash:       b.Hash().Hex(),
+		ParentHash: b.ParentHash().Hex(),
+		Height:     b.Number(),
+		Timestamp:  b.Time(),
+		ChainId:    b.ChainID(),
+
+		ConsensusRoot: b.ConsensusRoot().Hex(),
+		StateRoot:     b.StateRoot().Hex(),
+		TxsRoot:       b.TxsRoot().Hex(),
+		ReceiptsRoot:  b.ReceiptsRoot().Hex(),
+	}, nil
 }
