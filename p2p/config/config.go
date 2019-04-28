@@ -55,6 +55,10 @@ var cfgLog = cfgLogger{
 	debug__: false,
 }
 
+func SwtichConfigDebugFlag(flag bool) {
+	cfgLog.debug__ = flag
+}
+
 func (log cfgLogger) Debug(fmt string, args ...interface{}) {
 	if log.debug__ {
 		p2plog.Debug(fmt, args...)

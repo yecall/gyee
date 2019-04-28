@@ -206,6 +206,7 @@ func NewOsnService(cfg *YeShellConfig) (*OsnService, error) {
 	osns := OsnService{
 		yeShCfg: *cfg,
 	}
+	config.SwtichConfigDebugFlag(cfg.BootstrapNode)
 	shell.SwtichStaticDebugFlag(cfg.BootstrapNode)
 	if osns.yeShMgr = NewYeShellManager(&osns.yeShCfg); osns.yeShMgr == nil {
 		return nil, errors.New("NewOsnService: NewYeShellManager failed")
