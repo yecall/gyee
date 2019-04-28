@@ -34,11 +34,9 @@ ${OUT_BIN}/%: env
 
 .PHONY: protobufgen
 protobufgen: env
-	$(MAKE) -C core/pb clean all
 	$(MAKE) -C p2p/discover/udpmsg/pb clean all
 	$(MAKE) -C p2p/dht/pb clean all
 	$(MAKE) -C p2p/peer/pb clean all
-	$(MAKE) -C rpc/pb clean all
 
 .PHONY: clean env
 clean: env
