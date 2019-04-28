@@ -48,8 +48,9 @@ const (
 	SchEnoSuspended  SchErrno = 14 // user task is suspended for some reasons
 	SchEnoUnknown    SchErrno = 15 // unknowns
 	SchEnoPowerOff   SchErrno = 16 // in power off stage
-	SchEnoTimeout    SchErrno = 17 // timeout
-	SchEnoMax        SchErrno = 18 // just for bound checking
+	SchEnoDone		 SchErrno = 17 // done
+	SchEnoTimeout    SchErrno = 18 // timeout
+	SchEnoMax        SchErrno = 19 // just for bound checking
 )
 
 var SchErrnoDescription = []string{
@@ -102,11 +103,17 @@ type SchUserTaskInterface interface {
 }
 
 // message type for scheduling between user tasks
+type SchMsgSendCallback func(errno SchErrno)
 type SchMessage struct {
-	sender *schTaskNode // sender task node pointer
-	recver *schTaskNode // receiver task node pointer
-	Id     int          // message identity
-	Body   interface{}  // message body
+	sender *schTaskNode			// sender task node pointer
+	recver *schTaskNode			// receiver task node pointer
+	Id     int          		// message identity
+	Body   interface{}  		// message body
+
+	// callback for sending result.
+	// notice: the user task should try to complete its' work
+	// for message sending result as fast as it could.
+	Mscb   SchMsgSendCallback
 }
 
 // Watch dog for a user task
@@ -219,23 +226,37 @@ func (sdl *Scheduler) SchGetUserTaskNode(name string) (eno SchErrno, task interf
 
 // Send message to a specific task
 func (sdl *Scheduler) SchSendMessageByName(dstTask string, srcTask string, msg *SchMessage) SchErrno {
-	eno, src := sdl.SchGetUserTaskNode(srcTask)
-	if eno != SchEnoNone {
-		return eno
+	result := SchEnoNone
+	eno := SchEnoNone
+	src := interface{}(nil)
+	dst := interface{}(nil)
+
+	if eno, src = sdl.SchGetUserTaskNode(srcTask); eno != SchEnoNone {
+		result = eno
+		goto _failed
 	}
 	if src == nil {
-		return SchEnoInternal
+		result = SchEnoInternal
+		goto _failed
 	}
-	eno, dst := sdl.SchGetUserTaskNode(dstTask)
-	if eno != SchEnoNone {
-		return eno
+	if eno, dst = sdl.SchGetUserTaskNode(dstTask); eno != SchEnoNone {
+		result = eno
+		goto _failed
 	}
 	if dst == nil {
-		return SchEnoInternal
+		result = SchEnoInternal
+		goto _failed
 	}
+
 	msg.sender = src.(*schTaskNode)
 	msg.recver = dst.(*schTaskNode)
-	return sdl.SchSendMessage(msg)
+	result = sdl.SchSendMessage(msg)
+
+_failed:
+	if msg.Mscb != nil {
+		msg.Mscb(result)
+	}
+	return result
 }
 
 func (sdl *Scheduler) SchSendMessage(msg *SchMessage) SchErrno {

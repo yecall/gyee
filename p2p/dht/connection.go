@@ -173,9 +173,7 @@ func (conMgr *ConMgr) checkMailBox() {
 
 func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	if msg.Id != sch.EvDhtConMgrConnectReq && msg.Id != sch.EvDhtConMgrSendReq {
-		connLog.Debug("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
-	}
+	connLog.ForceDebug("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	conMgr.checkMailBox()
 
@@ -232,9 +230,7 @@ func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = sch.SchEnoParameter
 	}
 
-	if msg.Id != sch.EvDhtConMgrConnectReq && msg.Id != sch.EvDhtConMgrSendReq {
-		connLog.Debug("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
-	}
+	connLog.ForceDebug("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	return eno
 }
@@ -578,10 +574,22 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		"sdl: %s, inst: %s, dir: %d",
 		conMgr.sdlName, ci.name, ci.dir)
 
-	schMsg = sch.SchMessage{}
 	req := sch.MsgDhtConInstStartupReq{
 		EnoCh: make(chan int, 0),
 	}
+
+	reqLost := false
+	mscb := func(rc sch.SchErrno) {
+		if rc != sch.SchEnoNone {
+			reqLost = true
+			req.EnoCh <- DhtEnoScheduler.GetEno()
+		}
+	}
+
+	schMsg = sch.SchMessage{
+		Mscb: mscb,
+	}
+
 	conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstStartupReq, &req)
 	schEno := conMgr.sdl.SchSendMessage(&schMsg)
 	if schEno == sch.SchEnoNone {
@@ -590,17 +598,26 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 			"sdl: %s, inst: %s, dir: %d, eno: %d",
 			conMgr.sdlName, ci.name, ci.dir, schEno)
 
-		if eno, ok := <-req.EnoCh; !ok {
+		eno, ok := <-req.EnoCh
+		if !ok {
 			panic("handshakeRsp: would not happen in current implement")
-		} else if eno != DhtEnoNone.GetEno() {
-			panic("handshakeRsp: would not happen in current implement")
-		} else {
-			close(req.EnoCh)
+		}
+		close(req.EnoCh)
+
+		if !reqLost && eno != DhtEnoNone.GetEno() {
+			panic("")
+		}
+
+		if reqLost {
+			connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq lost, "+
+				"sdl: %s, inst: %s, dir: %d, eno: %d",
+				conMgr.sdlName, ci.name, ci.dir, eno)
+			return rsp2TasksPending(ci, msg, DhtEnoScheduler)
 		}
 
 		connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confirmed ok, "+
-			"sdl: %s, inst: %s, dir: %d",
-			conMgr.sdlName, ci.name, ci.dir)
+			"sdl: %s, inst: %s, dir: %d, eno: %d",
+			conMgr.sdlName, ci.name, ci.dir, eno)
 
 		return rsp2TasksPending(ci, msg, DhtEnoNone)
 	}
@@ -858,8 +875,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 
 	//
 	// notice: when requested to send, the connection instance might not be exist,
-	// we need to establesh the connection and backup the data if it is the case;
-	//
+	// we need to establish the connection and backup the data if it is the case;
 	// notice: it must be a outbound instance to bear the data requested to be sent,
 	// even we have an instance of inbound with the same node identity, we do not
 	// send on it.

@@ -242,7 +242,10 @@ func (sdl *scheduler) schCommonTask(ptn *schTaskNode) SchErrno {
 
 			for {
 				select {
-				case <-*queMsg:
+				case m := <-*queMsg:
+					if m.Mscb != nil {
+						m.Mscb(SchEnoDone)
+					}
 				default:
 					break drainLoop1
 				}
@@ -282,6 +285,10 @@ taskLoop:
 					break drainLoop2
 				} else if msg.Id == EvSchPoweroff && !task.killing {
 					break drainLoop2
+				}
+
+				if msg.Mscb != nil {
+					msg.Mscb(SchEnoDone)
 				}
 			}
 
@@ -1403,6 +1410,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 	// or EvSchDone if currently in power off stage.
 	//
 
+	mscb := func(m *schMessage, e SchErrno) SchErrno {
+		if m.Mscb != nil {
+			m.Mscb(e)
+		}
+		return e
+	}
+
 	sdl.lock.Lock()
 
 	if sdl.powerOff == true {
@@ -1414,20 +1428,20 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 				schLog.ForceDebug("schSendMsg: in power off stage, sdl: %s, mid: %d", sdlName, msg.Id)
 			}
 			sdl.lock.Unlock()
-			return SchEnoPowerOff
+			return mscb(msg, SchEnoPowerOff)
 		}
 	}
 
 	if msg.sender == nil {
 		schLog.ForceDebug("schSendMsg: invalid sender, sdl: %s, mid: %d", sdlName, msg.Id)
 		sdl.lock.Unlock()
-		return SchEnoParameter
+		return mscb(msg, SchEnoParameter)
 	}
 
 	if msg.recver == nil {
 		schLog.ForceDebug("schSendMsg: invalid receiver, sdl: %s, mid: %d", sdlName, msg.Id)
 		sdl.lock.Unlock()
-		return SchEnoParameter
+		return mscb(msg, SchEnoParameter)
 	}
 
 	//
@@ -1449,7 +1463,7 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 	if len(targetName) == 0 {
 		schLog.ForceDebug("schSendMsg: receiver not found, sdl: %s, src: %s, ev: %d",
 			sdlName, source.name, msg.Id)
-		return SchEnoNotFound
+		return mscb(msg, SchEnoNotFound)
 	}
 
 	target.lock.Lock()
@@ -1464,13 +1478,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 				if schLog.debug__ {
 					schLog.ForceDebug("schSendMsg: duplicated, sdl: %s, mid: %d", sdlName, msg.Id)
 				}
-				return SchEnoDuplicated
+				return mscb(msg, SchEnoDuplicated)
 			}
 		default:
 			if schLog.debug__ {
 				schLog.ForceDebug("schSendMsg: target in killing, sdl: %s, mid: %d", sdlName, msg.Id)
 			}
-			return SchEnoMismatched
+			return mscb(msg, SchEnoMismatched)
 		}
 	}
 
@@ -1516,7 +1530,7 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 			if msg.Id != EvSchPoweron {
 
 				target.delayMessages = append(target.delayMessages, msg)
-				return SchEnoNone
+				return mscb(msg, SchEnoNone)
 
 			} else {
 
@@ -1532,15 +1546,17 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 				}
 
 				target.delayMessages = nil
-				return SchEnoNone
+				return mscb(msg, SchEnoNone)
 			}
 		} else {
 
-			return msg2MailBox(msg)
+			eno := msg2MailBox(msg)
+			return mscb(msg, eno)
 		}
 	} else {
 
-		return msg2MailBox(msg)
+		eno := msg2MailBox(msg)
+		return mscb(msg, eno)
 	}
 
 	panic(fmt.Sprintf("schSendMsg: would never come here!!! sdl: %s", sdlName))
