@@ -18,24 +18,67 @@
  *
  */
 
-
 //protoc -I . rpc.proto --go_out=plugins=grpc:.
 
 syntax = "proto3";
 
 package rpcpb;
 
-service AdminService{
-    rpc NewAccount(NewAccountRequest) returns (NewAccountResponse){};
+
+service AdminService {
+    rpc NewAccount (NewAccountRequest) returns (NewAccountResponse) {
+    }
 }
 
-service ApiService{
-    rpc NodeInfo (NonParamsRequest) returns (NodeInfoResponse){};
+service ApiService {
+    rpc NodeInfo (NonParamsRequest) returns (NodeInfoResponse) {
+    }
 
+    rpc GetBlockByHash (GetBlockByHashRequest) returns (BlockResponse) {
+    }
+
+    rpc GetBlockByHeight (GetBlockByHeightRequest) returns (BlockResponse) {
+    }
 }
 
 // Request message of non params.
 message NonParamsRequest {
+}
+
+message BlockResponse {
+    // block hash hex string
+    string hash = 1;
+
+    // block parent hash
+    string parent_hash = 2;
+
+    // block height
+    uint64 height = 3;
+
+    // block timestamp
+    uint64 timestamp = 4;
+
+    // block chain id
+    uint32 chain_id = 5;
+
+    // consensus root hex string
+    string consensus_root = 6;
+    // state root hex string
+    string state_root = 7;
+    // transactions root hex string
+    string txs_root = 8;
+    // receipts root hex string
+    string receipts_root = 9;
+}
+
+message GetBlockByHashRequest {
+    // block hash hex string
+    string hash = 1;
+}
+
+message GetBlockByHeightRequest {
+    // block height
+    uint64 height = 1;
 }
 
 // Response message of node info.

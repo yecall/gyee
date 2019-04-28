@@ -96,13 +96,43 @@ func (b *jsBridge) setHost(call otto.FunctionCall) otto.Value {
 }
 
 func (b *jsBridge) nodeInfo(call otto.FunctionCall) otto.Value {
-	response, err := b.svcApi.NodeInfo(context.Background(), &rpcpb.NonParamsRequest{})
+	response, err := b.svcApi.NodeInfo(context.Background(),
+		&rpcpb.NonParamsRequest{})
 	if err != nil {
 		log.Error("nodeInfo()", "err", err)
 		return otto.NullValue()
 	}
 	result, _ := otto.ToValue(fmt.Sprintf("nodeInfo: %v", response))
 	return result
+}
+
+func (b *jsBridge) getBlockByHash(call otto.FunctionCall) otto.Value {
+	hash := call.Argument(0)
+	if !hash.IsString() {
+		return jsError(call.Otto, errors.New("not hash hex str"))
+	}
+	response, err := b.svcApi.GetBlockByHash(context.Background(),
+		&rpcpb.GetBlockByHashRequest{Hash: hash.String()})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	value, _ := otto.ToValue(response.String())
+	return value
+}
+
+func (b *jsBridge) getBlockByHeight(call otto.FunctionCall) otto.Value {
+	hObj := call.Argument(0)
+	if !hObj.IsNumber() {
+		return jsError(call.Otto, errors.New("not height number"))
+	}
+	h, _ := hObj.ToInteger()
+	response, err := b.svcApi.GetBlockByHeight(context.Background(),
+		&rpcpb.GetBlockByHeightRequest{Height: uint64(h)})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	value, _ := otto.ToValue(response.String())
+	return value
 }
 
 // request handle http request

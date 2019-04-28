@@ -91,57 +91,26 @@ func (c *Console) methodSwizzling() error {
 
 	// replace js xmlhttprequest to go implement
 	c.jsre.Set("bridge", struct{}{})
+	if err := c.setupBridge(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Console) setupBridge() error {
 	bridgeObj, _ := c.jsre.Get("bridge")
-	bridgeObj.Object().Set("request", c.bridge.request)
-	bridgeObj.Object().Set("asyncRequest", c.bridge.request)
 	bridgeObj.Object().Set("nodeInfo", c.bridge.nodeInfo)
 
-	/*
-	if _, err := c.jsre.Run("var Neb = require('neb');"); err != nil {
-		return fmt.Errorf("neb require: %v", err)
-	}
-	if _, err := c.jsre.Run("var neb = new Neb(bridge);"); err != nil {
-		return fmt.Errorf("neb create: %v", err)
-	}
-	jsAlias := "var api = neb.api; var admin = neb.admin; "
-	if _, err := c.jsre.Run(jsAlias); err != nil {
-		return fmt.Errorf("namespace: %v", err)
+	bridgeObj.Object().Set("request", c.bridge.request)
+	bridgeObj.Object().Set("asyncRequest", c.bridge.request)
+	// temporary bridge api, should switch to js binding later
+	if true {
+		bridgeObj.Object().Set("getBlockByHash", c.bridge.getBlockByHash)
+		bridgeObj.Object().Set("getBlockByHeight", c.bridge.getBlockByHeight)
+
 	}
 
-	if c.prompter != nil {
-		admin, err := c.jsre.Get("admin")
-		if err != nil {
-			return err
-		}
-		if obj := admin.Object(); obj != nil {
-			bridgeRequest := `bridge._sendRequest = function (method, api, params, callback) {
-				var action = "/admin" + api;
-				return this.request(method, action, params);
-			};`
-			if _, err = c.jsre.Run(bridgeRequest); err != nil {
-				return fmt.Errorf("bridge._sendRequest: %v", err)
-			}
-
-			if _, err = c.jsre.Run(`bridge.newAccount = admin.newAccount;`); err != nil {
-				return fmt.Errorf("admin.newAccount: %v", err)
-			}
-			if _, err = c.jsre.Run(`bridge.unlockAccount = admin.unlockAccount;`); err != nil {
-				return fmt.Errorf("admin.unlockAccount: %v", err)
-			}
-			if _, err = c.jsre.Run(`bridge.sendTransactionWithPassphrase = admin.sendTransactionWithPassphrase;`); err != nil {
-				return fmt.Errorf("admin.sendTransactionWithPassphrase: %v", err)
-			}
-			if _, err = c.jsre.Run(`bridge.signTransactionWithPassphrase = admin.signTransactionWithPassphrase;`); err != nil {
-				return fmt.Errorf("admin.signTransactionWithPassphrase: %v", err)
-			}
-			obj.Set("setHost", c.bridge.setHost)
-			obj.Set("newAccount", c.bridge.newAccount)
-			obj.Set("unlockAccount", c.bridge.unlockAccount)
-			obj.Set("sendTransactionWithPassphrase", c.bridge.sendTransactionWithPassphrase)
-			obj.Set("signTransactionWithPassphrase", c.bridge.signTransactionWithPassphrase)
-		}
-	}
-	*/
 	return nil
 }
 
