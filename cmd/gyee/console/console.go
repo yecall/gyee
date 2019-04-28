@@ -61,7 +61,7 @@ func NewConsole(conn *grpc.ClientConn) *Console {
 	}
 
 	c.bridge = newBridge(conn, c.prompter, c.writer)
-	c.jsre = newJSRE()
+	c.jsre = newJSRE(c.writer)
 
 	if err := c.loadLibraryScripts(); err != nil {
 		fmt.Fprintln(c.writer, err)
