@@ -119,6 +119,9 @@ type ConInst struct {
 	txDtm         *DiffTimerManager         // difference timer manager for response waiting
 	txTmCycle     int                       // wait peer response timer cycle in ticks
 	bakReq2Conn   map[string]interface{}    // connection request backup map, k: task name, v: message
+
+	doneCnt			int
+	doneWhy			[]int
 }
 
 //
@@ -325,7 +328,7 @@ func (conInst *ConInst) poweroff(ptn interface{}) sch.SchErrno {
 	ciLog.ForceDebug("poweroff: sdl: %s, inst: %s, dir: %d, task will be done ...",
 		conInst.sdlName, conInst.name, conInst.dir)
 	conInst.cleanUp(DhtEnoScheduler.GetEno())
-	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
+	return conInst.sdl.SchTaskDone(conInst.ptnMe, conInst.name, sch.SchEnoKilled)
 }
 
 //
@@ -507,6 +510,18 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 // Instance-close-request handler
 //
 func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
+
+	conInst.doneCnt++
+	if len(conInst.doneWhy) == 0 {
+		conInst.doneWhy = make([]int, 0)
+	}
+	conInst.doneWhy = append(conInst.doneWhy, msg.Why)
+	if conInst.doneCnt > 1 {
+		p2plog.Debug("closeReq: sdl: %s, inst: %s, doneCnt: %d, doneWhy: %d",
+			conInst.sdlName, conInst.name, conInst.doneCnt, conInst.doneWhy)
+	}
+
+
 	if status := conInst.getStatus(); status >= CisClosed {
 		ciLog.ForceDebug("closeReq: sdl: %s, inst: %s, dir: %d, why: %d, status mismatched: %d",
 			conInst.sdlName, conInst.name, conInst.dir, msg.Why, status)
@@ -536,7 +551,7 @@ func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	}
 	conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstCloseRsp, &rsp)
 	conInst.sdl.SchSendMessage(&schMsg)
-	return conInst.sdl.SchTaskDone(conInst.ptnMe, sch.SchEnoKilled)
+	return conInst.sdl.SchTaskDone(conInst.ptnMe, conInst.name, sch.SchEnoKilled)
 }
 
 //
