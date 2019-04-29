@@ -99,15 +99,22 @@ func (c *Console) methodSwizzling() error {
 }
 
 func (c *Console) setupBridge() error {
-	bridgeObj, _ := c.jsre.Get("bridge")
-	bridgeObj.Object().Set("nodeInfo", c.bridge.nodeInfo)
+	bridgeObj, err := c.jsre.Get("bridge")
+	if err != nil {
+		return err
+	}
+	obj := bridgeObj.Object()
+	_ = obj.Set("nodeInfo", c.bridge.nodeInfo)
 
-	bridgeObj.Object().Set("request", c.bridge.request)
-	bridgeObj.Object().Set("asyncRequest", c.bridge.request)
+	_ = obj.Set("request", c.bridge.request)
+	_ = obj.Set("asyncRequest", c.bridge.request)
 	// temporary bridge api, should switch to js binding later
 	if true {
-		bridgeObj.Object().Set("getBlockByHash", c.bridge.getBlockByHash)
-		bridgeObj.Object().Set("getBlockByHeight", c.bridge.getBlockByHeight)
+		_ = obj.Set("getBlockByHash", c.bridge.getBlockByHash)
+		_ = obj.Set("getBlockByHeight", c.bridge.getBlockByHeight)
+		_ = obj.Set("getLastBlock", c.bridge.getLastBlock)
+		_ = obj.Set("getTxByHash", c.bridge.getTxByHash)
+		_ = obj.Set("getAccountState", c.bridge.getAccountState)
 
 	}
 

@@ -50,6 +50,8 @@ type jsBridge struct {
 	svcAdmin rpcpb.AdminServiceClient
 	svcApi   rpcpb.ApiServiceClient
 
+	ctx context.Context
+
 	// terminal input prompter
 	prompter UserPrompter
 
@@ -62,16 +64,11 @@ func newBridge(conn *grpc.ClientConn, prompter UserPrompter, writer io.Writer) *
 		conn:     conn,
 		svcAdmin: rpcpb.NewAdminServiceClient(conn),
 		svcApi:   rpcpb.NewApiServiceClient(conn),
+		ctx:      context.Background(),
 		prompter: prompter,
-		writer:   writer}
-	//if config.GetRpc() != nil {
-	//	bridge.host = config.GetRpc().HttpListen[0]
-	//	if !strings.HasPrefix(bridge.host, "http") {
-	//		bridge.host = "http://" + bridge.host
-	//	}
-	//} else {
+		writer:   writer,
+	}
 	bridge.host = "http://localhost:8685"
-	//}
 	return bridge
 }
 
@@ -96,7 +93,7 @@ func (b *jsBridge) setHost(call otto.FunctionCall) otto.Value {
 }
 
 func (b *jsBridge) nodeInfo(call otto.FunctionCall) otto.Value {
-	response, err := b.svcApi.NodeInfo(context.Background(),
+	response, err := b.svcApi.NodeInfo(b.ctx,
 		&rpcpb.NonParamsRequest{})
 	if err != nil {
 		log.Error("nodeInfo()", "err", err)
@@ -111,7 +108,7 @@ func (b *jsBridge) getBlockByHash(call otto.FunctionCall) otto.Value {
 	if !hash.IsString() {
 		return jsError(call.Otto, errors.New("not hash hex str"))
 	}
-	response, err := b.svcApi.GetBlockByHash(context.Background(),
+	response, err := b.svcApi.GetBlockByHash(b.ctx,
 		&rpcpb.GetBlockByHashRequest{Hash: hash.String()})
 	if err != nil {
 		return jsError(call.Otto, err)
@@ -126,8 +123,46 @@ func (b *jsBridge) getBlockByHeight(call otto.FunctionCall) otto.Value {
 		return jsError(call.Otto, errors.New("not height number"))
 	}
 	h, _ := hObj.ToInteger()
-	response, err := b.svcApi.GetBlockByHeight(context.Background(),
+	response, err := b.svcApi.GetBlockByHeight(b.ctx,
 		&rpcpb.GetBlockByHeightRequest{Height: uint64(h)})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	value, _ := otto.ToValue(response.String())
+	return value
+}
+
+func (b *jsBridge) getLastBlock(call otto.FunctionCall) otto.Value {
+	response, err := b.svcApi.GetLastBlock(b.ctx,
+		&rpcpb.GetLastBlockRequest{})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	value, _ := otto.ToValue(response.String())
+	return value
+}
+
+func (b *jsBridge) getTxByHash(call otto.FunctionCall) otto.Value {
+	hash := call.Argument(0)
+	if !hash.IsString() {
+		return jsError(call.Otto, errors.New("not hash hex str"))
+	}
+	response, err := b.svcApi.GetTxByHash(b.ctx,
+		&rpcpb.GetTxByHashRequest{Hash: hash.String()})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	value, _ := otto.ToValue(response.String())
+	return value
+}
+
+func (b *jsBridge) getAccountState(call otto.FunctionCall) otto.Value {
+	addr := call.Argument(0)
+	if !addr.IsString() {
+		return jsError(call.Otto, errors.New("not addr str"))
+	}
+	response, err := b.svcApi.GetAccountState(b.ctx,
+		&rpcpb.GetAccountStateRequest{Address: addr.String()})
 	if err != nil {
 		return jsError(call.Otto, err)
 	}
