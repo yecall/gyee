@@ -25,7 +25,9 @@ import (
 	"errors"
 
 	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/core"
+	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/rpc/pb"
 )
 
@@ -49,6 +51,26 @@ func (s *APIService) GetBlockByHeight(ctx context.Context, req *rpcpb.GetBlockBy
 	return blockResponse(b)
 }
 
+func (s *APIService) GetLastBlock(ctx context.Context, req *rpcpb.GetLastBlockRequest) (*rpcpb.GetLastBlockResponse, error) {
+	b := s.server.Core().Chain().LastBlock()
+	return lastBlockResponse(b)
+}
+
+func (s *APIService) GetTxByHash(ctx context.Context, req *rpcpb.GetTxByHashRequest) (*rpcpb.TransactionResponse, error) {
+	txHash := common.HexToHash(req.Hash)
+	tx := s.server.Core().Chain().GetTxByHash(txHash)
+	return txResponse(tx)
+}
+
+func (s *APIService) GetAccountState(ctx context.Context, req *rpcpb.GetAccountStateRequest) (*rpcpb.GetAccountStateResponse, error) {
+	addr, err := address.AddressParse(req.Address)
+	if err != nil {
+		return nil, err
+	}
+	account := s.server.Core().Chain().LastBlock().GetAccount(*addr.CommonAddress())
+	return accountStateResponse(account)
+}
+
 func blockResponse(b *core.Block) (*rpcpb.BlockResponse, error) {
 	if b == nil {
 		return nil, errors.New("block not found")
@@ -64,5 +86,40 @@ func blockResponse(b *core.Block) (*rpcpb.BlockResponse, error) {
 		StateRoot:     b.StateRoot().Hex(),
 		TxsRoot:       b.TxsRoot().Hex(),
 		ReceiptsRoot:  b.ReceiptsRoot().Hex(),
+	}, nil
+}
+
+func lastBlockResponse(b *core.Block) (*rpcpb.GetLastBlockResponse, error) {
+	br, err := blockResponse(b)
+	if err != nil {
+		return nil, err
+	}
+	return &rpcpb.GetLastBlockResponse{
+		Hash:  b.Hash().Hex(),
+		Block: br,
+	}, nil
+}
+
+func txResponse(tx *core.Transaction) (*rpcpb.TransactionResponse, error) {
+	if tx == nil {
+		return nil, errors.New("tx not found")
+	}
+	return &rpcpb.TransactionResponse{
+		Hash:      tx.Hash().Hex(),
+		Nonce:     tx.Nonce(),
+		From:      tx.From().Hex(),
+		Recipient: tx.Recipient().Hex(),
+		Amount:    tx.Amount().String(),
+	}, nil
+}
+
+func accountStateResponse(account state.Account) (*rpcpb.GetAccountStateResponse, error) {
+	if account == nil {
+		return nil, errors.New("account not found")
+	}
+	return &rpcpb.GetAccountStateResponse{
+		Address: account.Address().String(),
+		Nonce:   account.Nonce(),
+		Balance: account.Balance().String(),
 	}, nil
 }

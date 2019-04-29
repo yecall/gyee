@@ -160,6 +160,17 @@ func hasTransaction(getter persistent.Getter, hash common.Hash) bool {
 	return has
 }
 
+func getTransaction(getter persistent.Getter, hash common.Hash) *corepb.Transaction {
+	msg := new(corepb.Transaction)
+	if err := getProtoMsg(getter, keyTx(hash), msg); err != nil {
+		if err != persistent.ErrKeyNotFound {
+			log.Error("getTransaction()", "hash", hash, "err", err)
+		}
+		return nil
+	}
+	return msg
+}
+
 func putTransaction(putter persistent.Putter, hash common.Hash, tx *corepb.Transaction) {
 	putProtoMsg(putter, keyTx(hash), tx)
 }

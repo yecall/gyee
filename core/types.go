@@ -41,4 +41,5 @@ type ChainReader interface {
 	GetBlockByNumber(number uint64) *Block
 	GetBlockByHash(hash common.Hash) *Block
 	GetBlockNum2Hash(number uint64) *common.Hash
+	GetTxByHash(hash common.Hash) *Transaction
 }

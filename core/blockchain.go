@@ -322,6 +322,18 @@ func (bc *BlockChain) GetBlockNum2Hash(number uint64) *common.Hash {
 	return &hash
 }
 
+func (bc *BlockChain) GetTxByHash(hash common.Hash) *Transaction {
+	pbtx := getTransaction(bc.storage, hash)
+	if pbtx == nil {
+		return nil
+	}
+	tx := new(Transaction)
+	if err := tx.FromProto(pbtx); err != nil {
+		return nil
+	}
+	return tx
+}
+
 // Build Next block from parent block, with transactions
 func (bc *BlockChain) BuildNextBlock(parent *Block, t uint64, txs Transactions) (*Block, error) {
 	var err error
