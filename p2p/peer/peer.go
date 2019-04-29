@@ -3395,32 +3395,37 @@ func (peMgr *PeerManager) RegisterInstIndCallback(cb interface{}, userData inter
 }
 
 func (pi *PeerInstance) stopRxTx() {
-	if pi.rxtxRuning {
+	cleanIo := func() {
+		if pi.ior != nil {
+			pi.ior.Close()
+		}
+		if pi.iow != nil {
+			pi.iow.Close()
+		}
+		pi.conn.Close()
+		pi.conn = nil
+	}
+	cleanCh := func() {
 		pi.rxtxRuning = false
 		if pi.conn != nil {
-			pi.ior.Close()
-			pi.iow.Close()
-			pi.conn.Close()
-			pi.conn = nil
+			cleanIo()
 		}
-
 		if pi.txChan != nil {
 			close(pi.txChan)
 		}
-
 		if pi.rxDone != nil {
 			pi.rxDone <- PeMgrEnoNone
 			<-pi.rxDone
 		}
-
 		if pi.rxChan != nil {
 			close(pi.rxChan)
 		}
+	}
+
+	if pi.rxtxRuning {
+		cleanCh()
 	} else if pi.conn != nil {
-		pi.ior.Close()
-		pi.iow.Close()
-		pi.conn.Close()
-		pi.conn = nil
+		cleanIo()
 	}
 	pi.state = peInstStateKilled
 }
