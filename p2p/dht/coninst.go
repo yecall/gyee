@@ -120,8 +120,9 @@ type ConInst struct {
 	txTmCycle     int                       // wait peer response timer cycle in ticks
 	bakReq2Conn   map[string]interface{}    // connection request backup map, k: task name, v: message
 
-	doneCnt			int
-	doneWhy			[]int
+	// for debug only
+	doneCnt			int						// counted for requesting to be done
+	doneWhy			[]int					// buffer for why done
 }
 
 //
@@ -424,19 +425,14 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 
 	go func() {
 		if conInst.dir == ConInstDirOutbound {
-			if eno := conInst.outboundHandshake(); eno != DhtEnoNone {
-				hsCh<-eno
-			}
+			hsCh<-conInst.outboundHandshake()
 		} else if conInst.dir == ConInstDirInbound {
-			if eno := conInst.inboundHandshake(); eno != DhtEnoNone {
-				hsCh<-eno
-			}
+			hsCh<-conInst.inboundHandshake()
 		} else {
 			ciLog.ForceDebug("handshakeReq: sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 			panic("handshakeReq: invalid direction")
 		}
-		hsCh<-DhtEnoNone
 	}()
 
 	select {
@@ -511,16 +507,17 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 //
 func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 
-	conInst.doneCnt++
-	if len(conInst.doneWhy) == 0 {
-		conInst.doneWhy = make([]int, 0)
+	if ciLog.debugForce__ {
+		conInst.doneCnt++
+		if len(conInst.doneWhy) == 0 {
+			conInst.doneWhy = make([]int, 0)
+		}
+		conInst.doneWhy = append(conInst.doneWhy, msg.Why)
+		if conInst.doneCnt > 1 {
+			ciLog.ForceDebug("closeReq: sdl: %s, inst: %s, doneCnt: %d, doneWhy: %d",
+				conInst.sdlName, conInst.name, conInst.doneCnt, conInst.doneWhy)
+		}
 	}
-	conInst.doneWhy = append(conInst.doneWhy, msg.Why)
-	if conInst.doneCnt > 1 {
-		p2plog.Debug("closeReq: sdl: %s, inst: %s, doneCnt: %d, doneWhy: %d",
-			conInst.sdlName, conInst.name, conInst.doneCnt, conInst.doneWhy)
-	}
-
 
 	if status := conInst.getStatus(); status >= CisClosed {
 		ciLog.ForceDebug("closeReq: sdl: %s, inst: %s, dir: %d, why: %d, status mismatched: %d",
@@ -1171,6 +1168,17 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), hs.Dir)
 		return DhtEnoProtocol
 	}
+
+	//
+	// notice: when try outbound, the peer(conInst.hsInfo.peer) is alway known
+	// before the handshaking, but here after the handshaking ok, we update the
+	// peer according what we obtained in the procedure as following, and this
+	// can be different from that we had believed it would be. the connection
+	// manager must handle this case(or we can check against this here, and if
+	// it's the case, we return failed, so the connection manager would drop
+	// this connection later). see function handshakeRsp in connection.go for
+	// detail please.
+	//
 
 	conInst.hsInfo.peer = config.Node{
 		IP:  hs.IP,

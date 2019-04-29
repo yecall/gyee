@@ -490,6 +490,11 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 				return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 			}
 
+			//
+			// the instance reported can be in closing(conMgr.instInClosing), this
+			// case we do nothing since EvDhtConInstCloseReq had been sent to it.
+			//
+
 			connLog.ForceDebug("handshakeRsp: too late, sdl: %s, inst: %s, dir: %d",
 				conMgr.sdlName, ci.name, ci.dir)
 
@@ -515,6 +520,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	}
 
 	if _, dup := conMgr.instInClosing[cid]; dup {
+
+		//
 		// if the instance is an outbound one, then it must have been requested
 		// to be closed and EvDhtConInstCloseReq must have been sent to it, while
 		// the handshake response of this instance comes here just now. in this
@@ -523,6 +530,8 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		// than that in closing. this can caused by that the peer connects us for
 		// some reasons while an old instance outgoing from the same peer is in
 		// closing in our side. we done the new one in this case;
+		//
+
 		if ci.dir == ConInstDirInbound {
 			connLog.ForceDebug("handshakeRsp: done inbound duplicated to closing, sdl: %s, inst: %s, dir: %d",
 				conMgr.sdlName, ci.name, ci.dir)
@@ -531,23 +540,36 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 
 		connLog.ForceDebug("handshakeRsp: ignored for outbound duplicated to closing, sdl: %s, inst: %s, dir: %d",
 			conMgr.sdlName, ci.name, ci.dir)
+
 		return sch.SchEnoNone
 	}
 
 	if msg.Dir == ConInstDirInbound {
+
+		//
 		// peer connects us for some reasons while an inbound instance for
 		// the peer exist in our side, done the new one reported.
+		//
+
 		if duped, dup := conMgr.ciTab[cid]; dup {
 			connLog.ForceDebug("handshakeRsp: duplicated, sdl: %s, inst: %s, dir: %d, duped: %s, dupdir: %d",
 				conMgr.sdlName, ci.name, msg.Dir, duped.name, duped.dir)
 			return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 		}
+
 		conMgr.ciTab[cid] = ci
+
 	} else if duped, dup := conMgr.ciTab[cid]; !dup || duped != ci {
+
+		//
 		// it's possible, the peer had changed node identity but kept the
-		// same ip address and port, we done it
+		// same ip address and port, we done it. see function outboundHandshake
+		// in file coninst.go for more please.
+		//
+
 		connLog.ForceDebug("handshakeRsp: not found, sdl: %s, inst: %s, dir: %d",
 			conMgr.sdlName, ci.name, msg.Dir)
+
 		return conMgr.sdl.SchTaskDone(ci.ptnMe, ci.name, sch.SchEnoKilled)
 	}
 
