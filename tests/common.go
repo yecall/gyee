@@ -94,7 +94,7 @@ Exit:
 						MsgType: p2p.MessageTypeTx,
 						Data:    data,
 					}
-					//_ = fn.P2pService().DhtSetValue(hash[:], data)
+					_ = fn.P2pService().DhtSetValue(hash[:], data)
 					_ = fn.P2pService().BroadcastMessage(*msg)
 					fn.Core().FakeP2pRecv(msg)
 					tn.Core().FakeP2pRecv(msg)
@@ -271,15 +271,13 @@ func dftConfig(nodeDir string, portShift uint16) *config.Config {
 			Validator: true,
 			BootstrapNodes: []string{
 				"E1E6B370C9BDA28A7420DD9BC577ACFDBB335EF7AA38CA43998C921AFBC13834AF1F809C43C524D13A6E7454AA97BADA72EE36A2389A1177630207F04C9B3F8B@13.230.176.195:30304:30304",
-				//"3744B7FEDB7D51441168EB8497AA6CBE19C137D795858FBDD1F0B07DC9860BBEEA2FC6638609D96CE696FEDA8A685AE6DCC7418C043A3110CAF32BCFAE4990DD@172.16.1.97:30304:30304",
 			},
 			DhtBootstrapNodes: []string{
 				"E1E6B370C9BDA28A7420DD9BC577ACFDBB335EF7AA38CA43998C921AFBC13834AF1F809C43C524D13A6E7454AA97BADA72EE36A2389A1177630207F04C9B3F8B@13.230.176.195:40405:40405",
-				//"3744B7FEDB7D51441168EB8497AA6CBE19C137D795858FBDD1F0B07DC9860BBEEA2FC6638609D96CE696FEDA8A685AE6DCC7418C043A3110CAF32BCFAE4990DD@172.16.1.97:40405:40405",
 			},
 			NodeDataDir:  filepath.Join(nodeDir, "p2p"),
-			LocalNodeIp:  "172.16.1.97",
-			LocalDhtIp:   "172.16.1.97",
+			LocalNodeIp:  "0.0.0.0",
+			LocalDhtIp:   "0.0.0.0",
 			LocalTcpPort: p2pCfg.DftTcpPort + portShift + 32,
 			LocalUdpPort: p2pCfg.DftUdpPort + portShift + 32,
 			LocalDhtPort: p2pCfg.DftDhtPort + portShift + 32,

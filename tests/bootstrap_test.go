@@ -40,7 +40,7 @@ func TestLocalBootstrapWithTx(t *testing.T) {
 
 func TestLocalBootstrapFullSync(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 300*time.Second, 90*time.Second, genInMemNode,
+	doTest(t, numNodes, 300*time.Second, 120*time.Second, genInMemNode,
 		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
 			genTestTxs(t, quitCh, wg, nodes, numNodes)
 		})
