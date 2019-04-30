@@ -23,6 +23,7 @@ package core
 import (
 	"errors"
 
+	"github.com/yeeco/gyee/accounts"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/p2p"
 )
@@ -33,6 +34,7 @@ var (
 
 type INode interface {
 	NodeID() string
+	AccountManager() *accounts.AccountManager
 	Core() *Core
 	P2pService() p2p.Service
 }

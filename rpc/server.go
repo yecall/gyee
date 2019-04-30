@@ -52,10 +52,8 @@ func NewServer(conf *config.Config, node core.INode) *Server {
 		core:      node.Core(),
 		rpcServer: rpc,
 	}
-	admin := &AdminService{server: srv}
-	api := &APIService{server: srv}
-	rpcpb.RegisterAdminServiceServer(rpc, admin)
-	rpcpb.RegisterApiServiceServer(rpc, api)
+	rpcpb.RegisterAdminServiceServer(rpc, newAdminService(srv))
+	rpcpb.RegisterApiServiceServer(rpc, newAPIService(srv))
 
 	return srv
 }

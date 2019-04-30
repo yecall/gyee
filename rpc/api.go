@@ -33,6 +33,14 @@ import (
 
 type APIService struct {
 	server RPCServer
+	chain  *core.BlockChain
+}
+
+func newAPIService(server RPCServer) *APIService {
+	return &APIService{
+		server: server,
+		chain:  server.Core().Chain(),
+	}
 }
 
 func (s *APIService) NodeInfo(ctx context.Context, req *rpcpb.NonParamsRequest) (*rpcpb.NodeInfoResponse, error) {

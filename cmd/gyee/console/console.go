@@ -108,6 +108,12 @@ func (c *Console) setupBridge() error {
 
 	_ = obj.Set("request", c.bridge.request)
 	_ = obj.Set("asyncRequest", c.bridge.request)
+
+	_ = obj.Set("Accounts", c.bridge.getAccounts)
+	_ = obj.Set("newAccount", c.bridge.newAccount)
+	_ = obj.Set("unlockAccount", c.bridge.unlockAccount)
+	_ = obj.Set("lockAccount", c.bridge.lockAccount)
+
 	// temporary bridge api, should switch to js binding later
 	if true {
 		_ = obj.Set("getBlockByHash", c.bridge.getBlockByHash)

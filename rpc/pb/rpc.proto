@@ -25,11 +25,6 @@ syntax = "proto3";
 package rpcpb;
 
 
-service AdminService {
-    rpc NewAccount (NewAccountRequest) returns (NewAccountResponse) {
-    }
-}
-
 service ApiService {
     rpc NodeInfo (NonParamsRequest) returns (NodeInfoResponse) {
     }
@@ -147,6 +142,24 @@ message NodeInfoResponse {
     uint32 version = 2;
 }
 
+// Admin Service
+service AdminService {
+    rpc Accounts (NonParamsRequest) returns (AccountsResponse) {
+    }
+
+    rpc NewAccount (NewAccountRequest) returns (NewAccountResponse) {
+    }
+
+    rpc UnlockAccount (UnlockAccountRequest) returns (UnlockAccountResponse) {
+    }
+    rpc LockAccount (LockAccountRequest) returns (LockAccountResponse) {
+    }
+}
+
+message AccountsResponse {
+    // account address list
+    repeated string addresses = 1;
+}
 
 message NewAccountRequest {
     string passphrase = 1;
@@ -156,3 +169,20 @@ message NewAccountResponse {
     string address = 1;
 }
 
+message UnlockAccountRequest {
+    string address = 1;
+    string passphrase = 2;
+    uint64 duration = 3;
+}
+
+message UnlockAccountResponse {
+    bool result = 1;
+}
+
+message LockAccountRequest {
+    string address = 1;
+}
+
+message LockAccountResponse {
+    bool result = 1;
+}

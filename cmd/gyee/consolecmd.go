@@ -80,8 +80,5 @@ func consoleAttach(ctx *cli.Context) error {
 
 	c.Interactive()
 
-	// TODO:
 	return nil
 }
-
-//TODO:console如何与node连接上，ipc
