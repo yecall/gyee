@@ -143,7 +143,8 @@ const (
 // Max mail box size: notice that it's the real depth of queue implemented as a channel,
 // when MbSize is set to (-1) for a task. In extreme case when system load is very heavy,
 // the queue might be full so tasks can be blocked in sending messages.
-const SchMaxMbSize = 1024 * (1)
+const SchDftMbSize = 1024 * (1)
+const SchMaxMbSize = 1024 * (8)
 
 type SchTaskDescription struct {
 	Name   string                     // user task name

@@ -40,6 +40,7 @@ type schUserTaskProc = SchUserTaskInterface
 //
 // max mail box size
 //
+const schDftMbSize = SchDftMbSize
 const schMaxMbSize = SchMaxMbSize
 
 //

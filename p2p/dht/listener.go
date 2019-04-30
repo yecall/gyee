@@ -127,7 +127,7 @@ func (lsnMgr *LsnMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) s
 func (lsnMgr *LsnMgr) lsnMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		lsnLog.Debug("lsnMgrProc: "+
+		lsnLog.Debug("lsnMgrProc: " +
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -316,7 +316,7 @@ func (lsnMgr *LsnMgr) driveSelf() sch.SchErrno {
 	// ForceAcceptOut.
 	//
 
-	lsnLog.Debug("driveSelf: "+
+	lsnLog.Debug("driveSelf: " +
 		"listener:[%s:%d], try accept again ...",
 		lsnMgr.config.ip.String(), lsnMgr.config.port)
 
@@ -371,7 +371,7 @@ func (lsnMgr *LsnMgr) driveSelf() sch.SchErrno {
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrAcceptInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 
-	lsnLog.Debug("driveSelf: connection accepted ok, "+
+	lsnLog.Debug("driveSelf: connection accepted ok, " +
 		"listener:[%s:%d], loccal address: %s, remote address: %s",
 		lsnMgr.config.ip.String(), lsnMgr.config.port,
 		con.LocalAddr().String(),
@@ -393,14 +393,14 @@ func (lsnMgr *LsnMgr) setupListener() DhtErrno {
 	lsnAddr := fmt.Sprintf("%s:%d", ip, port)
 
 	if lsnMgr.listener, err = net.Listen(network, lsnAddr); err != nil {
-		lsnLog.Debug("setupListener: "+
+		lsnLog.Debug("setupListener: " +
 			"listen failed, addr: %s, err: %s",
 			lsnAddr, err.Error())
 		return DhtEnoOs
 	}
 
 	lsnMgr.listenAddr = lsnMgr.listener.Addr().(*net.TCPAddr)
-	lsnLog.Debug("setupListener: "+
+	lsnLog.Debug("setupListener: " +
 		"task inited ok, listening address: %s",
 		lsnMgr.listenAddr.String())
 	return DhtEnoNone

@@ -721,12 +721,12 @@ func (tabMgr *TableManager) tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp) TabMgrErr
 	var result = msg.Result & 0xffff
 	if result == TabMgrEnoDuplicated {
 		if eno := mgr.tabDeleteActiveQueryInst(inst); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrFindNodeRsp: tabDeleteActiveQueryInst failed, "+
+			tabLog.Debug("tabMgrFindNodeRsp: tabDeleteActiveQueryInst failed, " +
 				"eno: %d, subnet: %x", eno, snid)
 			return eno
 		}
 		if eno := mgr.tabActiveQueryInst(); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrFindNodeRsp: tabActiveQueryInst failed, "+
+			tabLog.Debug("tabMgrFindNodeRsp: tabActiveQueryInst failed, " +
 				"eno: %d, subnet: %x", eno, snid)
 			return eno
 		}
@@ -736,7 +736,7 @@ func (tabMgr *TableManager) tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp) TabMgrErr
 	// update database for the neighbor node.
 	// DON'T care the result
 	if eno := mgr.tabUpdateNodeDb4Query(inst, result); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrFindNodeRsp: tabUpdateNodeDb4Query failed, "+
+		tabLog.Debug("tabMgrFindNodeRsp: tabUpdateNodeDb4Query failed, " +
 			"eno: %d, subnet: %x", eno, snid)
 	}
 
@@ -1416,7 +1416,7 @@ func (tabMgr *TableManager) tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrEr
 	target[config.NodeIDBytes-1] = snid[1]
 	if nodes = mgr.tabClosest(Closest4Querying, target, -1, TabInstQPendingMax); len(nodes) == 0 {
 
-		tabLog.Debug("tabRefresh: snid: %x, seems all buckets are empty, "+
+		tabLog.Debug("tabRefresh: snid: %x, seems all buckets are empty, " +
 			"set local as target and try seeds from database and bootstrap nodes ...",
 			*snid)
 

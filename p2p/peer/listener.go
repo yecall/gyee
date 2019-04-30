@@ -285,8 +285,8 @@ acceptLoop:
 		}
 
 		if err != nil && !err.(net.Error).Temporary() {
-			lsnLog.Debug("PeerAcceptProc: break loop for non-temporary error while "+
-				"accepting, err: %s", err.Error())
+			lsnLog.Debug("PeerAcceptProc: break loop for non-temporary error while accepting, " +
+				"err: %s", err.Error())
 			break acceptLoop
 		}
 

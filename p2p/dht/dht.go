@@ -676,7 +676,7 @@ func (dhtMgr *DhtMgr) InstallEventCallback(cbf DhtCallback) DhtErrno {
 	defer dhtMgr.cbLock.Unlock()
 
 	if dhtMgr.cbf != nil {
-		dhtLog.Debug("DhtInstallCallback: "+
+		dhtLog.Debug("DhtInstallCallback: " +
 			"callback is not nil: %p, it will be overlapped",
 			dhtMgr.cbf)
 	}

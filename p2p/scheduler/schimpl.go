@@ -165,7 +165,7 @@ func (sdl *scheduler) schCommonTask(ptn *schTaskNode) SchErrno {
 
 	if ptn.task.utep == nil || ptn.task.mailbox.que == nil || ptn.task.done == nil {
 
-		schLog.Debug("schCommonTask: "+
+		schLog.Debug("schCommonTask: " +
 			"invalid user task: %s",
 			ptn.task.name)
 
@@ -351,7 +351,7 @@ taskDone:
 
 	if eno := sdl.schTaskDemap(ptn.task.name, ptn); eno != SchEnoNone {
 
-		panic(fmt.Sprintf("schCommonTasks: "+
+		panic(fmt.Sprintf("schCommonTasks: " +
 			"schTaskDemap failed, eno: %d, task: %s",
 			eno, ptn.task.name))
 
@@ -367,7 +367,7 @@ taskDone:
 
 	if eno := sdl.schTaskBusyDeque(ptn); eno != SchEnoNone {
 
-		panic(fmt.Sprintf("schCommonTasks: "+
+		panic(fmt.Sprintf("schCommonTasks: " +
 			"schTaskBusyDeque failed, eno: %d, task: %s",
 			eno, ptn.task.name))
 	}
@@ -381,7 +381,7 @@ taskDone:
 
 	if eno := sdl.schStopTaskEx(ptn); eno != SchEnoNone {
 
-		panic(fmt.Sprintf("schCommonTasks: "+
+		panic(fmt.Sprintf("schCommonTasks: " +
 			"schStopTaskEx failed, eno: %d, task: %s",
 			eno, ptn.task.name))
 	}
@@ -395,7 +395,7 @@ taskDone:
 
 	if eno := sdl.schRetTaskNode(ptn); eno != SchEnoNone {
 
-		panic(fmt.Sprintf("schCommonTask: "+
+		panic(fmt.Sprintf("schCommonTask: " +
 			"schRetTaskNode failed, eno: %d, task: %s",
 			eno, ptn.task.name))
 	}
@@ -517,7 +517,7 @@ func (sdl *scheduler) schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
 				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone && eno != SchEnoPowerOff {
 
-					schLog.Debug("schTimerCommonTask: "+
+					schLog.Debug("schTimerCommonTask: " +
 						"send timer event failed, eno: %d, task: %s",
 						eno,
 						ptm.tmcb.taskNode.task.name)
@@ -539,7 +539,7 @@ func (sdl *scheduler) schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 		dur := ptm.tmcb.dur
 		if dur <= time.Duration(0) {
 
-			schLog.Debug("schTimerCommonTask: "+
+			schLog.Debug("schTimerCommonTask: " +
 				"invalid absolute timer duration:%d",
 				ptm.tmcb.dur)
 
@@ -587,7 +587,7 @@ func (sdl *scheduler) schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 
 				if eno := sdl.schSendTimerEvent(ptm); eno != SchEnoNone {
 
-					schLog.Debug("schTimerCommonTask: "+
+					schLog.Debug("schTimerCommonTask: " +
 						"send timer event failed, eno: %d, task: %s",
 						eno,
 						ptm.tmcb.taskNode.task.name)
@@ -620,7 +620,7 @@ func (sdl *scheduler) schTimerCommonTask(ptm *schTmcbNode) SchErrno {
 		// unknown
 		//
 
-		schLog.Debug("schTimerCommonTask: "+
+		schLog.Debug("schTimerCommonTask: " +
 			"invalid timer type: %d",
 			ptm.tmcb.tmt)
 
@@ -676,7 +676,7 @@ func (sdl *scheduler) schGetTimerNode() (SchErrno, *schTmcbNode) {
 
 		if sdl.tmFreeSize-1 != 0 {
 
-			schLog.Debug("schGetTimerNode: "+
+			schLog.Debug("schGetTimerNode: " +
 				"internal errors, should be 0, but free size: %d",
 				sdl.tmFreeSize)
 
@@ -690,7 +690,7 @@ func (sdl *scheduler) schGetTimerNode() (SchErrno, *schTmcbNode) {
 
 		if sdl.tmFreeSize-1 <= 0 {
 
-			schLog.Debug("schGetTimerNode: "+
+			schLog.Debug("schGetTimerNode: " +
 				"internal errors, should equal or less than 0, but free size: %d",
 				sdl.tmFreeSize)
 
@@ -1002,7 +1002,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 
 	if eno, ptn = sdl.schGetTaskNode(); eno != SchEnoNone || ptn == nil {
 
-		schLog.Debug("schCreateTask: "+
+		schLog.Debug("schCreateTask: " +
 			"schGetTaskNode failed, eno: %d",
 			eno)
 
@@ -1075,7 +1075,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 	} else if _, dup := sdl.tkMap[ptn.task.name]; dup == true {
 
 		_, file, line, _ := runtime.Caller(2)
-		schLog.Debug("schCreateTask: "+
+		schLog.Debug("schCreateTask: " +
 			"sdl: %s, duplicated task: %s, fbt2: %s, lbt2: %d",
 			sdl.p2pCfg.Name, ptn.task.name, file, line)
 
@@ -1107,7 +1107,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 
 	if eno := sdl.schTaskBusyEnque(ptn); eno != SchEnoNone {
 
-		schLog.Debug("schCreateTask: "+
+		schLog.Debug("schCreateTask: " +
 			"schTaskBusyEnque failed, rc: %d",
 			eno)
 
@@ -1134,7 +1134,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 
 	} else {
 
-		schLog.Debug("schCreateTask: "+
+		schLog.Debug("schCreateTask: " +
 			"suspended for invalid goStatus flag: %d",
 			taskDesc.Flag)
 
@@ -1165,7 +1165,7 @@ func (sdl *scheduler) schStartTask(name string) SchErrno {
 
 	if eno != SchEnoNone || ptn == nil {
 
-		schLog.Debug("schStartTask: "+
+		schLog.Debug("schStartTask: " +
 			"schGetTaskNodeByName failed, name: %s, eno: %d, ptn: %X",
 			name, eno, ptn)
 
@@ -1178,7 +1178,7 @@ func (sdl *scheduler) schStartTask(name string) SchErrno {
 
 	if ptn.task.goStatus != SchCreatedSuspend {
 
-		schLog.Debug("schStartTask: "+
+		schLog.Debug("schStartTask: " +
 			"invalid user task status: %d",
 			ptn.task.goStatus)
 
@@ -1216,7 +1216,7 @@ func (sdl *scheduler) schStartTaskEx(ptn *schTaskNode) SchErrno {
 
 	if ptn.task.goStatus != SchCreatedSuspend {
 
-		schLog.Debug("schStartTaskEx: "+
+		schLog.Debug("schStartTaskEx: " +
 			"invalid user task status: %d",
 			ptn.task.goStatus)
 
@@ -1245,7 +1245,7 @@ func (sdl *scheduler) schStopTaskByName(name string) SchErrno {
 
 	eno, ptn := sdl.schGetTaskNodeByName(name)
 	if eno != SchEnoNone || ptn == nil {
-		schLog.Debug("schStopTaskByName: "+
+		schLog.Debug("schStopTaskByName: " +
 			"schGetTaskNodeByName failed, name: %s, eno: %d, ptn: %X",
 			name, eno, ptn)
 		return eno
@@ -1272,7 +1272,7 @@ func (sdl *scheduler) schStopTask(ptn *schTaskNode, name string) SchErrno {
 
 	if ptn.task.scheduling == false {
 
-		schLog.ForceDebug("schStopTask: "+
+		schLog.ForceDebug("schStopTask: " +
 			"no in scheduling, sdl: %s, task: %s",
 			sdl.p2pCfg.CfgName, ptn.task.name)
 
@@ -1282,7 +1282,7 @@ func (sdl *scheduler) schStopTask(ptn *schTaskNode, name string) SchErrno {
 
 	if ptn.task.name != name {
 
-		schLog.ForceDebug("schStopTask: "+
+		schLog.ForceDebug("schStopTask: " +
 			"name mismatched, sdl: %s, name: %s, dst: %s",
 			sdl.p2pCfg.CfgName, name, ptn.task.name)
 
@@ -1296,7 +1296,7 @@ func (sdl *scheduler) schStopTask(ptn *schTaskNode, name string) SchErrno {
 
 	} else {
 
-		schLog.ForceDebug("schStopTask: "+
+		schLog.ForceDebug("schStopTask: " +
 			"duplicated, sdl: %s, task: %s",
 			sdl.p2pCfg.CfgName, ptn.task.name)
 
@@ -1342,7 +1342,7 @@ func (sdl *scheduler) schStopTaskEx(ptn *schTaskNode) SchErrno {
 			// ahead.
 			//
 
-			schLog.Debug("schStopTaskEx: "+
+			schLog.Debug("schStopTaskEx: " +
 				"dieCb failed, eno: %d, task: %s",
 				eno, ptn.task.name)
 		}
@@ -1356,7 +1356,7 @@ func (sdl *scheduler) schStopTaskEx(ptn *schTaskNode) SchErrno {
 		sdl.p2pCfg.CfgName, ptn.task.name)
 
 	if eno = sdl.schKillTaskTimers(&ptn.task); eno != SchEnoNone {
-		panic(fmt.Sprintf("schStopTaskEx: "+
+		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schKillTaskTimers faild, eno: %d， task: %s",
 			eno, ptn.task.name))
 	}
@@ -1369,7 +1369,7 @@ func (sdl *scheduler) schStopTaskEx(ptn *schTaskNode) SchErrno {
 		sdl.p2pCfg.CfgName, ptn.task.name)
 
 	if eno = sdl.schTcbClean(&ptn.task); eno != SchEnoNone {
-		panic(fmt.Sprintf("schStopTaskEx: "+
+		panic(fmt.Sprintf("schStopTaskEx: " +
 			"schTcbClean faild, eno: %d, task: %s",
 			eno, ptn.task.name))
 	}
@@ -1576,7 +1576,7 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		if target.goStatus != SchCreatedGo {
 
 			if schLog.debug__ {
-				schLog.ForceDebug("schSendMsg: target had been killed, "+
+				schLog.ForceDebug("schSendMsg: target had been killed, " +
 					"sdl: %s, mid: %d",
 					sdlName, msg.Id)
 			}
@@ -1733,7 +1733,7 @@ func (sdl *scheduler) schSetTimer(ptn *schTaskNode, tdc *timerDescription) (SchE
 
 	if eno, ptm = sdl.schGetTimerNode(); eno != SchEnoNone || ptm == nil {
 
-		schLog.Debug("schSetTimer: "+
+		schLog.Debug("schSetTimer: " +
 			"schGetTimerNode failed, eno: %d",
 			eno)
 
@@ -1935,7 +1935,7 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, name string, eno SchErrno) S
 
 	if ptn.task.scheduling == false {
 
-		schLog.ForceDebug("schTaskDone: "+
+		schLog.ForceDebug("schTaskDone: " +
 			"no in scheduling, sdl: %s, task: %s",
 			sdl.p2pCfg.CfgName, ptn.task.name)
 
@@ -1945,7 +1945,7 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, name string, eno SchErrno) S
 
 	if ptn.task.name != name {
 
-		schLog.ForceDebug("schTaskDone: "+
+		schLog.ForceDebug("schTaskDone: " +
 			"name mismatched, sdl: %s, name: %s, dst: %s",
 			sdl.p2pCfg.CfgName, name, ptn.task.name)
 
@@ -1959,7 +1959,7 @@ func (sdl *scheduler) schTaskDone(ptn *schTaskNode, name string, eno SchErrno) S
 
 	} else {
 
-		schLog.ForceDebug("schTaskDone: "+
+		schLog.ForceDebug("schTaskDone: " +
 			"duplicated, sdl: %s, task: %s",
 			sdl.p2pCfg.CfgName, ptn.task.name)
 
@@ -2095,7 +2095,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 
 		// watch dog is not implemented, ignored
 		tkd = schTaskDescription{
-			MbSize: schMaxMbSize,
+			MbSize: schDftMbSize,
 			Wd:     &SchWatchDog{HaveDog: false},
 			Flag:   SchCreatedGo,
 		}
@@ -2110,7 +2110,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 	for loop := 0; loop < len(tsd); loop++ {
 
 		desc := tsd[loop]
-		schLog.Debug("schSchedulerStart: "+
+		schLog.Debug("schSchedulerStart: " +
 			"start a static task, idx: %d, name: %s",
 			loop,
 			desc.Name)
@@ -2128,8 +2128,17 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		tkd.Flag = SchCreatedGo
 
 		if tsd[loop].MbSize < 0 {
-			tkd.MbSize = schMaxMbSize
+
+			tkd.MbSize = schDftMbSize
+
+		} else if tsd[loop].MbSize > schMaxMbSize{
+
+			panic(fmt.Sprintf("schSchedulerStart: " +
+				"schCreateTask failed, task: %s",
+				tkd.Name))
+
 		} else {
+
 			tkd.MbSize = tsd[loop].MbSize
 		}
 
@@ -2138,7 +2147,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		//
 
 		if eno, ptn = sdl.schCreateTask(&tkd); eno != SchEnoNone {
-			schLog.Debug("schSchedulerStart: "+
+			schLog.Debug("schSchedulerStart: " +
 				"schCreateTask failed, task: %s",
 				tkd.Name)
 			return SchEnoParameter, nil
@@ -2165,7 +2174,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		if tsd[loop].Flag == SchCreatedGo {
 			po.recver = ptn.(*schTaskNode)
 			if eno = sdl.schSendMsg(&po); eno != SchEnoNone {
-				schLog.Debug("schSchedulerStart: "+
+				schLog.Debug("schSchedulerStart: " +
 					"schSendMsg failed, event: EvSchPoweron, eno: %d, task: %s",
 					eno,
 					tkd.Name)
@@ -2186,7 +2195,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		schLog.Debug("schSchedulerStart: send poweron to task: %s", name)
 		eno, tsk := sdl.schGetTaskNodeByName(name)
 		if eno != SchEnoNone {
-			schLog.Debug("schSchedulerStart: "+
+			schLog.Debug("schSchedulerStart: " +
 				"schGetTaskNodeByName failed, eno: %d, name: %s",
 				eno,
 				name)
@@ -2194,7 +2203,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		}
 
 		if tsk == nil {
-			schLog.Debug("schSchedulerStart: "+
+			schLog.Debug("schSchedulerStart: " +
 				"nil task node pointer, eno: %d, name: %s",
 				eno,
 				name)
@@ -2204,7 +2213,7 @@ func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []strin
 		po.recver = tsk
 
 		if eno = sdl.schSendMsg(&po); eno != SchEnoNone {
-			schLog.Debug("schSchedulerStart: "+
+			schLog.Debug("schSchedulerStart: " +
 				"schSendMsg failed, event: EvSchPoweron, eno: %d, task: %s",
 				eno,
 				name)

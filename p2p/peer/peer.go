@@ -904,7 +904,7 @@ func (peMgr *PeerManager) peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrEr
 		if tmPeers, exist := peMgr.tmLastOCR[*snid]; exist {
 			if t, ok := tmPeers[n.ID]; ok {
 				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
-					peerLog.Debug("peMgrDynamicSubNetOutbound: too early, "+
+					peerLog.Debug("peMgrDynamicSubNetOutbound: too early, " +
 						"snid: %x, peer: %x", *snid, n.IP.String())
 					continue
 				}
@@ -1088,7 +1088,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	idExTemp := idEx
 	idExTemp.Dir = PeInstDirInbound
 	if _, dup := peMgr.workers[snid][idExTemp]; dup {
-		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to inbound worker, "+
+		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to inbound worker, " +
 			"inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_IBW_DUPLICATED)
@@ -1097,7 +1097,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	idExTemp.Dir = PeInstDirOutbound
 	if _, dup := peMgr.workers[snid][idExTemp]; dup {
-		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to outbound worker, "+
+		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to outbound worker, " +
 			"inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_OBW_DUPLICATED)
@@ -1109,7 +1109,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			peMgr.workers[snid][idEx] = inst
 		} else {
 			if peMgr.ibpNum[snid] >= maxInbound {
-				peerLog.ForceDebug("peMgrHandshakeRsp: inbound too much, "+
+				peerLog.ForceDebug("peMgrHandshakeRsp: inbound too much, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_INBOUNDS)
@@ -1120,7 +1120,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				// this duplicated case, we kill one instance here, but the peer might kill
 				// what he saw there also at the "same time", then two connections are lost,
 				// protection needed for this case.
-				peerLog.ForceDebug("peMgrHandshakeRsp: inbound conflict to outbound, "+
+				peerLog.ForceDebug("peMgrHandshakeRsp: inbound conflict to outbound, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_IB2OB_DUPLICATED)
@@ -1136,7 +1136,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			peMgr.workers[snid][idEx] = inst
 		} else {
 			if peMgr.obpNum[snid] >= maxOutbound {
-				peerLog.ForceDebug("peMgrHandshakeRsp: outbound, too much workers, "+
+				peerLog.ForceDebug("peMgrHandshakeRsp: outbound, too much workers, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_OUTBOUNDS)
@@ -1145,7 +1145,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			idExTemp.Dir = PeInstDirInbound
 			if _, dup := peMgr.nodes[snid][idExTemp]; dup {
 				// conflict
-				peerLog.ForceDebug("peMgrHandshakeRsp: outbound conflicts to inbound, "+
+				peerLog.ForceDebug("peMgrHandshakeRsp: outbound conflicts to inbound, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_OB2IB_DUPLICATED)
@@ -1165,7 +1165,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, &cfmCh)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	if eno, ok := <-cfmCh; eno != PeMgrEnoNone || !ok {
-		peerLog.ForceDebug("peMgrHandshakeRsp: confirm failed, "+
+		peerLog.ForceDebug("peMgrHandshakeRsp: confirm failed, " +
 			"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
 			inst.name, inst.snid, inst.dir, inst.state, eno)
 		if ok {
@@ -1204,13 +1204,13 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
-			peerLog.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, "+
+			peerLog.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, " +
 				"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
 				inst.name, inst.snid, inst.dir, inst.state, tabEno)
 		}
 		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
-			peerLog.Debug("peMgrHandshakeRsp: TabUpdateNode failed, "+
+			peerLog.Debug("peMgrHandshakeRsp: TabUpdateNode failed, " +
 				"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
 				inst.name, inst.snid, inst.dir, inst.state, tabEno)
 		}
@@ -2211,7 +2211,7 @@ func (peMgr *PeerManager) peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&schMsg)
 		timerName = fmt.Sprintf("%s%x", sch.PeerMgrName+"_DcvFindNodeTimer_", *snid)
 
-		peerLog.Debug("peMgrAsk4More: "+
+		peerLog.Debug("peMgrAsk4More: " +
 			"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
 			peMgr.cfg.cfgName,
 			*snid,

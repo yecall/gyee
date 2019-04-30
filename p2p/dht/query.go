@@ -1138,7 +1138,7 @@ func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) 
 		return DhtEnoParameter
 	}
 
-	qryLog.Debug("qryMgrQcbPutPending: "+
+	qryLog.Debug("qryMgrQcbPutPending: " +
 		"number of nodes to be put: %d, size: %d", len(nodes), size)
 
 	li := qcb.qryPending
@@ -1235,7 +1235,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qryInst.icb = &icb
 		td := sch.SchTaskDescription{
 			Name:   icb.name,
-			MbSize: sch.SchMaxMbSize,
+			MbSize: sch.SchDftMbSize,
 			Ep:     qryInst,
 			Wd:     &sch.SchWatchDog{HaveDog: false},
 			Flag:   sch.SchCreatedGo,
@@ -1246,7 +1246,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		eno, ptn := qryMgr.sdl.SchCreateTask(&td)
 		if eno != sch.SchEnoNone || ptn == nil {
 
-			qryLog.Debug("qryMgrQcbPutActived: "+
+			qryLog.Debug("qryMgrQcbPutActived: " +
 				"SchCreateTask failed, eno: %d", eno)
 
 			dhtEno = DhtEnoScheduler
@@ -1275,7 +1275,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qcb.qryPending.Remove(el)
 	}
 
-	qryLog.Debug("qryMgrQcbPutActived: "+
+	qryLog.Debug("qryMgrQcbPutActived: " +
 		"pending: %d, actived: %d, history: %d",
 		qcb.qryPending.Len(), len(qcb.qryActived), len(qcb.qryHistory))
 

@@ -202,7 +202,7 @@ func (rutMgr *RutMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) s
 func (rutMgr *RutMgr) rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		rutLog.Debug("rutMgrProc: "+
+		rutLog.Debug("rutMgrProc: " +
 			"invalid parameters, ptn: %p, msg: %p",
 			ptn, msg)
 		return sch.SchEnoParameter
@@ -370,7 +370,7 @@ func (rutMgr *RutMgr) queryStartRsp(rsp *sch.MsgDhtQryMgrQueryStartRsp) sch.SchE
 		return sch.SchEnoParameter
 	}
 
-	rutLog.Debug("queryStartRsp: "+
+	rutLog.Debug("queryStartRsp: " +
 		"bootstrap startup response, eno: %d, target: %x",
 		rsp.Eno, rsp.Target)
 
@@ -402,7 +402,7 @@ func (rutMgr *RutMgr) queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sc
 		return sch.SchEnoParameter
 	}
 
-	rutLog.Debug("queryResultInd: "+
+	rutLog.Debug("queryResultInd: " +
 		"bootstrap result indication, eno: %d, target: %x",
 		ind.Eno, ind.Target)
 
@@ -736,7 +736,7 @@ func (rutMgr *RutMgr) stopNotifyReq(req *sch.MsgDhtRutMgrStopNofiyReq) sch.SchEr
 		target: req.Target,
 	}
 	if _, exist := rutMgr.ntfTab[nfi]; exist == false {
-		rutLog.Debug("stopNotifyReq: "+
+		rutLog.Debug("stopNotifyReq: " +
 			"notifee not found, task: %p, target: %x",
 			nfi.task, nfi.target)
 		return sch.SchEnoUserTask
@@ -788,7 +788,7 @@ func (rutMgr *RutMgr) rutMgrStartBspTimer() DhtErrno {
 	// when the application starting up, see it please.
 
 	if eno, tid := rutMgr.sdl.SchSetTimer(rutMgr.ptnMe, &td); eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		rutLog.Debug("rutMgrStartBspTimer: "+
+		rutLog.Debug("rutMgrStartBspTimer: " +
 			"SchSetTimer failed, eno: %d, tid: %d",
 			eno, tid)
 		return DhtEnoScheduler
@@ -1087,7 +1087,7 @@ func (rutMgr *RutMgr) update(bn *rutMgrBucketNode, dist int) DhtErrno {
 
 	eno, ewma := rutMgr.rutMgrMetricGetEWMA(bn.node.ID)
 	if eno != DhtEnoNone && eno != DhtEnoNotFound {
-		rutLog.Debug("update: "+
+		rutLog.Debug("update: " +
 			"rutMgrMetricGetEWMA failed, eno: %d, ewma: %d",
 			eno, ewma)
 		return eno
@@ -1098,7 +1098,7 @@ func (rutMgr *RutMgr) update(bn *rutMgrBucketNode, dist int) DhtErrno {
 	}
 
 	if ewma > rt.maxLatency {
-		rutLog.Debug("update: "+
+		rutLog.Debug("update: " +
 			"discarded, ewma: %d,  maxLatency: %d",
 			ewma, rt.maxLatency)
 		return DhtEnoNone
@@ -1321,7 +1321,7 @@ func (rutMgr *RutMgr) rutMgrNearest(target *config.DsKey, size int) (DhtErrno, [
 	}
 
 	if size <= 0 || size > rutMgrMaxNearest {
-		rutLog.Debug("rutMgrNearest: "+
+		rutLog.Debug("rutMgrNearest: " +
 			"invalid size: %d, min: 1, max: %d",
 			size, rutMgrMaxNearest)
 
@@ -1411,7 +1411,7 @@ func (rutMgr *RutMgr) showRoute(tag string) {
 		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
 		rt := rutMgr.rutTab
 		for idx := 0; idx < len(rt.bucketTab); idx++ {
-			routInfo = routInfo + fmt.Sprintf("showRoute: "+
+			routInfo = routInfo + fmt.Sprintf("showRoute: " +
 				"=============================== tag: %s, dht: %s, bucket: %d ==============================\n",
 				tag, dht, idx)
 			li := rt.bucketTab[idx]

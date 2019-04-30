@@ -212,28 +212,28 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 	pkg := new(pb.P2PPackage)
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"ReadMsg faied, err: %s",
 			err.Error())
 		return nil, PeMgrEnoOs
 	}
 
 	if *pkg.Pid != PID_P2P {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"not a p2p package, pid: %d",
 			*pkg.Pid)
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pkg.PayloadLength <= 0 {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"invalid payload length: %d",
 			*pkg.PayloadLength)
 		return nil, PeMgrEnoMessage
 	}
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"payload length mismatched, PlLen: %d, real: %d",
 			*pkg.PayloadLength, len(pkg.Payload))
 		return nil, PeMgrEnoMessage
@@ -241,14 +241,14 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 
 	pbMsg := new(pb.P2PMessage)
 	if err := proto.Unmarshal(pkg.Payload, pbMsg); err != nil {
-		tcpmsgLog.Debug("getHandshakeInbound:"+
+		tcpmsgLog.Debug("getHandshakeInbound:" +
 			"Unmarshal failed, err: %s",
 			err.Error())
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pbMsg.Mid != MID_HANDSHAKE {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"it's not a handshake message, mid: %d",
 			*pbMsg.Mid)
 		return nil, PeMgrEnoMessage
@@ -261,28 +261,28 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 	}
 
 	if pbHS == nil {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"invalid handshake message pointer: %p",
 			pbHS)
 		return nil, PeMgrEnoMessage
 	}
 
 	if len(pbHS.NodeId) != config.NodeIDBytes {
-		tcpmsgLog.Debug("getHandshakeInbound:"+
+		tcpmsgLog.Debug("getHandshakeInbound:" +
 			"invalid node identity length: %d",
 			len(pbHS.NodeId))
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pbHS.ProtoNum > MaxProtocols {
-		tcpmsgLog.Debug("getHandshakeInbound:"+
+		tcpmsgLog.Debug("getHandshakeInbound:" +
 			"too much protocols: %d",
 			*pbHS.ProtoNum)
 		return nil, PeMgrEnoMessage
 	}
 
 	if int(*pbHS.ProtoNum) != len(pbHS.Protocols) {
-		tcpmsgLog.Debug("getHandshakeInbound: "+
+		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"number of protocols mismathced, ProtoNum: %d, real: %d",
 			int(*pbHS.ProtoNum), len(pbHS.Protocols))
 		return nil, PeMgrEnoMessage
@@ -774,7 +774,7 @@ func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 
 	pid := uint32(*pkg.Pid)
 	if pid != uint32(PID_P2P) && pid != uint32(PID_EXT) {
-		tcpmsgLog.Debug("RecvPackage: "+
+		tcpmsgLog.Debug("RecvPackage: " +
 			"Invalid protocol identity: %d",
 			pid)
 		return PeMgrEnoMessage
@@ -885,7 +885,7 @@ func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 		pcd.Data = append(pcd.Data, pbMsg.PutChainData.Data...)
 		extMsg.Pcd = pcd
 	} else {
-		tcpmsgLog.Debug("GetExtMessage: "+
+		tcpmsgLog.Debug("GetExtMessage: " +
 			"unknown message identity: %d",
 			extMsg.Mid)
 		return PeMgrEnoMessage

@@ -331,7 +331,7 @@ func (conMgr *ConMgr) acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 
 	td := sch.SchTaskDescription{
 		Name:   ci.name,
-		MbSize: sch.SchMaxMbSize,
+		MbSize: sch.SchDftMbSize,
 		Ep:     ci,
 		Wd:     &sch.SchWatchDog{HaveDog: false},
 		Flag:   sch.SchCreatedGo,
@@ -584,7 +584,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	//
 	// update the route manager
 	//
-	connLog.ForceDebug("handshakeRsp: update router, "+
+	connLog.ForceDebug("handshakeRsp: update router, " +
 		"sdl: %s, inst: %s, dir: %d",
 		conMgr.sdlName, ci.name, ci.dir)
 
@@ -605,7 +605,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	//
 	// startup the instance
 	//
-	connLog.ForceDebug("handshakeRsp: send EvDhtConInstStartupReq, "+
+	connLog.ForceDebug("handshakeRsp: send EvDhtConInstStartupReq, " +
 		"sdl: %s, inst: %s, dir: %d",
 		conMgr.sdlName, ci.name, ci.dir)
 
@@ -630,7 +630,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	schEno := conMgr.sdl.SchSendMessage(&schMsg)
 	if schEno == sch.SchEnoNone {
 
-		connLog.ForceDebug("handshakeRsp: send EvDhtConInstStartupReq ok, "+
+		connLog.ForceDebug("handshakeRsp: send EvDhtConInstStartupReq ok, " +
 			"sdl: %s, inst: %s, dir: %d, eno: %d",
 			conMgr.sdlName, ci.name, ci.dir, schEno)
 
@@ -645,20 +645,20 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 		}
 
 		if reqLost {
-			connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq lost, "+
+			connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq lost, " +
 				"sdl: %s, inst: %s, dir: %d, eno: %d",
 				conMgr.sdlName, ci.name, ci.dir, eno)
 			return rsp2TasksPending(ci, msg, DhtEnoScheduler)
 		}
 
-		connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confirmed ok, "+
+		connLog.ForceDebug("handshakeRsp: EvDhtConInstStartupReq confirmed ok, " +
 			"sdl: %s, inst: %s, dir: %d, eno: %d",
 			conMgr.sdlName, ci.name, ci.dir, eno)
 
 		return rsp2TasksPending(ci, msg, DhtEnoNone)
 	}
 
-	connLog.ForceDebug("handshakeRsp: send EvDhtConInstStartupReq failed, "+
+	connLog.ForceDebug("handshakeRsp: send EvDhtConInstStartupReq failed, " +
 		"sdl: %s, inst: %s, dir: %d, eno: %d",
 		conMgr.sdlName, ci.name, ci.dir, schEno)
 
@@ -784,7 +784,7 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	conMgr.ciSeq++
 	td := sch.SchTaskDescription{
 		Name:   ci.name,
-		MbSize: sch.SchMaxMbSize,
+		MbSize: sch.SchDftMbSize,
 		Ep:     ci,
 		Wd:     &sch.SchWatchDog{HaveDog: false},
 		Flag:   sch.SchCreatedGo,
