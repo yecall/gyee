@@ -55,7 +55,7 @@ var cfgLog = cfgLogger{
 	debug__: false,
 }
 
-func SwtichConfigDebugFlag(flag bool) {
+func SwitchConfigDebugFlag(flag bool) {
 	cfgLog.debug__ = flag
 }
 

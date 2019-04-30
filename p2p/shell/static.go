@@ -45,7 +45,7 @@ var stLog = staticTaskLogger{
 	debug__: false,
 }
 
-func SwtichStaticDebugFlag(flag bool) {
+func SwitchStaticDebugFlag(flag bool) {
 	stLog.debug__ = flag
 }
 
