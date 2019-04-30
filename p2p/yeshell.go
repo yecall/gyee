@@ -133,6 +133,7 @@ var yesInStopping = errors.New("yesmgr: in stopping")
 
 type YeShellManager struct {
 	name           string                           // unique name of the shell manager
+	config         *YeShellConfig					// configuration
 	inStopping     bool                             // in stopping procedure
 	status			int
 	chainInst      *sch.Scheduler                   // chain scheduler pointer
@@ -247,15 +248,15 @@ var DefaultYeShellConfig = YeShellConfig{
 // which can be reconfigurated, since YeShellConfigToP2pCfg should be called once only.
 var YeShellCfg = make(map[string]YeShellConfig, 0)
 
-func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
+func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) ([]*config.Config, *YeShellConfig) {
 	if yesCfg == nil {
 		yesLog.Debug("YeShellConfigToP2pCfg: nil configuration")
-		return nil
+		return nil, nil
 	}
 
 	if yesCfg.AppType != config.P2P_TYPE_ALL {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2P_TYPE_ALL needed")
-		return nil
+		return nil, nil
 	}
 
 	thisCfg := *yesCfg
@@ -287,15 +288,15 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	if config.P2pSetLocalIpAddr(chainCfg, yesCfg.LocalNodeIp, yesCfg.LocalUdpPort,
 		yesCfg.LocalTcpPort) != config.P2pCfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalIpAddr failed")
-		return nil
+		return nil, nil
 	}
 	if config.P2pSetupLocalNodeId(chainCfg) != config.P2pCfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetupLocalNodeId failed")
-		return nil
+		return nil, nil
 	}
 	if err := SetupSubNetwork(chainCfg, yesCfg.SubNetMaskBits, yesCfg.Validator); err != nil {
 		yesLog.Debug("YeShellConfigToP2pCfg: SetupSubNetwork failed")
-		return nil
+		return nil, nil
 	}
 	thisCfg.localSnid = append(thisCfg.localSnid, chainCfg.SubNetIdList...)
 	for _, snid := range thisCfg.localSnid {
@@ -309,12 +310,12 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 		yesCfg.LocalDhtIp, yesCfg.LocalDhtPort)
 	if config.P2pSetLocalDhtIpAddr(chainCfg, yesCfg.LocalDhtIp, yesCfg.LocalDhtPort) != config.P2pCfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetLocalDhtIpAddr failed")
-		return nil
+		return nil, nil
 	}
 
 	if chCfgName, eno := config.P2pSetConfig("chain", chainCfg); eno != config.P2pCfgEnoNone {
 		yesLog.Debug("YeShellConfigToP2pCfg: P2pSetConfig failed")
-		return nil
+		return nil, nil
 	} else {
 		chainCfg = config.P2pGetConfig(chCfgName)
 	}
@@ -330,7 +331,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) []*config.Config {
 	cfg[DhtCfgIdx] = dhtCfg
 	YeShellCfg[yesCfg.Name] = thisCfg
 
-	return cfg
+	return cfg, &thisCfg
 }
 
 func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
@@ -352,12 +353,12 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 		ddtChan:        make(chan bool, 1),
 	}
 
-	cfg := YeShellConfigToP2pCfg(yesCfg)
+	cfg, shellCfg := YeShellConfigToP2pCfg(yesCfg)
+	yeShMgr.config = shellCfg
 	if cfg == nil || len(cfg) != 2 {
 		yesLog.Debug("NewYeShellManager: YeShellConfigToP2pCfg failed")
 		return nil
 	}
-
 	if cfg[0] == nil || cfg[1] == nil {
 		yesLog.Debug("NewYeShellManager: nil configuration")
 		return nil
@@ -443,7 +444,7 @@ func (yeShMgr *YeShellManager) Start() error {
 	go yeShMgr.dhtEvProc()
 	go yeShMgr.dhtCsProc()
 
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 	if thisCfg.BootstrapNode == false {
 		yesLog.Debug("Start: wait dht ready, inst: %s", yeShMgr.dhtInst.SchGetP2pCfgName())
 		if dht.DhtReady(yeShMgr.dhtInst.SchGetP2pCfgName()) {
@@ -486,7 +487,7 @@ func (yeShMgr *YeShellManager) Stop() {
 
 	log.Info("Stop: dht done", yeShMgr.dhtInst.SchGetP2pCfgName())
 
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 	if thisCfg.BootstrapNode == false {
 		yesLog.Debug("Stop: close dht bootstrap timer")
 		close(yeShMgr.dhtBsChan)
@@ -513,7 +514,7 @@ func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
 		return errors.New(fmt.Sprintf("invalid mask bits: %d", reCfg.SubnetMaskBits))
 	}
 
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 	if reCfg.SubnetMaskBits == thisCfg.SubNetMaskBits &&
 		reCfg.Validator == thisCfg.Validator {
 		yesLog.Debug("Reconfig: no reconfiguration needed")
@@ -1107,7 +1108,7 @@ _rxLoop:
 
 func (yeShMgr *YeShellManager) dhtBootstrapProc() {
 	defer yeShMgr.bsTicker.Stop()
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 
 _bootstarp:
 	for {
@@ -1293,7 +1294,7 @@ _gvpLoop:
 
 func (yeShMgr *YeShellManager) dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
 	yesLog.Debug("dhtBlindConnectRsp: msg: %+v", *msg)
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 
 	for _, bsn := range thisCfg.dhtBootstrapNodes {
 		if msg.Eno == dht.DhtEnoNone.GetEno() || msg.Eno == dht.DhtEnoDuplicated.GetEno() {
@@ -1466,7 +1467,7 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 	// over the validator-subnet. also, the Ev should be stored into DHT
 	// with a duration to be expired. the message here would be dispatched
 	// to chain shell manager and DHT shell manager.
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 	k := yesKey{}
 	if len(msg.Key) == 0 {
 		k = sha256.Sum256(msg.Data)
@@ -1617,7 +1618,7 @@ func (yeShMgr *YeShellManager) setDedupTimer(key [yesKeyBytes]byte) error {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
 
-	thisCfg, _ := YeShellCfg[yeShMgr.name]
+	thisCfg := yeShMgr.config
 
 	if len(key) != yesKeyBytes {
 		return errors.New(fmt.Sprintf("setDedupTimer: invalid key length: %d", len(key)))

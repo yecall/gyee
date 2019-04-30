@@ -110,7 +110,7 @@ const (
 const (
 	switch2Root         = true         // switch to root
 	nodeId2SubnetId     = true         // subnet identity is masked from node identity
-	bucketSize          = 32           // max nodes can be held for one bucket
+	bucketSize          = 256          // max nodes can be held for one bucket
 	nBuckets            = HashBits + 1 // total number of buckets
 	maxBonding          = 16           // max concurrency bondings
 	maxFindnodeFailures = 3            // max FindNode failures to remove a node
