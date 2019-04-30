@@ -518,7 +518,6 @@ func (tabMgr *TableManager) mgr4Subnet(snid config.SubNetworkID) *TableManager {
 	mgr.boundIcb = make([]*instCtrlBlock, 0, TabInstBondingMax)
 	mgr.queryPending = make([]*queryPendingEntry, 0, TabInstQPendingMax)
 	mgr.boundPending = make([]*Node, 0, TabInstBPendingMax)
-	mgr.dlkTab = make([]int, 256)
 	mgr.tabSetupLocalHashId()
 
 	for loop := 0; loop < cap(mgr.buckets); loop++ {
@@ -2041,22 +2040,26 @@ func (tabMgr *TableManager) tabBucketUpdateBoundTime(id NodeID, pit *time.Time, 
 	return TabMgrEnoNone
 }
 
-func (b *bucket) maxFindNodeFailed(src []*bucketEntry) []*bucketEntry {
+func (b *bucket) maxFindNodeFailed(src []*bucketEntry) ([]*bucketEntry, []int) {
 	if src == nil {
 		return b.maxFindNodeFailed(b.nodes)
 	}
 	var max = 0
 	var beMaxf = make([]*bucketEntry, 0)
-	for _, be := range src {
+	var idxMaxf = make([]int, 0)
+	for idx, be := range src {
 		if be.failCount > max {
 			max = be.failCount
 			beMaxf = []*bucketEntry{}
+			idxMaxf = []int{}
 			beMaxf = append(beMaxf, be)
+			idxMaxf = append(idxMaxf, idx)
 		} else if be.failCount == max {
 			beMaxf = append(beMaxf, be)
+			idxMaxf = append(idxMaxf, idx)
 		}
 	}
-	return beMaxf
+	return beMaxf, idxMaxf
 }
 
 func (b *bucket) findNode(id NodeID) (int, TabMgrErrno) {
@@ -2068,34 +2071,60 @@ func (b *bucket) findNode(id NodeID) (int, TabMgrErrno) {
 	return -1, TabMgrEnoNotFound
 }
 
+func (b *bucket) earlistAdd(src []*bucketEntry) ([]*bucketEntry, []int) {
+	var earliest = time.Now()
+	var beEarliest = make([]*bucketEntry, 0)
+	var idxEarliest = make([]int, 0)
+	for idx, be := range src {
+		if be.addTime.Before(earliest) {
+			earliest = be.addTime
+			beEarliest = []*bucketEntry{}
+			idxEarliest = []int{}
+			beEarliest = append(beEarliest, be)
+			idxEarliest = append(idxEarliest, idx)
+		} else if be.addTime.Equal(earliest) {
+			beEarliest = append(beEarliest, be)
+			idxEarliest = append(idxEarliest, idx)
+		}
+	}
+	return beEarliest, idxEarliest
+}
+
 func (b *bucket) latestAdd(src []*bucketEntry) []*bucketEntry {
 	var latest = time.Time{}
 	var beLatest = make([]*bucketEntry, 0)
-	for _, be := range src {
+	var idxLatest = make([]int, 0)
+	for idx, be := range src {
 		if be.addTime.After(latest) {
 			latest = be.addTime
 			beLatest = []*bucketEntry{}
+			idxLatest = []int{}
 			beLatest = append(beLatest, be)
+			idxLatest = append(idxLatest, idx)
 		} else if be.addTime.Equal(latest) {
 			beLatest = append(beLatest, be)
+			idxLatest = append(idxLatest, idx)
 		}
 	}
 	return beLatest
 }
 
-func (b *bucket) eldestPong(src []*bucketEntry) []*bucketEntry {
+func (b *bucket) eldestPong(src []*bucketEntry) ([]*bucketEntry, []int) {
 	var eldest = time.Now()
 	var beEldest = make([]*bucketEntry, 0)
-	for _, be := range src {
+	var idxEldest = make([]int, 0)
+	for idx, be := range src {
 		if be.lastPong.Before(eldest) {
 			eldest = be.lastPong
 			beEldest = []*bucketEntry{}
 			beEldest = append(beEldest, be)
+			idxEldest = append(idxEldest, idx)
 		} else if be.lastPong.Equal(eldest) {
 			beEldest = append(beEldest, be)
+			idxEldest = append(idxEldest, idx)
 		}
 	}
-	return beEldest
+	return beEldest, idxEldest
 }
 
 func (tabMgr *TableManager) tabBucketAddNode(n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
@@ -2127,9 +2156,10 @@ func (tabMgr *TableManager) tabBucketAddNode(n *um.Node, lastQuery *time.Time, l
 		return TabMgrEnoNone
 	}
 
-	// if bucket not full, append node
+	var be = new(bucketEntry)
+
+	// if bucket not full, insert node
 	if len(b.nodes) < bucketSize {
-		var be = new(bucketEntry)
 		be.Node = config.Node{
 			IP:  n.IP,
 			UDP: n.UDP,
@@ -2143,51 +2173,71 @@ func (tabMgr *TableManager) tabBucketAddNode(n *um.Node, lastQuery *time.Time, l
 		be.lastPing = *lastPing
 		be.lastPong = *lastPong
 		be.failCount = 0
-		b.nodes = append(b.nodes, be)
+		b.nodes = append([]*bucketEntry{be}, b.nodes...)
 
 		return TabMgrEnoNone
 	}
 
 	// full, we had to kick another node out. the following order applied:
 	// 1) the max find node failed
-	// 2) the youngest added
+	// 2) the earliest added
 	// 3) the eldest pong
 	// if at last more than one nodes selected, we kick one randomly.
 	var kicked []*bucketEntry = nil
-	var beKicked *bucketEntry = nil
+	var beKickedIdx int
 
-	if kicked = b.maxFindNodeFailed(nil); len(kicked) == 1 {
-		beKicked = kicked[0]
+	var index []int
+	var _index []int
+	var tempIdx []int
+
+	if kicked, index = b.maxFindNodeFailed(nil); len(kicked) == 1 {
+		beKickedIdx = index[0]
 		goto kickSelected
 	}
 
-	if kicked := b.latestAdd(kicked); len(kicked) == 1 {
-		beKicked = kicked[0]
+	if kicked, _index = b.earlistAdd(kicked); len(kicked) == 1 {
+		beKickedIdx = _index[0]
 		goto kickSelected
 	}
+	for loop := 0; loop < len(_index); loop++ {
+		tempIdx = append(tempIdx, index[loop])
+	}
+	index = tempIdx
 
-	if kicked := b.eldestPong(kicked); len(kicked) == 1 {
-		beKicked = kicked[0]
+	if kicked, _index = b.eldestPong(kicked); len(kicked) == 1 {
+		beKickedIdx = _index[0]
 		goto kickSelected
 	}
+	for loop := 0; loop < len(_index); loop++ {
+		tempIdx = append(tempIdx, index[loop])
+	}
+	index = tempIdx
 
-	beKicked = kicked[rand.Int()%len(kicked)]
+	beKickedIdx = rand.Int()%len(kicked)
 
 kickSelected:
 
-	beKicked.Node = config.Node{
+	be.Node = config.Node{
 		IP:  n.IP,
 		UDP: n.UDP,
 		TCP: n.TCP,
 		ID:  n.NodeId,
 	}
+	be.sha = *TabNodeId2Hash(id)
+	be.addTime = time.Now()
+	be.lastPing = *lastQuery
+	be.lastPing = *lastPing
+	be.lastPong = *lastPong
+	be.failCount = 0
 
-	beKicked.sha = *TabNodeId2Hash(id)
-	beKicked.addTime = time.Now()
-	beKicked.lastPing = *lastQuery
-	beKicked.lastPing = *lastPing
-	beKicked.lastPong = *lastPong
-	beKicked.failCount = 0
+	if beKickedIdx == 0 {
+		b.nodes[0] = be
+	} else if beKickedIdx == len(b.nodes) - 1 {
+		b.nodes = append([]*bucketEntry{be}, b.nodes[0:beKickedIdx]...)
+	} else {
+		b.nodes = append(append([]*bucketEntry{be}, b.nodes[0:beKickedIdx]...), b.nodes[beKickedIdx+1])
+	}
+
 	return TabMgrEnoNone
 }
 

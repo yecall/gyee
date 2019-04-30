@@ -307,8 +307,7 @@ func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
 	}
-	conMgr.sdl.SchTaskDone(conMgr.ptnMe, conMgr.name, sch.SchEnoKilled)
-	return sch.SchEnoNone
+	return conMgr.sdl.SchTaskDone(conMgr.ptnMe, conMgr.name, sch.SchEnoKilled)
 }
 
 //
