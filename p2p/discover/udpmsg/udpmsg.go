@@ -196,7 +196,7 @@ func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) Udp
 func (pum *UdpMsg) Decode() UdpMsgErrno {
 	pum.Msg = new(pb.UdpMessage)
 	if err := proto.Unmarshal((*pum.Pbuf)[0:pum.Len], pum.Msg); err != nil {
-		udpmsgLog.Debug("Decode: "+
+		udpmsgLog.Debug("Decode: " +
 			"Unmarshal failed, err: %s",
 			err.Error())
 		return UdpMsgEnoDecodeFailed
@@ -218,7 +218,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	mt := pum.GetDecodedMsgType()
 	if mt == UdpMsgTypeUnknown {
-		udpmsgLog.Debug("GetDecodedMsg: "+
+		udpmsgLog.Debug("GetDecodedMsg: " +
 			"GetDecodedMsgType failed, mt: %d",
 			mt)
 		return nil
@@ -234,7 +234,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 	var ok bool
 
 	if f, ok = funcMap[mt]; !ok {
-		udpmsgLog.Debug("GetDecodedMsg: "+
+		udpmsgLog.Debug("GetDecodedMsg: " +
 			"invalid message type: %d",
 			mt)
 		return nil
@@ -448,7 +448,7 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 	var err error
 	if *pum.Pbuf, err = proto.Marshal(pum.Msg); err != nil {
-		udpmsgLog.Debug("Encode: "+
+		udpmsgLog.Debug("Encode: " +
 			"Marshal failed, err: %s",
 			err.Error())
 		pum.Eno = UdpMsgEnoEncodeFailed
