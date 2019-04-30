@@ -120,6 +120,44 @@ func (t *Transaction) Hash() *common.Hash {
 	return t.hash
 }
 
+func (t *Transaction) From() *common.Address {
+	// TODO: maybe handle concurrency here
+	if t.from == nil {
+		sigFrom, err := t.sigFrom(false)
+		if err != nil {
+			return nil
+		}
+		t.from = sigFrom
+	}
+	return t.from
+}
+
+func (t *Transaction) sigFrom(verifySig bool) (*common.Address, error) {
+	signer := getSigner(t.signature.Algorithm)
+	if signer == nil {
+		return nil, ErrNoSigner
+	}
+	txHash := t.Hash()[:]
+	pubkey, err := signer.RecoverPublicKey(txHash, t.signature)
+	if err != nil {
+		return nil, err
+	}
+	if verifySig {
+		if !signer.Verify(pubkey, txHash, t.signature) {
+			return nil, ErrSignatureMismatch
+		}
+	}
+	addr, err := address.NewAddressFromPublicKey(pubkey)
+	if err != nil {
+		return nil, err
+	}
+	return addr.CommonAddress(), nil
+}
+
+func (t *Transaction) To() *common.Address {
+	return t.to
+}
+
 func (t *Transaction) ToProto() (*corepb.Transaction, error) {
 	pbTx := &corepb.Transaction{
 		ChainID: t.chainID,
@@ -188,26 +226,14 @@ func (t *Transaction) VerifySig() error {
 	if t.signature == nil {
 		return ErrNoSignature
 	}
-	signer := getSigner(t.signature.Algorithm)
-	if signer == nil {
-		return ErrNoSigner
-	}
-	txHash := t.Hash()[:]
-	pubkey, err := signer.RecoverPublicKey(txHash, t.signature)
-	if err != nil {
-		return err
-	}
-	if !signer.Verify(pubkey, txHash, t.signature) {
-		return ErrSignatureMismatch
-	}
-	addr, err := address.NewAddressFromPublicKey(pubkey)
+	sigFrom, err := t.sigFrom(true)
 	if err != nil {
 		return err
 	}
 	if t.from == nil {
-		t.from = addr.CommonAddress()
+		t.from = sigFrom
 	} else {
-		if *t.from != *addr.CommonAddress() {
+		if *t.from != *sigFrom {
 			return ErrTxFromMismatch
 		}
 	}

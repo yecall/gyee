@@ -323,6 +323,10 @@ func (b *Block) VerifyBody() error {
 	return nil
 }
 
+func (b *Block) GetAccount(address common.Address) state.Account {
+	return b.stateTrie.GetAccount(address, false)
+}
+
 func (b *Block) ToBytes() ([]byte, error) {
 	pbBlock := &corepb.Block{
 		Header: b.pbHeader,

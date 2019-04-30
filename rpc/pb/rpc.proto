@@ -39,6 +39,15 @@ service ApiService {
 
     rpc GetBlockByHeight (GetBlockByHeightRequest) returns (BlockResponse) {
     }
+
+    rpc GetLastBlock (GetLastBlockRequest) returns (GetLastBlockResponse) {
+    }
+
+    rpc GetTxByHash (GetTxByHashRequest) returns (TransactionResponse) {
+    }
+
+    rpc GetAccountState (GetAccountStateRequest) returns (GetAccountStateResponse) {
+    }
 }
 
 // Request message of non params.
@@ -79,6 +88,54 @@ message GetBlockByHashRequest {
 message GetBlockByHeightRequest {
     // block height
     uint64 height = 1;
+}
+
+message GetLastBlockResponse {
+    // block hash hex string
+    string hash = 1;
+
+    // block detail
+    BlockResponse block = 2;
+}
+
+message GetLastBlockRequest {
+}
+
+message TransactionResponse {
+    // tx hash hex string
+    string hash = 1;
+
+    // transaction nonce
+    uint64 nonce = 2;
+
+    // tx from address
+    string from = 3;
+    // tx recipient address
+    string recipient = 4;
+
+    // transaction amount decimal string
+    string amount = 5;
+
+}
+
+message GetTxByHashRequest {
+    // tx hash hex string
+    string hash = 1;
+}
+
+message GetAccountStateResponse {
+    // account address string
+    string address = 1;
+
+    // account nonce
+    uint64 nonce = 2;
+    // account balance decimal string
+    string balance = 3;
+}
+
+message GetAccountStateRequest {
+    // account address string
+    string address = 1;
 }
 
 // Response message of node info.
