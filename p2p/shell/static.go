@@ -97,7 +97,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 		return []sch.TaskStaticDescription{
 			{Name: sch.NatMgrName, Tep: nat.NewNatMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: dht.DhtMgrName, Tep: dht.NewDhtMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
-			{Name: dht.DsMgrName, Tep: dht.NewDsMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
+			{Name: dht.DsMgrName, Tep: dht.NewDsMgr(), MbSize: 4096, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: dht.LsnMgrName, Tep: dht.NewLsnMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: dht.PrdMgrName, Tep: dht.NewPrdMgr(), MbSize: -1, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
 			{Name: dht.QryMgrName, Tep: dht.NewQryMgr(), MbSize: 4096, DieCb: nil, Wd: noDog, Flag: sch.SchCreatedSuspend},
