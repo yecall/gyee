@@ -622,7 +622,6 @@ func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	// we have to ask route manager for nearest for key requested
 	//
 
-	schMsg := sch.SchMessage{}
 	fnReq := sch.MsgDhtRutMgrNearestReq{
 		Target:  dsk,
 		Max:     rutMgrMaxNearest,
@@ -631,7 +630,7 @@ func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 		ForWhat: MID_FINDNODE,
 		Msg:     msg,
 	}
-
+	schMsg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &fnReq)
 	return conInst.sdl.SchSendMessage(&schMsg)
 }

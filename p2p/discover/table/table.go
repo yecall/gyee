@@ -967,7 +967,6 @@ func (tabMgr *TableManager) tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgr
 		tabMgr.pubUdpPort = int(tabMgr.cfg.local.UDP)
 		tabMgr.natUdpResult = true
 	} else {
-		schMsg := sch.SchMessage{}
 		reqUdp := sch.MsgNatMgrMakeMapReq{
 			Proto:      "udp",
 			FromPort:   int(tabMgr.cfg.local.UDP),
@@ -975,6 +974,7 @@ func (tabMgr *TableManager) tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgr
 			DurKeep:    natMapKeepTime,
 			DurRefresh: natMapRefreshTime,
 		}
+		schMsg := sch.SchMessage{}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
@@ -984,6 +984,7 @@ func (tabMgr *TableManager) tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgr
 		reqTcp.Proto = "tcp"
 		reqTcp.FromPort = int(tabMgr.cfg.local.TCP)
 		reqTcp.ToPort = int(tabMgr.cfg.local.TCP)
+		schMsg = sch.SchMessage{}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
@@ -1646,7 +1647,6 @@ func (tabMgr *TableManager) tabQuery(target *NodeID, nodes []*Node) TabMgrErrno 
 	}
 
 	// create query instances
-	var schMsg = sch.SchMessage{}
 	var loop = 0
 	var dup bool
 
@@ -1705,6 +1705,7 @@ func (tabMgr *TableManager) tabQuery(target *NodeID, nodes []*Node) TabMgrErrno 
 			tabLog.Debug("tabQuery: EvNblFindNodeReq will be sent, ip: %s, udp: %d",
 				msg.To.IP.String(), msg.To.UDP)
 
+			var schMsg = sch.SchMessage{}
 			tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblFindNodeReq, msg)
 			tabMgr.sdl.SchSendMessage(&schMsg)
 
@@ -2434,9 +2435,6 @@ func (tabMgr *TableManager) tabActiveBoundInst() TabMgrErrno {
 			Extra:        nil,
 		}
 
-		var schMsg = sch.SchMessage{}
-		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblPingpongReq, &req)
-
 		var icb = new(instCtrlBlock)
 		icb.snid = tabMgr.snid
 		icb.state = TabInstStateBonding
@@ -2452,12 +2450,13 @@ func (tabMgr *TableManager) tabActiveBoundInst() TabMgrErrno {
 			return eno
 		}
 
-		// Update node database for pingpong related info
 		if eno := tabMgr.tabUpdateNodeDb4Bounding(pn, &pit, &pot); eno != TabMgrEnoNone {
 			tabLog.Debug("tabActiveBoundInst: tabUpdateNodeDb4Bounding failed, eno: %d", eno)
 			return eno
 		}
 
+		schMsg := sch.SchMessage{}
+		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNblPingpongReq, &req)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 		tabMgr.tabStartTimer(icb, sch.TabPingpongTimerId, pingpongExpiration)
 		if len(tabMgr.boundPending) > 1 {
@@ -2495,7 +2494,7 @@ func (tabMgr *TableManager) tabDiscoverResp(node *um.Node) TabMgrErrno {
 			},
 		},
 	}
-	var schMsg = sch.SchMessage{}
+	schMsg := sch.SchMessage{}
 	tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnDcvMgr, sch.EvTabRefreshRsp, &rsp)
 	tabMgr.sdl.SchSendMessage(&schMsg)
 	return TabMgrEnoNone

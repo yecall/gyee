@@ -164,9 +164,9 @@ func (inst *neighborInst) NgbProtoFindNodeReq(ptn interface{}, fn *um.FindNode) 
 	if eno := sendUdpMsg(inst.sdl, inst.ngbMgr.ptnLsn, inst.ptn, buf, &dst); eno != sch.SchEnoNone {
 		ngbLog.Debug("NgbProtoFindNodeReq: failed to send, ip: %s, udp: %d", dst.IP.String(), dst.Port)
 		rsp := sch.NblFindNodeRsp{}
-		schMsg := sch.SchMessage{}
 		rsp.Result = (NgbProtoEnoUdp << 16) + tab.TabMgrEnoUdp
 		rsp.FindNode = inst.msgBody.(*um.FindNode)
+		schMsg := sch.SchMessage{}
 		inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		inst.sdl.SchSendMessage(&schMsg)
 		inst.cleanMap(inst.name)
@@ -226,10 +226,10 @@ func (inst *neighborInst) NgbProtoPingRsp(msg *um.Pong) NgbProtoErrno {
 	}
 
 	rsp := sch.NblPingRsp{}
-	schMsg := sch.SchMessage{}
 	rsp.Result = NgbProtoEnoNone
 	rsp.Ping = inst.msgBody.(*um.Ping)
 	rsp.Pong = msg
+	schMsg := sch.SchMessage{}
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 	inst.cleanMap(inst.name)
@@ -254,10 +254,10 @@ func (inst *neighborInst) NgbProtoFindNodeRsp(msg *um.Neighbors) NgbProtoErrno {
 	}
 
 	rsp := sch.NblFindNodeRsp{}
-	schMsg := sch.SchMessage{}
 	rsp.Result = (NgbProtoEnoNone << 16) + tab.TabMgrEnoNone
 	rsp.FindNode = inst.msgBody.(*um.FindNode)
 	rsp.Neighbors = msg
+	schMsg := sch.SchMessage{}
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 	inst.cleanMap(inst.name)
@@ -266,9 +266,9 @@ func (inst *neighborInst) NgbProtoFindNodeRsp(msg *um.Neighbors) NgbProtoErrno {
 
 func (inst *neighborInst) NgbProtoFindNodeTimeout() NgbProtoErrno {
 	rsp := sch.NblFindNodeRsp{}
-	schMsg := sch.SchMessage{}
 	rsp.Result = (NgbProtoEnoTimeout << 16) + tab.TabMgrEnoTimeout
 	rsp.FindNode = inst.msgBody.(*um.FindNode)
+	schMsg := sch.SchMessage{}
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 	inst.cleanMap(inst.name)
@@ -277,9 +277,9 @@ func (inst *neighborInst) NgbProtoFindNodeTimeout() NgbProtoErrno {
 
 func (inst *neighborInst) NgbProtoPingTimeout() NgbProtoErrno {
 	rsp := sch.NblPingRsp{}
-	schMsg := sch.SchMessage{}
 	rsp.Result = NgbProtoEnoTimeout
 	rsp.Ping = inst.msgBody.(*um.Ping)
+	schMsg := sch.SchMessage{}
 	inst.sdl.SchMakeMessage(&schMsg, inst.ptn, inst.ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 	inst.sdl.SchSendMessage(&schMsg)
 	inst.cleanMap(inst.name)
@@ -401,19 +401,17 @@ func (ngbMgr *NeighborManager) PoweronHandler(ptn interface{}) sch.SchErrno {
 
 func (ngbMgr *NeighborManager) PoweroffHandler(ptn interface{}) sch.SchErrno {
 	ngbLog.Debug("PoweroffHandler: task will be done, name: %s", ngbMgr.sdl.SchGetTaskName(ptn))
-	po := sch.SchMessage{
-		Id:   sch.EvSchPoweroff,
-	}
-
 	ngbMgr.lock.Lock()
-	ngbMgr.sdl.SchSetSender(&po, &sch.RawSchTask)
 	for _, ngbInst := range ngbMgr.ngbMap {
+		po := sch.SchMessage{
+			Id:   sch.EvSchPoweroff,
+		}
+		ngbMgr.sdl.SchSetSender(&po, &sch.RawSchTask)
 		ngbMgr.sdl.SchSetRecver(&po, ngbInst.ptn)
 		po.TgtName = ngbInst.tskName
 		ngbMgr.sdl.SchSendMessage(&po)
 	}
 	ngbMgr.lock.Unlock()
-
 	return ngbMgr.sdl.SchTaskDone(ptn, ngbMgr.name, sch.SchEnoKilled)
 }
 
@@ -731,8 +729,8 @@ func (ngbMgr *NeighborManager) NeighborsHandler(nbs *um.Neighbors, from *net.UDP
 
 func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 	var rsp = sch.NblFindNodeRsp{}
-	var schMsg = sch.SchMessage{}
 	var funcRsp2Tab = func() NgbMgrErrno {
+		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblFindNodeRsp, &rsp)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
@@ -791,6 +789,7 @@ func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 
 	rsp.Result = NgbMgrEnoNone
 	rsp.FindNode = findNode
+	schMsg := sch.SchMessage{}
 	ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblFindNodeReq, findNode)
 	if ngbMgr.sdl.SchSendMessage(&schMsg) != sch.SchEnoNone {
 		if ngbMgr.sdl.SchTaskDone(ngbInst.ptn, ngbInst.tskName, sch.SchEnoKilled) != sch.SchEnoNone {
@@ -804,13 +803,14 @@ func (ngbMgr *NeighborManager) FindNodeReq(findNode *um.FindNode) NgbMgrErrno {
 
 func (ngbMgr *NeighborManager) PingpongReq(ping *um.Ping) NgbMgrErrno {
 	var rsp = sch.NblPingRsp{}
-	var schMsg = sch.SchMessage{}
 	var funcRsp2Tab = func() NgbMgrErrno {
+		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ngbMgr.ptnTab, sch.EvNblPingpongRsp, &rsp)
 		ngbMgr.sdl.SchSendMessage(&schMsg)
 		return NgbMgrEnoNone
 	}
 	var funcReq2Inst = func(ptn interface{}) NgbMgrErrno {
+		schMsg := sch.SchMessage{}
 		ngbMgr.sdl.SchMakeMessage(&schMsg, ngbMgr.ptnMe, ptn, sch.EvNblPingpongReq, ping)
 		if ngbMgr.sdl.SchSendMessage(&schMsg) != sch.SchEnoNone {
 			return NgbMgrEnoScheduler

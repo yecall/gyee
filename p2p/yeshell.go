@@ -135,11 +135,13 @@ type YeShellManager struct {
 	name           string                           // unique name of the shell manager
 	config         *YeShellConfig					// configuration
 	inStopping     bool                             // in stopping procedure
-	status			int
+	status			int								// shell status
 	chainInst      *sch.Scheduler                   // chain scheduler pointer
+	chainSdlName   string							// chain scheduler name
 	ptnChainShell  interface{}                      // chain shell manager task node pointer
 	ptChainShMgr   *p2psh.ShellManager              // chain shell manager object
 	dhtInst        *sch.Scheduler                   // dht scheduler pointer
+	dhtSdlName     string							// dht scheduler name
 	ptnDhtShell    interface{}                      // dht shell manager task node pointer
 	ptDhtShMgr     *p2psh.DhtShellManager           // dht shell manager object
 	ptDhtConMgr    *dht.ConMgr					    // dht connection manager object
@@ -393,6 +395,7 @@ func (yeShMgr *YeShellManager) Start() error {
 		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
+	yeShMgr.dhtSdlName = yeShMgr.dhtInst.SchGetP2pCfgName()
 
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
@@ -418,6 +421,7 @@ func (yeShMgr *YeShellManager) Start() error {
 		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
+	yeShMgr.chainSdlName = yeShMgr.chainInst.SchGetP2pCfgName()
 
 	yeShMgr.status = yesDhtStart
 
@@ -547,7 +551,6 @@ func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
 	}
 
 	msg := sch.SchMessage{}
-
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellReconfigReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.Debug("Reconfig: SchSendMessage failed, eno: %d", eno)
@@ -641,7 +644,7 @@ func (yeShMgr *YeShellManager) UnRegister(subscriber *Subscriber) {
 }
 
 func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
-	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
 		return nil, yesInStopping
 	}
@@ -687,7 +690,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 }
 
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
-	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
 		return yesInStopping
 	}
@@ -757,12 +760,12 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	yeShMgr.gcdName = kind
 	yeShMgr.gcdKey = key
 
-	msg := sch.SchMessage{}
 	req := sch.MsgShellGetChainInfoReq {
 		Seq: yeShMgr.gcdSeq,
 		Kind: yeShMgr.gcdName,
 		Key: yeShMgr.gcdKey,
 	}
+	msg := sch.SchMessage{}
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.Debug("GetChainInfo: SchSendMessage failed, eno: %d", eno)
@@ -1234,7 +1237,7 @@ func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch c
 }
 
 func (yeShMgr *YeShellManager)dhtGetValProc() {
-	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	sdl := yeShMgr.dhtSdlName
 	const period = time.Second
 	yk := yesKey{}
 	tm := time.NewTimer(period)
@@ -1373,7 +1376,7 @@ func (yeShMgr *YeShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvide
 }
 
 func (yeShMgr *YeShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
-	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	sdl := yeShMgr.dhtSdlName
 	yesLog.Debug("dhtMgrPutValueLocalRsp: sdl: %s, msg: %+v", sdl, *msg)
 	pvr := putValueResult {
 		eno: msg.Eno,
@@ -1386,7 +1389,7 @@ func (yeShMgr *YeShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueL
 func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 	// see function dhtMgrPutValueLocalRsp for more please, an event EvDhtMgrPutValueLocalRsp should
 	// had received before this EvDhtMgrPutValueRsp.
-	sdl := yeShMgr.dhtInst.SchGetP2pCfgName()
+	sdl := yeShMgr.dhtSdlName
 	yesLog.Debug("dhtMgrPutValueRsp: sdl: %s, eno: %d, key: %x, peers: %d",
 		sdl, msg.Eno, msg.Key, len(msg.Peers))
 	return sch.SchEnoNone
@@ -1485,7 +1488,6 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 		return err
 	}
 
-	schMsg := sch.SchMessage{}
 	req := sch.MsgShellBroadcastReq{
 		MsgType: yesMtAtoi[msg.MsgType],
 		From:    msg.From,
@@ -1493,6 +1495,7 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 		Data:    msg.Data,
 		Exclude: exclude,
 	}
+	schMsg := sch.SchMessage{}
 	yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 		yesLog.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)
@@ -1505,6 +1508,7 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 			Val:      msg.Data,
 			KeepTime: thisCfg.EvKeepTime,
 		}
+		schMsg := sch.SchMessage{}
 		yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req2Dht)
 		if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 			yesLog.Debug("broadcastEvOsn: SchSendMessage failed, eno: %d", eno)

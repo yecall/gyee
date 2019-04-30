@@ -274,7 +274,7 @@ taskLoop:
 		// check power off stage
 		//
 
-		var msg schMessage
+		var msg *schMessage
 
 		if sdl.powerOff || task.killing {
 
@@ -336,7 +336,7 @@ taskLoop:
 		// call user task
 		//
 
-		proc(ptn, (*SchMessage)(&msg))
+		proc(ptn, msg)
 	}
 
 	//
@@ -973,7 +973,7 @@ func (sdl *scheduler) schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 	task.evHistory[task.evhIndex] = msg
 	task.evhIndex = (task.evhIndex + 1) & (evHistorySize - 1)
 
-	*task.mailbox.que <- msg
+	*task.mailbox.que <- &msg
 
 	return SchEnoNone
 }
@@ -1036,7 +1036,7 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 	ptn.task.sdl = sdl
 	ptn.task.name = strings.TrimSpace(taskDesc.Name)
 	ptn.task.utep = taskDesc.Ep
-	mq := make(chan schMessage, taskDesc.MbSize)
+	mq := make(chan *schMessage, taskDesc.MbSize)
 	ptn.task.mailbox.que = &mq
 	ptn.task.mailbox.size = taskDesc.MbSize
 	ptn.task.killing = false
@@ -1631,7 +1631,7 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 			return SchEnoResource
 		}
 
-		*target.mailbox.que <- *msg
+		*target.mailbox.que <- msg
 		target.evTotal += 1
 		target.evHistory[target.evhIndex] = *msg
 		target.evhIndex = (target.evhIndex + 1) & (evHistorySize - 1)

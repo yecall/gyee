@@ -183,6 +183,7 @@ func main() {
 }
 
 func startGoProfile() {
+	//
 	// profile all, such as memory, cpu, ... example client commands like:
 	//	http://localhost:6060/debug/pprof/heap
 	//	http://localhost:6060/debug/pprof/profile
@@ -194,8 +195,13 @@ func startGoProfile() {
 	//	go tool pprof http://localhost:6060/debug/pprof/heap
 	//	go tool pprof http://localhost:6060/debug/pprof/block
 	//	...
-	// please query the web for more. and notice that "localhost:6060" is
-	// shown just as an example.
+	// please query the web for more, such like:
+	//  https://www.jianshu.com/p/4e4ff6be6af9
+	//  https://www.jianshu.com/p/01a333a29288
+	//  ...
+	//
+	// and notice that "localhost:6060" is shown just as an example.
+	//
 	go func() {
 		http.ListenAndServe("localhost:6060", nil)
 	}()
@@ -971,7 +977,7 @@ func testCase17(tc *testCase) {
 	yesCfg := yep2p.DefaultYeShellConfig
 	yesCfg.Validator = true
 	yesCfg.BootstrapNode = false
-	yesCfg.SubNetMaskBits = 0
+	yesCfg.SubNetMaskBits = 1
 
 	yesCfg.NatType = config.NATT_NONE
 	//yesCfg.NatType = config.NATT_PMP
@@ -998,7 +1004,7 @@ func testCase17(tc *testCase) {
 	} else if true {
 		yeChainProcEx(yeShMgr, ev, tx, bh, bk, done)
 		//waitInterrupt()
-		for loop := 0; loop < 60; loop++ {
+		for loop := 0; loop < 600000; loop++ {
 			time.Sleep(time.Second * 1)
 			fmt.Printf("wait: %d\n", loop)
 		}

@@ -404,10 +404,12 @@ func (shMgr *ShellManager) reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrn
 	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		return eno
 	}
+	msg = sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnNgbMgr, sch.EvShellReconfigReq, req)
 	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		return eno
 	}
+	msg = sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnTabMgr, sch.EvShellReconfigReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }

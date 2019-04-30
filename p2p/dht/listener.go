@@ -363,11 +363,10 @@ func (lsnMgr *LsnMgr) driveSelf() sch.SchErrno {
 		return sch.SchEnoOS
 	}
 
-	msg := sch.SchMessage{}
 	ind := sch.MsgDhtLsnMgrAcceptInd{
 		Con: con,
 	}
-
+	msg := sch.SchMessage{}
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrAcceptInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 
@@ -410,8 +409,8 @@ func (lsnMgr *LsnMgr) setupListener() DhtErrno {
 // Report current status to connection manager
 //
 func (lsnMgr *LsnMgr) dispStaus() DhtErrno {
-	msg := sch.SchMessage{}
 	ind := sch.MsgDhtLsnMgrStatusInd{Status: lsnMgr.status}
+	msg := sch.SchMessage{}
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnConMgr, sch.EvDhtLsnMgrStatusInd, &ind)
 	lsnMgr.sdl.SchSendMessage(&msg)
 	return DhtEnoNone

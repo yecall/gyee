@@ -269,6 +269,8 @@ _failed:
 }
 
 func (sdl *Scheduler) SchSendMessage(msg *SchMessage) SchErrno {
+	// to ensure the message not be modified by the caller after calling
+	// this function, we make a copy.
 	_msg := *msg
 	return sdl.schSendMsg((*schMessage)(&_msg))
 }

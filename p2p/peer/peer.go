@@ -524,11 +524,7 @@ func (peMgr *PeerManager) PeMgrStart() PeMgrErrno {
 
 func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
 	peerLog.Debug("peMgrPoweroff: task will be done, name: %s", sch.PeerMgrName)
-	po := sch.SchMessage{
-		Id:   sch.EvSchPoweroff,
-	}
 	close(peMgr.indChan)
-	peMgr.sdl.SchSetSender(&po, &sch.RawSchTask)
 	for _, pi := range peMgr.peers {
 		peerLog.ForceDebug("peMgrPoweroff: send EvSchPoweroff to inst: %s, dir: %d, state: %d",
 			pi.name, pi.dir, pi.state)
@@ -537,6 +533,10 @@ func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
 				pi.name, pi.dir, pi.state)
 			continue
 		}
+		po := sch.SchMessage{
+			Id:   sch.EvSchPoweroff,
+		}
+		peMgr.sdl.SchSetSender(&po, &sch.RawSchTask)
 		peMgr.sdl.SchSetRecver(&po, pi.ptnMe)
 		po.TgtName = pi.name
 		peMgr.sdl.SchSendMessage(&po)
@@ -1160,8 +1160,8 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	// bug: the following sch.EvPeEstablishedInd message contains a channel for the
 	// receiver task to confirm us, might cause "deadlock" issues in "poweroff".
-	schMsg := sch.SchMessage{}
 	cfmCh := make(chan int)
+	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, &cfmCh)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	if eno, ok := <-cfmCh; eno != PeMgrEnoNone || !ok {
@@ -1329,13 +1329,13 @@ func (peMgr *PeerManager) peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		Dir:     cfm.dir,
 	}
 	if peMgr.ptnShell != nil {
-		schMsg := sch.SchMessage{}
 		ind2Sh := sch.MsgShellPeerCloseCfm{
 			Result: int(cfm.result),
 			Dir:    cfm.dir,
 			Snid:   cfm.snid,
 			PeerId: cfm.peNode.ID,
 		}
+		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellPeerCloseCfm, &ind2Sh)
 		peMgr.sdl.SchSendMessage(&schMsg)
 	} else {
@@ -1344,8 +1344,8 @@ func (peMgr *PeerManager) peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 	if peMgr.inStartup == peMgrInStartup {
 
-		schMsg := sch.SchMessage{}
 		peerLog.Debug("peMgrConnCloseCfm: send EvPeOutboundReq")
+		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
 
@@ -1480,8 +1480,8 @@ func (peMgr *PeerManager) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd
 }
 
 func (peMgr *PeerManager) start() PeMgrErrno {
-	msg := sch.SchMessage{}
 	if peMgr.cfg.noAccept == false {
+		msg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
 		peMgr.sdl.SchSendMessage(&msg)
 		peerLog.Debug("start: EvPeLsnStartReq sent")
@@ -1502,7 +1502,7 @@ func (peMgr *PeerManager) start() PeMgrErrno {
 	}
 	peerLog.Debug("start: ocrTid start ok")
 
-	msg = sch.SchMessage{}
+	msg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	peMgr.sdl.SchSendMessage(&msg)
 	peerLog.Debug("start: EvPeOutboundReq sent")
@@ -1972,11 +1972,11 @@ func (peMgr *PeerManager) peMgrConflictAccessProtect(snid config.SubNetworkID, p
 func (peMgr *PeerManager) peMgrCatHandler(msg interface{}) PeMgrErrno {
 	idexx := msg.(*PeerIdExx)
 	delete(peMgr.caTids, (*idexx).toString())
-	schMsg := sch.SchMessage{}
 	r := sch.MsgDcvFindNodeRsp{
 		Snid:  idexx.Snid,
 		Nodes: []*config.Node{&idexx.Node},
 	}
+	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvDcvFindNodeRsp, &r)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	peerLog.Debug("peMgrCatHandler: EvDcvFindNodeRsp sent, peer: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
@@ -1991,7 +1991,6 @@ func (peMgr *PeerManager) reconfigTimerHandler() PeMgrErrno {
 			continue
 		}
 		why := sch.PEC_FOR_RECONFIG
-		msg := sch.SchMessage{}
 		for _, peerInst := range wks {
 
 			peerLog.ForceDebug("reconfigTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
@@ -2004,6 +2003,7 @@ func (peMgr *PeerManager) reconfigTimerHandler() PeMgrErrno {
 				Dir:  peerInst.dir,
 				Why:  why,
 			}
+			msg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
 			peMgr.sdl.SchSendMessage(&msg)
 		}
@@ -2087,7 +2087,6 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 
 		wkNum := len(wks)
 		count := 0
-		schMsg := sch.SchMessage{}
 		for _, peerInst := range wks {
 			if count++; count >= wkNum/2 {
 				break
@@ -2104,6 +2103,7 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 				Dir:  peerInst.dir,
 				Why:  why,
 			}
+			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
 			if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 				peerLog.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
@@ -2157,7 +2157,6 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 }
 
 func (peMgr *PeerManager) peMgrRecfg2DcvMgr() PeMgrErrno {
-	schMsg := sch.SchMessage{}
 	req := sch.MsgDcvReconfigReq{
 		DelList: make(map[config.SubNetworkID]interface{}, 0),
 		AddList: make(map[config.SubNetworkID]interface{}, 0),
@@ -2168,6 +2167,7 @@ func (peMgr *PeerManager) peMgrRecfg2DcvMgr() PeMgrErrno {
 	for add := range peMgr.reCfg.addList {
 		req.AddList[add] = nil
 	}
+	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvReconfigReq, &req)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	return PeMgrEnoNone
@@ -2199,14 +2199,13 @@ func (peMgr *PeerManager) peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 			return PeMgrEnoNone
 		}
 
-		schMsg := sch.SchMessage{}
 		req := sch.MsgDcvFindNodeReq{
 			Snid:    *snid,
 			More:    more,
 			Include: nil,
 			Exclude: nil,
 		}
-
+		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnDcv, sch.EvDcvFindNodeReq, &req)
 		peMgr.sdl.SchSendMessage(&schMsg)
 		timerName = fmt.Sprintf("%s%x", sch.PeerMgrName+"_DcvFindNodeTimer_", *snid)
@@ -2521,14 +2520,13 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 			pi.raddr.String())
 	}
 
-	schMsg := sch.SchMessage{}
 	rsp := msgConnOutRsp{
 		result: eno,
 		snid:   pi.snid,
 		peNode: &pi.node,
 		ptn:    pi.ptnMe,
 	}
-
+	schMsg := sch.SchMessage{}
 	pi.sdl.SchMakeMessage(&schMsg, pi.ptnMe, pi.ptnMgr, sch.EvPeConnOutRsp, &rsp)
 	pi.sdl.SchSendMessage(&schMsg)
 
@@ -2704,7 +2702,6 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 }
 
 func (pi *PeerInstance) piPingpongTimerHandler() PeMgrErrno {
-	msg := sch.SchMessage{}
 	if pi.ppCnt++; pi.ppCnt > PeInstMaxPingpongCnt {
 
 		peerLog.ForceDebug("piPingpongTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
@@ -2719,6 +2716,7 @@ func (pi *PeerInstance) piPingpongTimerHandler() PeMgrErrno {
 			Dir:  pi.dir,
 			Why:  why,
 		}
+		msg := sch.SchMessage{}
 		pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 		pi.sdl.SchSendMessage(&msg)
 		return pi.ppEno
@@ -2726,7 +2724,7 @@ func (pi *PeerInstance) piPingpongTimerHandler() PeMgrErrno {
 	pr := MsgPingpongReq{
 		seq: uint64(time.Now().UnixNano()),
 	}
-	msg = sch.SchMessage{}
+	msg := sch.SchMessage{}
 	pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPePingpongReq, &pr)
 	pi.sdl.SchSendMessage(&msg)
 	return PeMgrEnoNone

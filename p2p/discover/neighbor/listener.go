@@ -163,11 +163,11 @@ func (lsnMgr *ListenerManager) setupUdpConn() sch.SchErrno {
 
 func (lsnMgr *ListenerManager) start() sch.SchErrno {
 	var eno sch.SchErrno
-	var msg sch.SchMessage
 	if eno = lsnMgr.canStart(); eno != sch.SchEnoNone {
 		lsnLog.Debug("start: could not start, eno: %d", eno)
 		return eno
 	}
+	msg := sch.SchMessage{}
 	lsnMgr.sdl.SchMakeMessage(&msg, lsnMgr.ptnMe, lsnMgr.ptnMe, sch.EvNblStart, nil)
 	lsnMgr.sdl.SchSendMessage(&msg)
 	return sch.SchEnoNone
@@ -400,7 +400,6 @@ func (udpReader *UdpReaderTask) canErrIgnored(err error) bool {
 }
 
 func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPAddr) sch.SchErrno {
-	var msg sch.SchMessage
 	var eno umsg.UdpMsgErrno
 	if eno := udpReader.udpMsg.SetRawMessage(pbuf, len, from); eno != umsg.UdpMsgEnoNone {
 		return sch.SchEnoUserTask
@@ -418,6 +417,7 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 		return sch.SchEnoUserTask
 	}
 	udpReader.udpMsg.DebugMessageFromPeer()
+	msg := sch.SchMessage{}
 	udpReader.sdl.SchMakeMessage(&msg, udpReader.ptnMe, udpReader.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
 	udpReader.sdl.SchSendMessage(&msg)
 	return sch.SchEnoNone
@@ -451,11 +451,11 @@ func (lsnMgr *ListenerManager) sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.S
 }
 
 func sendUdpMsg(sdl *sch.Scheduler, lsn interface{}, sender interface{}, buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
-	var schMsg = sch.SchMessage{}
 	req := sch.NblDataReq{
 		Payload: buf,
 		TgtAddr: toAddr,
 	}
+	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, sender, lsn, sch.EvNblDataReq, &req)
 	sdl.SchSendMessage(&schMsg)
 	return sch.SchEnoNone

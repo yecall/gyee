@@ -157,13 +157,13 @@ func (dcvMgr *DiscoverManager) DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 }
 
 func (dcvMgr *DiscoverManager) DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvMgrErrno {
-	var schMsg = sch.SchMessage{}
 	var reqRefresh = sch.MsgTabRefreshReq{req.Snid, nil, nil}
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
 		dcvLog.Debug("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
 			reqRefresh.Snid, dcvMgr.more)
 		return DcvMgrEnoNone
 	}
+	var schMsg = sch.SchMessage{}
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnTab, sch.EvTabRefreshReq, &reqRefresh)
 	dcvMgr.sdl.SchSendMessage(&schMsg)
 	return DcvMgrEnoNone
@@ -187,12 +187,11 @@ func (dcvMgr *DiscoverManager) DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dc
 		return DcvMgrEnoNone
 	}
 
-	schMsg := sch.SchMessage{}
 	r := sch.MsgDcvFindNodeRsp{
 		Snid:  rsp.Snid,
 		Nodes: rsp.Nodes,
 	}
-
+	schMsg := sch.SchMessage{}
 	dcvMgr.sdl.SchMakeMessage(&schMsg, dcvMgr.ptnMe, dcvMgr.ptnPeMgr, sch.EvDcvFindNodeRsp, &r)
 	dcvMgr.sdl.SchSendMessage(&schMsg)
 	dcvMgr.more -= len(r.Nodes)

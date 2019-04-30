@@ -311,9 +311,9 @@ func (qryMgr *QryMgr) poweron(ptn interface{}) sch.SchErrno {
 //
 func (qryMgr *QryMgr) poweroff(ptn interface{}) sch.SchErrno {
 	qryLog.Debug("poweroff: task will be done ...")
-	po := sch.SchMessage{}
 	for _, qcb := range qryMgr.qcbTab {
 		for _, qry := range qcb.qryActived {
+			po := sch.SchMessage{}
 			qryMgr.sdl.SchMakeMessage(&po, qryMgr.ptnMe, qry.ptnInst, sch.EvSchPoweroff, nil)
 			po.TgtName = qry.name
 			qryMgr.sdl.SchSendMessage(&po)
@@ -344,8 +344,8 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 
 	var forWhat = msg.ForWhat
 	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno: DhtEnoUnknown.GetEno()}
-	var qcb *qryCtrlBlock = nil
-	var schMsg = sch.SchMessage{}
+	var qcb *qryCtrlBlock
+	var schMsg *sch.SchMessage
 
 	//
 	// set "NtfReq" to be true to tell route manager that we need notifications,
@@ -387,14 +387,16 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 
 	qryLog.Debug("queryStartReq: qcb: %+v", *qcb)
 
-	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
-	qryMgr.sdl.SchSendMessage(&schMsg)
+	schMsg = new(sch.SchMessage)
+	qryMgr.sdl.SchMakeMessage(schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &nearestReq)
+	qryMgr.sdl.SchSendMessage(schMsg)
 	rsp.Eno = DhtEnoNone.GetEno()
 
 _rsp2Sender:
 
-	qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStartRsp, &rsp)
-	qryMgr.sdl.SchSendMessage(&schMsg)
+	schMsg = new(sch.SchMessage)
+	qryMgr.sdl.SchMakeMessage(schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStartRsp, &rsp)
+	qryMgr.sdl.SchSendMessage(schMsg)
 	if rsp.Eno != DhtEnoNone.GetEno() {
 		return sch.SchEnoUserTask
 	}
@@ -441,23 +443,23 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	}
 
 	qryFailed2Sender := func(eno DhtErrno) {
-		schMsg := sch.SchMessage{}
 		rsp := sch.MsgDhtQryMgrQueryStartRsp{
 			Target: msg.Target,
 			Eno:    int(eno),
 		}
+		schMsg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryStartRsp, &rsp)
 		qryMgr.sdl.SchSendMessage(&schMsg)
 	}
 
 	qryOk2Sender := func(peer *config.Node) {
-		schMsg := sch.SchMessage{}
 		ind := sch.MsgDhtQryMgrQueryResultInd{
 			Eno:     DhtEnoNone.GetEno(),
 			ForWhat: msg.ForWhat,
 			Target:  target,
 			Peers:   []*config.Node{peer},
 		}
+		schMsg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 		qryMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -556,7 +558,7 @@ func (qryMgr *QryMgr) queryStopReq(sender interface{}, msg *sch.MsgDhtQryMgrQuer
 	target := msg.Target
 	rsp := sch.MsgDhtQryMgrQueryStopRsp{Target: target, Eno: DhtEnoNone.GetEno()}
 	rsp2Sender := func(rsp *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
-		var schMsg = sch.SchMessage{}
+		schMsg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, sender, sch.EvDhtQryMgrQueryStopRsp, rsp)
 		return qryMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -731,7 +733,6 @@ func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrn
 	from := msg.From
 	latency := msg.Latency
 	updateReq2RutMgr := func(peer *config.Node, dur time.Duration) sch.SchErrno {
-		schMsg := sch.SchMessage{}
 		updateReq := sch.MsgDhtRutMgrUpdateReq{
 			Why: rutMgrUpdate4Query,
 			Eno: DhtEnoNone.GetEno(),
@@ -742,6 +743,7 @@ func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrn
 				dur,
 			},
 		}
+		schMsg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
 		return qryMgr.sdl.SchSendMessage(&schMsg)
 	}
@@ -888,7 +890,6 @@ func (qryMgr *QryMgr) natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
 		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
 	} else {
-		schMsg := sch.SchMessage{}
 		req := sch.MsgNatMgrMakeMapReq{
 			Proto:      "tcp",
 			FromPort:   int(qryMgr.qmCfg.local.TCP),
@@ -896,6 +897,7 @@ func (qryMgr *QryMgr) natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 			DurKeep:    natMapKeepTime,
 			DurRefresh: natMapRefreshTime,
 		}
+		schMsg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
 		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
@@ -1061,11 +1063,11 @@ func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	}
 
 	if qcb.rutNtfFlag == true {
-		msg := sch.SchMessage{}
 		req := sch.MsgDhtRutMgrStopNofiyReq{
 			Task:   qryMgr.ptnMe,
 			Target: qcb.target,
 		}
+		msg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qryMgr.ptnRutMgr, sch.EvDhtRutMgrStopNotifyReq, &req)
 		qryMgr.sdl.SchSendMessage(&msg)
 	}
@@ -1346,7 +1348,6 @@ func (qryMgr *QryMgr) qryMgrResultReport(
 	// notice: "peer" passed in is not used, the "qcb.qryResult"
 	//
 
-	var msg = sch.SchMessage{}
 	var ind = sch.MsgDhtQryMgrQueryResultInd{
 		Eno:     eno,
 		ForWhat: qcb.forWhat,
@@ -1373,6 +1374,7 @@ func (qryMgr *QryMgr) qryMgrResultReport(
 	qryLog.Debug("qryMgrResultReport: eno: %d, ForWhat: %d, task: %s",
 		ind.Eno, ind.ForWhat, qryMgr.sdl.SchGetTaskName(qcb.ptnOwner))
 
+	var msg = sch.SchMessage{}
 	qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 	qryMgr.sdl.SchSendMessage(&msg)
 	return DhtEnoNone

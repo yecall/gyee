@@ -292,10 +292,10 @@ func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
 
 	CloseChConMgrReady(conMgr.sdl.SchGetP2pCfgName())
 
-	po := sch.SchMessage{}
 	for _, ci := range conMgr.ciTab {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to sdl: %s, inst: %s, dir: %d, statue: %d",
 			conMgr.sdlName, ci.name, ci.dir, ci.status)
+		po := sch.SchMessage{}
 		po.TgtName = ci.name
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
@@ -303,6 +303,7 @@ func (conMgr *ConMgr) poweroff(ptn interface{}) sch.SchErrno {
 	for _, ci := range conMgr.ibInstTemp {
 		connLog.ForceDebug("poweroff: sent EvSchPoweroff to sdl: %s, inst: %s, dir: %d, statue: %d",
 			conMgr.sdlName, ci.name, ci.dir, ci.status)
+		po := sch.SchMessage{}
 		po.TgtName = ci.name
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		conMgr.sdl.SchSendMessage(&po)
@@ -354,10 +355,10 @@ func (conMgr *ConMgr) acceptInd(msg *sch.MsgDhtLsnMgrAcceptInd) sch.SchErrno {
 	sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweron, nil)
 	sdl.SchSendMessage(&po)
 
-	hs := sch.SchMessage{}
 	hsreq := sch.MsgDhtConInstHandshakeReq{
 		DurHs: conMgr.cfg.hsTimeout,
 	}
+	hs := sch.SchMessage{}
 	sdl.SchMakeMessage(&hs, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstHandshakeReq, &hsreq)
 	sdl.SchSendMessage(&hs)
 
@@ -719,9 +720,9 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	rsp2Sender := func(eno DhtErrno, dir int) sch.SchErrno {
 		connLog.Debug("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
-		msg := sch.SchMessage{}
 		*ptrEno = int(eno)
 		*ptrDir = dir
+		msg := sch.SchMessage{}
 		sdl.SchMakeMessage(&msg, conMgr.ptnMe, sender, rspEvent, rsp)
 		return sdl.SchSendMessage(&msg)
 	}
@@ -806,10 +807,10 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweron, nil)
 	sdl.SchSendMessage(&po)
 
-	hs := sch.SchMessage{}
 	hsreq := sch.MsgDhtConInstHandshakeReq{
 		DurHs: conMgr.cfg.hsTimeout,
 	}
+	hs := sch.SchMessage{}
 	sdl.SchMakeMessage(&hs, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstHandshakeReq, &hsreq)
 	sdl.SchSendMessage(&hs)
 
@@ -842,7 +843,6 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 	sdl := conMgr.sdl
 	_, sender := sdl.SchGetUserTaskNode(msg.Task)
 	rsp2Sender := func(eno DhtErrno) sch.SchErrno {
-		schMsg := sch.SchMessage{}
 		if sender == nil {
 			connLog.ForceDebug("closeReq: rsp2Sender: nil sender, sdl: %s", conMgr.sdlName)
 			return sch.SchEnoMismatched
@@ -852,19 +852,20 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 			Peer: msg.Peer,
 			Dir:  msg.Dir,
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, sender, sch.EvDhtConMgrCloseRsp, &rsp)
 		return sdl.SchSendMessage(&schMsg)
 	}
 	req2Inst := func(inst *ConInst) sch.SchErrno {
 		connLog.ForceDebug("closeReq: req2Inst: sdl: %s, inst: %s, dir: %d",
 			conMgr.sdlName, inst.name, inst.dir)
-		schMsg := sch.SchMessage{}
 		conMgr.instInClosing[cid] = inst
 		delete(conMgr.ciTab, cid)
 		req := sch.MsgDhtConInstCloseReq{
 			Peer: &msg.Peer.ID,
 			Why:  sch.EvDhtConMgrCloseReq,
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
 		schMsg.Keep = sch.SchMsgKeepFromPoweroff
 		sdl.SchSendMessage(&schMsg)
@@ -1033,17 +1034,16 @@ func (conMgr *ConMgr) instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno 
 	}
 	sdl := conMgr.sdl
 	rsp2Sender := func(eno DhtErrno, peer *config.Node, task interface{}) sch.SchErrno {
-		schMsg := sch.SchMessage{}
 		rsp := sch.MsgDhtConMgrCloseRsp{
 			Eno:  int(eno),
 			Peer: peer,
 			Dir:  msg.Dir,
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, task, sch.EvDhtConMgrCloseRsp, &rsp)
 		return sdl.SchSendMessage(&schMsg)
 	}
 	rutUpdate := func(node *config.Node) sch.SchErrno {
-		schMsg := sch.SchMessage{}
 		update := sch.MsgDhtRutMgrUpdateReq{
 			Why: rutMgrUpdate4Closed,
 			Eno: DhtEnoNone.GetEno(),
@@ -1054,6 +1054,7 @@ func (conMgr *ConMgr) instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno 
 				-1,
 			},
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 		return sdl.SchSendMessage(&schMsg)
 	}
@@ -1100,7 +1101,6 @@ func (conMgr *ConMgr) rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.Sch
 		nid: msg.Peer,
 		dir: ConInstDirAllbound,
 	}
-	schMsg := sch.SchMessage{}
 	sdl := conMgr.sdl
 	req2Inst := func(inst *ConInst) sch.SchErrno {
 		connLog.ForceDebug("rutPeerRemoveInd: req2Inst: sdl: %s, inst: %s, dir: %d",
@@ -1112,6 +1112,7 @@ func (conMgr *ConMgr) rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.Sch
 			Peer: &msg.Peer,
 			Why:  sch.EvDhtRutPeerRemovedInd,
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
 		schMsg.Keep = sch.SchMsgKeepFromPoweroff
 		return sdl.SchSendMessage(&schMsg)
@@ -1377,7 +1378,6 @@ func (conMgr *ConMgr) instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 	}
 	sdl := conMgr.sdl
 	rutUpdate := func(node *config.Node) sch.SchErrno {
-		schMsg := sch.SchMessage{}
 		update := sch.MsgDhtRutMgrUpdateReq{
 			Why: rutMgrUpdate4Closed,
 			Eno: DhtEnoNone.GetEno(),
@@ -1388,6 +1388,7 @@ func (conMgr *ConMgr) instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 				-1,
 			},
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 		return sdl.SchSendMessage(&schMsg)
 	}
@@ -1424,7 +1425,6 @@ func (conMgr *ConMgr) instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.S
 	}
 	sdl := conMgr.sdl
 	rutUpdate := func(node *config.Node) sch.SchErrno {
-		schMsg := sch.SchMessage{}
 		update := sch.MsgDhtRutMgrUpdateReq{
 			Why: rutMgrUpdate4Closed,
 			Eno: DhtEnoNone.GetEno(),
@@ -1435,6 +1435,7 @@ func (conMgr *ConMgr) instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.S
 				-1,
 			},
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &update)
 		return sdl.SchSendMessage(&schMsg)
 	}
@@ -1535,8 +1536,8 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 
 	conMgr.instInClosing = make(map[conInstIdentity]*ConInst, 0)
 
-	po := sch.SchMessage{}
 	for _, ci := range conMgr.ciTab {
+		po := sch.SchMessage{}
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		po.TgtName = ci.name
 		conMgr.sdl.SchSendMessage(&po)
@@ -1546,6 +1547,7 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 	conMgr.ciTab = make(map[conInstIdentity]*ConInst, 0)
 
 	for _, ci := range conMgr.ibInstTemp {
+		po := sch.SchMessage{}
 		conMgr.sdl.SchMakeMessage(&po, conMgr.ptnMe, ci.ptnMe, sch.EvSchPoweroff, nil)
 		po.TgtName = ci.name
 		conMgr.sdl.SchSendMessage(&po)

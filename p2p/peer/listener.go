@@ -295,12 +295,12 @@ acceptLoop:
 			break acceptLoop
 		}
 
-		msg := sch.SchMessage{}
 		msgBody := msgConnAcceptedInd{
 			conn:       conn,
 			localAddr:  conn.LocalAddr().(*net.TCPAddr),
 			remoteAddr: conn.RemoteAddr().(*net.TCPAddr),
 		}
+		msg := sch.SchMessage{}
 		accepter.sdl.SchMakeMessage(&msg, ptn, accepter.ptnPeMgr, sch.EvPeLsnConnAcceptedInd, &msgBody)
 		accepter.sdl.SchSendMessage(&msg)
 	}

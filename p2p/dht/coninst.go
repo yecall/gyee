@@ -541,11 +541,11 @@ func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
 	ciLog.ForceDebug("closeReq: send EvDhtConInstCloseRsp, sdl: %s, inst: %s, dir: %d, why: %d, status: %d, peer: %x",
 		conInst.sdlName, conInst.name, conInst.dir, msg.Why, conInst.getStatus(), conInst.hsInfo.peer.ID)
 
-	schMsg := sch.SchMessage{}
 	rsp := sch.MsgDhtConInstCloseRsp{
 		Peer: &conInst.hsInfo.peer.ID,
 		Dir:  int(conInst.dir),
 	}
+	schMsg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstCloseRsp, &rsp)
 	conInst.sdl.SchSendMessage(&schMsg)
 	return conInst.sdl.SchTaskDone(conInst.ptnMe, conInst.name, sch.SchEnoKilled)
@@ -798,12 +798,12 @@ func (conInst *ConInst) txTimerHandler(userData interface{}) error {
 	eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
 	if eno == sch.SchEnoNone && ptn != nil && ptn == txPkg.task {
 		if txPkg.task != nil {
-			schMsg := sch.SchMessage{}
 			ind := sch.MsgDhtConInstTxInd{
 				Eno:     DhtEnoTimeout.GetEno(),
 				WaitMid: txPkg.waitMid,
 				WaitSeq: txPkg.waitSeq,
 			}
+			schMsg := sch.SchMessage{}
 			conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtConInstTxInd, &ind)
 			conInst.sdl.SchSendMessage(&schMsg)
 		}
@@ -821,7 +821,6 @@ func (conInst *ConInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 
 	var eno DhtErrno
 	var txPkg *conInstTxPkg
-	var schMsg = sch.SchMessage{}
 
 	switch msg.ForWhat {
 
@@ -845,8 +844,9 @@ func (conInst *ConInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 	if eno == DhtEnoNone && txPkg != nil {
 		_, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
 		if ptn != nil && ptn == txPkg.task {
-			conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, msg)
-			conInst.sdl.SchSendMessage(&schMsg)
+			schMsg := new(sch.SchMessage)
+			conInst.sdl.SchMakeMessage(schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtQryInstProtoMsgInd, msg)
+			conInst.sdl.SchSendMessage(schMsg)
 		}
 	}
 
@@ -1055,12 +1055,12 @@ func (conInst *ConInst) statusReport() DhtErrno {
 	// status of a connection instance to apply the "peer" information indicated by
 	// the following message.
 	//
-	msg := sch.SchMessage{}
 	ind := sch.MsgDhtConInstStatusInd{
 		Peer:   &conInst.hsInfo.peer.ID,
 		Dir:    int(conInst.dir),
 		Status: int(conInst.getStatus()),
 	}
+	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnConMgr, sch.EvDhtConInstStatusInd, &ind)
 	if conInst.sdl.SchSendMessage(&msg) != sch.SchEnoNone {
 		return DhtEnoScheduler
@@ -1706,7 +1706,6 @@ func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 // Handler for "MID_FINDNODE" from peer
 //
 func (conInst *ConInst) findNode(fn *FindNode) DhtErrno {
-	msg := sch.SchMessage{}
 	req := sch.MsgDhtRutMgrNearestReq{
 		Target:  fn.Target,
 		Max:     rutMgrMaxNearest,
@@ -1715,6 +1714,7 @@ func (conInst *ConInst) findNode(fn *FindNode) DhtErrno {
 		ForWhat: MID_FINDNODE,
 		Msg:     fn,
 	}
+	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &req)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
@@ -1724,12 +1724,12 @@ func (conInst *ConInst) findNode(fn *FindNode) DhtErrno {
 // Handler for "MID_NEIGHBORS" from peer
 //
 func (conInst *ConInst) neighbors(nbs *Neighbors) DhtErrno {
-	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd{
 		From:    &nbs.From,
 		Msg:     nbs,
 		ForWhat: sch.EvDhtConInstNeighbors,
 	}
+	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
@@ -1767,12 +1767,12 @@ func (conInst *ConInst) getValueReq(gvr *GetValueReq) DhtErrno {
 // Handler for "MID_GETVALUE_RSP" from peer
 //
 func (conInst *ConInst) getValueRsp(gvr *GetValueRsp) DhtErrno {
-	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd{
 		From:    &gvr.From,
 		Msg:     gvr,
 		ForWhat: sch.EvDhtConInstGetValRsp,
 	}
+	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
@@ -1810,12 +1810,12 @@ func (conInst *ConInst) getProviderReq(gpr *GetProviderReq) DhtErrno {
 // Handler for "MID_GETPROVIDER_RSP" from peer
 //
 func (conInst *ConInst) getProviderRsp(gpr *GetProviderRsp) DhtErrno {
-	msg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstProtoMsgInd{
 		From:    &gpr.From,
 		Msg:     gpr,
 		ForWhat: sch.EvDhtConInstGetProviderRsp,
 	}
+	msg := sch.SchMessage{}
 	conInst.sdl.SchMakeMessage(&msg, conInst.ptnMe, conInst.ptnMe, sch.EvDhtQryInstProtoMsgInd, &ind)
 	conInst.sdl.SchSendMessage(&msg)
 	return DhtEnoNone
@@ -1876,12 +1876,12 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 	eno, ptn := conInst.sdl.SchGetUserTaskNode(txPkg.taskName)
 	if eno == sch.SchEnoNone && ptn != nil && ptn == txPkg.task {
 		if txPkg.task != nil {
-			schMsg := sch.SchMessage{}
 			ind := sch.MsgDhtConInstTxInd{
 				Eno:     DhtEnoTimeout.GetEno(),
 				WaitMid: txPkg.waitMid,
 				WaitSeq: txPkg.waitSeq,
 			}
+			schMsg := sch.SchMessage{}
 			conInst.sdl.SchMakeMessage(&schMsg, conInst.ptnMe, txPkg.task, sch.EvDhtConInstTxInd, &ind)
 			conInst.sdl.SchSendMessage(&schMsg)
 		}

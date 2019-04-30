@@ -317,7 +317,7 @@ func (prdMgr *PrdMgr) localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.
 	var prds = make([]*config.Node, 0)
 	var eno = DhtErrno(DhtEnoUnknown)
 	var qry = sch.MsgDhtQryMgrQueryStartReq{}
-	var schMsg = sch.SchMessage{}
+	var schMsg *sch.SchMessage
 
 	//
 	// lookup cache
@@ -358,8 +358,9 @@ func (prdMgr *PrdMgr) localGetProviderReq(msg *sch.MsgDhtMgrGetProviderReq) sch.
 		Seq:     GetQuerySeqNo(prdMgr.sdl.SchGetP2pCfgName()),
 	}
 
-	prdMgr.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
-	return prdMgr.sdl.SchSendMessage(&schMsg)
+	schMsg = new(sch.SchMessage)
+	prdMgr.sdl.SchMakeMessage(schMsg, prdMgr.ptnMe, prdMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
+	return prdMgr.sdl.SchSendMessage(schMsg)
 
 _rsp2DhtMgr:
 
@@ -526,7 +527,6 @@ func (prdMgr *PrdMgr) getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sc
 	// we have to ask the route manager for nearest for key requested
 	//
 
-	schMsg := sch.SchMessage{}
 	fnReq := sch.MsgDhtRutMgrNearestReq{
 		Target:  dsk,
 		Max:     rutMgrMaxNearest,
@@ -535,7 +535,7 @@ func (prdMgr *PrdMgr) getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sc
 		ForWhat: MID_FINDNODE,
 		Msg:     msg,
 	}
-
+	schMsg := sch.SchMessage{}
 	ci.sdl.SchMakeMessage(&schMsg, prdMgr.ptnMe, prdMgr.ptnRutMgr, sch.EvDhtRutMgrNearestReq, &fnReq)
 	return ci.sdl.SchSendMessage(&schMsg)
 }

@@ -30,7 +30,7 @@ import (
 //
 // message
 //
-type schMessage SchMessage
+type schMessage = SchMessage
 
 //
 // User task entry point
@@ -52,8 +52,8 @@ type schWatchDog = SchWatchDog
 // Mail box
 //
 type schMailBox struct {
-	que  *chan schMessage // channel for message
-	size int              // number of messages buffered
+	que  *chan *schMessage	// channel for message
+	size int              	// number of messages buffered
 }
 
 //

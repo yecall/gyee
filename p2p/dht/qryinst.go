@@ -221,18 +221,17 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
-	msg := sch.SchMessage{}
+	qiLog.ForceDebug("startReq: ask connection manager for peer, " +
+		"sdl: %s, inst: %s, ForWhat: %d",
+		icb.sdlName, icb.name, icb.qryReq.ForWhat)
+
 	req := sch.MsgDhtConMgrConnectReq{
 		Task:    icb.ptnInst,
 		Name:    icb.name,
 		Peer:    &icb.to,
 		IsBlind: false,
 	}
-
-	qiLog.ForceDebug("startReq: ask connection manager for peer, " +
-		"sdl: %s, inst: %s, ForWhat: %d",
-		icb.sdlName, icb.name, icb.qryReq.ForWhat)
-
+	msg := sch.SchMessage{}
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
 	icb.sdl.SchSendMessage(&msg)
 	icb.conBegTime = time.Now()
@@ -259,6 +258,7 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 			icb.sdlName, icb.name, eno)
 		ind.Status = qisDone
 		icb.status = qisDone
+		msg = sch.SchMessage{}
 		icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		icb.sdl.SchSendMessage(&msg)
 		icb.sdl.SchTaskDone(icb.ptnInst, icb.name, sch.SchEnoInternal)
@@ -268,6 +268,7 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 	icb.qTid = tid
 	icb.status = qisWaitConnect
 	ind.Status = qisWaitConnect
+	msg = sch.SchMessage{}
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	icb.sdl.SchSendMessage(&msg)
 
@@ -298,7 +299,6 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 
 	icb := qryInst.icb
 	sdl := icb.sdl
-	schMsg := sch.SchMessage{}
 
 	//
 	// this timer might for waiting connection establishment response or waiting
@@ -334,6 +334,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 			Peer: &icb.to,
 			Dir:  icb.dir,
 		}
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
 		sdl.SchSendMessage(&schMsg)
 	}
@@ -348,6 +349,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 		Seens: []config.Node{icb.to},
 		Duras: []time.Duration{-1},
 	}
+	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
 	sdl.SchSendMessage(&schMsg)
 
@@ -363,6 +365,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	}
 
 	icb.status = qisDone
+	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	sdl.SchSendMessage(&schMsg)
 
@@ -392,7 +395,6 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		return sch.SchEnoMismatched
 	}
 
-	schMsg := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstStatusInd{
 		Peer:   icb.to.ID,
 		Target: icb.target,
@@ -419,6 +421,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		ind.Status = qisDone
 		icb.status = qisDone
 
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		sdl.SchSendMessage(&schMsg)
 		sdl.SchTaskDone(icb.ptnInst, icb.name, sch.SchEnoKilled)
@@ -441,6 +444,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 
 		ind.Status = qisDone
 		icb.status = qisDone
+		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 		sdl.SchSendMessage(&schMsg)
 		sdl.SchTaskDone(icb.ptnInst, icb.name, sch.SchEnoKilled)
@@ -473,6 +477,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		sendReq.WaitSeq = -1
 	}
 
+	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
 	sdl.SchSendMessage(&schMsg)
 
@@ -504,7 +509,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 			Value:    nil,
 			Pcs:      []int{pcsConnYes},
 		}
-		schMsg := sch.SchMessage{}
+		schMsg = sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
 		return sdl.SchSendMessage(&schMsg)
 	}
@@ -517,6 +522,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	icb.status = qisWaitResponse
 	icb.begTime = time.Now()
 
+	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	sdl.SchSendMessage(&schMsg)
 
@@ -690,12 +696,12 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 	icb.sdl.SchSendMessage(&msgResult)
 
 	icb.status = qisDoneOk
-	msgInd := sch.SchMessage{}
 	ind := sch.MsgDhtQryInstStatusInd{
 		Peer:   icb.to.ID,
 		Target: icb.target,
 		Status: qisNull,
 	}
+	msgInd := sch.SchMessage{}
 	icb.sdl.SchMakeMessage(&msgInd, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	icb.sdl.SchSendMessage(&msgInd)
 	return sch.SchEnoNone
