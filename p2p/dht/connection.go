@@ -866,6 +866,7 @@ func (conMgr *ConMgr) closeReq(msg *sch.MsgDhtConMgrCloseReq) sch.SchErrno {
 			Why:  sch.EvDhtConMgrCloseReq,
 		}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
+		schMsg.Keep = sch.SchMsgKeepFromPoweroff
 		sdl.SchSendMessage(&schMsg)
 		return sch.SchEnoNone
 	}
@@ -1016,6 +1017,7 @@ func (conMgr *ConMgr) instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 
 	schMsg := sch.SchMessage{}
 	conMgr.sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConInstStatusInd, msg)
+	schMsg.Keep = sch.SchMsgKeepFromPoweroff
 	conMgr.sdl.SchSendMessage(&schMsg)
 
 	return sch.SchEnoNone
@@ -1111,6 +1113,7 @@ func (conMgr *ConMgr) rutPeerRemoveInd(msg *sch.MsgDhtRutPeerRemovedInd) sch.Sch
 			Why:  sch.EvDhtRutPeerRemovedInd,
 		}
 		sdl.SchMakeMessage(&schMsg, conMgr.ptnMe, inst.ptnMe, sch.EvDhtConInstCloseReq, &req)
+		schMsg.Keep = sch.SchMsgKeepFromPoweroff
 		return sdl.SchSendMessage(&schMsg)
 	}
 	closeInst := func(ci *ConInst) (found, dup, err bool) {
@@ -1461,7 +1464,9 @@ func (conMgr *ConMgr) instOutOfServiceInd(msg *sch.MsgDhtConInstStatusInd) sch.S
 					}
 					msg := sch.SchMessage{}
 					sdl.SchMakeMessage(&msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConInstCloseReq, &req)
+					msg.Keep = sch.SchMsgKeepFromPoweroff
 					sdl.SchSendMessage(&msg)
+
 				}
 			}
 		}

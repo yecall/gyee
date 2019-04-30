@@ -227,7 +227,9 @@ func (sdl *scheduler) schCommonTask(ptn *schTaskNode) SchErrno {
 
 		//
 		// drain possible pending messages and send EvSchDone if the task done
-		// with a mailbox.
+		// with a mailbox. notice that we can always discard the messages queued
+		// in the mailbox of current task and need not to inform the message
+		// sender, since this task will be done.
 		//
 
 		if cap(*mailbox.que) > 0 {
@@ -288,12 +290,20 @@ taskLoop:
 
 				if msg.Id == EvSchDone {
 					break drainLoop2
-				} else if msg.Id == EvSchPoweroff && !task.killing {
+				} else if msg.Id == EvSchPoweroff {
+					break drainLoop2
+				} else if msg.Keep == SchMsgKeepFromPoweroff && !task.killing {
+					break drainLoop2
+				} else if msg.Keep == SchMsgKeepFromDone {
 					break drainLoop2
 				}
 
 				if msg.Mscb != nil {
-					msg.Mscb(SchEnoDone)
+					if task.killing {
+						msg.Mscb(SchEnoDone)
+					} else {
+						msg.Mscb(SchEnoPowerOff)
+					}
 				}
 			}
 
@@ -323,14 +333,10 @@ taskLoop:
 		}
 
 		//
-		// call handler, but if in power off stage, we discard all except EvSchPoweroff
+		// call user task
 		//
 
-		if (sdl.powerOff == false) || (sdl.powerOff == true && msg.Id == EvSchPoweroff) {
-
-			proc(ptn, (*SchMessage)(&msg))
-
-		}
+		proc(ptn, (*SchMessage)(&msg))
 	}
 
 	//
@@ -1470,11 +1476,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		case EvSchPoweroff:
 		case EvSchDone:
 		default:
-			if schLog.debug__ {
-				schLog.ForceDebug("schSendMsg: in power off stage, sdl: %s, mid: %d", sdlName, msg.Id)
+			if msg.Keep == SchMsgKeepFromNone {
+				if schLog.debug__ {
+					schLog.ForceDebug("schSendMsg: in power off stage, sdl: %s, mid: %d", sdlName, msg.Id)
+				}
+				sdl.lock.Unlock()
+				return mscb(msg, SchEnoPowerOff)
 			}
-			sdl.lock.Unlock()
-			return mscb(msg, SchEnoPowerOff)
 		}
 	}
 
@@ -1506,7 +1514,6 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 	targetName := sdl.tnMap[msg.recver]
 
 	if msg.Id == EvSchPoweroff {
-		// must go with target task name
 		if len(msg.TgtName) == 0 {
 			panic("schSendMsg: EvSchPoweroff, target name needed")
 		}
