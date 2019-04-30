@@ -93,6 +93,15 @@ func (b *jsBridge) nodeInfo(call otto.FunctionCall) otto.Value {
 	return result
 }
 
+func (b *jsBridge) getAccounts(call otto.FunctionCall) otto.Value {
+	response, err := b.svcAdmin.Accounts(b.ctx, &rpcpb.NonParamsRequest{})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	result, _ := otto.ToValue(response.String())
+	return result
+}
+
 func (b *jsBridge) getBlockByHash(call otto.FunctionCall) otto.Value {
 	hash := call.Argument(0)
 	if !hash.IsString() {
@@ -243,12 +252,19 @@ func (b *jsBridge) newAccount(call otto.FunctionCall) otto.Value {
 		fmt.Fprintln(b.writer, errors.New("unexpected argument count"))
 		return otto.NullValue()
 	}
-	ret, err := call.Otto.Call("bridge.newAccount", nil, password)
+	// TODO: switch to js wrapping
+	//ret, err := call.Otto.Call("bridge.newAccount", nil, password)
+	//if err != nil {
+	//	fmt.Fprintln(b.writer, err)
+	//	return otto.NullValue()
+	//}
+	response, err := b.svcAdmin.NewAccount(b.ctx,
+		&rpcpb.NewAccountRequest{Passphrase: password})
 	if err != nil {
-		fmt.Fprintln(b.writer, err)
-		return otto.NullValue()
+		return jsError(call.Otto, err)
 	}
-	return ret
+	value, _ := otto.ToValue(response.Address)
+	return value
 }
 
 // signTransaction handle the account unlock with passphrase input
@@ -279,14 +295,36 @@ func (b *jsBridge) unlockAccount(call otto.FunctionCall) otto.Value {
 		}
 		passphrase = call.Argument(1)
 	}
-
+	// TODO: switch to js wrapping
 	// Send the request to the backend and return
-	val, err := call.Otto.Call("bridge.unlockAccount", nil, address, passphrase)
+	//val, err := call.Otto.Call("bridge.unlockAccount", nil, address, passphrase)
+	//if err != nil {
+	//	fmt.Fprintln(b.writer, err)
+	//	return otto.NullValue()
+	//}
+	response, err := b.svcAdmin.UnlockAccount(b.ctx,
+		&rpcpb.UnlockAccountRequest{
+			Address:    address.String(),
+			Passphrase: passphrase.String(),
+			Duration:   300,
+		})
 	if err != nil {
-		fmt.Fprintln(b.writer, err)
-		return otto.NullValue()
+		return jsError(call.Otto, err)
 	}
-	return val
+	value, _ := otto.ToValue(response.Result)
+	return value
+}
+
+func (b *jsBridge) lockAccount(call otto.FunctionCall) otto.Value {
+	response, err := b.svcAdmin.LockAccount(b.ctx,
+		&rpcpb.LockAccountRequest{
+			Address: call.Argument(0).String(),
+		})
+	if err != nil {
+		return jsError(call.Otto, err)
+	}
+	value, _ := otto.ToValue(response.String())
+	return value
 }
 
 // sendTransactionWithPassphrase handle the transaction send with passphrase input
