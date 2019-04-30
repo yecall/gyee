@@ -82,16 +82,6 @@ func (b *jsBridge) output(call otto.FunctionCall) otto.Value {
 	return otto.NullValue()
 }
 
-// setHost update repl request host
-func (b *jsBridge) setHost(call otto.FunctionCall) otto.Value {
-	host := call.Argument(0)
-	if !host.IsString() {
-		return jsError(call.Otto, errors.New("setHost host is null"))
-	}
-	b.host = host.String()
-	return otto.NullValue()
-}
-
 func (b *jsBridge) nodeInfo(call otto.FunctionCall) otto.Value {
 	response, err := b.svcApi.NodeInfo(b.ctx,
 		&rpcpb.NonParamsRequest{})
