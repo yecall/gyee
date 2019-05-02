@@ -1721,6 +1721,7 @@ func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 				Seq: msg.Gcd.Seq,
 				Kind: msg.Gcd.Name,
 				Key: msg.Gcd.Key,
+				Data: data,
 			}
 			schMsg := sch.SchMessage{}
 			yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell,
