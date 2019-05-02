@@ -678,23 +678,6 @@ func (shMgr *ShellManager) reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchEr
 }
 
 func (shMgr *ShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
-	// check if the peer is active currently
-	upkg := new(peer.P2pPackage)
-	upkg.Pid = uint32(rxPkg.ProtoId)
-	upkg.Mid = uint32(rxPkg.MsgId)
-	upkg.Key = rxPkg.Key
-	upkg.PayloadLength = uint32(rxPkg.PayloadLength)
-	upkg.Payload = rxPkg.Payload
-	msg := peer.ExtMessage{}
-	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
-		chainLog.Debug("getChainDataFromPeer: GetExtMessage failed, eno: %d", eno)
-		return sch.SchEnoUserTask
-	}
-	if msg.Mid != uint32(MID_GCD) {
-		chainLog.Debug("getChainDataFromPeer: message type mismatched, mid: %d", msg.Mid)
-		return sch.SchEnoUserTask
-	}
-
 	shMgr.peerLock.Lock()
 	defer shMgr.peerLock.Unlock()
 
@@ -716,7 +699,6 @@ func (shMgr *ShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.Sc
 }
 
 func (shMgr *ShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
-	// nothing to do
 	return sch.SchEnoNone
 }
 
