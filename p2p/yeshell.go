@@ -1755,6 +1755,9 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 		yesLog.Debug("putChainDataFromPeer: sequence mismatch")
 		return sch.SchEnoMismatched
 	}
+	// notice: when all matched, we should delete the key from the map at once
+	// to discard the possible responses with the same key value, or in the worst
+	// case, deadlock can happen. see function GetChainInfo also please.
 	delete(yeShMgr.gciMap, kex)
 	if vex.gcdChan != nil {
 		vex.gcdChan <- msg.Pcd.Data
