@@ -1045,6 +1045,7 @@ func testCase18(tc *testCase) {
 	getChainInfo := func() ([]byte, error){
 		kind := fmt.Sprintf("%s", time.Now())
 		key := sha256.Sum256([]byte(kind))
+		log.Debug("testCase18: call GetChainInfo ...")
 		return yeShMgr.GetChainInfo(kind, key[0:])
 	}
 	cp := testChainProvider{}
@@ -1057,8 +1058,11 @@ func testCase18(tc *testCase) {
 		for {
 			select {
 			case <-tm.C:
-				ci, err := getChainInfo()
-				log.Debug("testCase18: ci: %x, err: %s", ci, err.Error())
+				if ci, err := getChainInfo(); err != nil {
+					log.Debug("testCase18: failed, error: %s", err.Error())
+				} else {
+					log.Debug("testCase18: ok, chainInfo: %x", ci)
+				}
 				tm.Reset(cycle)
 			case <-quitCh:
 				break _gciExit

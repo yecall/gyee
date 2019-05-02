@@ -180,7 +180,7 @@ type YeShellManager struct {
 	bsTicker       *time.Ticker                     // bootstrap ticker
 	dhtBsChan      chan bool                        // bootstrap ticker channel
 	cp             ChainProvider                    // interface registered to p2p for "get chain data" message
-	gcdLock		   sync.Mutex						// get chain data lock
+	gciLock		   sync.Mutex						// get chain data lock
 	gciMap         map[getChainInfoKeyEx]*getChainInfoValEx // map for get chain information
 }
 
@@ -759,13 +759,13 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	}
 	copy(kex.key[0:], key)
 
-	yeShMgr.gcdLock.Lock()
+	yeShMgr.gciLock.Lock()
 	if _, dup := yeShMgr.gciMap[kex]; dup {
-		yeShMgr.gcdLock.Unlock()
+		yeShMgr.gciLock.Unlock()
 		return nil, errors.New("GetChainInfo: duplicated (kind,key) pair")
 	}
 	if len(yeShMgr.gciMap) > GCIBS {
-		yeShMgr.gcdLock.Unlock()
+		yeShMgr.gciLock.Unlock()
 		return nil, errors.New(fmt.Sprintf("GetChainInfo: too much, max: %d", GCIBS))
 	}
 	vex := getChainInfoValEx{
@@ -774,7 +774,7 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 		gcdSeq: uint64(time.Now().UnixNano()),
 	}
 	yeShMgr.gciMap[kex] = &vex
-	yeShMgr.gcdLock.Unlock()
+	yeShMgr.gciLock.Unlock()
 	defer vex.gcdTimer.Stop()
 
 	req := sch.MsgShellGetChainInfoReq {
@@ -794,22 +794,14 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 
 	select {
 	case <-vex.gcdTimer.C:
-
-		yeShMgr.gcdLock.Lock()
-		delete(yeShMgr.gciMap, kex)
-		close(vex.gcdChan)
-		yeShMgr.gcdLock.Unlock()
-
-		return nil, errors.New("GetChainInfo: timeout")
-
-	case chainData, gcdOk = <-vex.gcdChan:
-
-		yeShMgr.gcdLock.Lock()
-		delete(yeShMgr.gciMap, kex)
-		if gcdOk {
+		yeShMgr.gciLock.Lock()
+		if _, ok := yeShMgr.gciMap[kex]; ok {
+			delete(yeShMgr.gciMap, kex)
 			close(vex.gcdChan)
 		}
-		yeShMgr.gcdLock.Unlock()
+		yeShMgr.gciLock.Unlock()
+		return nil, errors.New("GetChainInfo: timeout")
+	case chainData, gcdOk = <-vex.gcdChan:
 	}
 
 	if !gcdOk{
@@ -1734,8 +1726,8 @@ func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 }
 
 func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
-	yeShMgr.gcdLock.Lock()
-	defer yeShMgr.gcdLock.Unlock()
+	yeShMgr.gciLock.Lock()
+	defer yeShMgr.gciLock.Unlock()
 
 	upkg := new(peer.P2pPackage)
 	upkg.Pid = uint32(rxPkg.ProtoId)
@@ -1763,6 +1755,7 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 		yesLog.Debug("putChainDataFromPeer: sequence mismatch")
 		return sch.SchEnoMismatched
 	}
+	delete(yeShMgr.gciMap, kex)
 	if vex.gcdChan != nil {
 		vex.gcdChan <- msg.Pcd.Data
 		return sch.SchEnoNone
