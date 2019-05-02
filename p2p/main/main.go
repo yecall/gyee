@@ -142,20 +142,25 @@ var testCaseTable = []testCase{
 	},
 	{
 		name:        "testCase16",
-		description: "reconfiguration: nat",
+		description: "nat",
 		entry:       testCase16,
 	},
 	{
 		name:        "testCase17",
-		description: "reconfiguration: traffic with nat",
+		description: "nat: traffic with nat",
 		entry:       testCase17,
+	},
+	{
+		name:        "testCase18",
+		description: "get chain info",
+		entry:       testCase18,
 	},
 }
 
 //
 // target case
 //
-var targetCase = "testCase17"
+var targetCase = "testCase18"
 
 //
 // switch for playing go-monitors, related commands:
@@ -1014,4 +1019,54 @@ func testCase17(tc *testCase) {
 		time.Sleep(time.Second * 60)
 		yeChainStop(yeShMgr, subEv, subTx, subBh)
 	}
+}
+
+//
+// testCase18
+//
+type testChainProvider struct {
+}
+
+func (cp testChainProvider)GetChainData(kind string, key []byte) []byte {
+	data := []byte(fmt.Sprintf("kind: %s, key: %x", kind, key))
+	return data
+}
+
+func testCase18(tc *testCase) {
+	yesCfg := yep2p.DefaultYeShellConfig
+	yesCfg.Validator = true
+	yesCfg.BootstrapNode = false
+	yesCfg.SubNetMaskBits = 4
+	yesCfg.NatType = config.NATT_NONE
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+
+	quitCh := make(chan bool, 0)
+	getChainInfo := func() ([]byte, error){
+		kind := fmt.Sprintf("%s", time.Now())
+		key := sha256.Sum256([]byte(kind))
+		return yeShMgr.GetChainInfo(kind, key[0:])
+	}
+	cp := testChainProvider{}
+	yeShMgr.RegChainProvider(&cp)
+	go func() {
+		cycle := time.Millisecond * 1000
+		tm := time.NewTimer(cycle)
+		defer tm.Stop()
+		_gciExit:
+		for {
+			select {
+			case <-tm.C:
+				ci, err := getChainInfo()
+				log.Debug("testCase18: ci: %x, err: %s", ci, err.Error())
+				tm.Reset(cycle)
+			case <-quitCh:
+				break _gciExit
+			}
+		}
+	}()
+
+	waitInterrupt()
+	quitCh <- true
+	yeShMgr.Stop()
 }

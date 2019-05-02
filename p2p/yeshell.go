@@ -29,7 +29,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-	"strings"
 
 	log "github.com/yeeco/gyee/log"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
@@ -74,7 +73,6 @@ const (
 	yesMaxFindNode    = 4                   // max find node commands in pending
 	yesMaxGetProvider = 4                   // max get provider commands in pending
 	yesMaxPutProvider = 4                   // max put provider commands in pending
-	yesGetChainDataTm = time.Second * 8		// duration for get chain data
 )
 
 var yesMtAtoi = map[string]int{
@@ -109,9 +107,11 @@ const (
 
 const (
 	GVTO = time.Second * 4	// get value timeout
-	GVBS = 64				// get value buffer size
+	GVBS = 128				// get value buffer size
 	PVTO = time.Second * 8	// put value timeout
-	PVBS = 64				// put value buffer size
+	PVBS = 128				// put value buffer size
+	GCITO = time.Second * 8	// duration for get chain information
+	GCIBS = 64				// get chain formation buffer size
 )
 
 type SingleSubnetDescriptor = sch.SingleSubnetDescriptor // single subnet descriptor
@@ -127,6 +127,18 @@ type getValueResult struct {
 type putValueResult struct {
 	eno		int
 	key		[]byte
+}
+
+const GCIKEY_LEN = 32
+type getChainInfoKeyEx struct {
+	name	string
+	key		[GCIKEY_LEN]byte
+}
+
+type getChainInfoValEx struct {
+	gcdChan		chan []byte
+	gcdTimer	*time.Timer
+	gcdSeq		uint64
 }
 
 var yesInStopping = errors.New("yesmgr: in stopping")
@@ -169,11 +181,7 @@ type YeShellManager struct {
 	dhtBsChan      chan bool                        // bootstrap ticker channel
 	cp             ChainProvider                    // interface registered to p2p for "get chain data" message
 	gcdLock		   sync.Mutex						// get chain data lock
-	gcdChan        chan []byte						// get chain data channel
-	gcdTimer       *time.Timer						// get chain data timer
-	gcdSeq         uint64							// get chain data sequence number
-	gcdName        string							// get chain data name
-	gcdKey         []byte							// get chain data key
+	gciMap         map[getChainInfoKeyEx]*getChainInfoValEx // map for get chain information
 }
 
 const MaxSubNetMaskBits = 15 // max number of mask bits for sub network identity
@@ -353,6 +361,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 		subscribers:    new(sync.Map),
 		deDupMap:       make(map[[yesKeyBytes]byte]bool, 0),
 		ddtChan:        make(chan bool, 1),
+		gciMap:			make(map[getChainInfoKeyEx]*getChainInfoValEx, 0),
 	}
 
 	cfg, shellCfg := YeShellConfigToP2pCfg(yesCfg)
@@ -742,28 +751,36 @@ func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
 }
 
 func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, error) {
-	if yeShMgr.gcdTimer != nil || yeShMgr.gcdChan != nil {
-		return nil, errors.New("GetChainInfo: previous GCD exist")
+	if len(key) != GCIKEY_LEN || len(kind) == 0 {
+		return nil, errors.New("GetChainInfo: invalid (kind,key) pair")
 	}
-	yeShMgr.gcdChan = make(chan []byte, 0)
-	yeShMgr.gcdTimer = time.NewTimer(yesGetChainDataTm)
-	defer yeShMgr.gcdTimer.Stop()
-
-	gcdCleanUp := func() {
-		yeShMgr.gcdSeq = 0
-		yeShMgr.gcdName = ""
-		yeShMgr.gcdKey = make([]byte, 0)
+	kex := getChainInfoKeyEx {
+		name: kind,
 	}
-	defer gcdCleanUp()
+	copy(kex.key[0:], key)
 
-	yeShMgr.gcdSeq = uint64(time.Now().UnixNano())
-	yeShMgr.gcdName = kind
-	yeShMgr.gcdKey = key
+	yeShMgr.gcdLock.Lock()
+	if _, dup := yeShMgr.gciMap[kex]; dup {
+		yeShMgr.gcdLock.Unlock()
+		return nil, errors.New("GetChainInfo: duplicated (kind,key) pair")
+	}
+	if len(yeShMgr.gciMap) > GCIBS {
+		yeShMgr.gcdLock.Unlock()
+		return nil, errors.New(fmt.Sprintf("GetChainInfo: too much, max: %d", GCIBS))
+	}
+	vex := getChainInfoValEx{
+		gcdChan: make(chan []byte, 1),
+		gcdTimer: time.NewTimer(GCITO),
+		gcdSeq: uint64(time.Now().UnixNano()),
+	}
+	yeShMgr.gciMap[kex] = &vex
+	yeShMgr.gcdLock.Unlock()
+	defer vex.gcdTimer.Stop()
 
 	req := sch.MsgShellGetChainInfoReq {
-		Seq: yeShMgr.gcdSeq,
-		Kind: yeShMgr.gcdName,
-		Key: yeShMgr.gcdKey,
+		Seq: vex.gcdSeq,
+		Kind: kex.name,
+		Key: kex.key[0:],
 	}
 	msg := sch.SchMessage{}
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
@@ -776,25 +793,22 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	gcdOk := false
 
 	select {
-	case <-yeShMgr.gcdTimer.C:
+	case <-vex.gcdTimer.C:
 
 		yeShMgr.gcdLock.Lock()
-
-		close(yeShMgr.gcdChan)
-		yeShMgr.gcdChan = nil
-
+		delete(yeShMgr.gciMap, kex)
+		close(vex.gcdChan)
 		yeShMgr.gcdLock.Unlock()
+
 		return nil, errors.New("GetChainInfo: timeout")
 
-	case chainData, gcdOk = <-yeShMgr.gcdChan:
+	case chainData, gcdOk = <-vex.gcdChan:
 
 		yeShMgr.gcdLock.Lock()
-
+		delete(yeShMgr.gciMap, kex)
 		if gcdOk {
-			close(yeShMgr.gcdChan)
+			close(vex.gcdChan)
 		}
-		yeShMgr.gcdChan = nil
-
 		yeShMgr.gcdLock.Unlock()
 	}
 
@@ -1141,7 +1155,7 @@ _bootstarp:
 func (yeShMgr *YeShellManager)dhtPutValMapKey(key []byte, to time.Duration, ch chan bool) error {
 	yeShMgr.putValLock.Lock()
 	defer yeShMgr.putValLock.Unlock()
-	if len(yeShMgr.pvk2ChMap) >= PVBS {
+	if len(yeShMgr.pvk2ChMap) > PVBS {
 		yesLog.Debug("dhtPutValMapKey: too much, max: %d", PVBS)
 		return errors.New("too much")
 	}
@@ -1217,7 +1231,7 @@ _pvpLoop:
 func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch chan []byte) error {
 	yeShMgr.getValLock.Lock()
 	defer yeShMgr.getValLock.Unlock()
-	if len(yeShMgr.gvk2ChMap) >= GVBS {
+	if len(yeShMgr.gvk2ChMap) > GVBS {
 		yesLog.Debug("dhtGetValMapKey: too much, max: %d", GVBS)
 		return errors.New("dhtGetValMapKey: too much")
 	}
@@ -1735,18 +1749,26 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 		return sch.SchEnoUserTask
 	}
 
-	if msg.Pcd.Seq == yeShMgr.gcdSeq &&
-		bytes.Compare(msg.Pcd.Key, yeShMgr.gcdKey) == 0 &&
-		strings.Compare(msg.Pcd.Name, yeShMgr.gcdName) == 0 {
-		if yeShMgr.gcdChan != nil {
-			yeShMgr.gcdChan <- msg.Pcd.Data
-			return sch.SchEnoNone
-		}
+	kex := getChainInfoKeyEx{
+		name: msg.Pcd.Name,
+	}
+	copy(kex.key[0:], msg.Pcd.Key)
+	vex, ok := yeShMgr.gciMap[kex]
+	if !ok {
+		yesLog.Debug("putChainDataFromPeer: not found, name: %s, key: %x", kex.key, kex.name)
+		return sch.SchEnoNotFound
+	}
+	if vex.gcdSeq != msg.Pcd.Seq {
+		yesLog.Debug("putChainDataFromPeer: sequence mismatch")
+		return sch.SchEnoMismatched
+	}
+	if vex.gcdChan != nil {
+		vex.gcdChan <- msg.Pcd.Data
+		return sch.SchEnoNone
 	}
 
 	yesLog.Debug("putChainDataFromPeer: discarded, seq: %d, name: %s, key: %x",
 		msg.Pcd.Seq, msg.Pcd.Name, msg.Pcd.Key)
-
 	return sch.SchEnoNone
 }
 
