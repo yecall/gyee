@@ -601,7 +601,7 @@ func (upkg *P2pPackage) GetChainData(inst *PeerInstance, gcd *GetChainData, writ
 			Key: make([]byte, 0),
 		},
 	}
-	*pbGcd.Mid = MID_RPTK
+	*pbGcd.Mid = MID_GCD
 	*pbGcd.GetChainData.Seq = gcd.Seq
 	pbGcd.GetChainData.Key = append(pbGcd.GetChainData.Key, gcd.Key...)
 
@@ -662,7 +662,7 @@ func (upkg *P2pPackage) PutChainData(inst *PeerInstance, pcd *PutChainData, writ
 			Data: make([]byte, 0),
 		},
 	}
-	*pbPcd.Mid = MID_RPTK
+	*pbPcd.Mid = MID_PCD
 	*pbPcd.PutChainData.Seq = pcd.Seq
 	pbPcd.PutChainData.Key = append(pbPcd.PutChainData.Key, pcd.Key...)
 	pbPcd.PutChainData.Data = append(pbPcd.PutChainData.Data, pcd.Data...)
