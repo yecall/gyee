@@ -39,6 +39,23 @@ var (
 	p2pChainInfoAnswer = metrics.NewRegisteredMeter("core/p2p/cInfo/answer", nil)
 )
 
+func init() {
+	metrics.Enabled = true
+
+	p2pDhtSetMeter  = metrics.NewRegisteredMeter("core/p2p/dht/set", nil)
+	p2pDhtGetMeter  = metrics.NewRegisteredMeter("core/p2p/dht/get", nil)
+	p2pDhtHitMeter  = metrics.NewRegisteredMeter("core/p2p/dht/hit", nil)
+	p2pDhtMissMeter = metrics.NewRegisteredMeter("core/p2p/dht/miss", nil)
+
+	p2pMsgSent     = metrics.NewRegisteredMeter("core/p2p/msg/sent", nil)
+	p2pMsgSendFail = metrics.NewRegisteredMeter("core/p2p/msg/fail", nil)
+	p2pMsgRecv     = metrics.NewRegisteredMeter("core/p2p/msg/recv", nil)
+
+	p2pChainInfoGet    = metrics.NewRegisteredMeter("core/p2p/cInfo/get", nil)
+	p2pChainInfoHit    = metrics.NewRegisteredMeter("core/p2p/cInfo/hit", nil)
+	p2pChainInfoAnswer = metrics.NewRegisteredMeter("core/p2p/cInfo/answer", nil)
+}
+
 func printMetrics() {
 	m := make(map[string]string)
 	m["dhtSet"] = fmt.Sprintf("%d", p2pDhtSetMeter.Count())

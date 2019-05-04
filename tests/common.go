@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
@@ -111,7 +110,6 @@ Exit:
 func doTest(t *testing.T, numNodes uint, duration time.Duration, viewerDelay time.Duration,
 	genNode func(*config.Config, *core.Genesis) (*node.Node, error),
 	coroutine func(chan struct{}, sync.WaitGroup, []*node.Node)) {
-	metrics.Enabled = true
 	var (
 		quitCh = make(chan struct{})
 		wg     sync.WaitGroup
