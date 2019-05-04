@@ -261,6 +261,7 @@ func (c *Core) loop() {
 			c.metrics.p2pMsgRecv.Mark(1)
 			switch msg.MsgType {
 			case p2p.MessageTypeEvent:
+				c.metrics.p2pMsgRecvEv.Mark(1)
 				go c.engine.SendEvent(msg.Data)
 			default:
 				log.Crit("wrong msg", "msg", msg)

@@ -112,6 +112,7 @@ func (tp *TransactionPool) loop() {
 func (tp *TransactionPool) processMsg(msg p2p.Message) {
 	switch msg.MsgType {
 	case p2p.MessageTypeTx:
+		tp.core.metrics.p2pMsgRecvTx.Mark(1)
 		var tx = new(Transaction)
 		if err := tx.Decode(msg.Data); err != nil {
 			tp.markBadPeer(msg)

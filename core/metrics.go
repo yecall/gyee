@@ -33,6 +33,9 @@ type coreMetrics struct {
 	p2pMsgSent     metrics.Meter
 	p2pMsgSendFail metrics.Meter
 	p2pMsgRecv     metrics.Meter
+	p2pMsgRecvBlk  metrics.Meter
+	p2pMsgRecvEv   metrics.Meter
+	p2pMsgRecvTx   metrics.Meter
 
 	p2pChainInfoGet    metrics.Meter
 	p2pChainInfoHit    metrics.Meter
@@ -50,6 +53,9 @@ func newCoreMetrics() *coreMetrics {
 		p2pMsgSent:     metrics.NewRegisteredMeter("core/p2p/msg/sent", nil),
 		p2pMsgSendFail: metrics.NewRegisteredMeter("core/p2p/msg/fail", nil),
 		p2pMsgRecv:     metrics.NewRegisteredMeter("core/p2p/msg/recv", nil),
+		p2pMsgRecvBlk:  metrics.NewRegisteredMeter("core/p2p/msg/recvBlk", nil),
+		p2pMsgRecvEv:   metrics.NewRegisteredMeter("core/p2p/msg/recvEv", nil),
+		p2pMsgRecvTx:   metrics.NewRegisteredMeter("core/p2p/msg/recvTx", nil),
 
 		p2pChainInfoGet:    metrics.NewRegisteredMeter("core/p2p/cInfo/get", nil),
 		p2pChainInfoHit:    metrics.NewRegisteredMeter("core/p2p/cInfo/hit", nil),
@@ -65,6 +71,8 @@ func (cm *coreMetrics) printMetrics() {
 
 	m["msgSend"] = fmt.Sprintf("f%d / total%d", cm.p2pMsgSendFail.Count(), cm.p2pMsgSent.Count())
 	m["msgRecv"] = fmt.Sprintf("%d", cm.p2pMsgRecv.Count())
+	m["msgRecvType"] = fmt.Sprintf("blk:%d tx:%d ev:%d",
+		cm.p2pMsgRecvBlk.Count(), cm.p2pMsgRecvTx.Count(), cm.p2pMsgRecv.Count())
 
 	m["cInfoGet"] = fmt.Sprintf("%d / %d", cm.p2pChainInfoHit.Count(), cm.p2pChainInfoGet.Count())
 	m["cInfoAns"] = fmt.Sprintf("%d", cm.p2pChainInfoAnswer.Count())

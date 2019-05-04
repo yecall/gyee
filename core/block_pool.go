@@ -147,6 +147,7 @@ func (bp *BlockPool) loop() {
 			bp.core.metrics.p2pMsgRecv.Mark(1)
 			switch msg.MsgType {
 			case p2p.MessageTypeBlock:
+				bp.core.metrics.p2pMsgRecvBlk.Mark(1)
 				go bp.processMsgBlock(msg)
 			case p2p.MessageTypeBlockHeader:
 				go bp.processMsgHeader(msg)
