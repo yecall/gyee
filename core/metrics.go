@@ -24,49 +24,50 @@ import (
 	"github.com/yeeco/gyee/log"
 )
 
-var (
-	p2pDhtSetMeter  = metrics.NewRegisteredMeter("core/p2p/dht/set", nil)
-	p2pDhtGetMeter  = metrics.NewRegisteredMeter("core/p2p/dht/get", nil)
-	p2pDhtHitMeter  = metrics.NewRegisteredMeter("core/p2p/dht/hit", nil)
-	p2pDhtMissMeter = metrics.NewRegisteredMeter("core/p2p/dht/miss", nil)
+type coreMetrics struct {
+	p2pDhtSetMeter  metrics.Meter
+	p2pDhtGetMeter  metrics.Meter
+	p2pDhtHitMeter  metrics.Meter
+	p2pDhtMissMeter metrics.Meter
 
-	p2pMsgSent     = metrics.NewRegisteredMeter("core/p2p/msg/sent", nil)
-	p2pMsgSendFail = metrics.NewRegisteredMeter("core/p2p/msg/fail", nil)
-	p2pMsgRecv     = metrics.NewRegisteredMeter("core/p2p/msg/recv", nil)
+	p2pMsgSent     metrics.Meter
+	p2pMsgSendFail metrics.Meter
+	p2pMsgRecv     metrics.Meter
 
-	p2pChainInfoGet    = metrics.NewRegisteredMeter("core/p2p/cInfo/get", nil)
-	p2pChainInfoHit    = metrics.NewRegisteredMeter("core/p2p/cInfo/hit", nil)
-	p2pChainInfoAnswer = metrics.NewRegisteredMeter("core/p2p/cInfo/answer", nil)
-)
-
-func init() {
-	metrics.Enabled = true
-
-	p2pDhtSetMeter  = metrics.NewRegisteredMeter("core/p2p/dht/set", nil)
-	p2pDhtGetMeter  = metrics.NewRegisteredMeter("core/p2p/dht/get", nil)
-	p2pDhtHitMeter  = metrics.NewRegisteredMeter("core/p2p/dht/hit", nil)
-	p2pDhtMissMeter = metrics.NewRegisteredMeter("core/p2p/dht/miss", nil)
-
-	p2pMsgSent     = metrics.NewRegisteredMeter("core/p2p/msg/sent", nil)
-	p2pMsgSendFail = metrics.NewRegisteredMeter("core/p2p/msg/fail", nil)
-	p2pMsgRecv     = metrics.NewRegisteredMeter("core/p2p/msg/recv", nil)
-
-	p2pChainInfoGet    = metrics.NewRegisteredMeter("core/p2p/cInfo/get", nil)
-	p2pChainInfoHit    = metrics.NewRegisteredMeter("core/p2p/cInfo/hit", nil)
-	p2pChainInfoAnswer = metrics.NewRegisteredMeter("core/p2p/cInfo/answer", nil)
+	p2pChainInfoGet    metrics.Meter
+	p2pChainInfoHit    metrics.Meter
+	p2pChainInfoAnswer metrics.Meter
 }
 
-func printMetrics() {
+func newCoreMetrics() *coreMetrics {
+	metrics.Enabled = true
+	return &coreMetrics{
+		p2pDhtSetMeter:  metrics.NewRegisteredMeter("core/p2p/dht/set", nil),
+		p2pDhtGetMeter:  metrics.NewRegisteredMeter("core/p2p/dht/get", nil),
+		p2pDhtHitMeter:  metrics.NewRegisteredMeter("core/p2p/dht/hit", nil),
+		p2pDhtMissMeter: metrics.NewRegisteredMeter("core/p2p/dht/miss", nil),
+
+		p2pMsgSent:     metrics.NewRegisteredMeter("core/p2p/msg/sent", nil),
+		p2pMsgSendFail: metrics.NewRegisteredMeter("core/p2p/msg/fail", nil),
+		p2pMsgRecv:     metrics.NewRegisteredMeter("core/p2p/msg/recv", nil),
+
+		p2pChainInfoGet:    metrics.NewRegisteredMeter("core/p2p/cInfo/get", nil),
+		p2pChainInfoHit:    metrics.NewRegisteredMeter("core/p2p/cInfo/hit", nil),
+		p2pChainInfoAnswer: metrics.NewRegisteredMeter("core/p2p/cInfo/answer", nil),
+	}
+}
+
+func (cm *coreMetrics) printMetrics() {
 	m := make(map[string]string)
-	m["dhtSet"] = fmt.Sprintf("%d", p2pDhtSetMeter.Count())
+	m["dhtSet"] = fmt.Sprintf("%d", cm.p2pDhtSetMeter.Count())
 	m["dhtGet"] = fmt.Sprintf("h%d m%d / total%d",
-		p2pDhtHitMeter.Count(), p2pDhtMissMeter.Count(), p2pDhtGetMeter.Count())
+		cm.p2pDhtHitMeter.Count(), cm.p2pDhtMissMeter.Count(), cm.p2pDhtGetMeter.Count())
 
-	m["msgSend"] = fmt.Sprintf("f%d / total%d", p2pMsgSendFail.Count(), p2pMsgSent.Count())
-	m["msgRecv"] = fmt.Sprintf("%d", p2pMsgRecv.Count())
+	m["msgSend"] = fmt.Sprintf("f%d / total%d", cm.p2pMsgSendFail.Count(), cm.p2pMsgSent.Count())
+	m["msgRecv"] = fmt.Sprintf("%d", cm.p2pMsgRecv.Count())
 
-	m["cInfoGet"] = fmt.Sprintf("%d / %d", p2pChainInfoHit.Count(), p2pChainInfoGet.Count())
-	m["cInfoAns"] = fmt.Sprintf("%d", p2pChainInfoAnswer.Count())
+	m["cInfoGet"] = fmt.Sprintf("%d / %d", cm.p2pChainInfoHit.Count(), cm.p2pChainInfoGet.Count())
+	m["cInfoAns"] = fmt.Sprintf("%d", cm.p2pChainInfoAnswer.Count())
 
 	log.Info("core metrics", m)
 }

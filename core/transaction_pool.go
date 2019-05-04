@@ -103,6 +103,7 @@ func (tp *TransactionPool) loop() {
 			return
 		case msg := <-tp.subscriber.MsgChan:
 			//log.Info("tx pool receive ", msg.MsgType, " ", msg.From)
+			tp.core.metrics.p2pMsgRecv.Mark(1)
 			tp.processMsg(msg)
 		}
 	}
@@ -183,11 +184,11 @@ func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
 		return
 	}
 	go func(msg p2p.Message) {
-		p2pMsgSent.Mark(1)
+		tp.core.metrics.p2pMsgSent.Mark(1)
 		err = tp.core.node.P2pService().BroadcastMessage(msg)
 		if err != nil {
 			log.Error("TxBroadcast", "err", err)
-			p2pMsgSendFail.Mark(1)
+			tp.core.metrics.p2pMsgSendFail.Mark(1)
 		}
 	}(p2p.Message{
 		MsgType: p2p.MessageTypeTx,

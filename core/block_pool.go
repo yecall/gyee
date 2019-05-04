@@ -144,6 +144,7 @@ func (bp *BlockPool) loop() {
 			return
 		case msg := <-bp.subscriber.MsgChan:
 			log.Trace("block pool receive ", "type", msg.MsgType, "from", msg.From)
+			bp.core.metrics.p2pMsgRecv.Mark(1)
 			switch msg.MsgType {
 			case p2p.MessageTypeBlock:
 				go bp.processMsgBlock(msg)
@@ -324,9 +325,9 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 			log.Warn("failed to encode block", "block", nextBlock, "err", err)
 		} else {
 			go func(msg p2p.Message) {
-				p2pMsgSent.Mark(1)
+				bp.core.metrics.p2pMsgSent.Mark(1)
 				if err := bp.core.node.P2pService().BroadcastMessage(msg); err != nil {
-					p2pMsgSendFail.Mark(1)
+					bp.core.metrics.p2pMsgSendFail.Mark(1)
 				}
 			}(p2p.Message{
 				MsgType: p2p.MessageTypeBlock,

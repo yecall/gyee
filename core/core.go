@@ -89,6 +89,8 @@ type Core struct {
 	minerKey  []byte
 	minerAddr *address.Address
 
+	metrics *coreMetrics
+
 	lock    sync.RWMutex
 	running bool
 	quitCh  chan struct{}
@@ -122,6 +124,7 @@ func NewCoreWithGenesis(node INode, conf *config.Config, genesis *Genesis) (*Cor
 		node:    node,
 		config:  conf,
 		storage: storage,
+		metrics: newCoreMetrics(),
 		quitCh:  make(chan struct{}),
 	}
 	core.blockChain, err = NewBlockChainWithCore(core)
@@ -192,7 +195,7 @@ func (c *Core) Stop() error {
 	log.Info("Core Stop...")
 
 	// output metrics
-	printMetrics()
+	c.metrics.printMetrics()
 
 	// unsubscribe from p2p net
 	c.node.P2pService().UnRegister(c.subscriber)
@@ -255,7 +258,7 @@ func (c *Core) loop() {
 			c.handleEngineOutput(output)
 		case msg := <-c.subsChan:
 			log.Trace("core receive ", msg.MsgType, " ", msg.From)
-			p2pMsgRecv.Mark(1)
+			c.metrics.p2pMsgRecv.Mark(1)
 			switch msg.MsgType {
 			case p2p.MessageTypeEvent:
 				go c.engine.SendEvent(msg.Data)
@@ -274,12 +277,12 @@ func (c *Core) handleEngineEventSend(event []byte) {
 		return
 	}
 	h := sha256.Sum256(event)
-	p2pDhtSetMeter.Mark(1)
+	c.metrics.p2pDhtSetMeter.Mark(1)
 	err := c.node.P2pService().DhtSetValue(h[:], event)
 	if err != nil {
 		log.Warn("engine send event to dht failed", "err", err)
 	}
-	p2pMsgSent.Mark(1)
+	c.metrics.p2pMsgSent.Mark(1)
 	err = c.node.P2pService().BroadcastMessage(p2p.Message{
 		MsgType: p2p.MessageTypeEvent,
 		From:    c.node.NodeID(),
@@ -287,7 +290,7 @@ func (c *Core) handleEngineEventSend(event []byte) {
 	})
 	if err != nil {
 		log.Warn("engine send event failed", "err", err)
-		p2pMsgSendFail.Mark(1)
+		c.metrics.p2pMsgSendFail.Mark(1)
 	}
 }
 
@@ -300,12 +303,14 @@ func (c *Core) handleEngineEventReq(hash common.Hash) {
 			return
 		}
 
-		p2pDhtGetMeter.Mark(1)
+		c.metrics.p2pDhtGetMeter.Mark(1)
 		data, err := c.node.P2pService().DhtGetValue(hash[:])
 		if err == nil {
+			c.metrics.p2pDhtHitMeter.Mark(1)
 			c.engine.SendParentEvent(data)
 			return
 		}
+		c.metrics.p2pDhtMissMeter.Mark(1)
 		retry--
 		if retry <= 0 {
 			log.Warn("engine req event failed", "hash", hash, "err", err)
@@ -332,14 +337,14 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 
 		txs := make(Transactions, 0, len(o.Txs))
 		for _, hash := range o.Txs {
-			p2pDhtGetMeter.Mark(1)
+			c.metrics.p2pDhtGetMeter.Mark(1)
 			enc, err := c.node.P2pService().DhtGetValue(hash[:])
 			if err != nil {
 				log.Error("failed to get tx", "hash", hash, "err", err)
-				p2pDhtMissMeter.Mark(1)
+				c.metrics.p2pDhtMissMeter.Mark(1)
 				return
 			}
-			p2pDhtHitMeter.Mark(1)
+			c.metrics.p2pDhtHitMeter.Mark(1)
 			tx := &Transaction{}
 			if err := tx.Decode(enc); err != nil {
 				log.Error("failed to decode tx", "hash", hash, "err", err)
@@ -479,7 +484,7 @@ func getSigner(algorithm crypto.Algorithm) crypto.Signer {
 }
 
 func (c *Core) GetChainData(kind string, key []byte) []byte {
-	p2pChainInfoAnswer.Mark(1)
+	c.metrics.p2pChainInfoAnswer.Mark(1)
 	switch kind {
 	case ChainDataTypeLatestH:
 		return c.blockChain.LastBlock().Hash().Bytes()
@@ -509,7 +514,7 @@ func (c *Core) GetChainData(kind string, key []byte) []byte {
 }
 
 func (c *Core) GetRemoteLatestHash() (*common.Hash, error) {
-	p2pChainInfoGet.Mark(1)
+	c.metrics.p2pChainInfoGet.Mark(1)
 	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestH, nil)
 	if err != nil {
 		return nil, err
@@ -517,38 +522,38 @@ func (c *Core) GetRemoteLatestHash() (*common.Hash, error) {
 	if len(encoded) != common.HashLength {
 		return nil, errors.New(fmt.Sprintf("latest hash length mismatch, got %v", encoded))
 	}
-	p2pChainInfoHit.Mark(1)
+	c.metrics.p2pChainInfoHit.Mark(1)
 	return new(common.Hash).SetBytes(encoded), nil
 }
 
 func (c *Core) GetRemoteLatestNumber() (uint64, error) {
-	p2pChainInfoGet.Mark(1)
+	c.metrics.p2pChainInfoGet.Mark(1)
 	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestN, nil)
 	if err != nil {
 		return 0, err
 	}
-	p2pChainInfoHit.Mark(1)
+	c.metrics.p2pChainInfoHit.Mark(1)
 	n := new(big.Int).SetBytes(encoded).Uint64()
 	return n, nil
 }
 
 func (c *Core) GetRemoteBlockByHash(hash common.Hash) (*Block, error) {
-	p2pChainInfoGet.Mark(1)
+	c.metrics.p2pChainInfoGet.Mark(1)
 	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeBlockH, hash[:])
 	if err != nil {
 		return nil, err
 	}
-	p2pChainInfoHit.Mark(1)
+	c.metrics.p2pChainInfoHit.Mark(1)
 	return ParseBlock(encoded)
 }
 
 func (c *Core) GetRemoteBlockByNumber(n uint64) (*Block, error) {
 	key := new(big.Int).SetUint64(n).Bytes()
-	p2pChainInfoGet.Mark(1)
+	c.metrics.p2pChainInfoGet.Mark(1)
 	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeBlockN, key)
 	if err != nil {
 		return nil, err
 	}
-	p2pChainInfoHit.Mark(1)
+	c.metrics.p2pChainInfoHit.Mark(1)
 	return ParseBlock(encoded)
 }
