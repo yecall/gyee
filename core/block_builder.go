@@ -18,6 +18,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
@@ -71,7 +73,8 @@ func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
 			break
 		}
 		if txCount == len(txs) {
-			log.Warn("engine output nonce not possible", "remain", txs)
+			log.Warn("engine output nonce not possible",
+				fmt.Sprintf("remain[%d/%d]", len(txs), len(txs)+len(output)), txs)
 			break
 		}
 	}

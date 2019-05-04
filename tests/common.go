@@ -165,11 +165,9 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration, viewerDelay tim
 	close(quitCh)
 	wg.Wait()
 	// check node chains
-	for height := uint64(0); ; height++ {
+	for height := uint64(1); ; height++ {
 		var (
-			lastBlock *core.Block
-			reached   = int(0)
-			mismatch  = int(0)
+			hashCount = make(map[common.Hash]int)
 		)
 		for i, n := range nodes {
 			if height > n.Core().Chain().CurrentBlockHeight() {
@@ -181,25 +179,21 @@ func doTest(t *testing.T, numNodes uint, duration time.Duration, viewerDelay tim
 				t.Errorf("block not found idx %d height %d", i, height)
 				continue
 			}
-			if lastBlock == nil {
-				lastBlock = b
-				reached++
-			} else {
-				if lastBlock.Hash() != b.Hash() {
-					log.Error("block mismatch", "idx", i, "height", height)
-					t.Errorf("block mismatch idx %d height %d", i, height)
-					mismatch++
-				} else {
-					reached++
-				}
-			}
+			h := b.Hash()
+			hashCount[h] += 1
 		}
-		if lastBlock == nil {
-			// no node reached
+		if len(hashCount) == 0 {
 			break
 		}
-		log.Info("chain check", "height", height, "hash", lastBlock.Hash())
-		log.Info("    stats", "reached", reached, "mismatch", mismatch)
+		status := func(hashCount map[common.Hash]int) string {
+			switch len(hashCount) {
+			case 1:
+				return fmt.Sprintf("all matched %v", hashCount)
+			default:
+				return fmt.Sprintf("mismatch %v", hashCount)
+			}
+		}(hashCount)
+		log.Info("chain check", "height", height, "status", status)
 	}
 	// stop nodes
 	for _, n := range nodes {
