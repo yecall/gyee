@@ -23,6 +23,7 @@ package console
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -328,11 +329,29 @@ func (b *jsBridge) lockAccount(call otto.FunctionCall) otto.Value {
 }
 
 func (b *jsBridge) sendTransaction(call otto.FunctionCall) otto.Value {
-	txValue := call.Argument(0)
-	if !txValue.IsObject() {
-		return jsError(call.Otto, errors.New("transaction object not provided"))
+	v, err := func() (otto.Value, error) {
+		txValue := call.Argument(0)
+		if !txValue.IsObject() {
+			return otto.NullValue(), errors.New("transaction object not provided")
+		}
+		jsonStr, err := jsonStr(call.Otto, txValue)
+		if err != nil {
+			return otto.NullValue(), err
+		}
+		req := new(rpcpb.SendTransactionRequest)
+		if err := json.Unmarshal([]byte(jsonStr.String()), req); err != nil {
+			return otto.NullValue(), err
+		}
+		response, err := b.svcAdmin.SendTransaction(b.ctx, req)
+		if err != nil {
+			return otto.NullValue(), err
+		}
+		return otto.ToValue(response.String())
+	}()
+	if err != nil {
+		return jsError(call.Otto, err)
 	}
-	return otto.NullValue()
+	return v
 }
 
 // sendTransactionWithPassphrase handle the transaction send with passphrase input
@@ -405,6 +424,15 @@ func (b *jsBridge) signTransactionWithPassphrase(call otto.FunctionCall) otto.Va
 		return otto.NullValue()
 	}
 	return val
+}
+
+func jsonStr(otto *otto.Otto, obj otto.Value) (*otto.Value, error) {
+	JSON, _ := otto.Object("JSON")
+	val, err := JSON.Call("stringify", obj)
+	if err != nil {
+		return nil, err
+	}
+	return &val, nil
 }
 
 func jsError(otto *otto.Otto, err error) otto.Value {
