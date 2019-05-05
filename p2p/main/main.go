@@ -40,6 +40,7 @@ import (
 	yep2p "github.com/yeeco/gyee/p2p"
 	config "github.com/yeeco/gyee/p2p/config"
 	log "github.com/yeeco/gyee/p2p/logger"
+	"sync"
 )
 
 //
@@ -1095,12 +1096,15 @@ func testCase19(tc *testCase) {
 	okCount := 0
 	failedCount := 0
 	quitCh := make(chan bool, 0)
+	wg := &sync.WaitGroup{}
 
 	subBk := yep2p.Subscriber{
 		MsgChan: make(chan yep2p.Message, 64),
 		MsgType: yep2p.MessageTypeBlock,
 	}
 	var subBkFunc = func(sub yep2p.Subscriber) {
+		wg.Add(1)
+		defer wg.Done()
 		bkCount := 0
 	_subBkExit:
 		for {
@@ -1117,20 +1121,26 @@ func testCase19(tc *testCase) {
 				}
 			}
 		}
-		log.Debug("testCase19: subFunc: done")
+		log.Debug("testCase19: subBkFunc: done")
 	}
 
+	bk := yep2p.Message{
+		MsgType: yep2p.MessageTypeBlock,
+		From: fmt.Sprintf("%x", yeShMgr.GetLocalNode().ID),
+	}
 	blkBroadcast := func() error{
-		bk := yep2p.Message{}
 		data := []byte(fmt.Sprintf("bk: %d", time.Now()))
-		bk.Data = append(bk.Data[0:0], data...)
-		bk.Key = append(bk.Key, sha256.Sum256(data)[0:]...)
+		bk.Data = data
+		key := sha256.Sum256(data)
+		bk.Key = append(bk.Key[0:0], key[0:]...)
 		return yeShMgr.BroadcastMessageOsn(bk)
 	}
 
 	yeShMgr.Register(&subBk)
 	go subBkFunc(subBk)
 	go func() {
+		wg.Add(1)
+		defer wg.Done()
 		cycle := time.Millisecond * 1000
 		tm := time.NewTimer(cycle)
 		defer tm.Stop()
@@ -1150,9 +1160,11 @@ func testCase19(tc *testCase) {
 				break _bbExit
 			}
 		}
+		log.Debug("testCase19: blkBroadcast done")
 	}()
 
 	waitInterrupt()
-	quitCh <- true
+	close(quitCh)
+	wg.Wait()
 	yeShMgr.Stop()
 }
