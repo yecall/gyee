@@ -178,11 +178,11 @@ func (tp *TransactionPool) processTx(tx *Transaction) {
 	}
 }
 
-func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
+func (tp *TransactionPool) TxBroadcast(tx *Transaction) error {
 	data, err := tx.Encode()
 	if err != nil {
 		log.Error("TxBroadcast encode", "err", err)
-		return
+		return err
 	}
 	go func(msg p2p.Message) {
 		tp.core.metrics.p2pMsgSent.Mark(1)
@@ -196,6 +196,7 @@ func (tp *TransactionPool) TxBroadcast(tx *Transaction) {
 		From:    "node1",
 		Data:    data,
 	})
+	return nil
 }
 
 func (tp *TransactionPool) markBadPeer(msg p2p.Message) {

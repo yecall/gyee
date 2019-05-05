@@ -129,6 +129,10 @@ func (am *AccountManager) Lock(address *address.Address) error {
 	return am.ks.Lock(address.String())
 }
 
+func (am *AccountManager) GetUnlocked(address string) ([]byte, error) {
+	return am.ks.GetUnlocked(address)
+}
+
 func (am *AccountManager) SignHash(address *address.Address, hash common.Hash) ([]byte, error) {
 	key, err := am.ks.GetUnlocked(address.String())
 	if err != nil {

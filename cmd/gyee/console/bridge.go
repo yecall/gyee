@@ -327,6 +327,14 @@ func (b *jsBridge) lockAccount(call otto.FunctionCall) otto.Value {
 	return value
 }
 
+func (b *jsBridge) sendTransaction(call otto.FunctionCall) otto.Value {
+	txValue := call.Argument(0)
+	if !txValue.IsObject() {
+		return jsError(call.Otto, errors.New("transaction object not provided"))
+	}
+	return otto.NullValue()
+}
+
 // sendTransactionWithPassphrase handle the transaction send with passphrase input
 func (b *jsBridge) sendTransactionWithPassphrase(call otto.FunctionCall) otto.Value {
 	if !call.Argument(0).IsString() || !call.Argument(1).IsString() {
