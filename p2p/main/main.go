@@ -1116,9 +1116,7 @@ func testCase19(tc *testCase) {
 					log.Debug("testCase19: channel closed")
 					break _subBkExit
 				}
-				if bkCount++; bkCount&0x7f == 0 {
-					log.Debug("testCase19: subBkFunc: count: %d, %s: %x", bkCount, msg.Key)
-				}
+				log.Debug("testCase19: subBkFunc: count: %d, %s: %x", bkCount, msg.Key)
 			}
 		}
 		log.Debug("testCase19: subBkFunc: done")
