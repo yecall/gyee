@@ -115,6 +115,7 @@ type DsRecord struct {
 // Data store manager name registered in scheduler
 //
 const DsMgrName = sch.DhtDsMgrName
+const DsMgrMailboxSize = 1024 * 8
 
 //
 // data store type

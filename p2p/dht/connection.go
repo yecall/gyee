@@ -65,6 +65,7 @@ func (log connLogger) ForceDebug(fmt string, args ...interface{}) {
 // Connection manager name registered in scheduler
 //
 const ConMgrName = sch.DhtConMgrName
+const ConMgrMailboxSize = 1024 * 8
 
 //
 // Peer connection status

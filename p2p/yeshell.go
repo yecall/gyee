@@ -112,6 +112,7 @@ const (
 	PVBS = 128				// put value buffer size
 	GCITO = time.Second * 8	// duration for get chain information
 	GCIBS = 64				// get chain formation buffer size
+	gvkChBufSize = 32		// get value duplicated channel buffer size
 )
 
 type SingleSubnetDescriptor = sch.SingleSubnetDescriptor // single subnet descriptor
@@ -158,7 +159,7 @@ type YeShellManager struct {
 	ptDhtShMgr     *p2psh.DhtShellManager           // dht shell manager object
 	ptDhtConMgr    *dht.ConMgr					    // dht connection manager object
 	gvk2DurMap     map[yesKey]time.Duration			// remain time to wait
-	gvk2ChMap      map[yesKey]chan []byte			// channel for get value
+	gvk2ChMap      map[yesKey][]chan[]byte			// channel for get value
 	getValChan     chan *getValueResult             // get value channel
 	getValLock     sync.Mutex						// lock for get value
 	pvk2DurMap     map[yesKey]time.Duration			// remain time to wait
@@ -351,7 +352,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 		inStopping:     false,
 		getValChan:     make(chan *getValueResult, 0),
 		gvk2DurMap:		make(map[yesKey]time.Duration, 0),
-		gvk2ChMap:		make(map[yesKey]chan []byte, 0),
+		gvk2ChMap:		make(map[yesKey][]chan []byte, 0),
 		putValChan:     make(chan *putValueResult, 0),
 		pvk2DurMap:		make(map[yesKey]time.Duration, 0),
 		pvk2ChMap:		make(map[yesKey]chan bool, 0),
@@ -751,7 +752,7 @@ func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
 }
 
 func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, error) {
-	if len(key) != GCIKEY_LEN || len(kind) == 0 {
+	if /*len(key) != GCIKEY_LEN ||*/ key == nil || len(kind) == 0 {
 		return nil, errors.New("GetChainInfo: invalid (kind,key) pair")
 	}
 	kex := getChainInfoKeyEx {
@@ -1230,21 +1231,28 @@ func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch c
 	yeShMgr.getValLock.Lock()
 	defer yeShMgr.getValLock.Unlock()
 	if len(yeShMgr.gvk2ChMap) > GVBS {
-		yesLog.Debug("dhtGetValMapKey: too much, max: %d", GVBS)
+		yesLog.DebugDht("dhtGetValMapKey: too much, max: %d", GVBS)
 		return errors.New("dhtGetValMapKey: too much")
 	}
 	yk := yesKey{}
 	if len(key) != yesKeyBytes {
-		yesLog.Debug("dhtGetValMapKey: invalid key")
+		yesLog.DebugDht("dhtGetValMapKey: invalid key")
 		return errors.New("dhtGetValMapKey: invalid key")
 	}
 	copy(yk[0:], key)
-	if _, dup := yeShMgr.gvk2ChMap[yk]; dup {
-		yesLog.Debug("dhtGetValMapKey: duplicated")
-		return errors.New("dhtGetValMapKey: duplicated")
+	if chList, ok := yeShMgr.gvk2ChMap[yk]; !ok {
+		chList = make([]chan[]byte, 0, gvkChBufSize)
+		chList = append(chList, ch)
+		yeShMgr.gvk2ChMap[yk] = chList
+		yeShMgr.gvk2DurMap[yk] = to
+	} else if len(chList) < cap(chList) {
+		yesLog.DebugDht("dhtGetValMapKey: duplicated")
+		chList = append(chList, ch)
+		yeShMgr.gvk2ChMap[yk] = chList
+	} else {
+		yesLog.DebugDht("dhtGetValMapKey: duplicated full")
+		return errors.New("dhtGetValMapKey: duplicated full")
 	}
-	yeShMgr.gvk2ChMap[yk] = ch
-	yeShMgr.gvk2DurMap[yk] = to
 	return nil
 }
 
@@ -1263,10 +1271,14 @@ _gvpLoop:
 			for key, dur := range yeShMgr.gvk2DurMap {
 				dur = dur - period
 				if dur <= 0 {
-					yesLog.Debug("dhtGetValProc: timeout, sdl: %s, key: %x", sdl, key)
-					close(yeShMgr.gvk2ChMap[key])
-					delete(yeShMgr.gvk2ChMap, key)
-					delete(yeShMgr.gvk2DurMap, key)
+					yesLog.DebugDht("dhtGetValProc: timeout, sdl: %s, key: %x", sdl, key)
+					if chList, ok := yeShMgr.gvk2ChMap[key]; ok {
+						for _, ch := range chList {
+							close(ch)
+						}
+						delete(yeShMgr.gvk2ChMap, key)
+						delete(yeShMgr.gvk2DurMap, key)
+					}
 				} else {
 					yeShMgr.gvk2DurMap[key] = dur
 				}
@@ -1278,16 +1290,18 @@ _gvpLoop:
 			}
 			key := result.key
 			if len(key) != yesKeyBytes {
-				yesLog.Debug("dhtGetValProc: invalid key, sdl: %s", sdl)
+				yesLog.DebugDht("dhtGetValProc: invalid key, sdl: %s", sdl)
 			} else {
 				copy(yk[0:], key)
 				yeShMgr.getValLock.Lock()
-				if ch, ok := yeShMgr.gvk2ChMap[yk]; ok {
-					yesLog.Debug("dhtGetValProc: sdl: %s, eno: %d, key: %x", sdl, key, result.eno)
-					if result.eno == dht.DhtEnoNone.GetEno() {
-						ch <- result.value
+				if chList, ok := yeShMgr.gvk2ChMap[yk]; ok {
+					yesLog.DebugDht("dhtGetValProc: sdl: %s, eno: %d, key: %x", sdl, key, result.eno)
+					for _, ch := range chList {
+						if result.eno == dht.DhtEnoNone.GetEno() {
+							ch <- result.value
+						}
+						close(ch)
 					}
-					close(ch)
 					delete(yeShMgr.gvk2ChMap, yk)
 					delete(yeShMgr.gvk2DurMap, yk)
 				}
@@ -1297,8 +1311,10 @@ _gvpLoop:
 	}
 
 	yeShMgr.getValLock.Lock()
-	for k, ch := range yeShMgr.gvk2ChMap {
-		close(ch)
+	for k, chList := range yeShMgr.gvk2ChMap {
+		for _, ch := range chList {
+			close(ch)
+		}
 		delete(yeShMgr.gvk2ChMap, k)
 		delete(yeShMgr.gvk2DurMap, k)
 	}

@@ -45,6 +45,7 @@ func (log dhtShellLogger) Debug(fmt string, args ...interface{}) {
 
 const (
 	dhtShMgrName     = sch.DhtShMgrName // name registered in scheduler
+	ShMgrMailboxSize = 1024 * 8			// mailbox size
 	dhtShEvQueueSize = 64               // event indication queue size
 	dhtShCsQueueSize = 64               // connection status indication queue size
 )

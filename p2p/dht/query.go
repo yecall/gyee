@@ -57,6 +57,7 @@ func (log qryMgrLogger) Debug(fmt string, args ...interface{}) {
 //
 const (
 	QryMgrName        = sch.DhtQryMgrName                         // query manage name registered in shceduler
+	QryMgrMailboxSize = 1024 * 8								  // mail box size
 	qryMgrMaxPendings = 64                                        // max pendings can be held in the list
 	qryMgrMaxActInsts = 8                                         // max concurrent actived instances for one query
 	qryMgrQryExpired  = time.Second * 60                          // duration to get expired for a query
