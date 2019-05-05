@@ -150,6 +150,7 @@ func (bp *BlockPool) loop() {
 				bp.core.metrics.p2pMsgRecvBlk.Mark(1)
 				go bp.processMsgBlock(msg)
 			case p2p.MessageTypeBlockHeader:
+				bp.core.metrics.p2pMsgRecvH.Mark(1)
 				go bp.processMsgHeader(msg)
 			default:
 				log.Crit("unhandled msg sent to blockPool", "msg", msg)

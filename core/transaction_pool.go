@@ -103,13 +103,13 @@ func (tp *TransactionPool) loop() {
 			return
 		case msg := <-tp.subscriber.MsgChan:
 			//log.Info("tx pool receive ", msg.MsgType, " ", msg.From)
-			tp.core.metrics.p2pMsgRecv.Mark(1)
 			tp.processMsg(msg)
 		}
 	}
 }
 
 func (tp *TransactionPool) processMsg(msg p2p.Message) {
+	tp.core.metrics.p2pMsgRecv.Mark(1)
 	switch msg.MsgType {
 	case p2p.MessageTypeTx:
 		tp.core.metrics.p2pMsgRecvTx.Mark(1)
