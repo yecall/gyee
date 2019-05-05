@@ -1116,7 +1116,8 @@ func testCase19(tc *testCase) {
 					log.Debug("testCase19: channel closed")
 					break _subBkExit
 				}
-				log.Debug("testCase19: subBkFunc: count: %d, %s: %x", bkCount, msg.Key)
+				bkCount++
+				log.Debug("testCase19: subBkFunc: count: %d, key: %x", bkCount, msg.Key)
 			}
 		}
 		log.Debug("testCase19: subBkFunc: done")
@@ -1151,7 +1152,7 @@ func testCase19(tc *testCase) {
 					log.Debug("testCase19: blkBroadcast failed, error: %s", err.Error())
 				} else {
 					okCount++
-					log.Debug("testCase19: blkBroadcast ok")
+					log.Debug("testCase19: blkBroadcast ok, okCount: %d", okCount)
 				}
 				tm.Reset(cycle)
 			case <-quitCh:
