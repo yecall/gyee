@@ -1033,6 +1033,13 @@ _csLoop:
 }
 
 func (yeShMgr *YeShellManager) chainRxProc() {
+	// statistics
+	txCount := 0
+	evCount := 0
+	bhCount := 0
+	bkCount := 0
+	xxCount := 0
+
 _rxLoop:
 	for {
 		select {
@@ -1065,11 +1072,6 @@ _rxLoop:
 				}
 
 				msgType := yesMidItoa[pkg.MsgId]
-
-				txCount := 0
-				evCount := 0
-				bhCount := 0
-				xxCount := 0
 				switch msgType {
 				case MessageTypeTx:
 					txCount++
@@ -1077,6 +1079,8 @@ _rxLoop:
 					evCount++
 				case MessageTypeBlockHeader:
 					bhCount++
+				case MessageTypeBlock:
+					bkCount++
 				default:
 					xxCount++
 				}
@@ -1102,6 +1106,8 @@ _rxLoop:
 							err = yeShMgr.broadcastEvOsn(&msg, &exclude, false)
 						case MessageTypeBlockHeader:
 							err = yeShMgr.broadcastBhOsn(&msg, &exclude)
+						case MessageTypeBlock:
+							err = yeShMgr.broadcastBkOsn(&msg, &exclude)
 						default:
 							err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
 						}
@@ -1562,8 +1568,13 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 }
 
 func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.NodeID) error {
-	// the Bk should be stored by DHT and no broadcasting over any subnet.
-	// the message here would be dispatched to DHT shell manager.
+	// the old design requires that:
+	// 		the Bk should be stored by DHT and no broadcasting over any subnet.
+	// 		the message here would be dispatched to DHT shell manager.
+	// but it's changed to broadcast the blocks to peers instead of DHT now,
+	// related functions need to be modified also at the same time, see them
+	// for more please.
+
 	k := yesKey{}
 	if len(msg.Key) == 0 {
 		k = sha256.Sum256(msg.Data)
@@ -1581,17 +1592,34 @@ func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.Node
 		return err
 	}
 
+	// keep statements for old design, switch by a const, see comments above pls.
+	// would remove unnecessary statements later.
+	const bk2dht = false
 	schMsg := sch.SchMessage{}
-	req := sch.MsgDhtMgrPutValueReq{
-		Key:      msg.Key,
-		Val:      msg.Data,
-		KeepTime: dht.DsMgrDurInf,
-	}
-
-	yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
-	if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		yesLog.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
-		return eno
+	if bk2dht {
+		req := sch.MsgDhtMgrPutValueReq{
+			Key:      msg.Key,
+			Val:      msg.Data,
+			KeepTime: dht.DsMgrDurInf,
+		}
+		yeShMgr.dhtInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
+		if eno := yeShMgr.dhtInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			yesLog.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
+			return eno
+		}
+	} else {
+		req := sch.MsgShellBroadcastReq{
+			MsgType: yesMtAtoi[msg.MsgType],
+			From:    msg.From,
+			Key:     msg.Key,
+			Data:    msg.Data,
+			Exclude: exclude,
+		}
+		yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellBroadcastReq, &req)
+		if eno := yeShMgr.chainInst.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			yesLog.Debug("broadcastBkOsn: SchSendMessage failed, eno: %d", eno)
+			return eno
+		}
 	}
 
 	return nil

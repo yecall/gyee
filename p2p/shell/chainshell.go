@@ -415,21 +415,15 @@ func (shMgr *ShellManager) reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrn
 }
 
 func (shMgr *ShellManager) broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
-
-	if req.MsgType != sch.MSBR_MT_EV && req.MsgType != sch.MSBR_MT_TX && req.MsgType != sch.MSBR_MT_BLKH {
-		chainLog.Debug("broadcastReq: invalid mseeage type: %d", req.MsgType)
-		return sch.SchEnoParameter
-	}
-
 	switch req.MsgType {
-	case sch.MSBR_MT_EV, sch.MSBR_MT_TX, sch.MSBR_MT_BLKH:
+	case sch.MSBR_MT_EV, sch.MSBR_MT_TX, sch.MSBR_MT_BLKH, sch.MSBR_MT_BLK:
 		if shMgr.deDup {
 			key := config.DsKey{}
 			copy(key[0:], req.Key)
 			skm := shMgr.setKeyMap(&key)
 			chainLog.Debug("broadcastReq: setKeyMap result skm: %d", skm)
 			if skm == SKM_DUPLICATED || skm == SKM_FAILED {
-				break
+				return sch.SchEnoUserTask
 			}
 		}
 

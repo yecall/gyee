@@ -155,12 +155,17 @@ var testCaseTable = []testCase{
 		description: "get chain info",
 		entry:       testCase18,
 	},
+	{
+		name:        "testCase19",
+		description: "block broadcasting",
+		entry:       testCase19,
+	},
 }
 
 //
 // target case
 //
-var targetCase = "testCase18"
+var targetCase = "testCase19"
 
 //
 // switch for playing go-monitors, related commands:
@@ -1066,6 +1071,83 @@ func testCase18(tc *testCase) {
 				tm.Reset(cycle)
 			case <-quitCh:
 				break _gciExit
+			}
+		}
+	}()
+
+	waitInterrupt()
+	quitCh <- true
+	yeShMgr.Stop()
+}
+
+//
+// testCase19
+//
+func testCase19(tc *testCase) {
+	yesCfg := yep2p.DefaultYeShellConfig
+	yesCfg.Validator = true
+	yesCfg.BootstrapNode = false
+	yesCfg.SubNetMaskBits = 0
+	yesCfg.NatType = config.NATT_NONE
+	yeShMgr := yep2p.NewYeShellManager(&yesCfg)
+	yeShMgr.Start()
+
+	okCount := 0
+	failedCount := 0
+	quitCh := make(chan bool, 0)
+
+	subBk := yep2p.Subscriber{
+		MsgChan: make(chan yep2p.Message, 64),
+		MsgType: yep2p.MessageTypeBlock,
+	}
+	var subBkFunc = func(sub yep2p.Subscriber) {
+		bkCount := 0
+	_subBkExit:
+		for {
+			select {
+			case <-quitCh:
+				break _subBkExit
+			case msg, ok := <-sub.MsgChan:
+				if !ok {
+					log.Debug("testCase19: channel closed")
+					break _subBkExit
+				}
+				if bkCount++; bkCount&0x7f == 0 {
+					log.Debug("testCase19: subBkFunc: count: %d, %s: %x", bkCount, msg.Key)
+				}
+			}
+		}
+		log.Debug("testCase19: subFunc: done")
+	}
+
+	blkBroadcast := func() error{
+		bk := yep2p.Message{}
+		data := []byte(fmt.Sprintf("bk: %d", time.Now()))
+		bk.Data = append(bk.Data[0:0], data...)
+		bk.Key = append(bk.Key, sha256.Sum256(data)[0:]...)
+		return yeShMgr.BroadcastMessageOsn(bk)
+	}
+
+	yeShMgr.Register(&subBk)
+	go subBkFunc(subBk)
+	go func() {
+		cycle := time.Millisecond * 1000
+		tm := time.NewTimer(cycle)
+		defer tm.Stop()
+	_bbExit:
+		for {
+			select {
+			case <-tm.C:
+				if err := blkBroadcast(); err != nil {
+					failedCount++
+					log.Debug("testCase19: blkBroadcast failed, error: %s", err.Error())
+				} else {
+					okCount++
+					log.Debug("testCase19: blkBroadcast ok")
+				}
+				tm.Reset(cycle)
+			case <-quitCh:
+				break _bbExit
 			}
 		}
 	}()
