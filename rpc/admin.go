@@ -22,21 +22,26 @@ package rpc
 
 import (
 	"context"
+	"errors"
+	"math/big"
 	"time"
 
 	"github.com/yeeco/gyee/accounts"
 	"github.com/yeeco/gyee/common/address"
+	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/rpc/pb"
 )
 
 type AdminService struct {
 	server RPCServer
+	core   *core.Core
 	am     *accounts.AccountManager
 }
 
 func newAdminService(server RPCServer) *AdminService {
 	return &AdminService{
 		server: server,
+		core:   server.Core(),
 		am:     server.Node().AccountManager(),
 	}
 }
@@ -74,4 +79,35 @@ func (s *AdminService) LockAccount(ctx context.Context, req *rpcpb.LockAccountRe
 	}
 	err = s.am.Lock(addr)
 	return &rpcpb.LockAccountResponse{Result: err == nil}, err
+}
+
+func (s *AdminService) SendTransaction(ctx context.Context, req *rpcpb.SendTransactionRequest) (*rpcpb.SendTransactionResponse, error) {
+	toAddr, err := address.AddressParse(req.To)
+	if err != nil {
+		return nil, err
+	}
+	amount, ok := new(big.Int).SetString(req.Amount, 10)
+	if !ok {
+		return nil, errors.New("failed to parse amount")
+	}
+	chainID := s.core.Chain().ChainID()
+	to := toAddr.CommonAddress()
+	key, err := s.am.GetUnlocked(req.From)
+	if err != nil {
+		return nil, err
+	}
+	signer := s.core.GetSigner()
+	if err := signer.InitSigner(key); err != nil {
+		return nil, err
+	}
+	tx := core.NewTransaction(uint32(chainID), req.Nonce, to, amount)
+	if err := tx.Sign(signer); err != nil {
+		return nil, err
+	}
+	if err := s.core.TxBroadcast(tx); err != nil {
+		return nil, err
+	}
+	return &rpcpb.SendTransactionResponse{
+		Hash: tx.Hash().Hex(),
+	}, nil
 }

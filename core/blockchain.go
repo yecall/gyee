@@ -117,6 +117,10 @@ func NewBlockChain(chainID ChainID, storage persistent.Storage, engine consensus
 	return bc, nil
 }
 
+func (bc *BlockChain) ChainID() ChainID {
+	return bc.chainID
+}
+
 func (bc *BlockChain) loadLastBlock() error {
 	lastHash := getLastBlock(bc.storage)
 	if lastHash == common.EmptyHash {

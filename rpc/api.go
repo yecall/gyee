@@ -33,12 +33,14 @@ import (
 
 type APIService struct {
 	server RPCServer
+	core   *core.Core
 	chain  *core.BlockChain
 }
 
 func newAPIService(server RPCServer) *APIService {
 	return &APIService{
 		server: server,
+		core:   server.Core(),
 		chain:  server.Core().Chain(),
 	}
 }
@@ -50,23 +52,23 @@ func (s *APIService) NodeInfo(ctx context.Context, req *rpcpb.NonParamsRequest) 
 
 func (s *APIService) GetBlockByHash(ctx context.Context, req *rpcpb.GetBlockByHashRequest) (*rpcpb.BlockResponse, error) {
 	bhash := common.HexToHash(req.Hash)
-	b := s.server.Core().Chain().GetBlockByHash(bhash)
+	b := s.core.Chain().GetBlockByHash(bhash)
 	return blockResponse(b)
 }
 
 func (s *APIService) GetBlockByHeight(ctx context.Context, req *rpcpb.GetBlockByHeightRequest) (*rpcpb.BlockResponse, error) {
-	b := s.server.Core().Chain().GetBlockByNumber(req.Height)
+	b := s.core.Chain().GetBlockByNumber(req.Height)
 	return blockResponse(b)
 }
 
 func (s *APIService) GetLastBlock(ctx context.Context, req *rpcpb.GetLastBlockRequest) (*rpcpb.GetLastBlockResponse, error) {
-	b := s.server.Core().Chain().LastBlock()
+	b := s.core.Chain().LastBlock()
 	return lastBlockResponse(b)
 }
 
 func (s *APIService) GetTxByHash(ctx context.Context, req *rpcpb.GetTxByHashRequest) (*rpcpb.TransactionResponse, error) {
 	txHash := common.HexToHash(req.Hash)
-	tx := s.server.Core().Chain().GetTxByHash(txHash)
+	tx := s.core.Chain().GetTxByHash(txHash)
 	return txResponse(tx)
 }
 
@@ -75,7 +77,7 @@ func (s *APIService) GetAccountState(ctx context.Context, req *rpcpb.GetAccountS
 	if err != nil {
 		return nil, err
 	}
-	account := s.server.Core().Chain().LastBlock().GetAccount(*addr.CommonAddress())
+	account := s.core.Chain().LastBlock().GetAccount(*addr.CommonAddress())
 	return accountStateResponse(account)
 }
 

@@ -114,6 +114,8 @@ func (c *Console) setupBridge() error {
 	_ = obj.Set("unlockAccount", c.bridge.unlockAccount)
 	_ = obj.Set("lockAccount", c.bridge.lockAccount)
 
+	_ = obj.Set("sendTransaction", c.bridge.sendTransaction)
+
 	// temporary bridge api, should switch to js binding later
 	if true {
 		_ = obj.Set("getBlockByHash", c.bridge.getBlockByHash)

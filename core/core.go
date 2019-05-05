@@ -419,6 +419,10 @@ func (c *Core) MinerAddr() *address.Address {
 	return c.minerAddr.Copy()
 }
 
+func (c *Core) TxBroadcast(tx *Transaction) error {
+	return c.txPool.TxBroadcast(tx)
+}
+
 // as if msg was received from p2p module
 func (c *Core) FakeP2pRecv(msg *p2p.Message) {
 	c.txPool.subscriber.MsgChan <- *msg

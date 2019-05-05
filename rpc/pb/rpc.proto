@@ -154,6 +154,9 @@ service AdminService {
     }
     rpc LockAccount (LockAccountRequest) returns (LockAccountResponse) {
     }
+
+    rpc SendTransaction (SendTransactionRequest) returns (SendTransactionResponse) {
+    }
 }
 
 message AccountsResponse {
@@ -185,4 +188,22 @@ message LockAccountRequest {
 
 message LockAccountResponse {
     bool result = 1;
+}
+
+message SendTransactionRequest {
+    // tx from address hex string
+    string from = 1;
+    // tx to address hex string
+    string to = 2;
+
+    // tx amount decimal string
+    string amount = 3;
+
+    // account nonce
+    uint64 nonce = 15;
+}
+
+message SendTransactionResponse {
+    // tx hash hex string
+    string hash = 1;
 }
