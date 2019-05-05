@@ -1117,7 +1117,8 @@ func testCase19(tc *testCase) {
 					break _subBkExit
 				}
 				bkCount++
-				log.Debug("testCase19: subBkFunc: count: %d, key: %x", bkCount, msg.Key)
+				log.Debug("testCase19: subBkFunc: count: %d, data: %s, key: %x",
+					bkCount, string(msg.Data), msg.Key)
 			}
 		}
 		log.Debug("testCase19: subBkFunc: done")
@@ -1128,7 +1129,7 @@ func testCase19(tc *testCase) {
 		From: fmt.Sprintf("%x", yeShMgr.GetLocalNode().ID),
 	}
 	blkBroadcast := func() error{
-		data := []byte(fmt.Sprintf("bk: %d", time.Now()))
+		data := []byte(fmt.Sprintf("bk: %s", time.Now().String()))
 		bk.Data = data
 		key := sha256.Sum256(data)
 		bk.Key = append(bk.Key[0:0], key[0:]...)
