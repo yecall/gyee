@@ -1129,7 +1129,7 @@ func testCase19(tc *testCase) {
 		From: fmt.Sprintf("%x", yeShMgr.GetLocalNode().ID),
 	}
 	blkBroadcast := func() error{
-		data := []byte(fmt.Sprintf("bk: %s", time.Now().String()))
+		data := []byte(fmt.Sprintf("bk: %d", time.Now()))
 		bk.Data = data
 		key := sha256.Sum256(data)
 		bk.Key = append(bk.Key[0:0], key[0:]...)
