@@ -17,6 +17,10 @@
 
 package core
 
+import (
+	"github.com/yeeco/gyee/log"
+)
+
 type Receipt struct {
 	// caches
 	raw []byte
@@ -32,4 +36,10 @@ type Receipts []*Receipt
 
 func (rs Receipts) Len() int { return len(rs) }
 
-func (rs Receipts) GetEncoded(index int) []byte { return rs[index].raw }
+func (rs Receipts) GetEncoded(index int) []byte {
+	raw := rs[index].raw
+	if len(raw) == 0 {
+		log.Crit("hashing nil receipt content")
+	}
+	return raw
+}

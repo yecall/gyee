@@ -138,9 +138,9 @@ func (tp *TransactionPool) processTx(tx *Transaction) {
 	}
 
 	// search in-mem request, if we are requesting for this tx
-	if _, ok := tp.reqPool[*tx.hash]; ok {
-		delete(tp.reqPool, *tx.hash)
-		tp.pendingPool[*tx.hash] = tx
+	if _, ok := tp.reqPool[*tx.Hash()]; ok {
+		delete(tp.reqPool, *tx.Hash())
+		tp.pendingPool[*tx.Hash()] = tx
 
 		// TODO: check if block can be sealed
 		return

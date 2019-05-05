@@ -100,8 +100,21 @@ func (t *Transaction) Amount() *big.Int {
 	return t.amount
 }
 
+func (t *Transaction) contentHash() (*common.Hash, error) {
+	encoded, err := t.encode(true)
+	if err != nil {
+		return nil, err
+	}
+	h := new(common.Hash).SetBytes(sha3.Sha3256(encoded))
+	return h, nil
+}
+
 func (t *Transaction) Sign(signer crypto.Signer) error {
-	sig, err := signer.Sign(t.Hash()[:])
+	h, err := t.contentHash()
+	if err != nil {
+		return err
+	}
+	sig, err := signer.Sign(h[:])
 	if err != nil {
 		return err
 	}
@@ -111,7 +124,7 @@ func (t *Transaction) Sign(signer crypto.Signer) error {
 
 func (t *Transaction) Hash() *common.Hash {
 	if t.hash == nil {
-		enc, err := t.encode(true)
+		enc, err := t.encode(false)
 		if err != nil {
 			log.Crit("wrong tx hash")
 		}
@@ -137,7 +150,11 @@ func (t *Transaction) sigFrom(verifySig bool) (*common.Address, error) {
 	if signer == nil {
 		return nil, ErrNoSigner
 	}
-	txHash := t.Hash()[:]
+	h, err := t.contentHash()
+	if err != nil {
+		return nil, err
+	}
+	txHash := h[:]
 	pubkey, err := signer.RecoverPublicKey(txHash, t.signature)
 	if err != nil {
 		return nil, err
@@ -252,7 +269,13 @@ type Transactions []*Transaction
 
 func (txs Transactions) Len() int { return len(txs) }
 
-func (txs Transactions) GetEncoded(index int) []byte { return txs[index].raw }
+func (txs Transactions) GetEncoded(index int) []byte {
+	raw := txs[index].raw
+	if len(raw) == 0 {
+		log.Crit("hashing nil tx content")
+	}
+	return raw
+}
 
 func (txs Transactions) String() string {
 	var sb strings.Builder

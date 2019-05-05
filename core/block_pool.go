@@ -302,7 +302,7 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 		if err := bp.core.signBlock(nextBlock); err != nil {
 			log.Crit("failed to sign block", "err", err)
 		}
-		log.Info("block sealed", "txs", len(nextBlock.transactions), "hash", nextBlock.Hash())
+		log.Info("block sealed", "H", nextBlock.header.Number, "txs", len(nextBlock.transactions), "hash", nextBlock.Hash())
 		// merge with received signatures
 		if knownBlock, ok := bp.blockMap[nextBlock.Number()]; ok {
 			if knownBlock.Hash() != nextBlock.Hash() {

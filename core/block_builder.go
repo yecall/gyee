@@ -26,9 +26,8 @@ import (
 )
 
 func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
-	if len(txs) < 2 {
-		return txs
-	}
+	txsRoot := DeriveHash(txs)
+	log.Info("organizeTxs", "cnt", len(txs), "txsRoot", txsRoot)
 	var (
 		output   Transactions
 		nonceMap = make(map[common.Address]uint64)

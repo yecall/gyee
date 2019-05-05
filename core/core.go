@@ -355,6 +355,7 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 				log.Error("failed to verify tx", "hash", hash, "err", err)
 				return
 			}
+			tx.raw = enc
 			txs = append(txs, tx)
 		}
 		c.blockPool.AddSealRequest(o.H,
