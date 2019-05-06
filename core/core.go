@@ -336,6 +336,7 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 		c.wg.Add(1)
 		defer c.wg.Done()
 		retry := 60
+		knownTxs := make(map[common.Hash]*Transaction)
 		for {
 			if !c.running {
 				return
@@ -344,24 +345,28 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 			txs := func(txHash []common.Hash) Transactions {
 				txs := make(Transactions, 0, len(txHash))
 				for _, hash := range txHash {
-					c.metrics.p2pDhtGetMeter.Mark(1)
-					enc, err := c.node.P2pService().DhtGetValue(hash[:])
-					if err != nil {
-						log.Error("failed to get tx", "hash", hash, "err", err)
-						c.metrics.p2pDhtMissMeter.Mark(1)
-						continue
+					tx, exists := knownTxs[hash]
+					if !exists {
+						c.metrics.p2pDhtGetMeter.Mark(1)
+						enc, err := c.node.P2pService().DhtGetValue(hash[:])
+						if err != nil {
+							log.Warn("failed to get tx", "hash", hash, "err", err)
+							c.metrics.p2pDhtMissMeter.Mark(1)
+							continue
+						}
+						c.metrics.p2pDhtHitMeter.Mark(1)
+						tx = &Transaction{}
+						if err := tx.Decode(enc); err != nil {
+							log.Error("failed to decode tx", "hash", hash, "err", err)
+							continue
+						}
+						if err := tx.VerifySig(); err != nil {
+							log.Error("failed to verify tx", "hash", hash, "err", err)
+							continue
+						}
+						tx.raw = enc
+						knownTxs[hash] = tx
 					}
-					c.metrics.p2pDhtHitMeter.Mark(1)
-					tx := &Transaction{}
-					if err := tx.Decode(enc); err != nil {
-						log.Error("failed to decode tx", "hash", hash, "err", err)
-						continue
-					}
-					if err := tx.VerifySig(); err != nil {
-						log.Error("failed to verify tx", "hash", hash, "err", err)
-						continue
-					}
-					tx.raw = enc
 					txs = append(txs, tx)
 				}
 				return txs
