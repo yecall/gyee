@@ -521,7 +521,7 @@ func (c *Core) GetChainData(kind string, key []byte) []byte {
 
 func (c *Core) GetRemoteLatestHash() (*common.Hash, error) {
 	c.metrics.p2pChainInfoGet.Mark(1)
-	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestH, nil)
+	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestH, []byte(""))
 	if err != nil {
 		return nil, err
 	}
@@ -534,7 +534,7 @@ func (c *Core) GetRemoteLatestHash() (*common.Hash, error) {
 
 func (c *Core) GetRemoteLatestNumber() (uint64, error) {
 	c.metrics.p2pChainInfoGet.Mark(1)
-	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestN, nil)
+	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestN, []byte(""))
 	if err != nil {
 		return 0, err
 	}
