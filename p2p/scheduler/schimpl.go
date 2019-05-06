@@ -316,7 +316,7 @@ taskLoop:
 			//
 
 		_msgLoop:
-			
+
 			for {
 				select {
 				case msg = <-*queMsg:

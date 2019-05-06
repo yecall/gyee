@@ -120,26 +120,27 @@ type SingleSubnetDescriptor = sch.SingleSubnetDescriptor // single subnet descri
 type yesKey = config.DsKey
 
 type getValueResult struct {
-	eno		int
-	key		[]byte
-	value	[]byte
+	eno		int			// result
+	key		[]byte		// key
+	value	[]byte		// value
 }
 
 type putValueResult struct {
-	eno		int
-	key		[]byte
+	eno		int			// result
+	key		[]byte		// key
 }
 
 const GCIKEY_LEN = 32
 type getChainInfoKeyEx struct {
-	name	string
-	key		[GCIKEY_LEN]byte
+	name	string				// name(kind)
+	key		[GCIKEY_LEN]byte	// key, obtained from a slice, "0"s padding
+	keyLen	int					// ken length
 }
 
 type getChainInfoValEx struct {
-	gcdChan		chan []byte
-	gcdTimer	*time.Timer
-	gcdSeq		uint64
+	gcdChan		chan []byte		// channel to sleep on
+	gcdTimer	*time.Timer		// timer for expiration
+	gcdSeq		uint64			// sequence
 }
 
 var yesInStopping = errors.New("yesmgr: in stopping")
@@ -499,7 +500,7 @@ func (yeShMgr *YeShellManager) Stop() {
 	close(yeShMgr.putValChan)
 	yesLog.Debug("Stop: dht stopped")
 
-	log.Info("Stop: dht done", yeShMgr.dhtInst.SchGetP2pCfgName())
+	log.Info("Stop: dht done", yeShMgr.dhtSdlName)
 
 	thisCfg := yeShMgr.config
 	if thisCfg.BootstrapNode == false {
@@ -512,7 +513,7 @@ func (yeShMgr *YeShellManager) Stop() {
 	<-stopCh
 	yesLog.Debug("Stop: chain stopped")
 
-	log.Info("Stop: chain done", yeShMgr.chainInst.SchGetP2pCfgName())
+	log.Info("Stop: chain done", yeShMgr.chainSdlName)
 }
 
 func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
@@ -752,20 +753,25 @@ func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
 }
 
 func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, error) {
-	if /*len(key) != GCIKEY_LEN ||*/ key == nil || len(kind) == 0 {
+	if key == nil || len(key) > GCIKEY_LEN || len(kind) == 0 {
+		yesLog.Debug("GetChainInfo: invalid invalid (kind,key) pair, sdl: %s, kind: %s, key: %x",
+			yeShMgr.chainSdlName, kind, key)
 		return nil, errors.New("GetChainInfo: invalid (kind,key) pair")
 	}
 	kex := getChainInfoKeyEx {
 		name: kind,
+		keyLen: len(key),
 	}
 	copy(kex.key[0:], key)
 
 	yeShMgr.gciLock.Lock()
 	if _, dup := yeShMgr.gciMap[kex]; dup {
+		yesLog.Debug("GetChainInfo: duplicated, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		yeShMgr.gciLock.Unlock()
 		return nil, errors.New("GetChainInfo: duplicated (kind,key) pair")
 	}
 	if len(yeShMgr.gciMap) > GCIBS {
+		yesLog.Debug("GetChainInfo: too much, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		yeShMgr.gciLock.Unlock()
 		return nil, errors.New(fmt.Sprintf("GetChainInfo: too much, max: %d", GCIBS))
 	}
@@ -778,15 +784,18 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	yeShMgr.gciLock.Unlock()
 	defer vex.gcdTimer.Stop()
 
+	// do not use kex.key[0:] for req.Key, since it's an array than a slice,
+	// on which "0"s might have been padded after copy(...) called above.
 	req := sch.MsgShellGetChainInfoReq {
 		Seq: vex.gcdSeq,
 		Kind: kex.name,
-		Key: kex.key[0:],
+		Key: key,
 	}
 	msg := sch.SchMessage{}
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		yesLog.Debug("GetChainInfo: SchSendMessage failed, eno: %d", eno)
+		yesLog.Debug("GetChainInfo: SchSendMessage failed, sdl: %s, kind: %s, key: %x, eno: %d",
+			yeShMgr.chainSdlName, kind, key, eno)
 		return nil, eno
 	}
 
@@ -801,16 +810,22 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 			close(vex.gcdChan)
 		}
 		yeShMgr.gciLock.Unlock()
+		yesLog.Debug("GetChainInfo: timeout, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		return nil, errors.New("GetChainInfo: timeout")
 	case chainData, gcdOk = <-vex.gcdChan:
+		yesLog.Debug("GetChainInfo: gcdChan got, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 	}
 
 	if !gcdOk{
+		yesLog.Debug("GetChainInfo: failed, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		return nil, errors.New("GetChainInfo: channel closed")
 	}
 	if  len(chainData) == 0 {
+		yesLog.Debug("GetChainInfo: empty, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		return nil, errors.New("GetChainInfo: empty")
 	}
+	yesLog.Debug("GetChainInfo: ok, sdl: %s, kind: %s, key: %x, data: %x",
+		yeShMgr.chainSdlName, kind, key, chainData)
 	return chainData, nil
 }
 
@@ -1751,6 +1766,10 @@ func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 
 	if yeShMgr.cp != nil {
 		data := yeShMgr.cp.GetChainData(msg.Gcd.Name, msg.Gcd.Key)
+
+		yesLog.Debug("getChainDataFromPeer: cp: sdl: %s, kind: %s, key: %x, data: %x",
+			yeShMgr.chainSdlName, msg.Gcd.Name, msg.Gcd.Key, data)
+
 		if len(data) > 0 {
 			rsp := sch.MsgShellGetChainInfoRsp {
 				Peer: rxPkg.PeerInfo,
@@ -1788,8 +1807,10 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 
 	kex := getChainInfoKeyEx{
 		name: msg.Pcd.Name,
+		keyLen: len(msg.Pcd.Key),
 	}
 	copy(kex.key[0:], msg.Pcd.Key)
+
 	vex, ok := yeShMgr.gciMap[kex]
 	if !ok {
 		yesLog.Debug("putChainDataFromPeer: not found, name: %s, key: %x", kex.key, kex.name)
@@ -1799,6 +1820,7 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 		yesLog.Debug("putChainDataFromPeer: sequence mismatch")
 		return sch.SchEnoMismatched
 	}
+
 	// notice: when all matched, we should delete the key from the map at once
 	// to discard the possible responses with the same key value, or in the worst
 	// case, deadlock can happen. see function GetChainInfo also please.
