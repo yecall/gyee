@@ -139,8 +139,9 @@ func GetConfig(ctx *cli.Context) *Config {
 }
 
 func GetDefaultConfig() *Config {
-	var config Config
-	config.NodeDir = utils.DefaultNodeDir()
+	var config = &Config{
+		NodeDir: utils.DefaultNodeDir(),
+	}
 
 	cdata, err := res.Asset("config/config_test.toml")
 	if err != nil {
@@ -156,7 +157,7 @@ func GetDefaultConfig() *Config {
 		return nil
 	}
 
-	return &config
+	return config
 }
 
 func GetConfigFromFile(file string, config *Config) *Config {

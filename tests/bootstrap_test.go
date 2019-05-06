@@ -53,7 +53,7 @@ func TestBootstrapNoTx(t *testing.T) {
 
 func TestBootstrapWithTx(t *testing.T) {
 	numNodes := uint(16)
-	doTest(t, numNodes, 300*time.Second, 0, genDefaultNode,
+	doTest(t, numNodes, 300*time.Second, 120*time.Second, genDefaultNode,
 		func(quitCh chan struct{}, wg sync.WaitGroup, nodes []*node.Node) {
 			genTestTxs(t, quitCh, wg, nodes, numNodes)
 		})

@@ -27,7 +27,7 @@ import (
 
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
-	p2pcfg "github.com/yeeco/gyee/p2p/config"
+	p2pCfg "github.com/yeeco/gyee/p2p/config"
 )
 
 func main() {
@@ -36,10 +36,10 @@ func main() {
 		writeNodeID = flag.Bool("writenodeid", false, "write out the node's id and quit")
 		nodeDataDir = flag.String("nodeDataDir", "", "node data directory")
 		nodeName    = flag.String("nodeName", "", "node name")
-		chainIp     = flag.String("cip", "", "chain ip(b1.b2.b3.b4)")
-		chainPort   = flag.Int("cport", 0, "chain port")
-		dhtIp       = flag.String("dip", "", "dht ip(b1.b2.b3.b4)")
-		dhtPort     = flag.Int("dport", 0, "dht port")
+		chainIp     = flag.String("cip", "0.0.0.0", "chain ip(b1.b2.b3.b4)")
+		chainPort   = flag.Int("cport", p2pCfg.DftUdpPort, "chain port")
+		dhtIp       = flag.String("dip", "0.0.0.0", "dht ip(b1.b2.b3.b4)")
+		dhtPort     = flag.Int("dport", p2pCfg.DftDhtPort, "dht port")
 		nodeKey     *ecdsa.PrivateKey
 		err         error
 	)
@@ -50,12 +50,12 @@ func main() {
 			log.Crit("nodeDataDir and nodeName must not be empty", "err", err)
 			os.Exit(-1)
 		}
-		kf := filepath.Join(*nodeDataDir, *nodeName, p2pcfg.KeyFileName)
-		nodeKey, err = p2pcfg.GenerateKey()
+		kf := filepath.Join(*nodeDataDir, *nodeName, p2pCfg.KeyFileName)
+		nodeKey, err = p2pCfg.GenerateKey()
 		if err != nil {
 			log.Crit("failed to generate nodekey", "err", err)
 		}
-		if err = p2pcfg.SaveECDSA(kf, nodeKey); err != nil {
+		if err = p2pCfg.SaveECDSA(kf, nodeKey); err != nil {
 			log.Crit("failed to save nodekey", "err", err)
 			os.Exit(-1)
 		}
@@ -68,13 +68,13 @@ func main() {
 			log.Crit("nodeDataDir and nodeName must not be empty")
 			os.Exit(-1)
 		}
-		kf := filepath.Join(*nodeDataDir, *nodeName, p2pcfg.KeyFileName)
-		nodeKey, err = p2pcfg.LoadECDSA(kf)
+		kf := filepath.Join(*nodeDataDir, *nodeName, p2pCfg.KeyFileName)
+		nodeKey, err = p2pCfg.LoadECDSA(kf)
 		if err != nil {
 			log.Crit("failed to load nodekey", "err", err)
 			os.Exit(-1)
 		}
-		nodeID := p2pcfg.P2pPubkey2NodeId(&nodeKey.PublicKey)
+		nodeID := p2pCfg.P2pPubkey2NodeId(&nodeKey.PublicKey)
 		if nodeID == nil {
 			log.Crit("failed to parse nodeID")
 			os.Exit(-1)
@@ -89,29 +89,19 @@ func main() {
 	}
 
 	nodeCfg := p2p.DefaultYeShellConfig
-	nodeCfg.LocalNodeIp = "0.0.0.0"
-	nodeCfg.LocalDhtIp = "0.0.0.0"
+	nodeCfg.LocalNodeIp = *chainIp
+	nodeCfg.LocalTcpPort = (uint16)(*chainPort & 0xffff)
+	nodeCfg.LocalUdpPort = (uint16)(*chainPort & 0xffff)
+	nodeCfg.LocalDhtIp = *dhtIp
+	nodeCfg.LocalDhtPort = (uint16)(*dhtPort & 0xffff)
 	if *nodeDataDir != "" && *nodeName != "" {
 		nodeCfg.NodeDataDir = *nodeDataDir
 		nodeCfg.Name = *nodeName
 	}
-	if *chainIp != "" {
-		nodeCfg.LocalNodeIp = *chainIp
-	}
-	if *chainPort != 0 {
-		nodeCfg.LocalTcpPort = (uint16)(*chainPort & 0xffff)
-		nodeCfg.LocalUdpPort = (uint16)(*chainPort & 0xffff)
-	}
-	if *dhtIp != "" {
-		nodeCfg.LocalDhtIp = *dhtIp
-	}
-	if *dhtPort != 0 {
-		nodeCfg.LocalDhtPort = (uint16)(*dhtPort & 0xffff)
-	}
 	nodeCfg.BootstrapNode = true
 	nodeCfg.Validator = false
 	nodeCfg.SubNetMaskBits = 0
-	nodeCfg.NatType = p2pcfg.NATT_NONE
+	nodeCfg.NatType = p2pCfg.NATT_NONE
 	nodeCfg.BootstrapNodes = make([]string, 0)
 	nodeCfg.DhtBootstrapNodes = make([]string, 0)
 	bootNode, err := p2p.NewOsnService(&nodeCfg)
