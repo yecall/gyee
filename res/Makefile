@@ -25,7 +25,7 @@ GO = res.go
 all: $(GO)
 
 $(GO): $(FILES)
-	$(GOBINDATA) -pkg res -o $@ $^
+	$(GOBINDATA) -nometadata -pkg res -o $@ $^
 
 clean:
 	rm -f $(GO)
