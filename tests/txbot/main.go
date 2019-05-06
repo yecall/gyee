@@ -18,9 +18,18 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
+	"sync"
+	"time"
 
+	"github.com/yeeco/gyee/common"
+	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/crypto/keystore"
+	"github.com/yeeco/gyee/crypto/secp256k1"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
 	p2pCfg "github.com/yeeco/gyee/p2p/config"
@@ -35,6 +44,11 @@ func main() {
 	)
 	flag.Parse()
 
+	//*ksPassword = strings.Split(*ksPassword, "\n")[0]
+	if len(*ksPassword) == 0 {
+		log.Crit("must provide keystore password")
+	}
+
 	cfg := config.GetDefaultConfig()
 	cfg.P2p.LocalNodeIp = *localIP
 	cfg.P2p.LocalTcpPort = (uint16)(*localPort & 0xffff)
@@ -42,16 +56,88 @@ func main() {
 	cfg.P2p.LocalDhtIp = *localIP
 	cfg.P2p.LocalDhtPort = (uint16)(*dhtPort & 0xffff)
 
+	// load accounts
+	signers, addrs, err := loadAccounts(cfg, *ksPassword)
+	if err != nil {
+		log.Crit("account load failed", "err", err)
+	}
+
+	// create node
 	n, err := node.NewNode(cfg)
 	if err != nil {
 		log.Crit("node create failure", "err", err)
 	}
+
+	// start node
 	if err := n.Start(); err != nil {
 		log.Crit("node start failure", "err", err)
 	}
 
-	// TODO: send tx in routine
-	_ = ksPassword
+	// start tx generator
+	var (
+		quitCh = make(chan struct{})
+		wg     sync.WaitGroup
+	)
+	go genTxs(n, signers, addrs, quitCh, wg)
 
 	n.WaitForShutdown()
+
+	// notify generator to stop
+	close(quitCh)
+	wg.Wait()
+}
+
+func loadAccounts(cfg *config.Config, password string) ([]crypto.Signer, []common.Address, error) {
+	ks := keystore.NewKeystoreWithConfig(cfg)
+	addrList := ks.List()
+	if len(addrList) == 0 {
+		return nil, nil, errors.New("no local account found")
+	}
+
+	signers := make([]crypto.Signer, 0)
+	addrs := make([]common.Address, 0)
+	for _, addr := range addrList {
+		key, err := ks.GetKey(addr, []byte(password))
+		if err != nil {
+			log.Warn("failed to load account", "addr", addr, "err", err)
+			continue
+		}
+		pub, err := secp256k1.GetPublicKey(key)
+		if err != nil {
+			log.Warn("failed to gen pubkey", "addr", addr, "err", err)
+			continue
+		}
+		addr, err := address.NewAddressFromPublicKey(pub)
+		signer := secp256k1.NewSecp256k1Signer()
+		if err := signer.InitSigner(key); err != nil {
+			log.Warn("failed to prepare signer", "addr", addr, "err", err)
+			continue
+		}
+		signers = append(signers, signer)
+		addrs = append(addrs, *addr.CommonAddress())
+	}
+	if len(signers) < 2 {
+		return nil, nil, fmt.Errorf("at least two accounts needed for txBot, got %d", len(signers))
+	}
+	log.Info("accounts loaded for txBot", "cnt", len(signers))
+	return signers, addrs, nil
+}
+
+func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitCh chan struct{}, wg sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
+
+	// generator loop
+	ticker := time.NewTicker(100 * time.Millisecond)
+Exit:
+	for {
+		select {
+		case <-quitCh:
+			ticker.Stop()
+			break Exit
+		case <-ticker.C:
+			// send txs
+		}
+		// TODO:
+	}
 }
