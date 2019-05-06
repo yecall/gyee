@@ -135,6 +135,7 @@ var dsType = dstLevelDB
 // infinite
 //
 const DsMgrDurInf = time.Duration(0)
+const dsMgrApplyCleanupTimer = true
 
 //
 // Data store manager
@@ -142,6 +143,7 @@ const DsMgrDurInf = time.Duration(0)
 type DsMgr struct {
 	sdl         *sch.Scheduler         // pointer to scheduler
 	name        string                 // my name
+	busy		bool				   // is dht too busy
 	tep         sch.SchUserTaskEp      // task entry
 	ptnMe       interface{}            // pointer to task node of myself
 	ptnDhtMgr   interface{}            // pointer to dht manager task node
@@ -185,12 +187,41 @@ func (dsMgr *DsMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch
 //
 // Datastore manager entry
 //
+
+func (dsMgr *DsMgr) IsBusy() bool {
+	return dsMgr.busy
+}
+
+func (dsMgr *DsMgr) checkMailBox() {
+	if dsMgr.sdl != nil && dsMgr.ptnMe != nil {
+		capacity := dsMgr.sdl.SchGetTaskMailboxCapacity(dsMgr.ptnMe)
+		space := dsMgr.sdl.SchGetTaskMailboxSpace(dsMgr.ptnMe)
+		dsMgr.busy = space < (capacity >> 3)
+	}
+}
+
+func (dsMgr *DsMgr) busyMsgFilter(ev int) bool {
+	if dsMgr.IsBusy() {
+		switch ev {
+		case sch.EvDhtDsMgrAddValReq, sch.EvDhtMgrGetValueReq:
+			return true
+		case sch.EvDhtDsMgrPutValReq, sch.EvDhtDsMgrGetValReq:
+			return true
+		}
+	}
+	return false
+}
+
 func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
-	eno := sch.SchEnoUnknown
+	if dsMgr.busyMsgFilter(msg.Id) {
+		dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+		return sch.SchEnoUserTask
+	}
 
+	eno := sch.SchEnoUnknown
 	switch msg.Id {
 
 	case sch.EvSchPoweron:
@@ -237,6 +268,9 @@ func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno
 // put
 //
 func (dsMgr *DsMgr) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
+
+	// this function start a timer for (key,value) pair after it is put
+	// ok to local datastore.
 
 	if eno := dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
 		dsLog.Debug("Put: failed, eno: %d", eno)
@@ -503,6 +537,7 @@ func (dsMgr *DsMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sc
 
 	} else if msg.ForWhat == MID_GETVALUE_REQ {
 
+		dsMgr.store(&msg.Target, msg.Val, DsMgrDurInf)
 		return dsMgr.localGetValRsp(msg.Target[0:], msg.Val, DhtErrno(msg.Eno))
 
 	} else {
@@ -747,6 +782,9 @@ func (dsMgr *DsMgr) store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 		return eno
 	}
 
+	if dsMgrApplyCleanupTimer {
+		return dsMgr.Put(dsr.Key[0:], dsr.Value, kt)
+	}
 	return dsMgr.ds.Put(dsr.Key[0:], dsr.Value, kt)
 }
 

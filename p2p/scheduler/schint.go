@@ -52,6 +52,7 @@ type schWatchDog = SchWatchDog
 // Mail box
 //
 type schMailBox struct {
+	qtm  *chan *schMessage	// channel for timer
 	que  *chan *schMessage	// channel for message
 	size int              	// number of messages buffered
 }
@@ -104,6 +105,8 @@ const schTimerNodePoolSize = 2048 // timer node pool size, must be (2^n)
 // Task struct
 //
 const schMaxTaskTimer = SchMaxTaskTimer // max timers can be held by one user task
+const schTmqSize = 32					// timer message queue size
+const schTmqFork = true					// do not send timer message to common queue if true
 const schInvalidTid = SchInvalidTid     // invalid timer identity
 const evHistorySize = 64                // round buffer size fo event history
 type schTask struct {

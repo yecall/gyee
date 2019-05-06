@@ -183,6 +183,7 @@ func (sdl *scheduler) schCommonTask(ptn *schTaskNode) SchErrno {
 	task.scheduling = true
 	mailbox := &ptn.task.mailbox
 	queMsg := ptn.task.mailbox.que
+	qtmMsg := ptn.task.mailbox.qtm
 	done := &ptn.task.done
 	proc := ptn.task.utep.TaskProc4Scheduler
 
@@ -249,6 +250,7 @@ func (sdl *scheduler) schCommonTask(ptn *schTaskNode) SchErrno {
 
 			for {
 				select {
+				case <-*qtmMsg:
 				case m := <-*queMsg:
 					if m.Mscb != nil {
 						m.Mscb(SchEnoDone)
@@ -310,10 +312,19 @@ taskLoop:
 		} else {
 
 			//
-			// get one message
+			// get one message from common queue or timer queue
 			//
 
-			msg = <-*queMsg
+		_msgLoop:
+			
+			for {
+				select {
+				case msg = <-*queMsg:
+					break _msgLoop
+				case msg = <-*qtmMsg:
+					break _msgLoop
+				}
+			}
 		}
 
 		//
@@ -964,16 +975,19 @@ func (sdl *scheduler) schSendTimerEvent(ptm *schTmcbNode) SchErrno {
 		Body:   ptm.tmcb.extra,
 	}
 
-	if len(*task.mailbox.que) + mbReserved >= cap(*task.mailbox.que) {
-		schLog.Debug("schSendTimerEvent: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name)
-		panic(fmt.Sprintf("system overload, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name))
+	if schTmqFork == false {
+		if len(*task.mailbox.que) + mbReserved >= cap(*task.mailbox.que) {
+			schLog.Debug("schSendTimerEvent: mailbox of target is full, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name)
+			panic(fmt.Sprintf("system overload, sdl: %s, task: %s", sdl.p2pCfg.CfgName, task.name))
+		}
+		*task.mailbox.que <- &msg
+	} else {
+		*task.mailbox.qtm <- &msg
 	}
 
 	task.evTotal += 1
 	task.evHistory[task.evhIndex] = msg
 	task.evhIndex = (task.evhIndex + 1) & (evHistorySize - 1)
-
-	*task.mailbox.que <- &msg
 
 	return SchEnoNone
 }
@@ -1021,6 +1035,11 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 		ptn.task.mailbox.size = 0
 	}
 
+	if ptn.task.mailbox.qtm != nil {
+		close(*ptn.task.mailbox.qtm)
+		ptn.task.mailbox.qtm = nil
+	}
+
 	if ptn.task.done != nil {
 		panic("schCreateTask: internal error")
 	}
@@ -1038,6 +1057,8 @@ func (sdl *scheduler) schCreateTask(taskDesc *schTaskDescription) (SchErrno, int
 	ptn.task.utep = taskDesc.Ep
 	mq := make(chan *schMessage, taskDesc.MbSize)
 	ptn.task.mailbox.que = &mq
+	tmq := make(chan *schMessage, schTmqSize)
+	ptn.task.mailbox.qtm = &tmq
 	ptn.task.mailbox.size = taskDesc.MbSize
 	ptn.task.killing = false
 	ptn.task.doneGot = false
@@ -1412,7 +1433,9 @@ func (sdl *scheduler) schTcbClean(tcb *schTask) SchErrno {
 	tcb.dieCb = nil
 	tcb.goStatus = SchCreatedSuspend
 
+	close (*tcb.mailbox.qtm)
 	close(*tcb.mailbox.que)
+	tcb.mailbox.qtm = nil
 	tcb.mailbox.que = nil
 	tcb.mailbox.size = 0
 
