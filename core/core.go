@@ -335,32 +335,54 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 	go func() {
 		c.wg.Add(1)
 		defer c.wg.Done()
+		retry := 60
+		for {
+			if !c.running {
+				return
+			}
 
-		txs := make(Transactions, 0, len(o.Txs))
-		for _, hash := range o.Txs {
-			c.metrics.p2pDhtGetMeter.Mark(1)
-			enc, err := c.node.P2pService().DhtGetValue(hash[:])
-			if err != nil {
-				log.Error("failed to get tx", "hash", hash, "err", err)
-				c.metrics.p2pDhtMissMeter.Mark(1)
+			txs := func(txHash []common.Hash) Transactions {
+				txs := make(Transactions, 0, len(txHash))
+				for _, hash := range txHash {
+					c.metrics.p2pDhtGetMeter.Mark(1)
+					enc, err := c.node.P2pService().DhtGetValue(hash[:])
+					if err != nil {
+						log.Error("failed to get tx", "hash", hash, "err", err)
+						c.metrics.p2pDhtMissMeter.Mark(1)
+						continue
+					}
+					c.metrics.p2pDhtHitMeter.Mark(1)
+					tx := &Transaction{}
+					if err := tx.Decode(enc); err != nil {
+						log.Error("failed to decode tx", "hash", hash, "err", err)
+						continue
+					}
+					if err := tx.VerifySig(); err != nil {
+						log.Error("failed to verify tx", "hash", hash, "err", err)
+						continue
+					}
+					tx.raw = enc
+					txs = append(txs, tx)
+				}
+				return txs
+			}(o.Txs)
+			if len(txs) == len(o.Txs) {
+				// all tx fetched
+				c.blockPool.AddSealRequest(o.H,
+					uint64(o.T.UTC().UnixNano()/int64(time.Millisecond/time.Nanosecond)),
+					txs)
 				return
 			}
-			c.metrics.p2pDhtHitMeter.Mark(1)
-			tx := &Transaction{}
-			if err := tx.Decode(enc); err != nil {
-				log.Error("failed to decode tx", "hash", hash, "err", err)
-				return
+
+			log.Warn("engine output getTx not finished", "retry", retry,
+				"got", len(txs), "total", len(o.Txs), "output", o)
+			retry--
+			if retry <= 0 {
+				log.Error("engine output getTx failed", "output", o)
+				break
 			}
-			if err := tx.VerifySig(); err != nil {
-				log.Error("failed to verify tx", "hash", hash, "err", err)
-				return
-			}
-			tx.raw = enc
-			txs = append(txs, tx)
+			time.Sleep(time.Second)
 		}
-		c.blockPool.AddSealRequest(o.H,
-			uint64(o.T.UTC().UnixNano()/int64(time.Millisecond/time.Nanosecond)),
-			txs)
 	}()
 }
 
