@@ -22,7 +22,7 @@ package main
 
 import (
 	"fmt"
-
+	"errors"
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
 )
@@ -57,16 +57,17 @@ Generate a a default config file.`,
 )
 
 func saveConfig(ctx *cli.Context) error {
+	var err error
 	fileName := ctx.Args().First()
 	if len(fileName) == 0 {
 		fmt.Println("please give a config file arg!!!")
-		return nil
+		return errors.New("please give a config file arg!!!")
 	}
 
 	node := makeNode(ctx)
-	config.SaveConfigToFile(fileName, node.Config())
+	err = config.SaveConfigToFile(fileName, node.Config())
 
-	return nil
+	return err
 }
 
 func createDefaultConfig(ctx *cli.Context) error {
