@@ -21,12 +21,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/core"
 	"github.com/yeeco/gyee/crypto"
 	"github.com/yeeco/gyee/crypto/keystore"
 	"github.com/yeeco/gyee/crypto/secp256k1"
@@ -127,7 +129,17 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 	wg.Add(1)
 	defer wg.Done()
 
+	if len(signers) != len(addrs) {
+		log.Crit("signer/addrs not match", "signers", signers, "addrs", addrs)
+	}
+
+	c := n.Core()
+	chainID := uint32(c.Chain().ChainID())
+	nonces := make([]uint64, len(signers))
+
 	// generator loop
+	round := int(0)
+	totalTxs := int(0)
 	ticker := time.NewTicker(100 * time.Millisecond)
 Exit:
 	for {
@@ -138,6 +150,43 @@ Exit:
 		case <-ticker.C:
 			// send txs
 		}
-		// TODO:
+		// reset inMem nonce if needed
+		if round%10000 == 0 {
+			log.Info("nonce reset")
+			if round > 0 {
+				time.Sleep(10 * time.Second)
+			}
+			nonces = make([]uint64, len(signers))
+			for i, addr := range addrs {
+				account := c.Chain().LastBlock().GetAccount(addr)
+				if account == nil {
+					nonces[i] = 0
+				} else {
+					nonces[i] = account.Nonce()
+				}
+			}
+		}
+		// batch transfer
+		for i, signer := range signers {
+			for j, toAddr := range addrs {
+				if j == i {
+					continue
+				}
+				tx := core.NewTransaction(chainID, nonces[i], &toAddr, big.NewInt(100))
+				if err := tx.Sign(signer); err != nil {
+					log.Error("tx sign failed", "err", err)
+					continue
+				}
+				if err := c.TxBroadcast(tx); err != nil {
+					log.Error("tx broadcast failed", "err", err)
+					continue
+				}
+				nonces[i]++
+				totalTxs++
+			}
+		}
+		log.Info("Total txs sent", totalTxs)
+		round++
 	}
+	log.Info("Total txs sent", totalTxs)
 }
