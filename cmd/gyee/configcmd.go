@@ -23,34 +23,32 @@ package main
 import (
 	"fmt"
 	"errors"
+
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
 )
 
 var (
 	configCommand = cli.Command{
-		Name:     "config",
-		Usage:    "Manage config",
-		Category: "CONFIG COMMANDS",
-		Description: `
-Manage gyee config, generate a default config file.`,
+		Name:        "config",
+		Usage:       "Manage config",
+		Category:    "CONFIG COMMANDS",
+		Description: `Manage gyee config, generate a default config file.`,
 
 		Subcommands: []cli.Command{
 			{
-				Name:      "new",
-				Usage:     "Generate a default config file",
-				Action:    config.MergeFlags(createDefaultConfig),
-				ArgsUsage: "<filename>",
-				Description: `
-Generate a a default config file.`,
+				Name:        "new",
+				Usage:       "Generate a default config file",
+				Action:      config.MergeFlags(createDefaultConfig),
+				ArgsUsage:   "<filename>",
+				Description: `Generate a a default config file.`,
 			},
 			{
-				Name:      "save",
-				Usage:     "Generate a default config file",
-				Action:    config.MergeFlags(saveConfig),
-				ArgsUsage: "<filename>",
-				Description: `
-Generate a a default config file.`,
+				Name:        "save",
+				Usage:       "Generate a default config file",
+				Action:      config.MergeFlags(saveConfig),
+				ArgsUsage:   "<filename>",
+				Description: `Generate a a default config file.`,
 			},
 		},
 	}
@@ -61,11 +59,11 @@ func saveConfig(ctx *cli.Context) error {
 	fileName := ctx.Args().First()
 	if len(fileName) == 0 {
 		fmt.Println("please give a config file arg!!!")
-		return errors.New("please give a config file arg!!!")
+		err = errors.New("please give a config file arg!!!")
+	} else {
+		node := makeNode(ctx)
+		err = config.SaveConfigToFile(fileName, node.Config())
 	}
-
-	node := makeNode(ctx)
-	err = config.SaveConfigToFile(fileName, node.Config())
 
 	return err
 }
