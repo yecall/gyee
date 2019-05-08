@@ -27,7 +27,6 @@ import (
 	"container/list"
 	"crypto/rand"
 	"crypto/sha256"
-	golog "log"
 	mrand "math/rand"
 
 	config "github.com/yeeco/gyee/p2p/config"
@@ -1412,7 +1411,7 @@ func (rutMgr *RutMgr) rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 func (rutMgr *RutMgr) showRoute(tag string) {
 	if rutMgr.bootstrapNode {
 		dht := rutMgr.sdl.SchGetP2pCfgName()
-		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %+v\n", dht, rutMgr.rutTab)
+		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %p\n", dht, &rutMgr.rutTab)
 		rt := rutMgr.rutTab
 		for idx := 0; idx < len(rt.bucketTab); idx++ {
 			routInfo = routInfo + fmt.Sprintf("showRoute: " +
@@ -1423,7 +1422,7 @@ func (rutMgr *RutMgr) showRoute(tag string) {
 			for el := li.Front(); el != nil; el = el.Next() {
 				bn, ok := el.Value.(*rutMgrBucketNode)
 				if !ok {
-					golog.Printf("showRoute: dht: %s, invalid bucket node found, idx: %d", dht, idx)
+					rutLog.Debug("showRoute: dht: %s, invalid bucket node found, idx: %d", dht, idx)
 					continue
 				}
 				count++
@@ -1433,7 +1432,7 @@ func (rutMgr *RutMgr) showRoute(tag string) {
 				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: dist: %d\n", dht, bn.dist)
 				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: fails: %d\n", dht, bn.fails)
 				routInfo = routInfo + fmt.Sprintf("dht: %s, showRoute: pcs: %d\n", dht, bn.pcs)
-				golog.Printf("%s", routInfo)
+				rutLog.Debug("%s", routInfo)
 			}
 		}
 	}
