@@ -180,11 +180,13 @@ func GetConfigFromFile(file string, config *Config) *Config {
 
 func SaveConfigToFile(file string, config *Config) error {
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0766)
+	defer f.Close()
 
 	if err != nil {
 		logging.Logger.WithFields(logrus.Fields{
 			"err": err,
 		}).Fatalf("Failed to write the config file: %s", file)
+		return err
 	}
 
 	encoder := toml.NewEncoder(f)
@@ -194,9 +196,8 @@ func SaveConfigToFile(file string, config *Config) error {
 		logging.Logger.WithFields(logrus.Fields{
 			"err": err,
 		}).Fatal("Failed to encode the config")
+		return err
 	}
-
-	f.Close()
 
 	return nil
 }

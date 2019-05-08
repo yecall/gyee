@@ -21,6 +21,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/urfave/cli"
@@ -57,16 +58,17 @@ Generate a a default config file.`,
 )
 
 func saveConfig(ctx *cli.Context) error {
+	var err error = nil
 	fileName := ctx.Args().First()
 	if len(fileName) == 0 {
 		fmt.Println("please give a config file arg!!!")
-		return nil
+		err = errors.New("please give a config file arg!!!")
+	} else {
+		node := makeNode(ctx)
+		err = config.SaveConfigToFile(fileName, node.Config())
 	}
-
-	node := makeNode(ctx)
-	config.SaveConfigToFile(fileName, node.Config())
-
-	return nil
+	
+	return err
 }
 
 func createDefaultConfig(ctx *cli.Context) error {
