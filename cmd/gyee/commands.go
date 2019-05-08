@@ -45,12 +45,18 @@ var (
 		Action: func(ctx *cli.Context) error {
 			conf := config.GetConfig(ctx)
 			client, err := rpc.Dial("unix", conf.IPCEndpoint())
+			if err != nil {
+				logging.Logger.Info(err)
+				return err
+			}
+
 			var reply string
 
 			args := Args{S: "test"}
 			err = client.Call("JSService.Hello", args, &reply)
 			if err != nil {
 				logging.Logger.Info(err)
+				return err
 			}
 			logging.Logger.Info(reply)
 			return nil
