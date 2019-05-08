@@ -33,7 +33,8 @@ var (
 		Name:        "config",
 		Usage:       "Manage config",
 		Category:    "CONFIG COMMANDS",
-		Description: `Manage gyee config, generate a default config file.`,
+		Description: `
+Manage gyee config, generate a default config file.`,
 
 		Subcommands: []cli.Command{
 			{
@@ -41,14 +42,16 @@ var (
 				Usage:       "Generate a default config file",
 				Action:      config.MergeFlags(createDefaultConfig),
 				ArgsUsage:   "<filename>",
-				Description: `Generate a a default config file.`,
+				Description: `
+Generate a a default config file.`,
 			},
 			{
 				Name:        "save",
 				Usage:       "Generate a default config file",
 				Action:      config.MergeFlags(saveConfig),
 				ArgsUsage:   "<filename>",
-				Description: `Generate a a default config file.`,
+				Description: `
+Generate a a default config file.`,
 			},
 		},
 	}
