@@ -122,33 +122,23 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	cfg.DhtBootstrapNodes = make([]string, 0)
 	cfg.DhtBootstrapNodes = append(cfg.DhtBootstrapNodes, p2p.DhtBootstrapNodes...)
 
-	if len(p2p.LocalNodeIp) == 0 {
-		yeelog.Logger.Infof("OsnServiceConfig: default LocalNodeIp: %s", cfg.LocalNodeIp)
-	} else {
+	if len(p2p.LocalNodeIp) > 0 {
 		cfg.LocalNodeIp = p2p.LocalNodeIp
 	}
 
-	if p2p.LocalUdpPort == 0 {
-		yeelog.Logger.Infof("OsnServiceConfig: default LocalUdpPort: %s", cfg.LocalUdpPort)
-	} else {
+	if p2p.LocalUdpPort > 0 {
 		cfg.LocalUdpPort = p2p.LocalUdpPort
 	}
 
-	if p2p.LocalTcpPort == 0 {
-		yeelog.Logger.Infof("OsnServiceConfig: default LocalTcpPort: %s", cfg.LocalTcpPort)
-	} else {
+	if p2p.LocalTcpPort > 0 {
 		cfg.LocalTcpPort = p2p.LocalTcpPort
 	}
 
-	if len(p2p.LocalDhtIp) == 0 {
-		yeelog.Logger.Infof("OsnServiceConfig: default LocalDhtIp: %s", cfg.LocalDhtIp)
-	} else {
+	if len(p2p.LocalDhtIp) > 0 {
 		cfg.LocalDhtIp = p2p.LocalDhtIp
 	}
 
-	if p2p.LocalDhtPort == 0 {
-		yeelog.Logger.Infof("OsnServiceConfig: default LocalDhtPort: %s", cfg.LocalDhtPort)
-	} else {
+	if p2p.LocalDhtPort > 0 {
 		cfg.LocalDhtPort = p2p.LocalDhtPort
 	}
 
@@ -163,6 +153,9 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	} else {
 		cfg.NodeDatabase = p2p.NodeDatabase
 	}
+
+	yeelog.Logger.Infof("OsnServiceConfig: node[%s:%d:%d]", cfg.LocalNodeIp, cfg.LocalUdpPort, cfg.LocalTcpPort)
+	yeelog.Logger.Infof("OsnServiceConfig: dht[%s:%d]", cfg.LocalDhtIp, cfg.LocalDhtPort)
 
 	cfg.SubNetMaskBits = p2p.SubNetMaskBits
 	if cfg.SubNetMaskBits < 0 {

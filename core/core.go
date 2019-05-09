@@ -173,6 +173,8 @@ func (c *Core) Start() error {
 			return err
 		}
 
+		log.Info("start mining", "coinbase", c.minerAddr.String())
+
 		c.subscriber = p2p.NewSubscriber(c, make(chan p2p.Message), p2p.MessageTypeEvent)
 		p2p := c.node.P2pService()
 		p2p.Register(c.subscriber)

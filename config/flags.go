@@ -79,11 +79,17 @@ var (
 	NetworkFlags = []cli.Flag{
 		NetworkBootNodeFlag,
 		NetworkListenFlag,
+		NetworkIPFlag,
 	}
 
 	NetworkBootNodeFlag = cli.StringSliceFlag{
 		Name:  "bootnode",
 		Usage: "boot node",
+	}
+
+	NetworkIPFlag = cli.StringFlag{
+		Name:  "localip",
+		Usage: "local IP",
 	}
 
 	NetworkListenFlag = cli.StringSliceFlag{
@@ -218,6 +224,11 @@ func getNetworkConfig(ctx *cli.Context, cfg *Config) {
 
 	if ctx.GlobalIsSet(FlagName(NetworkListenFlag.Name)) {
 		cfg.P2p.Listen = ctx.GlobalStringSlice(FlagName(NetworkListenFlag.Name))
+	}
+
+	if ctx.GlobalIsSet(FlagName(NetworkIPFlag.Name)) {
+		cfg.P2p.LocalNodeIp = ctx.GlobalString(FlagName(NetworkIPFlag.Name))
+		cfg.P2p.LocalDhtIp = ctx.GlobalString(FlagName(NetworkIPFlag.Name))
 	}
 }
 
