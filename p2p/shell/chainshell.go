@@ -41,11 +41,13 @@ import (
 type chainShellLogger struct {
 	debug__      bool
 	debugForce__ bool
+	piStatus__ bool
 }
 
 var chainLog = chainShellLogger{
 	debug__:      false,
 	debugForce__: false,
+	piStatus__: false,
 }
 
 func (log chainShellLogger) Debug(fmt string, args ...interface{}) {
@@ -255,8 +257,13 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 	shMgr.peerActived[peerId] = &peerInst
 	shMgr.peerLock.Unlock()
 
-	chainLog.ForceDebug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d",
-		peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
+	if chainLog.piStatus__ {
+		p2plog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d",
+			peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
+	} else {
+		chainLog.ForceDebug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d",
+			peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
+	}
 
 	approc := func() {
 		for {
@@ -328,20 +335,25 @@ func (shMgr *ShellManager) peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchEr
 	shMgr.peerLock.Lock()
 	defer shMgr.peerLock.Unlock()
 
+	_dbgFunc := chainLog.ForceDebug
+	if chainLog.piStatus__ {
+		_dbgFunc = p2plog.Debug
+	}
+
 	peerId := shellPeerID{
 		snid:   cfm.Snid,
 		nodeId: cfm.PeerId,
 		dir:    cfm.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		chainLog.ForceDebug("peerCloseCfm: peer not found, peerId: %+v", peerId)
+		_dbgFunc("peerCloseCfm: peer not found, peerId: %+v", peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisClosing {
-		chainLog.ForceDebug("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		_dbgFunc("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
 		hsInfo := peerInst.hsInfo
-		chainLog.ForceDebug("peerCloseCfm: snid: %x, dir: %d, ip: %s", hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String())
+		_dbgFunc("peerCloseCfm: snid: %x, dir: %d, ip: %s", hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String())
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
 	}

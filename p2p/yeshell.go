@@ -45,11 +45,13 @@ import (
 type yesLogger struct {
 	debug__ bool
 	dht__ bool
+	dhtCis__ bool
 }
 
 var yesLog = yesLogger{
 	debug__: false,
 	dht__: false,
+	dhtCis__: false,
 }
 
 func (log yesLogger) Debug(fmt string, args ...interface{}) {
@@ -997,39 +999,44 @@ _evLoop:
 }
 
 func (yeShMgr *YeShellManager) dhtCsProc() {
+	_dbgFunc := yesLog.Debug
+	if yesLog.dhtCis__ {
+		_dbgFunc = p2plog.Debug
+	}
+
 	csCh := yeShMgr.dhtCsChan
 	csHandler := func(csi *sch.MsgDhtConInstStatusInd) {
 		switch csi.Status {
 
 		case dht.CisNull:
-			yesLog.Debug("dhtCsProc: CisNull, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisNull, peer: %x", *csi.Peer)
 
 		case dht.CisConnecting:
-			yesLog.Debug("dhtCsProc: CisConnecting, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisConnecting, peer: %x", *csi.Peer)
 
 		case dht.CisConnected:
-			yesLog.Debug("dhtCsProc: CisConnected, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisConnected, peer: %x", *csi.Peer)
 
 		case dht.CisAccepted:
-			yesLog.Debug("dhtCsProc: CisAccepted, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisAccepted, peer: %x", *csi.Peer)
 
 		case dht.CisInHandshaking:
-			yesLog.Debug("dhtCsProc: CisInHandshaking, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisInHandshaking, peer: %x", *csi.Peer)
 
 		case dht.CisHandshook:
-			yesLog.Debug("dhtCsProc: CisHandshook, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisHandshook, peer: %x", *csi.Peer)
 
 		case dht.CisInService:
-			yesLog.Debug("dhtCsProc: CisInService, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisInService, peer: %x", *csi.Peer)
 
 		case dht.CisOutOfService:
-			yesLog.Debug("dhtCsProc: CisOutOfService, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisOutOfService, peer: %x", *csi.Peer)
 
 		case dht.CisClosed:
-			yesLog.Debug("dhtCsProc: CisClosed, peer: %x", *csi.Peer)
+			_dbgFunc("dhtCsProc: CisClosed, peer: %x", *csi.Peer)
 
 		default:
-			yesLog.Debug("dhtCsProc: invalid connection status: %d", csi.Status)
+			_dbgFunc("dhtCsProc: invalid connection status: %d", csi.Status)
 		}
 	}
 
