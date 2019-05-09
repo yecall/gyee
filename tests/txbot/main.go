@@ -133,6 +133,9 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 		log.Crit("signer/addrs not match", "signers", signers, "addrs", addrs)
 	}
 
+	// wait before sending txs
+	time.Sleep(20 * time.Second)
+
 	c := n.Core()
 	chainID := uint32(c.Chain().ChainID())
 	nonces := make([]uint64, len(signers))
