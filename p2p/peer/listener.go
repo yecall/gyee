@@ -129,7 +129,7 @@ func (lsnMgr *ListenerManager) lsnMgrPoweron(ptn interface{}) sch.SchErrno {
 
 func (lsnMgr *ListenerManager) lsnMgrSetupListener() sch.SchErrno {
 	var err error
-	lsnAddr := fmt.Sprintf("%s:%d", lsnMgr.cfg.IP.String(), lsnMgr.cfg.Port)
+	lsnAddr := fmt.Sprintf("0.0.0.0:%d", /*lsnMgr.cfg.IP.String(), */lsnMgr.cfg.Port)
 	if lsnMgr.listener, err = net.Listen("tcp", lsnAddr); err != nil {
 		lsnLog.Debug("lsnMgrSetupListener: listen failed, addr: %s, err: %s", lsnAddr, err.Error())
 		return sch.SchEnoOS

@@ -387,7 +387,7 @@ func (lsnMgr *LsnMgr) driveSelf() sch.SchErrno {
 func (lsnMgr *LsnMgr) setupListener() DhtErrno {
 	var err error
 	network := lsnMgr.config.network
-	ip := lsnMgr.config.ip.String()
+	ip := "0.0.0.0" //lsnMgr.config.ip.String()
 	port := lsnMgr.config.port
 	lsnAddr := fmt.Sprintf("%s:%d", ip, port)
 
