@@ -140,7 +140,7 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 	// generator loop
 	round := int(0)
 	totalTxs := int(0)
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(1000 * time.Millisecond)
 Exit:
 	for {
 		select {
