@@ -700,6 +700,25 @@ func (yeShMgr *YeShellManager) UnRegister(subscriber *Subscriber) {
 	m.(*sync.Map).Delete(subscriber)
 }
 
+// simple statistics for DhtGetValue
+const _gvStatistics = false
+var _gvStatLock sync.Mutex
+var _gvFailedCount int64 = 0
+var _gvOkCount int64 = 0
+func _gvStat(result bool) {
+	_gvStatLock.Lock()
+	defer _gvStatLock.Unlock()
+	if result {
+		if _gvOkCount++; _gvOkCount & 0x7f == 0 {
+			p2plog.Debug("_gvStat: ok: %d", _gvOkCount)
+		}
+	} else {
+		if _gvFailedCount++; _gvFailedCount & 0x7f == 0 {
+			p2plog.Debug("_gvStat: failed: %d", _gvFailedCount)
+		}
+	}
+}
+
 func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
@@ -741,13 +760,22 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	val, ok := <-ch
 	if !ok {
 		yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+		if _gvStatistics {
+			_gvStat(false)
+		}
 		return nil, YesEnoChClosed
 	} else if len(val) <= 0 {
 		yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
+		if _gvStatistics {
+			_gvStat(false)
+		}
 		return nil, YesEnoEmptyVal
 	}
 
 	yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+	if _gvStatistics {
+		_gvStat(true)
+	}
 	return val, nil
 }
 
