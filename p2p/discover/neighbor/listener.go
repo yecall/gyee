@@ -137,7 +137,7 @@ func (lsnMgr *ListenerManager) setupUdpConn() sch.SchErrno {
 	var conn *net.UDPConn = nil
 	var realAddr *net.UDPAddr = nil
 
-	strAddr := fmt.Sprintf("%s:%d", lsnMgr.cfg.IP.String(), lsnMgr.cfg.UDP)
+	strAddr := fmt.Sprintf("0.0.0.0:%d", /*lsnMgr.cfg.IP.String(),*/ lsnMgr.cfg.UDP)
 	udpAddr, err := net.ResolveUDPAddr("udp", strAddr)
 	if err != nil {
 		log.Warn("setupUdpConn: ResolveUDPAddr failed", err)
