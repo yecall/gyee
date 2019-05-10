@@ -170,7 +170,16 @@ func (tp *TransactionPool) processTx(tx *Transaction) {
 	}
 
 	// put tx to DHT
-	// TODO:
+	data := tx.raw
+	if data == nil {
+		var err error
+		data, err = tx.Encode()
+		if err != nil {
+			log.Warn("failed to encode tx", "err", err)
+			return
+		}
+	}
+	_ = tp.core.node.P2pService().DhtSetValue(tx.Hash()[:], data)
 
 	// send tx to consensus
 	if tp.core.engine != nil {
