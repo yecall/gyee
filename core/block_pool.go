@@ -199,6 +199,8 @@ func (bp *BlockPool) processBlock(blk *Block) {
 }
 
 func (bp *BlockPool) processVerifiedBlock(blk *Block) {
+	log.Info("processVerifiedBlock", "H", blk.Number(), "hash", blk.Hash(),
+		"sigCnt", len(blk.signatureMap), "sigs", blk.signatureMap)
 	currHeight := bp.chain.CurrentBlockHeight()
 	if blk.Number() <= currHeight {
 		bp.handleNewSignature(blk)
@@ -365,6 +367,7 @@ func (bp *BlockPool) handleNewSignature(blk *Block) {
 		return
 	}
 	if changed {
+		log.Info("block signature added", "H", currBlock.Number(), "cnt", len(currBlock.signatureMap), "hash", currBlock.Hash())
 		bp.cacheHash2Blk.Add(currBlock.Hash(), currBlock)
 		// TODO: less disk write
 		putHeader(bp.chain.storage, currBlock.pbHeader)
@@ -392,7 +395,7 @@ func (bp *BlockPool) syncLoop() {
 		return
 	}
 	defer atomic.StoreInt32(&bp.syncing, 0)
-	log.Info("block pool sync started")
+	log.Info("[sync] block pool sync started")
 
 	remoteHeight, err := bp.core.GetRemoteLatestNumber()
 	if err != nil {
@@ -406,10 +409,11 @@ func (bp *BlockPool) syncLoop() {
 			log.Warn("failed to get remote block", "err", err)
 			return
 		}
+		log.Info("[sync] got remote block", "H", b.Number(), "hash", b.Hash())
 		bp.processBlock(b)
 		h++
 	}
-	log.Info("block pool sync finished")
+	log.Info("[sync] block pool sync finished")
 }
 
 func (bp *BlockPool) GetBlockByNumber(number uint64) *Block {

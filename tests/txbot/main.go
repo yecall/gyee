@@ -146,15 +146,8 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 	ticker := time.NewTicker(1000 * time.Millisecond)
 Exit:
 	for {
-		select {
-		case <-quitCh:
-			ticker.Stop()
-			break Exit
-		case <-ticker.C:
-			// send txs
-		}
 		// reset inMem nonce if needed
-		if round%10000 == 0 {
+		if round%100 == 0 {
 			log.Info("nonce reset")
 			if round > 0 {
 				time.Sleep(10 * time.Second)
@@ -171,6 +164,13 @@ Exit:
 		}
 		// batch transfer
 		for i, signer := range signers {
+			select {
+			case <-quitCh:
+				ticker.Stop()
+				break Exit
+			case <-ticker.C:
+				// send txs
+			}
 			for j, toAddr := range addrs {
 				if j == i {
 					continue
