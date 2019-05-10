@@ -26,7 +26,8 @@ import (
 	"sync"
 	"time"
 
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/log"
+	"github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
@@ -392,9 +393,7 @@ func (lsnMgr *LsnMgr) setupListener() DhtErrno {
 	lsnAddr := fmt.Sprintf("%s:%d", ip, port)
 
 	if lsnMgr.listener, err = net.Listen(network, lsnAddr); err != nil {
-		lsnLog.Debug("setupListener: " +
-			"listen failed, addr: %s, err: %s",
-			lsnAddr, err.Error())
+		log.Crit("setupListener: listen failed", "addr", lsnAddr, "err", err)
 		return DhtEnoOs
 	}
 

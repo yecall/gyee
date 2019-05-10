@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
@@ -131,7 +132,7 @@ func (lsnMgr *ListenerManager) lsnMgrSetupListener() sch.SchErrno {
 	var err error
 	lsnAddr := fmt.Sprintf("0.0.0.0:%d", /*lsnMgr.cfg.IP.String(), */lsnMgr.cfg.Port)
 	if lsnMgr.listener, err = net.Listen("tcp", lsnAddr); err != nil {
-		lsnLog.Debug("lsnMgrSetupListener: listen failed, addr: %s, err: %s", lsnAddr, err.Error())
+		log.Crit("lsnMgrSetupListener: listen failed", "addr", lsnAddr, "err", err)
 		return sch.SchEnoOS
 	}
 	lsnMgr.listenAddr = lsnMgr.listener.Addr().(*net.TCPAddr)
