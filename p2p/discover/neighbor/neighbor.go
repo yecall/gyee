@@ -627,7 +627,9 @@ func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode, from *net.
 	}
 
 	if len(nodes) == 0 && findNode.SubNetId == config.AnySubNet {
-		nodes = append(nodes, tab.TabBuildNode(&cfgNode))
+		if !cfgNode.IP.IsUnspecified() {
+			nodes = append(nodes, tab.TabBuildNode(&cfgNode))
+		}
 	} else if findNode.From.NodeId == findNode.Target {
 		num := len(nodes)
 		if num < tab.TabInstQPendingMax {
