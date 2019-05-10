@@ -30,10 +30,10 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/yeeco/gyee/log"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p/dht"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
@@ -689,17 +689,26 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 
 	yesLog.DebugDht("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
 
-	val, ok := <-ch
-	if !ok {
-		yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
-		return nil, errors.New("DhtGetValue: failed, channel closed")
-	} else if len(val) <= 0 {
-		yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
-		return nil, errors.New("DhtGetValue: empty value")
-	}
- 	yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+	// FIXME:
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
 
-	return val, nil
+	select {
+	case <-ticker.C:
+		yesLog.DebugDht("DhtGetValue timeout")
+		return nil, errors.New("timeout")
+	case val, ok := <-ch:
+		if !ok {
+			yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+			return nil, errors.New("DhtGetValue: failed, channel closed")
+		}
+		if len(val) <= 0 {
+			yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
+			return nil, errors.New("DhtGetValue: empty value")
+		}
+		yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+		return val, nil
+	}
 }
 
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
