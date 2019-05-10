@@ -29,7 +29,8 @@ import (
 	"syscall"
 	"time"
 
-	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/log"
+	"github.com/yeeco/gyee/p2p/config"
 	umsg "github.com/yeeco/gyee/p2p/discover/udpmsg"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
@@ -136,16 +137,16 @@ func (lsnMgr *ListenerManager) setupUdpConn() sch.SchErrno {
 	var conn *net.UDPConn = nil
 	var realAddr *net.UDPAddr = nil
 
-	strAddr := fmt.Sprintf("%s:%d", lsnMgr.cfg.IP.String(), lsnMgr.cfg.UDP)
+	strAddr := fmt.Sprintf("0.0.0.0:%d", /*lsnMgr.cfg.IP.String(),*/ lsnMgr.cfg.UDP)
 	udpAddr, err := net.ResolveUDPAddr("udp", strAddr)
 	if err != nil {
-		lsnLog.Debug("setupUdpConn: ResolveUDPAddr failed, err: %s", err.Error())
+		log.Warn("setupUdpConn: ResolveUDPAddr failed", err)
 		return sch.SchEnoOS
 	}
 
 	conn, err = net.ListenUDP("udp", udpAddr)
 	if err != nil || conn == nil {
-		lsnLog.Debug("setupUdpConn: ListenUDP failed, err: %s", err.Error())
+		log.Crit("setupUdpConn: ListenUDP failed", "err", err)
 		return sch.SchEnoOS
 	}
 
