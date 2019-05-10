@@ -30,10 +30,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yeeco/gyee/log"
+	log "github.com/yeeco/gyee/log"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p/dht"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
@@ -108,13 +108,13 @@ const (
 )
 
 const (
-	GVTO = time.Second * 4	// get value timeout
-	GVBS = 128				// get value buffer size
-	PVTO = time.Second * 8	// put value timeout
-	PVBS = 128				// put value buffer size
+	GVTO = time.Second * 64	// get value timeout
+	GVBS = 256				// get value buffer size
+	PVTO = time.Second * 64	// put value timeout
+	PVBS = 256				// put value buffer size
 	GCITO = time.Second * 8	// duration for get chain information
 	GCIBS = 64				// get chain formation buffer size
-	gvkChBufSize = 32		// get value duplicated channel buffer size
+	gvkChBufSize = 64		// get value duplicated channel buffer size
 )
 
 type SingleSubnetDescriptor = sch.SingleSubnetDescriptor // single subnet descriptor
@@ -145,7 +145,51 @@ type getChainInfoValEx struct {
 	gcdSeq		uint64			// sequence
 }
 
-var yesInStopping = errors.New("yesmgr: in stopping")
+type YesErrno int
+const (
+	YesEnoNone			YesErrno = iota
+	YesEnoInStopping
+	YesEnoParameter
+	YesEnoPutValFull
+	YesEnoPutValDup
+	YesEnoGetValFull
+	YesEnoGetValDup
+	YesEnoGetValDupFull
+	YesEnoGcdFull
+	YesEnoGcdDup
+	YesEnoTimeout
+	YesEnoResource
+	YesEnoScheduler
+	YesEnoChClosed
+	YesEnoEmptyVal
+	YesEnoDhtInteral
+	YesEnoUnknown
+)
+var YesErrMsg = []string {
+	"yesmgr: YesEnoNone",
+	"yesmgr: YesEnoInStopping",
+	"yesmgr: YesEnoParameter",
+	"yesmgr: YesEnoPutValFull",
+	"yesmgr: YesEnoPutValDup",
+	"yesmgr: YesEnoGetValFull",
+	"yesmgr: YesEnoGetValDup",
+	"yesmgr: YesEnoGetValDupFull",
+	"yesmgr: YesEnoGcdFull",
+	"yesmgr: YesEnoGcdDup",
+	"yesmgr: YesEnoTimeout",
+	"yesmgr: YesEnoResource",
+	"yesmgr: YesEnoScheduler",
+	"yesmgr: YesEnoChClosed",
+	"yesmgr: YesEnoEmptyVal",
+	"yesmgr: YesEnoDhtInteral",
+	"yesmgr: YesEnoUnknown",
+}
+func (eno YesErrno)Error() string {
+	if eno > YesEnoUnknown {
+		return "yesmgr: invalid eno"
+	}
+	return YesErrMsg[eno]
+}
 
 type YeShellManager struct {
 	name           string                           // unique name of the shell manager
@@ -520,7 +564,7 @@ func (yeShMgr *YeShellManager) Stop() {
 
 func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
 	if yeShMgr.inStopping {
-		return yesInStopping
+		return YesEnoInStopping
 	}
 	if reCfg == nil {
 		yesLog.Debug("Reconfig: invalid parameter")
@@ -597,7 +641,7 @@ func (yeShMgr *YeShellManager) BroadcastMessage(message Message) error {
 	// 这两个接口的定义不明确。本来是不打算支持这个接口的，但为以后的扩充方便（比如，如果在接口函数
 	// BroadcastMessageOsn的输入参数中指定广播的子网号），暂时直接调用“OSN"接口的函数。
 	if yeShMgr.inStopping {
-		return yesInStopping
+		return YesEnoInStopping
 	}
 	var err error = nil
 	switch message.MsgType {
@@ -617,7 +661,7 @@ func (yeShMgr *YeShellManager) BroadcastMessage(message Message) error {
 
 func (yeShMgr *YeShellManager) BroadcastMessageOsn(message Message) error {
 	if yeShMgr.inStopping {
-		return yesInStopping
+		return YesEnoInStopping
 	}
 	var err error = nil
 	switch message.MsgType {
@@ -659,17 +703,23 @@ func (yeShMgr *YeShellManager) UnRegister(subscriber *Subscriber) {
 func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
-		return nil, yesInStopping
+		return nil, YesEnoInStopping
 	}
 	if yeShMgr.ptDhtConMgr.IsBusy(){
-		return nil, sch.SchEnoResource
+		return nil, YesEnoResource
 	}
 	if len(key) != yesKeyBytes {
 		yesLog.DebugDht("DhtGetValue: invalid key: %x", key)
-		return nil, sch.SchEnoParameter
+		return nil, YesEnoParameter
 	}
 
 	yesLog.DebugDht("DhtGetValue: sdl: %s, key: %x", sdl, key)
+
+	ch := make(chan []byte, 1)
+	if err := yeShMgr.dhtGetValMapKey(key, GVTO, ch); err != YesEnoNone {
+		yesLog.DebugDht("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		return nil, err
+	}
 
 	req := sch.MsgDhtMgrGetValueReq{
 		Key: key,
@@ -678,53 +728,49 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.DebugDht("DhtGetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
-		return nil, eno
-	}
-
-	ch := make(chan []byte, 1)
-	if err := yeShMgr.dhtGetValMapKey(key, GVTO, ch); err != nil {
-		yesLog.DebugDht("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
-		return nil, err
+		yk := yesKey{}
+		copy(yk[0:], key)
+		yeShMgr.getValLock.Lock()
+		delete(yeShMgr.gvk2ChMap, yk)
+		delete(yeShMgr.gvk2DurMap, yk)
+		yeShMgr.getValLock.Unlock()
+		return nil, YesEnoScheduler
 	}
 
 	yesLog.DebugDht("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
-
-	// FIXME:
-	ticker := time.NewTicker(60 * time.Second)
-	defer ticker.Stop()
-
-	select {
-	case <-ticker.C:
-		yesLog.DebugDht("DhtGetValue timeout")
-		return nil, errors.New("timeout")
-	case val, ok := <-ch:
-		if !ok {
-			yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
-			return nil, errors.New("DhtGetValue: failed, channel closed")
-		}
-		if len(val) <= 0 {
-			yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
-			return nil, errors.New("DhtGetValue: empty value")
-		}
-		yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
-		return val, nil
+	val, ok := <-ch
+	if !ok {
+		yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+		return nil, YesEnoChClosed
+	} else if len(val) <= 0 {
+		yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
+		return nil, YesEnoEmptyVal
 	}
+
+	yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+	return val, nil
 }
 
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
-		return yesInStopping
+		return YesEnoInStopping
 	}
 	if yeShMgr.ptDhtConMgr.IsBusy(){
-		return sch.SchEnoResource
+		return YesEnoResource
 	}
 	if len(key) != yesKeyBytes || len(value) == 0 {
 		yesLog.DebugDht("DhtSetValue: invalid pair, sdl: %s, key: %x, length of value: %d", sdl, key, len(value))
-		return sch.SchEnoParameter
+		return YesEnoParameter
 	}
 
 	yesLog.DebugDht("DhtSetValue: sdl: %s, key: %x", sdl, key)
+
+	ch := make(chan bool, 1)
+	if err := yeShMgr.dhtPutValMapKey(key, PVTO, ch); err != YesEnoNone {
+		yesLog.DebugDht("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
+		return err
+	}
 
 	req := sch.MsgDhtMgrPutValueReq{
 		Key:      key,
@@ -735,24 +781,24 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrPutValueReq, &req)
 	if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x, eno: %d, error: %s", sdl, key, eno, eno.Error())
-		return eno
-	}
-
-	ch := make(chan bool, 1)
-	if err := yeShMgr.dhtPutValMapKey(key, PVTO, ch); err != nil {
-		yesLog.DebugDht("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, error: %s", sdl, key, err.Error())
-		return err
+		yk := yesKey{}
+		copy(yk[0:], key)
+		yeShMgr.putValLock.Lock()
+		delete(yeShMgr.pvk2ChMap, yk)
+		delete(yeShMgr.pvk2DurMap, yk)
+		yeShMgr.putValLock.Unlock()
+		return YesEnoScheduler
 	}
 
 	yesLog.DebugDht("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
 		yesLog.DebugDht("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
-		return errors.New("DhtSetValue: failed, channel closed")
+		return YesEnoChClosed
 	}
 	if result == false {
 		yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
-		return errors.New("DhtSetValue: failed")
+		return YesEnoDhtInteral
 	}
 	yesLog.DebugDht("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
 
@@ -767,7 +813,7 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	if key == nil || len(key) > GCIKEY_LEN || len(kind) == 0 {
 		yesLog.Debug("GetChainInfo: invalid invalid (kind,key) pair, sdl: %s, kind: %s, key: %x",
 			yeShMgr.chainSdlName, kind, key)
-		return nil, errors.New("GetChainInfo: invalid (kind,key) pair")
+		return nil, YesEnoParameter
 	}
 	kex := getChainInfoKeyEx {
 		name: kind,
@@ -779,12 +825,12 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	if _, dup := yeShMgr.gciMap[kex]; dup {
 		yesLog.Debug("GetChainInfo: duplicated, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		yeShMgr.gciLock.Unlock()
-		return nil, errors.New("GetChainInfo: duplicated (kind,key) pair")
+		return nil, YesEnoGcdDup
 	}
 	if len(yeShMgr.gciMap) > GCIBS {
 		yesLog.Debug("GetChainInfo: too much, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		yeShMgr.gciLock.Unlock()
-		return nil, errors.New(fmt.Sprintf("GetChainInfo: too much, max: %d", GCIBS))
+		return nil, YesEnoGcdFull
 	}
 	vex := getChainInfoValEx{
 		gcdChan: make(chan []byte, 1),
@@ -807,7 +853,7 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
 		yesLog.Debug("GetChainInfo: SchSendMessage failed, sdl: %s, kind: %s, key: %x, eno: %d",
 			yeShMgr.chainSdlName, kind, key, eno)
-		return nil, eno
+		return nil, YesEnoScheduler
 	}
 
 	chainData := ([]byte)(nil)
@@ -822,22 +868,22 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 		}
 		yeShMgr.gciLock.Unlock()
 		yesLog.Debug("GetChainInfo: timeout, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
-		return nil, errors.New("GetChainInfo: timeout")
+		return nil, YesEnoTimeout
 	case chainData, gcdOk = <-vex.gcdChan:
 		yesLog.Debug("GetChainInfo: gcdChan got, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 	}
 
 	if !gcdOk{
 		yesLog.Debug("GetChainInfo: failed, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
-		return nil, errors.New("GetChainInfo: channel closed")
+		return nil, YesEnoChClosed
 	}
 	if  len(chainData) == 0 {
 		yesLog.Debug("GetChainInfo: empty, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
-		return nil, errors.New("GetChainInfo: empty")
+		return nil, YesEnoEmptyVal
 	}
 	yesLog.Debug("GetChainInfo: ok, sdl: %s, kind: %s, key: %x, data: %x",
 		yeShMgr.chainSdlName, kind, key, chainData)
-	return chainData, nil
+	return chainData, YesEnoNone
 }
 
 func (yeShMgr *YeShellManager) DhtFindNode(target *config.NodeID, done chan interface{}) error {
@@ -1182,32 +1228,32 @@ _bootstarp:
 	yesLog.Debug("dhtBootstrapProc: exit")
 }
 
-func (yeShMgr *YeShellManager)dhtPutValMapKey(key []byte, to time.Duration, ch chan bool) error {
+func (yeShMgr *YeShellManager)dhtPutValMapKey(key []byte, to time.Duration, ch chan bool) YesErrno {
 	yeShMgr.putValLock.Lock()
 	defer yeShMgr.putValLock.Unlock()
 	if len(yeShMgr.pvk2ChMap) > PVBS {
 		yesLog.Debug("dhtPutValMapKey: too much, max: %d", PVBS)
-		return errors.New("too much")
+		return YesEnoPutValFull
 	}
 	yk := yesKey{}
 	if len(key) != yesKeyBytes {
 		yesLog.Debug("dhtPutValMapKey: invalid key")
-		return errors.New("dhtPutValMapKey: invalid key")
+		return YesEnoParameter
 	}
 	copy(yk[0:], key)
 	if _, dup := yeShMgr.pvk2ChMap[yk]; dup {
 		yesLog.Debug("dhtPutValMapKey: duplicated")
-		return errors.New("dhtPutValMapKey: duplicated")
+		return YesEnoPutValDup
 	}
 	yeShMgr.pvk2ChMap[yk] = ch
 	yeShMgr.pvk2DurMap[yk] = to
-	return nil
+	return YesEnoNone
 }
 
 func (yeShMgr *YeShellManager)dhtPutValProc() {
 	const period = time.Second
 	yk := yesKey{}
-	tm := time.NewTimer(period)
+	tm := time.NewTicker(period)
 	defer tm.Stop()
 
 _pvpLoop:
@@ -1258,17 +1304,17 @@ _pvpLoop:
 	yesLog.Debug("dhtPutValProc: exit")
 }
 
-func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch chan []byte) error {
+func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch chan []byte) YesErrno {
 	yeShMgr.getValLock.Lock()
 	defer yeShMgr.getValLock.Unlock()
 	if len(yeShMgr.gvk2ChMap) > GVBS {
 		yesLog.DebugDht("dhtGetValMapKey: too much, max: %d", GVBS)
-		return errors.New("dhtGetValMapKey: too much")
+		return YesEnoGetValFull
 	}
 	yk := yesKey{}
 	if len(key) != yesKeyBytes {
 		yesLog.DebugDht("dhtGetValMapKey: invalid key")
-		return errors.New("dhtGetValMapKey: invalid key")
+		return YesEnoParameter
 	}
 	copy(yk[0:], key)
 	if chList, ok := yeShMgr.gvk2ChMap[yk]; !ok {
@@ -1280,18 +1326,19 @@ func (yeShMgr *YeShellManager)dhtGetValMapKey(key []byte, to time.Duration, ch c
 		yesLog.DebugDht("dhtGetValMapKey: duplicated")
 		chList = append(chList, ch)
 		yeShMgr.gvk2ChMap[yk] = chList
+		return YesEnoGetValDup
 	} else {
 		yesLog.DebugDht("dhtGetValMapKey: duplicated full")
-		return errors.New("dhtGetValMapKey: duplicated full")
+		return YesEnoGetValDupFull
 	}
-	return nil
+	return YesEnoNone
 }
 
 func (yeShMgr *YeShellManager)dhtGetValProc() {
 	sdl := yeShMgr.dhtSdlName
 	const period = time.Second
 	yk := yesKey{}
-	tm := time.NewTimer(period)
+	tm := time.NewTicker(period)
 	defer tm.Stop()
 
 _gvpLoop:
