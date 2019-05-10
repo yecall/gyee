@@ -659,6 +659,7 @@ type MsgDhtQryMgrQueryStartReq struct {
 
 // EvDhtQryMgrQueryStartRsp
 type MsgDhtQryMgrQueryStartRsp struct {
+	ForWhat int			// what's for
 	Target config.DsKey // target node identity
 	Eno    int          // result code
 }

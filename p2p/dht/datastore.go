@@ -142,6 +142,7 @@ const dsMgrApplyCleanupTimer = true
 //
 type DsMgr struct {
 	sdl         *sch.Scheduler         // pointer to scheduler
+	sdlName		string				   // scheduler name
 	name        string                 // my name
 	busy		bool				   // is dht too busy
 	tep         sch.SchUserTaskEp      // task entry
@@ -217,7 +218,7 @@ func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno
 	dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	if dsMgr.busyMsgFilter(msg.Id) {
-		dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+		dsLog.Debug("dsMgrProc: filtered out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 		return sch.SchEnoUserTask
 	}
 
@@ -339,6 +340,7 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	sdl := sch.SchGetScheduler(ptn)
 	dsMgr.sdl = sdl
+	dsMgr.sdlName = sdl.SchGetP2pCfgName()
 	if sdl == nil {
 		dsLog.Debug("poweron: invalid sdl")
 		return sch.SchEnoInternal
@@ -506,6 +508,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 
 	if !dsMgr.getfromPeer {
 		if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
+			dsLog.Debug("localGetValueReq: get it from local, sdl: %s", dsMgr.sdlName)
 			return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
 		}
 	}
@@ -513,6 +516,8 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 	//
 	// try to fetch the value from peers
 	//
+
+	dsLog.Debug("localGetValueReq: try to get it from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
 
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
@@ -537,7 +542,9 @@ func (dsMgr *DsMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sc
 
 	} else if msg.ForWhat == MID_GETVALUE_REQ {
 
-		dsMgr.store(&msg.Target, msg.Val, DsMgrDurInf)
+		if msg.Eno == int(DhtEnoNone) {
+			dsMgr.store(&msg.Target, msg.Val, DsMgrDurInf)
+		}
 		return dsMgr.localGetValRsp(msg.Target[0:], msg.Val, DhtErrno(msg.Eno))
 
 	} else {
@@ -730,8 +737,11 @@ func (dsMgr *DsMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErr
 }
 
 func (dsMgr *DsMgr) qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
+	// should inform the task whose action results in this query, we leave
+	// this later. notice that no timer for this query since it is not startup.
 	if msg.Eno != DhtEnoNone.GetEno() {
-		dsLog.Debug("qryStartRsp: errors reported, eno: %d", msg.Eno)
+		dsLog.Debug("qryStartRsp: errors reported, sdl: %s, eno: %d, forWhat: %d, target: %x",
+			dsMgr.sdlName, msg.Eno, msg.ForWhat, msg.Target)
 	}
 	return sch.SchEnoNone
 }
@@ -819,6 +829,8 @@ func (dsMgr *DsMgr) localAddValRsp(ev int, key []byte, peers []*config.Node, eno
 // response the get-value request sender task
 //
 func (dsMgr *DsMgr) localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
+
+	dsLog.Debug("localGetValRsp: sdl: %s, eno: %d, key: %x", dsMgr.sdlName, eno, key)
 
 	rsp := sch.MsgDhtMgrGetValueRsp{
 		Eno: int(eno),

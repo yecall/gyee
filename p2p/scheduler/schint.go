@@ -167,7 +167,7 @@ type scheduler struct {
 	freeSize         int                               // number of nodes in free
 	tkBusy           *schTaskNode                      // busy task queue in scheduling
 	tkMap            map[string]*schTaskNode           // map task name to pointer of running task node
-	tnMap			 map[*schTaskNode]string
+	tnMap			 map[*schTaskNode]string		   // map task node pointer to task name
 	busySize         int                               // number of nodes in busy
 	tmFree           *schTmcbNode                      // free timer node queue
 	tmFreeSize       int                               // free timer node queue size

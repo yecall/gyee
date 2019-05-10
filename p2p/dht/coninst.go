@@ -200,11 +200,11 @@ type conInstTxPkg struct {
 //
 const (
 	ciTxPendingQueueSize    = 4096            // max tx-pending queue size
-	ciConn2PeerTimeout      = time.Second * 8 // Connect to peer timeout vale
+	ciConn2PeerTimeout      = time.Second * 16 // Connect to peer timeout vale
 	ciMaxPackageSize        = 1024 * 1024     // bytes
 	ciTxTimerDuration       = time.Second * 8 // tx timer duration
 	ciTxDtmTick             = time.Second * 1 // tx difference timer mananger tick
-	ciTxMaxWaitResponseSize = 512             // tx max wait peer response queue size
+	ciTxMaxWaitResponseSize = 4096            // tx max wait peer response queue size
 	ciHandshakeTimeout	= time.Second * 8	// handshake timeout
 )
 
@@ -1309,7 +1309,7 @@ func (conInst *ConInst) txProc() {
 	//
 	// dtm scanner routine
 	//
-	ticker := time.NewTimer(ciTxDtmTick)
+	ticker := time.NewTicker(ciTxDtmTick)
 	go func() {
 	_dtmScanLoop:
 		for {
@@ -1964,7 +1964,7 @@ func (dtm *DiffTimerManager) setCallback(cbf DiffTimerCallback) {
 }
 
 func (dtm *DiffTimerManager) dur2Ticks(d time.Duration) (tv int, err error) {
-	if tv = int(d / dtm.tick); tv == 0 {
+	if tv = int(d/dtm.tick); tv == 0 {
 		return 0, errors.New("dur2Ticks: too small tv")
 	}
 	return tv, nil

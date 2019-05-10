@@ -58,8 +58,8 @@ func (log qryMgrLogger) Debug(fmt string, args ...interface{}) {
 const (
 	QryMgrName        = sch.DhtQryMgrName                         // query manage name registered in shceduler
 	QryMgrMailboxSize = 1024 * 8								  // mail box size
-	qryMgrMaxPendings = 64                                        // max pendings can be held in the list
-	qryMgrMaxActInsts = 8                                         // max concurrent actived instances for one query
+	qryMgrMaxPendings = 512                                       // max pendings can be held in the list, 0 is unlimited
+	qryMgrMaxActInsts = 32                                        // max concurrent actived instances for one query
 	qryMgrQryExpired  = time.Second * 60                          // duration to get expired for a query
 	qryMgrQryMaxWidth = 64                                        // not the true "width", the max number of peers queryied
 	qryMgrQryMaxDepth = 8                                         // the max depth for a query
@@ -344,7 +344,11 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 		msg.ForWhat, qryMgr.sdl.SchGetTaskName(sender))
 
 	var forWhat = msg.ForWhat
-	var rsp = sch.MsgDhtQryMgrQueryStartRsp{Target: msg.Target, Eno: DhtEnoUnknown.GetEno()}
+	var rsp = sch.MsgDhtQryMgrQueryStartRsp{
+		ForWhat: msg.ForWhat,
+		Target: msg.Target,
+		Eno: DhtEnoUnknown.GetEno(),
+	}
 	var qcb *qryCtrlBlock
 	var schMsg *sch.SchMessage
 
@@ -445,6 +449,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 
 	qryFailed2Sender := func(eno DhtErrno) {
 		rsp := sch.MsgDhtQryMgrQueryStartRsp{
+			ForWhat: forWhat,
 			Target: msg.Target,
 			Eno:    int(eno),
 		}
@@ -503,8 +508,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	qcb.qryResult = list.New()
 	for idx, peer := range peers {
 		if forWhat == MID_FINDNODE ||
-			forWhat == MID_GETPROVIDER_REQ ||
-			forWhat == MID_GETVALUE_REQ {
+			forWhat == MID_GETPROVIDER_REQ {
 			if bytes.Compare(peer.hash[0:], target[0:]) == 0 {
 				qryLog.Debug("rutNearestRsp: target found: %x", target)
 				qryOk2Sender(&peer.node)
@@ -522,7 +526,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	}
 
 	//
-	// start queries by putting nearests to pending queue and then putting
+	// start queries by putting nearest to pending queue and then putting
 	// pending nodes to be activated.
 	//
 
@@ -536,6 +540,11 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		pendInfo = append(pendInfo, &pi)
 	}
 
+	//
+	// notice: qryMgrQcbPutPending always return DhtEnoNone(with normal parameters), but
+	// some peers planed to be queried might be discarded there, see comments there pls.
+	//
+
 	var dhtEno = DhtErrno(DhtEnoNone)
 	if dhtEno = qcb.qryMgrQcbPutPending(pendInfo, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
 		if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
@@ -544,7 +553,6 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 			return sch.SchEnoNone
 		}
 	}
-
 	qryLog.Debug("rutNearestRsp: qryMgrQcbPutPending failed, eno: %d", dhtEno)
 	qryFailed2Sender(dhtEno)
 	qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
@@ -1136,13 +1144,18 @@ func (qcb *qryCtrlBlock) qcbUpdateResult(qri *qryResultInfo) DhtErrno {
 // Put node to pending queue
 //
 func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) DhtErrno {
-	if len(nodes) == 0 || size <= 0 {
+	// this function is trying to put a batch of peers for a query into pending queue.
+	// we would like to limit the queue size not so big, but this might result in lost
+	// of some or all peers for a query, and also, it's hard to decide what should be
+	// returned when just some of peers put. currently this function always return ok,
+	// so the "size" should be large enough. if "size" is 0, no limited then.
+	if len(nodes) == 0 || size < 0 {
 		qryLog.Debug("qryMgrQcbPutPending: no pendings to be put")
 		return DhtEnoParameter
 	}
 
 	qryLog.Debug("qryMgrQcbPutPending: " +
-		"number of nodes to be put: %d, size: %d", len(nodes), size)
+		"number of nodes to be put: %d, size(zero is unlimited): %d", len(nodes), size)
 
 	li := qcb.qryPending
 	for _, n := range nodes {
@@ -1169,7 +1182,7 @@ func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) 
 		}
 	}
 
-	for li.Len() > size {
+	for li.Len() > size && size > 0{
 		li.Remove(li.Back())
 	}
 
