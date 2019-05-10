@@ -244,6 +244,7 @@ func (bc *BlockChain) storeBlock(b *Block) error {
 	if err := b.Write(batch); err != nil {
 		return err
 	}
+	putLastBlock(batch, b.Hash())
 
 	// batch writing to storage
 	if err := batch.Write(); err != nil {
