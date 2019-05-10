@@ -353,7 +353,8 @@ func (shMgr *ShellManager) peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchEr
 		return sch.SchEnoMismatched
 	} else {
 		hsInfo := peerInst.hsInfo
-		_dbgFunc("peerCloseCfm: snid: %x, dir: %d, ip: %s", hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String())
+		_dbgFunc("peerCloseCfm: snid: %x, dir: %d, ip: %s, port: %d",
+			hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String(), hsInfo.TCP)
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
 	}
@@ -370,6 +371,11 @@ func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd)
 	shMgr.peerLock.Lock()
 	defer shMgr.peerLock.Unlock()
 
+	_dbgFunc := chainLog.ForceDebug
+	if chainLog.piStatus__ {
+		_dbgFunc = p2plog.Debug
+	}
+
 	why, _ := ind.Why.(string)
 	peerId := shellPeerID{
 		snid:   ind.Snid,
@@ -378,16 +384,16 @@ func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd)
 	}
 
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		chainLog.ForceDebug("peerAskToCloseInd: not found, why: %s, snid: %x, dir: %d",
+		_dbgFunc("peerAskToCloseInd: not found, why: %s, snid: %x, dir: %d",
 			why, ind.Snid, ind.Dir)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		chainLog.ForceDebug("peerAskToCloseInd: status mismatched, why: %s, snid: %x, dir: %d, status: %d",
+		_dbgFunc("peerAskToCloseInd: status mismatched, why: %s, snid: %x, dir: %d, status: %d",
 			why, ind.Snid, ind.Dir, peerInst.status)
 		return sch.SchEnoMismatched
 	} else {
 		peerInfo := peerInst.hsInfo
-		chainLog.ForceDebug("peerAskToCloseInd: why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
+		_dbgFunc("peerAskToCloseInd: why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
 			why, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
 		req := sch.MsgPeCloseReq{
 			Ptn:  nil,
