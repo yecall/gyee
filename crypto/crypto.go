@@ -56,3 +56,8 @@ func (a Algorithm) AddressInferrable() bool {
 		return false
 	}
 }
+
+func (s Signature) String() string {
+	// TODO: temporary for sigMap log
+	return ""
+}
