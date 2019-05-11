@@ -756,27 +756,58 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		return nil, YesEnoScheduler
 	}
 
-	yesLog.DebugDht("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
-	val, ok := <-ch
-	if !ok {
-		yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
-		if _gvStatistics {
-			_gvStat(false)
-		}
-		return nil, YesEnoChClosed
-	} else if len(val) <= 0 {
-		yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
-		if _gvStatistics {
-			_gvStat(false)
-		}
-		return nil, YesEnoEmptyVal
-	}
+	if false {
+		tm := time.NewTimer(time.Second * 70)
+		defer tm.Stop()
+		for {
+			select {
+			case <-tm.C:
+				panic("why?")
+			case val, ok := <-ch:
+				if !ok {
+					yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+					if _gvStatistics {
+						_gvStat(false)
+					}
+					return nil, YesEnoChClosed
+				} else if len(val) <= 0 {
+					yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
+					if _gvStatistics {
+						_gvStat(false)
+					}
+					return nil, YesEnoEmptyVal
+				}
 
-	yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
-	if _gvStatistics {
-		_gvStat(true)
+				yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+				if _gvStatistics {
+					_gvStat(true)
+				}
+				return val, nil
+			}
+		}
+	} else {
+		yesLog.DebugDht("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+		val, ok := <-ch
+		if !ok {
+			yesLog.DebugDht("DhtGetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+			if _gvStatistics {
+				_gvStat(false)
+			}
+			return nil, YesEnoChClosed
+		} else if len(val) <= 0 {
+			yesLog.DebugDht("DhtGetValue: empty value, sdl: %s, key: %x", sdl, key)
+			if _gvStatistics {
+				_gvStat(false)
+			}
+			return nil, YesEnoEmptyVal
+		}
+
+		yesLog.DebugDht("DhtGetValue: ok, sdl: %s, key: %x, val: %x", sdl, key, val)
+		if _gvStatistics {
+			_gvStat(true)
+		}
+		return val, nil
 	}
-	return val, nil
 }
 
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
@@ -818,19 +849,40 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 		return YesEnoScheduler
 	}
 
-	yesLog.DebugDht("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
-	result, ok := <-ch
-	if !ok {
-		yesLog.DebugDht("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
-		return YesEnoChClosed
+	if false {
+		tm := time.NewTimer(time.Second * 70)
+		defer tm.Stop()
+		for {
+			select {
+			case <-tm.C:
+				panic("why")
+			case result, ok := <-ch:
+				if !ok {
+					yesLog.DebugDht("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+					return YesEnoChClosed
+				}
+				if result == false {
+					yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
+					return YesEnoDhtInteral
+				}
+				yesLog.DebugDht("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+				return nil
+			}
+		}
+	} else {
+		yesLog.DebugDht("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
+		result, ok := <-ch
+		if !ok {
+			yesLog.DebugDht("DhtSetValue: failed, channel closed, sdl: %s, key: %x", sdl, key)
+			return YesEnoChClosed
+		}
+		if result == false {
+			yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
+			return YesEnoDhtInteral
+		}
+		yesLog.DebugDht("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+		return nil
 	}
-	if result == false {
-		yesLog.DebugDht("DhtSetValue: failed, sdl: %s, key: %x", sdl, key)
-		return YesEnoDhtInteral
-	}
-	yesLog.DebugDht("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
-
-	return nil
 }
 
 func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
@@ -887,6 +939,21 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	chainData := ([]byte)(nil)
 	gcdOk := false
 
+	_dbgch := make(chan bool, 1)
+	go func() {
+		_dbgtm := time.NewTimer(GCITO + 4)
+		defer _dbgtm.Stop()
+		for {
+			select {
+			case <-_dbgtm.C:
+				panic("why")
+			case <-_dbgch:
+				return
+			}
+		}
+	}()
+
+
 	select {
 	case <-vex.gcdTimer.C:
 		yeShMgr.gciLock.Lock()
@@ -896,8 +963,10 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 		}
 		yeShMgr.gciLock.Unlock()
 		yesLog.Debug("GetChainInfo: timeout, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
+		close(_dbgch)
 		return nil, YesEnoTimeout
 	case chainData, gcdOk = <-vex.gcdChan:
+		close(_dbgch)
 		yesLog.Debug("GetChainInfo: gcdChan got, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 	}
 

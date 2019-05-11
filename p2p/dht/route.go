@@ -596,9 +596,11 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		rt := &rutMgr.rutTab
 		for idx, n := range req.Seens {
-			pcs := conInstStatus2PCS(CisHandshook)
-			doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
-			rutMgr.showRoute("rutMgrUpdate4Handshake.DhtEnoNone")
+			if !n.IP.IsUnspecified() {
+				pcs := conInstStatus2PCS(CisHandshook)
+				doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
+				rutMgr.showRoute("rutMgrUpdate4Handshake.DhtEnoNone")
+			}
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
