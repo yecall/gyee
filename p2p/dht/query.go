@@ -1323,6 +1323,7 @@ func (qryMgr *QryMgr) qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
 // Query control block timer handler
 //
 func (qryMgr *QryMgr) qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
+	p2plog.Debug("qcbTimerHandler: forWhat: %d", qcb.forWhat)
 	qryMgr.qryMgrResultReport(qcb, DhtEnoTimeout.GetEno(), nil, nil, nil)
 	qryMgr.qryMgrDelQcb(delQcb4Timeout, qcb.target)
 	return sch.SchEnoNone
