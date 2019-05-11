@@ -135,7 +135,10 @@ func (e *Event) Marshal() []byte {
 }
 
 func (e *Event) Unmarshal(data []byte) {
-	json.Unmarshal(data, &e.Body)
+	err := json.Unmarshal(data, &e.Body)
+	if err != nil {
+		logging.Logger.Error("unmarshal data failed")
+	}
 }
 
 func (e *Event) totalTxAndEvent() int {

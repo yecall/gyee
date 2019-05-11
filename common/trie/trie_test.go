@@ -26,7 +26,7 @@ import (
 )
 
 func newEmpty() *Trie {
-	memStorage, _ := persistent.NewMemoryStorage()
+	memStorage := persistent.NewMemoryStorage()
 	trie, _ := New(common.Hash{}, NewDatabase(memStorage))
 	return trie
 }

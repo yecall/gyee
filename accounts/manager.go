@@ -89,10 +89,12 @@ func (am *AccountManager) CreateNewAccount(passphrase []byte) (*address.Address,
 	address, err := address.NewAddressFromPublicKey(key.PublicKey())
 	if err != nil {
 		logging.Logger.Panic("failed create account:", err)
+		return nil, err
 	}
 	err = am.ks.SetKey(address.String(), key.PrivateKey(), passphrase)
 	if err != nil {
 		logging.Logger.Panic("failed create account:", err)
+		return nil, err
 	}
 	return address, nil
 }

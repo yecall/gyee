@@ -269,7 +269,12 @@ func (t *Tetris) sendPlaceholderEvent() {
 
 	event := NewEvent(t.vid, t.h, t.n)
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
-	event.Sign(t.signer)
+	err := event.Sign(t.signer)
+	if err != nil {
+		logging.Logger.Error("sign failed!")
+		return
+	}
+
 	eb := event.Marshal()
 	t.Metrics.AddTrafficOut(uint64(len(eb)))
 	t.SendEventCh <- eb
@@ -299,7 +304,11 @@ func (t *Tetris) sendEvent() {
 	event.AddSelfParent(t.validators[t.vid][t.n-1])
 	event.AddParents(t.eventAccepted)
 	event.AddTransactions(t.txsAccepted)
-	event.Sign(t.signer)
+	err := event.Sign(t.signer)
+	if err != nil {
+		logging.Logger.Error("sign failed!")
+		return
+	}
 	eb := event.Marshal()
 	t.Metrics.AddTrafficOut(uint64(len(eb)))
 	t.SendEventCh <- eb
@@ -986,10 +995,8 @@ func (t *Tetris) knowWell(x, y *Event) bool {
 		}
 	}
 
-	if c >= t.params.superMajority {
-		return true
-	}
-	return false
+	// simplify code
+	return c >= t.params.superMajority 
 }
 
 func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {

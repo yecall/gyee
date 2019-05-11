@@ -193,8 +193,10 @@ func sendRandomTx() {
 		binary.BigEndian.PutUint32(buf, uint32(i))
 		hash := sha256.Sum256(buf)
 		hex := fmt.Sprintf("0x%X", hash)
+		// should call wg.Add(1) before starting the goroutine to avoid a race
+		wg.Add(1)
 		go func(hex string) {
-			wg.Add(1)
+			
 			for i := 0; i < TNUM; i++ {
 				t := rand.Intn(TNUM - 1) //最后一个不发tx
 				tetrises[t].TxsCh <- hex

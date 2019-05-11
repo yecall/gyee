@@ -942,10 +942,7 @@ func (t *Tetris) knowWell(x, y *Event) bool {
 		}
 	}
 
-	if c >= t.params.superMajority {
-		return true
-	}
-	return false
+	return c >= t.params.superMajority
 }
 
 //func (t *Tetris) cacheKnowWell(x, y *Event) bool {
