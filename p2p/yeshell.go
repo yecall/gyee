@@ -911,7 +911,7 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	}
 	yesLog.Debug("GetChainInfo: ok, sdl: %s, kind: %s, key: %x, data: %x",
 		yeShMgr.chainSdlName, kind, key, chainData)
-	return chainData, YesEnoNone
+	return chainData, nil
 }
 
 func (yeShMgr *YeShellManager) DhtFindNode(target *config.NodeID, done chan interface{}) error {
