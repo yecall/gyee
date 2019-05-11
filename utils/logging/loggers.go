@@ -21,57 +21,72 @@
 package logging
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"path"
+	"path/filepath"
+	"time"
+
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 var Logger *logrus.Logger
 
 func init() {
 	Logger = logrus.New()
-	Logger.Out = os.Stdout
-	Logger.Formatter = &logrus.TextFormatter{FullTimestamp: true}
-	Logger.Level = logrus.InfoLevel
+	Logger.SetOutput(os.Stdout)
+	Logger.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
+	Logger.SetLevel(logrus.InfoLevel)
 }
 
-func SetFileRotationHooker(path string, count uint) {
-	frHook := newFileRotateHooker(path, count)
-	Logger.Hooks.Add(frHook)
+func SetRotationFileLogger(logPath string) {
+	if len(Logger.Hooks) > 0 {
+		panic("Logger hooks exceeded")
+	}
+	rotateWriter, err := newFileRotateWriter(logPath)
+	if err != nil {
+		panic("failed to create rotate logs" + err.Error())
+	}
+	Logger.Out = rotateWriter
+	Logger.Hooks.Add(newConsoleHooker())
+	Logger.SetLevel(logrus.DebugLevel)
 }
 
-func newFileRotateHooker(path string, count uint) logrus.Hook {
-	if len(path) == 0 {
-		panic("Failed to parse logger folder:" + path + ".")
+func newConsoleHooker() logrus.Hook {
+	return lfshook.NewHook(lfshook.WriterMap{
+		logrus.WarnLevel:  os.Stdout,
+		logrus.ErrorLevel: os.Stdout,
+		logrus.FatalLevel: os.Stdout,
+	}, nil)
+}
+
+func newFileRotateWriter(logPath string) (io.Writer, error) {
+	var err error
+	if len(logPath) == 0 {
+		return nil, fmt.Errorf("failed to parse logger folder: %s", logPath)
 	}
-	if !filepath.IsAbs(path) {
-		path, _ = filepath.Abs(path)
+	if !filepath.IsAbs(logPath) {
+		logPath, err = filepath.Abs(logPath)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if err := os.MkdirAll(path, 0700); err != nil {
-		panic("Failed to create logger folder:" + path + ". err:" + err.Error())
+	if err = os.MkdirAll(logPath, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create logger folder: %v", err)
 	}
-	filePath := path + "/yee-%Y%m%d-%H.log"
-	linkPath := path + "/yee.log"
-	writer, err := rotatelogs.New(
+	return newRotateLogs(logPath, "yee")
+}
+
+func newRotateLogs(logpath, prefix string) (*rotatelogs.RotateLogs, error) {
+	filePath := path.Join(logpath, prefix+"-%Y%m%d-%H%M.log")
+	linkPath := path.Join(logpath, prefix+".log")
+	return rotatelogs.New(
 		filePath,
 		rotatelogs.WithLinkName(linkPath),
-		rotatelogs.WithRotationTime(time.Duration(24)*time.Hour),
-		rotatelogs.WithRotationCount(count),
+		rotatelogs.WithMaxAge(30*24*time.Hour), // max age for clean up
+		rotatelogs.WithRotationTime(time.Hour),
 	)
-
-	if err != nil {
-		panic("Failed to create rotate logs. err:" + err.Error())
-	}
-
-	hook := lfshook.NewHook(lfshook.WriterMap{
-		logrus.DebugLevel: writer,
-		logrus.InfoLevel:  writer,
-		logrus.WarnLevel:  writer,
-		logrus.ErrorLevel: writer,
-		logrus.FatalLevel: writer,
-	}, nil)
-	return hook
 }

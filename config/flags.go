@@ -21,8 +21,10 @@
 package config
 
 import (
-	"github.com/urfave/cli"
 	"strings"
+
+	"github.com/urfave/cli"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 var (
@@ -202,6 +204,7 @@ func getAppConfig(ctx *cli.Context, cfg *Config) {
 
 	if ctx.GlobalIsSet(FlagName(AppLogFileFlag.Name)) {
 		cfg.App.LogFile = ctx.GlobalString(FlagName(AppLogFileFlag.Name))
+		logging.SetRotationFileLogger(cfg.App.LogFile)
 	}
 
 	if ctx.GlobalIsSet(FlagName(AppEnableCrashReportFlag.Name)) {
