@@ -594,8 +594,8 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 					ind.Peers = append(ind.Peers[0:idx], ind.Peers[idx+1:]...)
 					ind.Pcs = append(ind.Pcs[0:idx], ind.Pcs[idx+1:]...)
 				} else {
-					ind.Peers = msg.Peers[0:idx]
-					ind.Pcs = msg.Pcs[0:idx]
+					ind.Peers = ind.Peers[0:idx]
+					ind.Pcs = ind.Pcs[0:idx]
 				}
 			}
 		}
