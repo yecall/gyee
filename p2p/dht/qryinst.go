@@ -588,15 +588,10 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 			Pcs:      nbs.Pcs,
 		}
 
-		for idx, peer := range ind.Peers {
-			if peer.IP.IsUnspecified() {
-				if idx != len(ind.Peers)-1 {
-					ind.Peers = append(ind.Peers[0:idx], ind.Peers[idx+1:]...)
-					ind.Pcs = append(ind.Pcs[0:idx], ind.Pcs[idx+1:]...)
-				} else {
-					ind.Peers = ind.Peers[0:idx]
-					ind.Pcs = ind.Pcs[0:idx]
-				}
+		for idx, peer := range nbs.Nodes {
+			if peer.IP.IsUnspecified() == false {
+				ind.Peers = append(ind.Peers, peer)
+				ind.Pcs = append(ind.Pcs, nbs.Pcs[idx])
 			}
 		}
 
