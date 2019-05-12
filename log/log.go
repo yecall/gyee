@@ -60,17 +60,17 @@ func Crit(msg string, ctx ...interface{}) {
 //
 
 func Debugf(fmt string, args ...interface{}) {
-	logging.Logger.Debugf(fmt, args)
+	logging.Logger.Debugf(fmt, args...)
 }
 
 func Infof(fmt string, args ...interface{}) {
-	logging.Logger.Infof(fmt, args)
+	logging.Logger.Infof(fmt, args...)
 }
 
 func Warnf(fmt string, args ...interface{}) {
-	logging.Logger.Warnf(fmt, args)
+	logging.Logger.Warnf(fmt, args...)
 }
 
 func Errorf(fmt string, args ...interface{}) {
-	logging.Logger.Errorf(fmt, args)
+	logging.Logger.Errorf(fmt, args...)
 }
