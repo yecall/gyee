@@ -21,6 +21,10 @@ import (
 	"github.com/yeeco/gyee/utils/logging"
 )
 
+//
+// logging API for geth code
+//
+
 // Trace is a convenient alias for Root().Trace
 func Trace(msg string, ctx ...interface{}) {
 	logging.Logger.Trace(msg, ctx)
@@ -49,4 +53,24 @@ func Error(msg string, ctx ...interface{}) {
 // Crit is a convenient alias for Root().Crit
 func Crit(msg string, ctx ...interface{}) {
 	logging.Logger.Fatal(msg, ctx)
+}
+
+//
+// logging API with printf format
+//
+
+func Debugf(fmt string, args ...interface{}) {
+	logging.Logger.Debugf(fmt, args)
+}
+
+func Infof(fmt string, args ...interface{}) {
+	logging.Logger.Infof(fmt, args)
+}
+
+func Warnf(fmt string, args ...interface{}) {
+	logging.Logger.Warnf(fmt, args)
+}
+
+func Errorf(fmt string, args ...interface{}) {
+	logging.Logger.Errorf(fmt, args)
 }
