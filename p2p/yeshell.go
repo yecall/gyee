@@ -30,10 +30,10 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/yeeco/gyee/log"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p/dht"
+	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
@@ -788,6 +788,14 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		_gvStat(true)
 	}
 	return result.value, nil
+}
+
+func (yeShMgr *YeShellManager) DhtGetValues(keys [][]byte, out chan<- []byte) error {
+	if cap(out) < len(keys) {
+		return ErrInsufficientOutChanCapacity
+	}
+	// TODO:
+	return nil
 }
 
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {

@@ -30,8 +30,8 @@ import (
 	"github.com/pkg/errors"
 	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"
-	yeelog "github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/p2p/shell"
+	yeelog "github.com/yeeco/gyee/utils/logging"
 )
 
 type OsnService struct {
@@ -162,7 +162,7 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 		cfg.SubNetMaskBits = 0
 	}
 
-	factor := int64(time.Second /time.Nanosecond)
+	factor := int64(time.Second / time.Nanosecond)
 	if p2p.EvKeepTime <= 0 {
 		yeelog.Logger.Infof("OsnServiceConfig: default EvKeepTime: %d(s)", int64(cfg.EvKeepTime)/factor)
 	} else {
@@ -237,6 +237,10 @@ func (osns *OsnService) UnRegister(subscriber *Subscriber) {
 
 func (osns *OsnService) DhtGetValue(key []byte) ([]byte, error) {
 	return osns.yeShMgr.DhtGetValue(key)
+}
+
+func (osns *OsnService) DhtGetValues(keys [][]byte, out chan<- []byte) error {
+	return osns.yeShMgr.DhtGetValues(keys, out)
 }
 
 func (osns *OsnService) DhtSetValue(key []byte, value []byte) error {

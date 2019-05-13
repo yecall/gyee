@@ -132,7 +132,34 @@ func (is *InmemService) UnRegister(subscriber *Subscriber) {
 }
 
 func (is *InmemService) DhtGetValue(key []byte) ([]byte, error) {
-	return is.hub.GetValue(key)
+	keys := [][]byte{key}[:]
+	out := make(chan []byte, 1)
+	if err := is.DhtGetValues(keys, out); err != nil {
+		return nil, err
+	}
+	v, ok := <-out
+	if !ok {
+		return nil, ErrDhtNotFound
+	}
+	return v, nil
+}
+
+func (is *InmemService) DhtGetValues(keys [][]byte, out chan<- []byte) error {
+	if cap(out) < len(keys) {
+		return ErrInsufficientOutChanCapacity
+	}
+	go func() {
+		for _, key := range keys {
+			v, err := is.hub.GetValue(key)
+			if err != nil {
+				continue
+			}
+			out <- v
+		}
+		// in mem service is stable most of the time, just close to notify finished
+		close(out)
+	}()
+	return nil
 }
 
 func (is *InmemService) DhtSetValue(key []byte, value []byte) error {

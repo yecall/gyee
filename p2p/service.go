@@ -54,7 +54,9 @@ type Service interface {
 	BroadcastMessageOsn(message Message) error
 	Register(subscriber *Subscriber)
 	UnRegister(subscriber *Subscriber)
+
 	DhtGetValue(key []byte) ([]byte, error)
+	DhtGetValues(keys [][]byte, out chan<- []byte) error
 	DhtSetValue(key []byte, value []byte) error
 
 	// p2p service get chain data from provider

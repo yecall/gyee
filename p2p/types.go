@@ -20,6 +20,10 @@
 
 package p2p
 
+import (
+	"errors"
+)
+
 const (
 	MessageTypeTx          = "tx"
 	MessageTypeEvent       = "ev"
@@ -33,3 +37,8 @@ type Message struct {
 	Key     []byte
 	Data    []byte
 }
+
+var (
+	ErrDhtNotFound                 = errors.New("dht value not found")
+	ErrInsufficientOutChanCapacity = errors.New("output chan capacity insufficient")
+)
