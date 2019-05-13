@@ -1366,7 +1366,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qcb.qryHistory[icb.to.ID] = pending
 
 		log.Infof("qryMgrQcbPutActived: EvSchPoweron and EvDhtQryInstStartReq sent, " +
-			"sdl: %x, forWhat: %d, target: %x",
+			"sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, qcb.forWhat, qcb.target)
 	}
 

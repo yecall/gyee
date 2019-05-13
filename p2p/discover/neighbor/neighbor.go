@@ -631,11 +631,13 @@ func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode, from *net.
 			nodes = append(nodes, tab.TabBuildNode(&cfgNode))
 		}
 	} else if findNode.From.NodeId == findNode.Target {
-		num := len(nodes)
-		if num < tab.TabInstQPendingMax {
-			nodes = append(nodes, tab.TabBuildNode(&cfgNode))
-		} else {
-			nodes[num-1] = tab.TabBuildNode(&cfgNode)
+		if !cfgNode.IP.IsUnspecified() {
+			num := len(nodes)
+			if num < tab.TabInstQPendingMax {
+				nodes = append(nodes, tab.TabBuildNode(&cfgNode))
+			} else {
+				nodes[num-1] = tab.TabBuildNode(&cfgNode)
+			}
 		}
 	}
 
