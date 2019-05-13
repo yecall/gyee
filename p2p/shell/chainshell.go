@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/yeeco/gyee/log"
 	"github.com/pkg/errors"
 	config "github.com/yeeco/gyee/p2p/config"
 	dht "github.com/yeeco/gyee/p2p/dht"
@@ -41,13 +42,11 @@ import (
 type chainShellLogger struct {
 	debug__      bool
 	debugForce__ bool
-	piStatus__ bool
 }
 
 var chainLog = chainShellLogger{
 	debug__:      false,
 	debugForce__: false,
-	piStatus__: false,
 }
 
 func (log chainShellLogger) Debug(fmt string, args ...interface{}) {
@@ -113,6 +112,7 @@ const (
 
 type ShellManager struct {
 	sdl          *sch.Scheduler                      // pointer to scheduler
+	sdlName		 string								 // scheduler name
 	name         string                              // my name
 	tep          sch.SchUserTaskEp                   // task entry
 	ptnMe        interface{}                         // pointer to task node of myself
@@ -207,6 +207,7 @@ func (shMgr *ShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 func (shMgr *ShellManager) powerOn(ptn interface{}) sch.SchErrno {
 	shMgr.ptnMe = ptn
 	shMgr.sdl = sch.SchGetScheduler(ptn)
+	shMgr.sdlName = shMgr.sdl.SchGetP2pCfgName()
 	_, shMgr.ptnPeMgr = shMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName)
 	_, shMgr.ptnTabMgr = shMgr.sdl.SchGetUserTaskNode(sch.TabMgrName)
 	_, shMgr.ptnNgbMgr = shMgr.sdl.SchGetUserTaskNode(sch.NgbLsnName)
@@ -250,19 +251,20 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 	shMgr.peerLock.Lock()
 	if _, dup := shMgr.peerActived[peerId]; dup {
-		chainLog.Debug("peerActiveInd: duplicated, peerId: %+v", peerId)
+		log.Warnf("peerActiveInd: duplicated, peerId: %+v", peerId)
 		shMgr.peerLock.Unlock()
 		return sch.SchEnoUserTask
 	}
 	shMgr.peerActived[peerId] = &peerInst
 	shMgr.peerLock.Unlock()
 
-	if chainLog.piStatus__ {
-		p2plog.Debug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d",
-			peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
+	log.Infof("peerActiveInd: peer: sdl: %s, snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
+		shMgr.sdlName, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
+	if local, ok := shMgr.localNode[peerInfo.Snid]; !ok {
+		log.Infof("peerActiveInd: not found, sdl: %s, subnet: %x", shMgr.sdlName,  peerInfo.Snid)
 	} else {
-		chainLog.ForceDebug("peerActiveInd: snid: %x, dir: %d, peer ip: %s, port: %d",
-			peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
+		log.Infof("peerActiveInd: local: sdl: %s, snid: %x, ip: %s, port: %d, id: %x",
+			shMgr.sdlName, peerInfo.Snid, local.IP.String(), local.TCP, local.ID)
 	}
 
 	approc := func() {
@@ -270,7 +272,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 			select {
 			case rxPkg, ok := <-peerInst.rxChan:
 				if !ok {
-					chainLog.Debug("approc: exit for rxChan closed, peer info: %+v", *peerInfo)
+					chainLog.Debug("approc: exit, peer info: %+v", *peerInfo)
 					return
 				}
 
@@ -307,7 +309,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					k := config.DsKey{}
 					copy(k[0:], rxPkg.Key)
-					skm := shMgr.setKeyMap(&k)
+					skm := shMgr.checkKeyMap(&k)
 
 					if skm == SKM_OK {
 
@@ -335,26 +337,22 @@ func (shMgr *ShellManager) peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchEr
 	shMgr.peerLock.Lock()
 	defer shMgr.peerLock.Unlock()
 
-	_dbgFunc := chainLog.ForceDebug
-	if chainLog.piStatus__ {
-		_dbgFunc = p2plog.Debug
-	}
-
 	peerId := shellPeerID{
 		snid:   cfm.Snid,
 		nodeId: cfm.PeerId,
 		dir:    cfm.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		_dbgFunc("peerCloseCfm: peer not found, peerId: %+v", peerId)
+		log.Infof("peerCloseCfm: peer not found, sdl: %s, peerId: %+v", shMgr.sdlName, peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisClosing {
-		_dbgFunc("peerCloseCfm: status mismatched, status: %d, peerId: %+v", peerInst.status, peerId)
+		log.Infof("peerCloseCfm: status mismatched, sdl: %s, status: %d, peerId: %+v",
+			shMgr.sdlName, peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
 		hsInfo := peerInst.hsInfo
-		_dbgFunc("peerCloseCfm: snid: %x, dir: %d, ip: %s, port: %d",
-			hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String(), hsInfo.TCP)
+		log.Infof("peerCloseCfm: sdl: %s, snid: %x, dir: %d, ip: %s, port: %d",
+			shMgr.sdlName, hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String(), hsInfo.TCP)
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
 	}
@@ -371,11 +369,6 @@ func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd)
 	shMgr.peerLock.Lock()
 	defer shMgr.peerLock.Unlock()
 
-	_dbgFunc := chainLog.ForceDebug
-	if chainLog.piStatus__ {
-		_dbgFunc = p2plog.Debug
-	}
-
 	why, _ := ind.Why.(string)
 	peerId := shellPeerID{
 		snid:   ind.Snid,
@@ -384,17 +377,17 @@ func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd)
 	}
 
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		_dbgFunc("peerAskToCloseInd: not found, why: %s, snid: %x, dir: %d",
-			why, ind.Snid, ind.Dir)
+		log.Infof("peerAskToCloseInd: not found, sdl: %s, why: %s, snid: %x, dir: %d",
+			shMgr.sdlName, why, ind.Snid, ind.Dir)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		_dbgFunc("peerAskToCloseInd: status mismatched, why: %s, snid: %x, dir: %d, status: %d",
-			why, ind.Snid, ind.Dir, peerInst.status)
+		log.Infof("peerAskToCloseInd: status mismatched, sdl: %s, why: %s, snid: %x, dir: %d, status: %d",
+			shMgr.sdlName, why, ind.Snid, ind.Dir, peerInst.status)
 		return sch.SchEnoMismatched
 	} else {
 		peerInfo := peerInst.hsInfo
-		_dbgFunc("peerAskToCloseInd: why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
-			why, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
+		log.Infof("peerAskToCloseInd: sdl: %s, why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
+			shMgr.sdlName, why, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
 		req := sch.MsgPeCloseReq{
 			Ptn:  nil,
 			Snid: peerId.snid,
@@ -886,6 +879,15 @@ const (
 	SKM_DUPLICATED
 	SKM_FAILED
 )
+
+func (shMgr *ShellManager) checkKeyMap(k *config.DsKey) int {
+	shMgr.deDupKeyLock.Lock()
+	defer shMgr.deDupKeyLock.Unlock()
+	if _, ok := shMgr.deDupKeyMap[*k]; ok {
+		return SKM_DUPLICATED
+	}
+	return SKM_OK
+}
 
 func (shMgr *ShellManager) setKeyMap(k *config.DsKey) int {
 	shMgr.deDupKeyLock.Lock()

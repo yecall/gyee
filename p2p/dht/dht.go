@@ -535,7 +535,7 @@ func (dhtMgr *DhtMgr) putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 // get value request handler
 //
 func (dhtMgr *DhtMgr) getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	log.Infof("getValueReq: going to dispatch EvDhtMgrGetValueReq received")
+	log.Infof("getValueReq: going to dispatch EvDhtMgrGetValueReq")
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueReq, msg)
 }
 

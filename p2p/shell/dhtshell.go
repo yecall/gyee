@@ -323,7 +323,7 @@ func (shMgr *DhtShellManager) dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectRe
 }
 
 func (shMgr *DhtShellManager) dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	log.Infof("dhtShGetValueReq: going to dispath EvDhtMgrGetValueReq received")
+	log.Infof("dhtShGetValueReq: going to dispath EvDhtMgrGetValueReq")
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetValueReq, req)
 	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {

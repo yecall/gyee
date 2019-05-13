@@ -80,7 +80,9 @@ func (b *Balloon) EncryptKey(address string, data []byte, passphrase []byte) ([]
 	if err != nil {
 		return nil, err
 	}
-	uuid := uuid.NewV4()
+	//liyy for debug, 20190418
+	//uuid := uuid.NewV4()
+	uuid, _ := uuid.NewV4()
 	encryptedKeyJSON := encryptedKeyJSON{
 		Address: address,
 		Crypto:  *crypto,

@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"time"
 	"fmt"
+	"sync"
 	"container/list"
 	"crypto/rand"
 	"crypto/sha256"
@@ -32,7 +33,7 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/log"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -1416,7 +1417,34 @@ func (rutMgr *RutMgr) rutMgrRmvNotify(bn *rutMgrBucketNode) DhtErrno {
 //
 // Just for debug to show the route table
 //
+var rutStatLock sync.Mutex
+var numberOfBucketNode = make(map[string]int, 0)
+
+func (rutMgr *RutMgr)updateNumberOfBucketNode() {
+	rutStatLock.Lock()
+	defer rutStatLock.Unlock()
+	rt := rutMgr.rutTab
+	count := 0
+	for idx := 0; idx < len(rt.bucketTab); idx++ {
+		if li := rt.bucketTab[idx]; li != nil {
+			count += li.Len()
+		}
+	}
+	numberOfBucketNode[rutMgr.sdlName] = count
+}
+
+func GetNumberOfBucketNode(sdl string) int {
+	rutStatLock.Lock()
+	defer rutStatLock.Unlock()
+	return numberOfBucketNode[sdl]
+}
+
 func (rutMgr *RutMgr) showRoute(tag string) {
+
+	rutMgr.updateNumberOfBucketNode()
+
+	log.Infof("showRoute: numberOfBucketNode: %d", GetNumberOfBucketNode(rutMgr.sdlName))
+
 	if rutMgr.bootstrapNode {
 		dht := rutMgr.sdl.SchGetP2pCfgName()
 		routInfo := fmt.Sprintf("showRoute: dht: %s, rutTab: %p\n", dht, &rutMgr.rutTab)

@@ -518,7 +518,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 
 	if !dsMgr.getfromPeer {
 		if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
-			log.Errorf("localGetValueReq: get from local ok, sdl: %s", dsMgr.sdlName)
+			log.Infof("localGetValueReq: get from local ok, sdl: %s", dsMgr.sdlName)
 			return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
 		}
 	}

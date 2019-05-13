@@ -1615,10 +1615,8 @@ func (yeShMgr *YeShellManager) broadcastBk(msg *Message) error {
 }
 
 func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.NodeID) error {
-	// if local node is a validator, the Tx should be broadcast over the
-	// validator-subnet; else the Tx should be broadcast over the dynamic
-	// subnet. this is done in chain shell manager, and the message here
-	// would be dispatched to chain shell manager.
+	// broadcast the tx to peers connected currently;
+	// need not to throw it into dht;
 	k := yesKey{}
 	if len(msg.Key) == 0 {
 		k = sha256.Sum256(msg.Data)
@@ -1653,10 +1651,8 @@ func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.Node
 }
 
 func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.NodeID, dht bool) error {
-	// the local node must be a validator, and the Ev should be broadcast
-	// over the validator-subnet. also, the Ev should be stored into DHT
-	// with a duration to be expired. the message here would be dispatched
-	// to chain shell manager and DHT shell manager.
+	// broadcast the event to peers connected currently;
+	// and if needed, throw the event into dht also, determined by "dht" passed in;
 	thisCfg := yeShMgr.config
 	k := yesKey{}
 	if len(msg.Key) == 0 {
@@ -1707,8 +1703,8 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 }
 
 func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.NodeID) error {
-	// the Bh should be broadcast over the any-subnet. the message here
-	// would be dispatched to chain shell manager.
+	// the Bh should be broadcast over the any-subnet;
+	// need not to throw Bh into dht;
 	k := yesKey{}
 	if len(msg.Key) == 0 {
 		k = sha256.Sum256(msg.Data)
