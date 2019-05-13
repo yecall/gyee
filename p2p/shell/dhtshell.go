@@ -24,6 +24,7 @@ import (
 	dht "github.com/yeeco/gyee/p2p/dht"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -322,9 +323,14 @@ func (shMgr *DhtShellManager) dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectRe
 }
 
 func (shMgr *DhtShellManager) dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+	log.Infof("dhtShGetValueReq: going to dispath EvDhtMgrGetValueReq received")
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetValueReq, req)
-	return shMgr.sdl.SchSendMessage(&msg)
+	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Errorf("dhtShGetValueReq: send message failed, eno: %d", eno)
+		return eno
+	}
+	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtShPutValueReq(req *sch.MsgDhtMgrPutValueReq) sch.SchErrno {

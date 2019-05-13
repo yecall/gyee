@@ -34,6 +34,7 @@ import (
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -65,7 +66,7 @@ func (log connLogger) ForceDebug(fmt string, args ...interface{}) {
 // Connection manager name registered in scheduler
 //
 const ConMgrName = sch.DhtConMgrName
-const ConMgrMailboxSize = 1024 * 8
+const ConMgrMailboxSize = 1024 * 16
 
 //
 // Peer connection status
@@ -168,7 +169,7 @@ func (conMgr *ConMgr) checkMailBox() {
 	if conMgr.sdl != nil && conMgr.ptnMe != nil {
 		capacity := conMgr.sdl.SchGetTaskMailboxCapacity(conMgr.ptnMe)
 		space := conMgr.sdl.SchGetTaskMailboxSpace(conMgr.ptnMe)
-		conMgr.busy = space < (capacity >> 2)
+		conMgr.busy = space < (capacity >> 3)
 	}
 }
 
@@ -925,7 +926,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	//
 
 	if msg == nil {
-		connLog.Debug("sendReq: invalid parameter")
+		log.Warnf("sendReq: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
@@ -941,7 +942,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	}
 
 	if ci == nil {
-		connLog.Debug("sendReq: not found, peer id: %x", msg.Peer.ID)
+		log.Warnf("sendReq: not found, peer id: %x", msg.Peer.ID)
 		return sch.SchEnoResource
 	}
 
@@ -949,7 +950,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		ci.name, ci.dir, ci.hsInfo.peer.IP.String())
 
 	if curStat := ci.getStatus(); curStat != CisInService {
-		connLog.Debug("sendReq: can't send in status: %d", curStat)
+		log.Warnf("sendReq: can't send in status: %d", curStat)
 		return sch.SchEnoResource
 	}
 	key := instLruKey{
@@ -969,7 +970,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		pkg.waitSeq = msg.WaitSeq
 	}
 	if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
-		connLog.Debug("sendReq: txPutPending failed, eno: %d", eno)
+		log.Warnf("sendReq: txPutPending failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 

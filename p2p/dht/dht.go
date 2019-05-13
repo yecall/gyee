@@ -26,6 +26,7 @@ import (
 
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -534,6 +535,7 @@ func (dhtMgr *DhtMgr) putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 // get value request handler
 //
 func (dhtMgr *DhtMgr) getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
+	log.Infof("getValueReq: going to dispatch EvDhtMgrGetValueReq received")
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueReq, msg)
 }
 
@@ -703,7 +705,11 @@ func (dhtMgr *DhtMgr) GetScheduler() *sch.Scheduler {
 func (dhtMgr *DhtMgr) dispMsg(dstTask interface{}, event int, msg interface{}) sch.SchErrno {
 	schMsg := sch.SchMessage{}
 	dhtMgr.sdl.SchMakeMessage(&schMsg, dhtMgr.ptnMe, dstTask, event, msg)
-	return dhtMgr.sdl.SchSendMessage(&schMsg)
+	if eno := dhtMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Errorf("dispMsg: send message failed, eno: %d, event: %d", eno, event)
+		return eno
+	}
+	return sch.SchEnoNone
 }
 
 //

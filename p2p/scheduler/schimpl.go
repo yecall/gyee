@@ -29,6 +29,7 @@ import (
 
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -1640,13 +1641,13 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 
 		if len(*target.mailbox.que) + mbReserved >= cap(*target.mailbox.que) {
 
-			schLog.ForceDebug("schSendMsg: mailbox full, " +
+			log.Warnf("schSendMsg: mailbox full, " +
 				"sdl: %s, src: %s, dst: %s, ev: %d",
 				sdlName, source.name, target.name, msg.Id)
 
 			target.discardMessages += 1
 			if target.discardMessages & 0x1f == 0 {
-				schLog.ForceDebug("schSendMsg: " +
+				log.Warnf("schSendMsg: " +
 					"sdl: %s, task: %s, discardMessages: %d",
 					sdlName, target.name, target.discardMessages)
 			}

@@ -32,6 +32,7 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -190,6 +191,7 @@ func (dsMgr *DsMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) sch
 //
 
 func (dsMgr *DsMgr) IsBusy() bool {
+	dsMgr.checkMailBox()
 	return dsMgr.busy
 }
 
@@ -218,7 +220,7 @@ func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno
 	dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	if dsMgr.busyMsgFilter(msg.Id) {
-		dsLog.Debug("dsMgrProc: filtered out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+		log.Warnf("dsMgrProc: message filtered out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 		return sch.SchEnoUserTask
 	}
 
@@ -453,7 +455,7 @@ func (dsMgr *DsMgr) tickTimerHandler() sch.SchErrno {
 func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		dsLog.Debug("localAddValReq: invalid key length")
+		log.Errorf("localAddValReq: invalid key length: %d", len(msg.Key))
 		return sch.SchEnoParameter
 	}
 
@@ -465,11 +467,14 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	//
 
 	if eno := dsMgr.store(&k, msg.Val, msg.KT); eno != DhtEnoNone {
-		dsLog.Debug("localAddValReq: store failed, eno: %d", eno)
-		dsMgr.localAddValRsp(sch.EvDhtMgrPutValueRsp, k[0:], nil, eno)
+		log.Errorf("localAddValReq: store failed, eno: %d", eno)
+		if schEno := dsMgr.localAddValRsp(sch.EvDhtMgrPutValueRsp, k[0:], nil, eno); schEno != sch.SchEnoNone {
+			log.Errorf("localAddValReq: localAddValRsp failed, eno: %e", schEno)
+			return schEno
+		}
 		return sch.SchEnoUserTask
 	} else {
-		dsLog.Debug("localAddValReq: store ok, eno: %d", eno)
+		log.Infof("localAddValReq: store ok, eno: %d", eno)
 		dsMgr.localAddValRsp(sch.EvDhtMgrPutValueLocalRsp, k[0:], nil, eno)
 	}
 
@@ -477,16 +482,21 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	// publish it to our neighbors
 	//
 
+	log.Infof("localAddValReq: publish (key,value) to neighbors")
+
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
 		Msg:     msg,
 		ForWhat: MID_PUTVALUE,
 		Seq:     GetQuerySeqNo(dsMgr.sdl.SchGetP2pCfgName()),
 	}
-
 	schMsg := sch.SchMessage{}
-	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
-	return dsMgr.sdl.SchSendMessage(&schMsg)
+	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry);
+	if eno := dsMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Errorf("localAddValReq: send message failed, eno: %d", eno)
+		return eno
+	}
+	return sch.SchEnoNone
 }
 
 //
@@ -495,7 +505,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
 
 	if len(msg.Key) != DsKeyLength {
-		dsLog.Debug("localGetValueReq: invalid key length")
+		log.Errorf("localGetValueReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -508,7 +518,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 
 	if !dsMgr.getfromPeer {
 		if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
-			dsLog.Debug("localGetValueReq: get it from local, sdl: %s", dsMgr.sdlName)
+			log.Errorf("localGetValueReq: get from local ok, sdl: %s", dsMgr.sdlName)
 			return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
 		}
 	}
@@ -517,7 +527,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 	// try to fetch the value from peers
 	//
 
-	dsLog.Debug("localGetValueReq: try to get it from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
+	log.Infof("localGetValueReq: try to get from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
 
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
@@ -528,7 +538,11 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 
 	schMsg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry)
-	return dsMgr.sdl.SchSendMessage(&schMsg)
+	if eno := dsMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Errorf("localGetValueReq: send message failed, eno: %d", eno)
+		return eno
+	}
+	return sch.SchEnoNone
 }
 
 //
@@ -737,12 +751,30 @@ func (dsMgr *DsMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErr
 }
 
 func (dsMgr *DsMgr) qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
-	// should inform the task whose action results in this query, we leave
-	// this later. notice that no timer for this query since it is not startup.
+
 	if msg.Eno != DhtEnoNone.GetEno() {
-		dsLog.Debug("qryStartRsp: errors reported, sdl: %s, eno: %d, forWhat: %d, target: %x",
+
+		log.Warnf("qryStartRsp: errors reported, sdl: %s, eno: %d, forWhat: %d, target: %x",
 			dsMgr.sdlName, msg.Eno, msg.ForWhat, msg.Target)
+
+		if msg.ForWhat == MID_PUTVALUE {
+
+			peers := []*config.Node{}
+			return dsMgr.localAddValRsp(sch.EvDhtMgrPutValueRsp, msg.Target[0:], peers, DhtErrno(msg.Eno))
+
+		} else if msg.ForWhat == MID_GETVALUE_REQ {
+
+			val := []byte{}
+			return dsMgr.localGetValRsp(msg.Target[0:], val, DhtErrno(msg.Eno))
+
+		} else {
+
+			dsLog.Debug("qryStartRsp: unknown what's for")
+		}
+
+		return sch.SchEnoMismatched
 	}
+
 	return sch.SchEnoNone
 }
 
@@ -830,7 +862,7 @@ func (dsMgr *DsMgr) localAddValRsp(ev int, key []byte, peers []*config.Node, eno
 //
 func (dsMgr *DsMgr) localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
 
-	dsLog.Debug("localGetValRsp: sdl: %s, eno: %d, key: %x", dsMgr.sdlName, eno, key)
+	log.Infof("localGetValRsp: sdl: %s, eno: %d, key: %x", dsMgr.sdlName, eno, key)
 
 	rsp := sch.MsgDhtMgrGetValueRsp{
 		Eno: int(eno),

@@ -33,6 +33,7 @@ import (
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	"github.com/yeeco/gyee/log"
 )
 
 //
@@ -713,36 +714,36 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	if pkg == nil {
-		ciLog.Debug("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
+		log.Warnf("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		return DhtEnoParameter
 	}
 
 	if status := conInst.getStatus(); status != CisInService {
-		ciLog.Debug("txPutPending: mismatched status: %d", status)
+		log.Warnf("txPutPending: mismatched status: %d", status)
 		return DhtEnoMismatched
 	}
 
-	if conInst.trySendingCnt += 1; conInst.trySendingCnt&0xff == 0 {
+	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
 		ciLog.Debug("txPutPending: trySendingCnt: %d, peer: %s:%d",
 			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 	}
 
 	if len(conInst.txChan) >= cap(conInst.txChan) {
-		ciLog.Debug("txPutPending: pending queue full, inst: %s, hsInfo: %+v, local: %+v",
-			conInst.name, conInst.hsInfo, *conInst.local)
-		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt&0x1f == 0 {
-			ciLog.Debug("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
+		log.Warnf("txPutPending: pending queue full, inst: %s, hsInfo: %s:%d",
+			conInst.name, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
+		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt & 0x1f == 0 {
+			log.Infof("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
 				conInst.txqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		}
 		return DhtEnoResource
 	}
 
 	if len(conInst.txWaitRsp) >= ciTxMaxWaitResponseSize {
-		ciLog.Debug("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
+		log.Warnf("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
-		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt&0x1f == 0 {
-			ciLog.Debug("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
+		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt & 0x1f == 0 {
+			log.Infof("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
 				conInst.wrqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		}
 		return DhtEnoResource

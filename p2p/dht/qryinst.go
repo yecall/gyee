@@ -28,6 +28,7 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	log "github.com/yeeco/gyee/log"
 )
 
 //
@@ -215,13 +216,13 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 
 	icb := qryInst.icb
 	if icb.status != qisInited {
-		qiLog.Debug("startReq: state mismatched, " + "" +
+		log.Errorf("startReq: state mismatched, " + "" +
 			"sdl: %s, inst: %s, status: %d",
 			qryInst.icb.sdlName, qryInst.icb.name, icb.status)
 		return sch.SchEnoUserTask
 	}
 
-	qiLog.ForceDebug("startReq: ask connection manager for peer, " +
+	log.Infof("startReq: ask connection manager for peer, " +
 		"sdl: %s, inst: %s, ForWhat: %d",
 		icb.sdlName, icb.name, icb.qryReq.ForWhat)
 
@@ -231,9 +232,28 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 		Peer:    &icb.to,
 		IsBlind: false,
 	}
+	eno := sch.SchEnoUnknown
+	tid := sch.SchInvalidTid
+	ind := sch.MsgDhtQryInstStatusInd{
+		Peer:   icb.to.ID,
+		Target: icb.target,
+		Status: qisNull,
+	}
+
 	msg := sch.SchMessage{}
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrConnectReq, &req)
-	icb.sdl.SchSendMessage(&msg)
+	if eno = icb.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Errorf("startReq: send EvDhtConMgrConnectReq failed, " +
+			"sdl: %s, inst: %s, ForWhat: %d, eno: %d",
+			icb.sdlName, icb.name, icb.qryReq.ForWhat, eno)
+		ind.Status = qisDone
+		icb.status = qisDone
+		msg = sch.SchMessage{}
+		icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
+		icb.sdl.SchSendMessage(&msg)
+		icb.sdl.SchTaskDone(icb.ptnInst, icb.name, sch.SchEnoInternal)
+		return eno
+	}
 	icb.conBegTime = time.Now()
 
 	td := sch.TimerDescription{
@@ -244,18 +264,11 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 		Extra: qryInst,
 	}
 
-	var eno sch.SchErrno
-	var tid int
-	ind := sch.MsgDhtQryInstStatusInd{
-		Peer:   icb.to.ID,
-		Target: icb.target,
-		Status: qisNull,
-	}
 	eno, tid = icb.sdl.SchSetTimer(icb.ptnInst, &td)
 	if eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		qiLog.ForceDebug("startReq: done for SchSetTimer failed, " +
-			"sdl: %s, inst: %s, eno: %d",
-			icb.sdlName, icb.name, eno)
+		log.Errorf("startReq: done for SchSetTimer failed, " +
+			"sdl: %s, inst: %s, eno: %d, ForWhat: %d",
+			icb.sdlName, icb.name, eno, icb.qryReq.ForWhat)
 		ind.Status = qisDone
 		icb.status = qisDone
 		msg = sch.SchMessage{}
@@ -270,8 +283,12 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 	ind.Status = qisWaitConnect
 	msg = sch.SchMessage{}
 	icb.sdl.SchMakeMessage(&msg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
-	icb.sdl.SchSendMessage(&msg)
-
+	if eno := icb.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Errorf("startReq: send EvDhtConMgrConnectReq failed, " +
+			"sdl: %s, inst: %s, ForWhat: %d",
+			icb.sdlName, icb.name, icb.qryReq.ForWhat)
+		return eno
+	}
 	return sch.SchEnoNone
 }
 
@@ -280,20 +297,20 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 //
 func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	if msg == nil {
-		qiLog.Debug("icbTimerHandler: invalid parameter, " +
-			"sdl: %s, inst: %s",
-			qryInst.icb.sdlName, qryInst.icb.name)
+		log.Errorf("icbTimerHandler: invalid parameter, " +
+			"sdl: %s, inst: %s, forWhat: %d",
+			qryInst.icb.sdlName, qryInst.icb.name, qryInst.icb.qryReq.ForWhat)
 		return sch.SchEnoParameter
 	}
 
-	qiLog.Debug("icbTimerHandler: query instance timer expired, " +
-		"sdl: %s, inst: %s",
-		qryInst.icb.sdlName, qryInst.icb.name)
+	log.Warnf("icbTimerHandler: query instance timer expired, " +
+		"sdl: %s, inst: %s, forWhat: %d",
+		qryInst.icb.sdlName, qryInst.icb.name, qryInst.icb.qryReq.ForWhat)
 
 	if qryInst != msg {
-		qiLog.Debug("icbTimerHandler: instance pointer mismatched, " +
-			"sdl: %s, inst: %s",
-			qryInst.icb.sdlName, qryInst.icb.name)
+		log.Errorf("icbTimerHandler: instance pointer mismatched, " +
+			"sdl: %s, inst: %s, forWhat: %d",
+			qryInst.icb.sdlName, qryInst.icb.name, qryInst.icb.qryReq.ForWhat)
 		return sch.SchEnoMismatched
 	}
 
@@ -306,19 +323,13 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 
 	if (icb.status != qisWaitConnect && icb.status != qisWaitResponse) || icb.qTid == sch.SchInvalidTid {
-		qiLog.Debug("icbTimerHandler: mismatched, " +
-			"sdl: %s, inst: %s, status: %d, qTid: %d",
-			icb.sdlName, icb.name, icb.status, icb.qTid)
+		log.Errorf("icbTimerHandler: mismatched, " +
+			"sdl: %s, inst: %s, status: %d, qTid: %d, forWhat: %d",
+			icb.sdlName, icb.name, icb.status, icb.qTid, icb.qryReq.ForWhat)
 		return sch.SchEnoMismatched
 	}
 
 	//
-	// if we are waiting connection to be established, we request the connection manager
-	// to abandon the connect-procedure. when this request received, the connection manager
-	// should check if the connection had been established and route table updated, if ture,
-	// then do not care this request, else it should close the connection and free all
-	// resources had been allocated to the connection instance.
-	// notice0:
 	// do not send EvDhtConMgrCloseReq when the instance is in qisWaitConnect status, this
 	// case, we do not know the "dir" about the connection instance, since we had never got
 	// a "connect-response"(so the timer expired). if it's really want to kill the connection
@@ -326,9 +337,9 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 
 	if icb.status == qisWaitResponse {
-		qiLog.ForceDebug("icbTimerHandler: send EvDhtConMgrCloseReq, " +
-			"sdl: %s, inst: %s, dir: %d",
-			icb.sdlName, icb.name, icb.dir)
+		log.Infof("icbTimerHandler: send EvDhtConMgrCloseReq, " +
+			"sdl: %s, inst: %s, dir: %d, forWhat: %d",
+			icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 		req := sch.MsgDhtConMgrCloseReq{
 			Task: icb.sdl.SchGetTaskName(icb.ptnInst),
 			Peer: &icb.to,
@@ -336,7 +347,11 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 		}
 		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
-		sdl.SchSendMessage(&schMsg)
+		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			log.Infof("icbTimerHandler: send EvDhtConMgrCloseReq failed, " +
+				"sdl: %s, inst: %s, dir: %d, forWhat: %d",
+				icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
+		}
 	}
 
 	//
@@ -351,7 +366,13 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	}
 	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
-	sdl.SchSendMessage(&schMsg)
+	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			log.Infof("icbTimerHandler: send EvDhtRutMgrUpdateReq failed, " +
+				"sdl: %s, inst: %s, dir: %d, forWhat: %d",
+				icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
+		}
+	}
 
 	//
 	// done this instance task and tell query manager task about instance done,
@@ -367,11 +388,15 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	icb.status = qisDone
 	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
-	sdl.SchSendMessage(&schMsg)
+	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Infof("icbTimerHandler: send EvDhtRutMgrUpdateReq failed, " +
+			"sdl: %s, inst: %s, dir: %d, forWhat: %d",
+			icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
+	}
 
-	qiLog.ForceDebug("icbTimerHandler: done instance, " +
-		"sdl: %s, inst: %s, dir: %d",
-		icb.sdlName, icb.name, icb.dir)
+	log.Infof("icbTimerHandler: done instance, " +
+		"sdl: %s, inst: %s, dir: %d, forWhat: %d",
+		icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 
 	return sdl.SchTaskDone(icb.ptnInst, icb.name, sch.SchEnoTimeout)
 }
@@ -384,12 +409,12 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	icb := qryInst.icb
 	sdl := icb.sdl
 
-	qiLog.ForceDebug("connectRsp: " +
+	log.Infof("connectRsp: " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
 	if icb.status != qisWaitConnect {
-		qiLog.ForceDebug("connectRsp: mismatched, " +
+		log.Warnf("connectRsp: mismatched, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 		return sch.SchEnoMismatched
@@ -414,7 +439,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 
 	if msg.Eno != DhtEnoNone.GetEno() && msg.Eno != DhtEnoDuplicated.GetEno() {
 
-		qiLog.ForceDebug("connectRsp: done for connect failed, " +
+		log.Warnf("connectRsp: done for connect failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -438,7 +463,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	eno, pkg := qryInst.setupQryPkg()
 	if eno != DhtEnoNone {
 
-		qiLog.ForceDebug("connectRsp: done for setupQryPkg failed, " +
+		log.Warnf("connectRsp: done for setupQryPkg failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -451,7 +476,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
-	qiLog.ForceDebug("connectRsp: setupQryPkg ok, " +
+	log.Infof("connectRsp: setupQryPkg ok, " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -479,7 +504,11 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 
 	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
-	sdl.SchSendMessage(&schMsg)
+	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
+	}
 
 	//
 	// for "put-value" or "put-provider", we should send indication to query manager
@@ -511,7 +540,13 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		}
 		schMsg = sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
-		return sdl.SchSendMessage(&schMsg)
+		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+				"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+				icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
+			return eno
+		}
+		return sch.SchEnoNone
 	}
 
 	//
@@ -524,7 +559,11 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 
 	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
-	sdl.SchSendMessage(&schMsg)
+	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
+			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
+	}
 
 	//
 	// start timer to wait query response from peer
@@ -540,7 +579,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 
 	schEno, tid := sdl.SchSetTimer(icb.ptnInst, &td)
 	if schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		qiLog.ForceDebug("connectRsp: SchSetTimer failed, " +
+		log.Warnf("connectRsp: SchSetTimer failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 		return schEno
@@ -615,6 +654,10 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 					icb.sdlName, icb.name)
 				return sch.SchEnoMismatched
 			}
+
+			log.Infof("protoMsgInd: EvDhtConInstGetValRsp, " +
+				"sdl: %s, forWhat: %d, inst: %s, key: %x",
+				icb.sdlName, msg.ForWhat, icb.name, icb.target)
 
 			ind := sch.MsgDhtQryInstResultInd{
 				From:     gvr.From,

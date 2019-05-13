@@ -32,6 +32,7 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
+	"github.com/yeeco/gyee/log"
 )
 
 //
@@ -450,6 +451,8 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 		return sch.SchEnoParameter
 	}
 
+	log.Infof("nearestReq: sdl: %s, forWhat: %d, target: %x", rutMgr.sdlName, req.ForWhat, req.Target)
+
 	var rsp = sch.MsgDhtRutMgrNearestRsp{
 		Eno:     int(DhtEnoUnknown),
 		ForWhat: req.ForWhat,
@@ -469,7 +472,7 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 		return rutMgr.sdl.SchSendMessage(&schMsg)
 	}
 
-	if dhtEno == DhtEnoNone && len(nearest) <= 0 {
+	if len(nearest) <= 0 {
 		rutLog.Debug("nearestReq: empty nearest set from buckets, bootstrap node applied")
 		bsns, ok := bootstrapNodes[rutMgr.sdlName]
 		if !ok || bsns == nil || len(bsns) == 0 {
@@ -510,12 +513,15 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 
 	for idx, n := range nearest {
 		if bytes.Compare(n.node.ID[0:], rutMgr.localNodeId[0:]) == 0 {
-			if idx != len(nearest)-1 {
+			if idx != len(nearest) - 1 {
 				nearest = append(nearest[0:idx], nearest[idx+1:]...)
+				nearestDist = append(nearestDist[0:idx], nearestDist[idx+1:]...)
 			} else if idx > 0 {
 				nearest = nearest[0:idx]
+				nearestDist = nearestDist[0:idx]
 			} else {
 				nearest = nil
+				nearestDist = nil
 			}
 			break
 		}
