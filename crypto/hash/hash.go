@@ -39,9 +39,7 @@ func Sha3256(args ...[]byte) []byte {
 }
 
 func Keccak256(args ...[]byte) []byte {
-	//liyy for debug, 20190418
-	//hasher := sha3.NewLegacyKeccak256()
-	hasher := NewHash256()
+	hasher := sha3.NewLegacyKeccak256()
 	for _, bytes := range args {
 		hasher.Write(bytes)
 	}

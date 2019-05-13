@@ -270,15 +270,8 @@ func dftConfig(nodeDir string, portShift uint16) *config.Config {
 				"E1E6B370C9BDA28A7420DD9BC577ACFDBB335EF7AA38CA43998C921AFBC13834AF1F809C43C524D13A6E7454AA97BADA72EE36A2389A1177630207F04C9B3F8B@13.230.176.195:40405:40405",
 			},
 			NodeDataDir:  filepath.Join(nodeDir, "p2p"),
-
-			//LocalNodeIp:  "0.0.0.0",
-			//LocalDhtIp:   "0.0.0.0",
-			LocalNodeIp:  "172.16.1.97",
-			LocalDhtIp:   "172.16.1.97",
-			//LocalNodeIp:  "192.168.43.25",
-			//LocalDhtIp:   "192.168.43.25",
-
-
+			LocalNodeIp:  "0.0.0.0",
+			LocalDhtIp:   "0.0.0.0",
 			LocalTcpPort: p2pCfg.DftTcpPort + portShift + 32,
 			LocalUdpPort: p2pCfg.DftUdpPort + portShift + 32,
 			LocalDhtPort: p2pCfg.DftDhtPort + portShift + 32,

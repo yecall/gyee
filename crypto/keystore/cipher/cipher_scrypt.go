@@ -92,9 +92,7 @@ func (s *Scrypt) EncryptKey(address string, data []byte, passphrase []byte) ([]b
 	if err != nil {
 		return nil, err
 	}
-	//liyy for debug, 20190418
-	//uuid := uuid.NewV4()
-	uuid, _ := uuid.NewV4()
+	uuid := uuid.NewV4()
 	encryptedKeyJSON := encryptedKeyJSON{
 		address,
 		*crypto,
