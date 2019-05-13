@@ -794,7 +794,18 @@ func (yeShMgr *YeShellManager) DhtGetValues(keys [][]byte, out chan<- []byte) er
 	if cap(out) < len(keys) {
 		return ErrInsufficientOutChanCapacity
 	}
-	// TODO:
+	go func() {
+		// FIXME: remove simple implementation
+		for _, key := range keys {
+			v, err := yeShMgr.DhtGetValue(key)
+			if err != nil {
+				continue
+			}
+			out <- v
+		}
+		//
+		close(out)
+	}()
 	return nil
 }
 
