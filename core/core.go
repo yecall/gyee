@@ -64,6 +64,13 @@ import (
 	"github.com/yeeco/gyee/persistent"
 )
 
+const (
+	EventReqDhtGetMaxRetry  = 128
+	EventReqDhtGetTimeout   = 60 * time.Second
+	OutputTxsDhtGetMaxRetry = 1024
+	OutputTxsDhtGetTimeout  = 60 * time.Second
+)
+
 var (
 	ErrNoCoinbase          = errors.New("coinbase not provided")
 	ErrNoCoinbasePwdFile   = errors.New("coinbase keystore password file not provided")
@@ -300,7 +307,7 @@ func (c *Core) handleEngineEventSend(event []byte) {
 func (c *Core) handleEngineEventReq(hash common.Hash) {
 	c.wg.Add(1)
 	defer c.wg.Done()
-	retry := 60
+	retry := 0
 	for {
 		if !c.running {
 			return
@@ -314,9 +321,10 @@ func (c *Core) handleEngineEventReq(hash common.Hash) {
 			return
 		}
 		c.metrics.p2pDhtMissMeter.Mark(1)
-		retry--
-		if retry <= 0 {
-			log.Warn("engine req event failed", "hash", hash, "err", err)
+		log.Warn("engine req event not finished", "retry", retry, "hash", hash, "err", err)
+		retry++
+		if retry >= EventReqDhtGetMaxRetry {
+			log.Error("engine req event failed", "hash", hash, "err", err)
 			break
 		}
 		time.Sleep(time.Second)
@@ -337,42 +345,79 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 	go func() {
 		c.wg.Add(1)
 		defer c.wg.Done()
-		retry := 60
+		retry := 0
 		knownTxs := make(map[common.Hash]*Transaction)
 		for {
 			if !c.running {
 				return
 			}
 
-			txs := func(txHash []common.Hash) Transactions {
+			var txs = func(txHash []common.Hash) Transactions {
+				// short cut for empty output
+				if len(txHash) == 0 {
+					return make(Transactions, 0)
+				}
+
+				var unknownHash [][]byte
+				for _, h := range txHash {
+					if _, ok := knownTxs[h]; !ok {
+						unknownHash = append(unknownHash, h.Copy().Bytes())
+					}
+				}
+				if fetchCnt := len(unknownHash); fetchCnt > 0 {
+					var output = make(chan []byte, fetchCnt)
+					c.metrics.p2pDhtGetMeter.Mark(int64(fetchCnt))
+					if err := c.node.P2pService().DhtGetValues(unknownHash, output); err != nil {
+						log.Error("DhtGetValues start failed", "err", err)
+						c.metrics.p2pDhtMissMeter.Mark(int64(fetchCnt))
+						return nil
+					}
+					var timer = time.NewTimer(OutputTxsDhtGetTimeout)
+					defer timer.Stop()
+				Loop:
+					for {
+						select {
+						case <-timer.C:
+							log.Debug("dht get timeout", "retry", retry,
+								"got", len(knownTxs), "total", len(txHash))
+							return nil
+						case enc, ok := <-output:
+							if !ok { // closed
+								break Loop
+							}
+							c.metrics.p2pDhtHitMeter.Mark(1)
+							tx := &Transaction{}
+							if err := tx.Decode(enc); err != nil {
+								log.Error("failed to decode tx", "err", err)
+								continue
+							}
+							if err := tx.VerifySig(); err != nil {
+								log.Error("failed to verify tx", "err", err)
+								continue
+							}
+							tx.raw = enc
+							knownTxs[*tx.Hash()] = tx
+						}
+					}
+				}
+				// engine ensured no dup tx hash in output,
+				// if numbers not adds up, fail with cache and wait for another round
+				if len(knownTxs) != len(txHash) {
+					return nil
+				}
 				txs := make(Transactions, 0, len(txHash))
 				for _, hash := range txHash {
 					tx, exists := knownTxs[hash]
 					if !exists {
-						c.metrics.p2pDhtGetMeter.Mark(1)
-						enc, err := c.node.P2pService().DhtGetValue(hash[:])
-						if err != nil {
-							log.Warn("failed to get tx", "hash", hash, "err", err)
-							c.metrics.p2pDhtMissMeter.Mark(1)
-							continue
-						}
-						c.metrics.p2pDhtHitMeter.Mark(1)
-						tx = &Transaction{}
-						if err := tx.Decode(enc); err != nil {
-							log.Error("failed to decode tx", "hash", hash, "err", err)
-							continue
-						}
-						if err := tx.VerifySig(); err != nil {
-							log.Error("failed to verify tx", "hash", hash, "err", err)
-							continue
-						}
-						tx.raw = enc
-						knownTxs[hash] = tx
+						// SHALL NOT HAPPEN
+						log.Error("tx count reached but tx not around", "hash", hash)
+						return nil
 					}
 					txs = append(txs, tx)
 				}
 				return txs
 			}(o.Txs)
+
 			if len(txs) == len(o.Txs) {
 				// all tx fetched
 				c.blockPool.AddSealRequest(o.H,
@@ -382,9 +427,9 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 			}
 
 			log.Warn("engine output getTx not finished", "retry", retry,
-				"got", len(txs), "total", len(o.Txs), "output", o)
-			retry--
-			if retry <= 0 {
+				"got", len(knownTxs), "total", len(o.Txs), "output", o)
+			retry++
+			if retry >= OutputTxsDhtGetMaxRetry {
 				log.Error("engine output getTx failed", "output", o)
 				break
 			}
