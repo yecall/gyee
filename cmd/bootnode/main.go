@@ -28,6 +28,7 @@ import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p"
 	p2pCfg "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 func main() {
@@ -36,14 +37,18 @@ func main() {
 		writeNodeID = flag.Bool("writenodeid", false, "write out the node's id and quit")
 		nodeDataDir = flag.String("nodeDataDir", "", "node data directory")
 		nodeName    = flag.String("nodeName", "", "node name")
-		chainIp     = flag.String("cip", "0.0.0.0", "chain ip(b1.b2.b3.b4)")
-		chainPort   = flag.Int("cport", p2pCfg.DftUdpPort, "chain port")
-		dhtIp       = flag.String("dip", "0.0.0.0", "dht ip(b1.b2.b3.b4)")
-		dhtPort     = flag.Int("dport", p2pCfg.DftDhtPort, "dht port")
+		localIP     = flag.String("localIP", "0.0.0.0", "node local ip")
+		localPort   = flag.Int("localPort", p2pCfg.DftUdpPort, "node local p2p port")
+		dhtPort     = flag.Int("dhtPort", p2pCfg.DftDhtPort, "node local dht port")
+		logPath     = flag.String("logPath", "", "on disk log storage path")
 		nodeKey     *ecdsa.PrivateKey
 		err         error
 	)
 	flag.Parse()
+
+	if len(*logPath) > 0 {
+		logging.SetRotationFileLogger(*logPath)
+	}
 
 	if *genKey {
 		if *nodeDataDir == "" || *nodeName == "" {
@@ -89,10 +94,10 @@ func main() {
 	}
 
 	nodeCfg := p2p.DefaultYeShellConfig
-	nodeCfg.LocalNodeIp = *chainIp
-	nodeCfg.LocalTcpPort = (uint16)(*chainPort & 0xffff)
-	nodeCfg.LocalUdpPort = (uint16)(*chainPort & 0xffff)
-	nodeCfg.LocalDhtIp = *dhtIp
+	nodeCfg.LocalNodeIp = *localIP
+	nodeCfg.LocalTcpPort = (uint16)(*localPort & 0xffff)
+	nodeCfg.LocalUdpPort = (uint16)(*localPort & 0xffff)
+	nodeCfg.LocalDhtIp = *localIP
 	nodeCfg.LocalDhtPort = (uint16)(*dhtPort & 0xffff)
 	if *nodeDataDir != "" && *nodeName != "" {
 		nodeCfg.NodeDataDir = *nodeDataDir
