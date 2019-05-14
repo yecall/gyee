@@ -274,7 +274,7 @@ func (rutMgr *RutMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	rutMgr.ptnMe = ptn
 	rutMgr.sdl = sch.SchGetScheduler(ptn)
-	rutMgr.sdlName = rutMgr.sdl.SchGetP2pNodeName()
+	rutMgr.sdlName = rutMgr.sdl.SchGetP2pCfgName()
 
 	eno, rutMgr.ptnQryMgr = rutMgr.sdl.SchGetUserTaskNode(QryMgrName)
 	if eno != sch.SchEnoNone || rutMgr.ptnQryMgr == nil {
