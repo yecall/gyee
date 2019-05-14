@@ -133,12 +133,15 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 		log.Crit("signer/addrs not match", "signers", signers, "addrs", addrs)
 	}
 
-	// wait before sending txs
-	time.Sleep(20 * time.Second)
-
 	c := n.Core()
 	chainID := uint32(c.Chain().ChainID())
 	nonces := make([]uint64, len(signers))
+
+	// trigger chain sync before start
+	c.TriggerSync()
+
+	// wait before sending txs
+	time.Sleep(20 * time.Second)
 
 	// generator loop
 	round := int(0)
@@ -149,9 +152,22 @@ Exit:
 		// reset inMem nonce if needed
 		if round%100 == 0 {
 			log.Info("nonce reset")
-			if round > 0 {
-				time.Sleep(10 * time.Second)
-			}
+			c.TriggerSync()
+			func() {
+				var ticker = time.NewTicker(time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+					}
+					if c.IsSyncing() {
+						log.Info("wait for sync")
+					} else {
+						log.Info("sync finished")
+						return
+					}
+				}
+			}()
 			nonces = make([]uint64, len(signers))
 			for i, addr := range addrs {
 				account := c.Chain().LastBlock().GetAccount(addr)

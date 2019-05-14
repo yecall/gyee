@@ -378,9 +378,12 @@ func (bp *BlockPool) markBadPeer(msg p2p.Message) {
 	// TODO: inform bad peed msg.From to p2p module
 }
 
+func (bp *BlockPool) isSyncing() bool {
+	return atomic.LoadInt32(&bp.syncing) != 0
+}
+
 func (bp *BlockPool) startFullSync() {
-	if atomic.LoadInt32(&bp.syncing) != 0 {
-		// already syncing
+	if bp.isSyncing() {
 		return
 	}
 	go bp.syncLoop()
@@ -395,13 +398,14 @@ func (bp *BlockPool) syncLoop() {
 		return
 	}
 	defer atomic.StoreInt32(&bp.syncing, 0)
-	log.Info("[sync] block pool sync started")
+	log.Info("[sync] block pool sync started", "localH", bp.chain.CurrentBlockHeight())
 
 	remoteHeight, err := bp.core.GetRemoteLatestNumber()
 	if err != nil {
 		log.Warn("failed to get remote height", "err", err)
 		return
 	}
+	log.Info("[sync] remote height", remoteHeight)
 	h := bp.chain.CurrentBlockHeight() + 1
 	for h <= remoteHeight {
 		b, err := bp.core.GetRemoteBlockByNumber(h)

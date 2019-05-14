@@ -554,6 +554,14 @@ func (c *Core) AddressFromPublicKey(publicKey []byte) ([]byte, error) {
 	return ad.Raw, nil
 }
 
+func (c *Core) IsSyncing() bool {
+	return c.blockPool.isSyncing()
+}
+
+func (c *Core) TriggerSync() {
+	c.blockPool.startFullSync()
+}
+
 func getSigner(algorithm crypto.Algorithm) crypto.Signer {
 	switch algorithm {
 	case crypto.ALG_SECP256K1:
