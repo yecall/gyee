@@ -239,8 +239,8 @@ func (osns *OsnService) DhtGetValue(key []byte) ([]byte, error) {
 	return osns.yeShMgr.DhtGetValue(key)
 }
 
-func (osns *OsnService) DhtGetValues(keys [][]byte, out chan<- []byte) error {
-	return osns.yeShMgr.DhtGetValues(keys, out)
+func (osns *OsnService) DhtGetValues(keys [][]byte, out chan<- []byte, timeout time.Duration) error {
+	return osns.yeShMgr.DhtGetValues(keys, out, timeout)
 }
 
 func (osns *OsnService) DhtSetValue(key []byte, value []byte) error {

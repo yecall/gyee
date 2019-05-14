@@ -134,7 +134,7 @@ func (is *InmemService) UnRegister(subscriber *Subscriber) {
 func (is *InmemService) DhtGetValue(key []byte) ([]byte, error) {
 	keys := [][]byte{key}[:]
 	out := make(chan []byte, 1)
-	if err := is.DhtGetValues(keys, out); err != nil {
+	if err := is.DhtGetValues(keys, out, DhtGetDftTimeout); err != nil {
 		return nil, err
 	}
 	v, ok := <-out
@@ -144,7 +144,7 @@ func (is *InmemService) DhtGetValue(key []byte) ([]byte, error) {
 	return v, nil
 }
 
-func (is *InmemService) DhtGetValues(keys [][]byte, out chan<- []byte) error {
+func (is *InmemService) DhtGetValues(keys [][]byte, out chan<- []byte, timeout time.Duration) error {
 	if cap(out) < len(keys) {
 		return ErrInsufficientOutChanCapacity
 	}

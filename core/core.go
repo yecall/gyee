@@ -367,18 +367,19 @@ func (c *Core) handleEngineOutput(o *consensus.Output) {
 				if fetchCnt := len(unknownHash); fetchCnt > 0 {
 					var output = make(chan []byte, fetchCnt)
 					c.metrics.p2pDhtGetMeter.Mark(int64(fetchCnt))
-					if err := c.node.P2pService().DhtGetValues(unknownHash, output); err != nil {
+					if err := c.node.P2pService().DhtGetValues(unknownHash, output, OutputTxsDhtGetTimeout); err != nil {
 						log.Error("DhtGetValues start failed", "err", err)
 						c.metrics.p2pDhtMissMeter.Mark(int64(fetchCnt))
 						return nil
 					}
-					var timer = time.NewTimer(OutputTxsDhtGetTimeout)
+					// failsafe timer, p2p layer should have timeout done by closing channel
+					var timer = time.NewTimer(OutputTxsDhtGetTimeout + 5*time.Second)
 					defer timer.Stop()
 				Loop:
 					for {
 						select {
 						case <-timer.C:
-							log.Debug("dht get timeout", "retry", retry,
+							log.Error("dht get timeout", "retry", retry,
 								"got", len(knownTxs), "total", len(txHash))
 							return nil
 						case enc, ok := <-output:

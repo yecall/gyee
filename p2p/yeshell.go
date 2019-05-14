@@ -790,7 +790,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	return result.value, nil
 }
 
-func (yeShMgr *YeShellManager) DhtGetValues(keys [][]byte, out chan<- []byte) error {
+func (yeShMgr *YeShellManager) DhtGetValues(keys [][]byte, out chan<- []byte, timeout time.Duration) error {
 	if cap(out) < len(keys) {
 		return ErrInsufficientOutChanCapacity
 	}

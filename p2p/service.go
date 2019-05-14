@@ -20,6 +20,12 @@
 
 package p2p
 
+import "time"
+
+const (
+	DhtGetDftTimeout = 60 * time.Second
+)
+
 /*
 inmem_service: 测试用inmem network
 p2p_service: 全广播p2p network
@@ -56,7 +62,7 @@ type Service interface {
 	UnRegister(subscriber *Subscriber)
 
 	DhtGetValue(key []byte) ([]byte, error)
-	DhtGetValues(keys [][]byte, out chan<- []byte) error
+	DhtGetValues(keys [][]byte, out chan<- []byte, timeout time.Duration) error
 	DhtSetValue(key []byte, value []byte) error
 
 	// p2p service get chain data from provider
