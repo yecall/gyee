@@ -743,7 +743,11 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 		return sch.SchEnoMismatched
 	}
 
-	icb.sdl.SchSendMessage(&msgResult)
+	if icb.sdl.SchSendMessage(&msgResult) != sch.SchEnoNone {
+		log.Errorf("protoMsgInd: send EvDhtQryInstResultInd failed, " +
+			"sdl: %s, inst: %d, ForWhat: %d",
+			icb.sdlName, icb.name, msg.ForWhat)
+	}
 
 	icb.status = qisDoneOk
 	ind := sch.MsgDhtQryInstStatusInd{
@@ -753,7 +757,12 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 	}
 	msgInd := sch.SchMessage{}
 	icb.sdl.SchMakeMessage(&msgInd, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
-	icb.sdl.SchSendMessage(&msgInd)
+	if eno := icb.sdl.SchSendMessage(&msgInd); eno != sch.SchEnoNone {
+		log.Errorf("protoMsgInd: send EvDhtQryInstStatusInd failed, " +
+			"sdl: %s, inst: %d, ForWhat: %d",
+			icb.sdlName, icb.name, msg.ForWhat)
+		return eno
+	}
 	return sch.SchEnoNone
 }
 

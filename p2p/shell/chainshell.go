@@ -309,8 +309,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					k := config.DsKey{}
 					copy(k[0:], rxPkg.Key)
-					//skm := shMgr.checkKeyMap(&k)
-					skm := shMgr.setKeyMap(&k)
+					skm := shMgr.checkKeyMap(&k)
 
 					if skm == SKM_OK {
 

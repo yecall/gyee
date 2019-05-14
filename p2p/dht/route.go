@@ -448,7 +448,8 @@ func (rutMgr *RutMgr) queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sc
 func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
 
 	if tskSender == nil || req == nil {
-		rutLog.Debug("nearestReq: invalid parameters, tskSender: %p, req: %p", tskSender, req)
+		log.Warnf("nearestReq: invalid parameters, sdl: %s, tskSender: %p, req: %p",
+			rutMgr.sdlName, tskSender, req)
 		return sch.SchEnoParameter
 	}
 
@@ -466,22 +467,30 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 
 	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
 	if dhtEno != DhtEnoNone {
-		rutLog.Debug("nearestReq: rutMgrNearest failed, eno: %d", dhtEno)
+		log.Warnf("nearestReq: rutMgrNearest failed, sdl: %s, eno: %d", rutMgr.sdlName, dhtEno)
 		rsp.Eno = int(dhtEno)
 		schMsg := sch.SchMessage{}
 		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
-		return rutMgr.sdl.SchSendMessage(&schMsg)
+		if eno := rutMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			log.Errorf("nearestReq: send message failed, sdl: %s, eno: %d", rutMgr.sdlName, eno)
+			return eno
+		}
+		return sch.SchEnoNone
 	}
 
 	if len(nearest) <= 0 {
-		rutLog.Debug("nearestReq: empty nearest set from buckets, bootstrap node applied")
+		log.Infof("nearestReq: empty nearest set, bootstrap node applied, sdl: %s", rutMgr.sdlName)
 		bsns, ok := bootstrapNodes[rutMgr.sdlName]
 		if !ok || bsns == nil || len(bsns) == 0 {
-			rutLog.Debug("nearestReq: not found")
+			log.Warnf("nearestReq: not found， sdl: %s", rutMgr.sdlName)
 			rsp.Eno = int(DhtEnoNotFound)
 			schMsg := sch.SchMessage{}
 			rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
-			return rutMgr.sdl.SchSendMessage(&schMsg)
+			if eno := rutMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+				log.Errorf("nearestReq: send message failed, sdl: %s, eno: %d", rutMgr.sdlName, eno)
+				return eno
+			}
+			return sch.SchEnoNone
 		}
 
 		idx := mrand.Int31n(int32(len(bsns)))
@@ -505,11 +514,15 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 	}
 
 	if len(nearest) == 0 {
-		rutLog.Debug("nearestReq: not found")
+		rutLog.Debug("nearestReq: not found, sdl: %s", rutMgr.sdlName)
 		rsp.Eno = int(DhtEnoNotFound)
 		schMsg := sch.SchMessage{}
 		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
-		return rutMgr.sdl.SchSendMessage(&schMsg)
+		if eno := rutMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			log.Errorf("nearestReq: send message failed, sdl: %s, eno: %d", rutMgr.sdlName, eno)
+			return eno
+		}
+		return sch.SchEnoNone
 	}
 
 	for idx, n := range nearest {
@@ -529,11 +542,15 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 	}
 
 	if len(nearest) == 0 {
-		rutLog.Debug("nearestReq: not found")
+		rutLog.Debug("nearestReq: not found, sdl: %s", rutMgr.sdlName)
 		rsp.Eno = int(DhtEnoNotFound)
 		schMsg := sch.SchMessage{}
 		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
-		return rutMgr.sdl.SchSendMessage(&schMsg)
+		if eno := rutMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+			log.Errorf("nearestReq: send message failed, sdl: %s, eno: %d", rutMgr.sdlName, eno)
+			return eno
+		}
+		return sch.SchEnoNone
 	}
 
 	pcsTab := make([]int, 0)
@@ -547,14 +564,19 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 	rsp.Pcs = pcsTab
 	schMsg := sch.SchMessage{}
 	rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
-	rutMgr.sdl.SchSendMessage(&schMsg)
+	if eno := rutMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
+		log.Errorf("nearestReq: send message failed, sdl: %s, eno: %d", rutMgr.sdlName, eno)
+	}
 
 	if req.NtfReq == true {
 		if dhtEno = rutMgr.rutMgrNotifeeReg(tskSender, &req.Target, req.Max, nil, nil); dhtEno != DhtEnoNone {
-			rutLog.Debug("nearestReq: rutMgrNotifeeReg failed, eno: %d", dhtEno)
+			log.Warnf("nearestReq: rutMgrNotifeeReg failed, sdl: %s, eno: %d", rutMgr.sdlName, dhtEno)
 			return sch.SchEnoUserTask
 		}
 	}
+
+	log.Infof("nearestReq: ok, sdl: %s, forWhat: %d, target: %x",
+		rutMgr.sdlName, req.ForWhat, req.Target)
 
 	return sch.SchEnoNone
 }
@@ -603,11 +625,17 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 		rt := &rutMgr.rutTab
 		for idx, n := range req.Seens {
-			if !n.IP.IsUnspecified() {
-				pcs := conInstStatus2PCS(CisHandshook)
-				doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
-				rutMgr.showRoute("rutMgrUpdate4Handshake.DhtEnoNone")
+			if bytes.Compare(n.ID[0:], rutMgr.localNodeId[0:]) == 0 {
+				log.Warnf("updateReq: discard local node seen, sdl: %s", rutMgr.sdlName)
+				continue
 			}
+			if n.IP.IsUnspecified() {
+				log.Warnf("updateReq: discard unspecified node seen, sdl: %s", rutMgr.sdlName)
+				continue
+			}
+			pcs := conInstStatus2PCS(CisHandshook)
+			doUpdate(&rt.shaLocal, &n, req.Duras[idx], pcs)
+			rutMgr.showRoute("rutMgrUpdate4Handshake.DhtEnoNone")
 		}
 
 		if dhtEno := rutMgr.rutMgrNotify(); dhtEno != DhtEnoNone {
@@ -688,7 +716,12 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 		for idx, n := range req.Seens {
 
 			if bytes.Compare(n.ID[0:], rutMgr.localNodeId[0:]) == 0 {
-				rutLog.Debug("updateReq: local node seen")
+				log.Warnf("updateReq: discard local node seen, sdl: %s", rutMgr.sdlName)
+				continue
+			}
+
+			if n.IP.IsUnspecified() {
+				log.Warnf("updateReq: discard unspecified node seen, sdl: %s", rutMgr.sdlName)
 				continue
 			}
 

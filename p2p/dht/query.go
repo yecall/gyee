@@ -436,7 +436,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		msg.ForWhat != MID_FINDNODE &&
 		msg.ForWhat != MID_GETPROVIDER_REQ &&
 		msg.ForWhat != MID_GETVALUE_REQ {
-		qryLog.Debug("rutNearestRsp: unknown what's for, sdl: %s, forWhat: %d, target: %x",
+		log.Warnf("rutNearestRsp: unknown what's for, sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, msg.ForWhat, msg.Target)
 		return sch.SchEnoMismatched
 	}
