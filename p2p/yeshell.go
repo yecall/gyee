@@ -222,7 +222,7 @@ type YeShellManager struct {
 	chainRxChan    chan *peer.P2pPackageRx          // total rx channel for chain
 	deDupLock      sync.Mutex                       // lock for deduplication timer manager
 	tmDedup        *dht.TimerManager                // deduplication timer manager
-	deDupMap       map[[yesKeyBytes]byte]bool       // map for keys of messages had been sent
+	deDupMap       map[yesKey][]byte		       // map for keys of messages had been sent
 	deDupTiker     *time.Ticker                     // deduplication ticker
 	ddtChan        chan bool                        // deduplication ticker channel
 	bsTicker       *time.Ticker                     // bootstrap ticker
@@ -406,7 +406,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 		getProviderMap: make(map[yesKey]chan interface{}, yesMaxGetProvider),
 		putProviderMap: make(map[yesKey]chan interface{}, yesMaxPutProvider),
 		subscribers:    new(sync.Map),
-		deDupMap:       make(map[[yesKeyBytes]byte]bool, 0),
+		deDupMap:       make(map[yesKey][]byte, 0),
 		ddtChan:        make(chan bool, 1),
 		gciMap:			make(map[getChainInfoKeyEx]*getChainInfoValEx, 0),
 	}
@@ -701,7 +701,7 @@ func (yeShMgr *YeShellManager) UnRegister(subscriber *Subscriber) {
 }
 
 // simple statistics for DhtGetValue
-const _gvStatistics = true
+const _gvStatistics = false
 var _gvStatLock sync.Mutex
 var _gvFailedCount int64 = 0
 var _gvOkCount int64 = 0
@@ -1643,7 +1643,7 @@ func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.Node
 		return errors.New("broadcastTxOsn: duplicated")
 	}
 
-	if err := yeShMgr.setDedupTimer(k); err != nil {
+	if err := yeShMgr.setDedupTimer(k, msg.Data); err != nil {
 		yesLog.Debug("broadcastTxOsn: error: %s", err.Error())
 		return err
 	}
@@ -1680,7 +1680,7 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 		return errors.New("broadcastEvOsn: duplicated")
 	}
 
-	if err := yeShMgr.setDedupTimer(k); err != nil {
+	if err := yeShMgr.setDedupTimer(k, msg.Data); err != nil {
 		yesLog.Debug("broadcastEvOsn: error: %s", err.Error())
 		return err
 	}
@@ -1728,10 +1728,12 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 	}
 
 	if yeShMgr.checkDupKey(k) {
+		old := yeShMgr.deDupMap[k]
+		log.Warnf("broadcastBhOsn: duplicated, data: %x, old: %x", msg.Data, old)
 		return errors.New("broadcastBhOsn: duplicated")
 	}
 
-	if err := yeShMgr.setDedupTimer(k); err != nil {
+	if err := yeShMgr.setDedupTimer(k, msg.Data); err != nil {
 		yesLog.Debug("broadcastBhOsn: error: %s", err.Error())
 		return err
 	}
@@ -1772,7 +1774,7 @@ func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.Node
 		return errors.New("broadcastBkOsn: duplicated")
 	}
 
-	if err := yeShMgr.setDedupTimer(k); err != nil {
+	if err := yeShMgr.setDedupTimer(k, msg.Data); err != nil {
 		yesLog.Debug("broadcastBkOsn: error: %s", err.Error())
 		return err
 	}
@@ -1837,7 +1839,7 @@ func (yeShMgr *YeShellManager) deDupTimerCb(el *list.Element, data interface{}) 
 	}
 }
 
-func (yeShMgr *YeShellManager) setDedupTimer(key [yesKeyBytes]byte) error {
+func (yeShMgr *YeShellManager) setDedupTimer(key yesKey, data []byte) error {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
 
@@ -1860,7 +1862,7 @@ func (yeShMgr *YeShellManager) setDedupTimer(key [yesKeyBytes]byte) error {
 		return err
 	}
 
-	yeShMgr.deDupMap[key] = true
+	yeShMgr.deDupMap[key] = data
 	return nil
 }
 
