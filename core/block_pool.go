@@ -192,6 +192,9 @@ func (bp *BlockPool) processMsgBlock(msg p2p.Message) {
 func (bp *BlockPool) processBlock(blk *Block) {
 	if err := bp.chain.verifyBlock(blk, false); err != nil {
 		log.Warn("processBlock() verify fails", "err", err)
+		if err == ErrBlockTooFarForChain {
+			bp.startFullSync()
+		}
 		// TODO: mark bad peer?
 		return
 	}
