@@ -482,7 +482,7 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 		log.Infof("nearestReq: empty nearest set, bootstrap node applied, sdl: %s", rutMgr.sdlName)
 		bsns, ok := bootstrapNodes[rutMgr.sdlName]
 		if !ok || bsns == nil || len(bsns) == 0 {
-			log.Warnf("nearestReq: not found， sdl: %s", rutMgr.sdlName)
+			log.Infof("nearestReq: not found， sdl: %s", rutMgr.sdlName)
 			rsp.Eno = int(DhtEnoNotFound)
 			schMsg := sch.SchMessage{}
 			rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)

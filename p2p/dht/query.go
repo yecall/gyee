@@ -57,16 +57,17 @@ func (log qryMgrLogger) Debug(fmt string, args ...interface{}) {
 // Constants
 //
 const (
-	QryMgrName        = sch.DhtQryMgrName                         // query manage name registered in shceduler
-	QryMgrMailboxSize = 1024 * 24								  // mail box size
-	qryMgrMaxPendings = 512                                       // max pendings can be held in the list, 0 is unlimited
-	qryMgrMaxActInsts = 32                                        // max concurrent actived instances for one query
-	qryMgrQryExpired  = time.Second * 60                          // duration to get expired for a query
-	qryMgrQryMaxWidth = 64                                        // not the true "width", the max number of peers queryied
-	qryMgrQryMaxDepth = 8                                         // the max depth for a query
-	qryInstExpired    = time.Second * 16                          // duration to get expired for a query instance
-	natMapKeepTime    = nat.MinKeepDuration                       // NAT map keep time
-	natMapRefreshTime = nat.MinKeepDuration - nat.MinRefreshDelta // NAT map refresh time
+	QryMgrName        = sch.DhtQryMgrName                         	// query manage name registered in shceduler
+	QryMgrMailboxSize = 1024 * 24								  		// mail box size
+	qryMgrMaxPendings = 512                                       		// max pendings can be held in the list, 0 is unlimited
+	qryMgrMaxActInsts = 32                                        		// max concurrent actived instances for one query
+	qryMgrQryExpired  = time.Second * 60                          	// duration to get expired for a query
+	qryMgrQryMaxWidth = 64                                        		// not the true "width", the max number of peers queryied
+	qryMgrQryMaxDepth = 8                                         		// the max depth for a query
+	qryInstExpired    = time.Second * 16                          	// duration to get expired for a query instance
+	natMapKeepTime    = nat.MinKeepDuration                       	// NAT map keep time
+	natMapRefreshTime = nat.MinKeepDuration - nat.MinRefreshDelta	// NAT map refresh time
+	qryGvbUnitSize		= 10											// get-value-batch unit size
 )
 
 //
@@ -130,6 +131,23 @@ type qryCtrlBlock struct {
 }
 
 //
+// get-value-batch control block
+//
+type gvbCtrlBlock struct {
+	gvbId		int				// batch identity
+	keys		*[][]byte		// total keys
+	output		chan<-[]byte	// value output channel
+	head		int				// index of key to query next
+	status		int				// current sutatus
+	got			int				// number of got
+	getting		int				// number of getting
+	failed		int				// number of failed
+	size		int				// batch size
+	remain		int				// number of remain
+	pending		map[config.DsKey] interface{} // target key in pending map
+}
+
+//
 // Query instance status
 //
 const (
@@ -179,8 +197,10 @@ type QryMgr struct {
 	ptnRutMgr    interface{}                    // pointer to task node of route manager
 	ptnDhtMgr    interface{}                    // pointer to task node of dht manager
 	ptnNatMgr    interface{}                    // pointer to task naode of nat manager
+	ptnDsMgr	 interface{}					 // pointer to task datastore manager
 	instSeq      int                            // query instance sequence number
 	qcbTab       map[config.DsKey]*qryCtrlBlock // query control blocks
+	gvbTab		 map[int]*gvbCtrlBlock			// get-value-batch control blocks
 	qmCfg        qryMgrCfg                      // query manager configuration
 	qcbSeq       int                            // query control block sequence number
 	natTcpResult bool                           // result about nap mapping for tcp
@@ -204,6 +224,7 @@ func NewQryMgr() *QryMgr {
 		name:       QryMgrName,
 		instSeq:    0,
 		qcbTab:     map[config.DsKey]*qryCtrlBlock{},
+		gvbTab:		map[int]*gvbCtrlBlock{},
 		qmCfg:      qmCfg,
 		qcbSeq:     0,
 		pubTcpIp:   net.IPv4zero,
@@ -241,6 +262,12 @@ func (qryMgr *QryMgr) qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 	case sch.EvDhtQryMgrQueryStartReq:
 		sender := qryMgr.sdl.SchGetSender(msg)
 		eno = qryMgr.queryStartReq(sender, msg.Body.(*sch.MsgDhtQryMgrQueryStartReq))
+
+	case sch.EvDhtDsGvbStartReq:
+		eno = qryMgr.dsGvbStartReq(msg.Body.(*sch.MsgDhtDsGvbStartReq))
+
+	case sch.EvDhtDsGvbStopReq:
+		eno = qryMgr.dsGvbStopReq(msg.Body.(*sch.MsgDhtDsGvbStopReq))
 
 	case sch.EvDhtRutMgrNearestRsp:
 		eno = qryMgr.rutNearestRsp(msg.Body.(*sch.MsgDhtRutMgrNearestRsp))
@@ -304,11 +331,15 @@ func (qryMgr *QryMgr) poweron(ptn interface{}) sch.SchErrno {
 		qryLog.Debug("poweron: get task failed, task: %s", nat.NatMgrName)
 		return eno
 	}
+	if eno, qryMgr.ptnDsMgr = qryMgr.sdl.SchGetUserTaskNode(DsMgrName); eno != sch.SchEnoNone {
+		qryLog.Debug("poweron: get task failed, task: %s", DsMgrName)
+		return eno
+	}
 	if dhtEno := qryMgr.qryMgrGetConfig(); dhtEno != DhtEnoNone {
 		qryLog.Debug("poweron: qryMgrGetConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
-	mapQrySeqLock[qryMgr.sdl.SchGetP2pCfgName()] = sync.Mutex{}
+	mapQrySeqLock[qryMgr.sdlName] = sync.Mutex{}
 	return sch.SchEnoNone
 }
 
@@ -345,8 +376,8 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 		return sch.SchEnoMismatched
 	}
 
-	log.Infof("queryStartReq: sdl: %s, ForWhat: %d, sender: %s, target: %x",
-		qryMgr.sdlName, msg.ForWhat, qryMgr.sdl.SchGetTaskName(sender), msg.Target)
+	log.Infof("queryStartReq: sdl: %s, ForWhat: %d, sender: %s, batch: %t, batchId: %d, target: %x",
+		qryMgr.sdlName, msg.ForWhat, qryMgr.sdl.SchGetTaskName(sender), msg.Batch, msg.BatchId, msg.Target)
 
 	var forWhat = msg.ForWhat
 	var rsp = sch.MsgDhtQryMgrQueryStartRsp{
@@ -424,6 +455,78 @@ _rsp2Sender:
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
+}
+
+//
+// Start get-value-batch handler
+//
+func (qryMgr *QryMgr)dsGvbStartReq(msg *sch.MsgDhtDsGvbStartReq) sch.SchErrno {
+	gvbCb := &gvbCtrlBlock{
+		gvbId: msg.GvbId,
+		keys: msg.Keys,
+		output: msg.Output,
+	}
+	gvbCb.status = sch.GVBS_NULL
+	gvbCb.size = len(*gvbCb.keys)
+	gvbCb.head = 0
+	gvbCb.got = 0
+	gvbCb.getting = 0
+	gvbCb.failed = 0
+	gvbCb.remain = gvbCb.size
+	gvbCb.pending = make(map[config.DsKey] interface{}, 0)
+	if _, dup := qryMgr.gvbTab[gvbCb.gvbId]; dup {
+		gvbCb.status = sch.GVBS_TERMED
+		qryMgr.gvbStatusReport(gvbCb, "dsGvbStartReq")
+		return sch.SchEnoDuplicated
+	}
+
+	log.Infof("dsGvbStartReq: sdl: %s, gvbId: %d, size: %d",
+		qryMgr.sdlName, msg.GvbId, gvbCb.size)
+
+	gvbCb.status = sch.GVBS_WORKING
+	qryMgr.gvbTab[gvbCb.gvbId] = gvbCb
+	for loop := 0; loop < qryGvbUnitSize; loop++ {
+		if gvbCb.remain <= 0 {
+			break
+		}
+		if dhtEno, schEno := qryMgr.gvbStartNext(gvbCb); dhtEno != DhtEnoNone  || schEno != sch.SchEnoNone {
+			log.Warnf("dsGvbStartReq: gvbStartNext failed, sdl: %s, dhtEno: %d, schEno: %d",
+				qryMgr.sdlName, dhtEno, schEno)
+		}
+	}
+
+	return qryMgr.gvbStatusReport(gvbCb, "dsGvbStartReq")
+}
+
+//
+// Stop get-value-batch handler
+//
+func (qryMgr *QryMgr)dsGvbStopReq(msg *sch.MsgDhtDsGvbStopReq) sch.SchErrno {
+
+	log.Infof("dsGvbStopReq: sdl: %s, gvbId: %d",
+		qryMgr.sdlName, msg.GvbId)
+
+	gvbCb, ok := qryMgr.gvbTab[msg.GvbId]
+	if !ok {
+		log.Warnf("dsGvbStopReq: not found, sdl: %s, id: %d", qryMgr.sdlName, msg.GvbId)
+		return sch.SchEnoNotFound
+	}
+	if gvbCb.status != sch.GVBS_WORKING {
+		log.Warnf("dsGvbStopReq: mismatched, sdl: %s, id: %d, status: %s",
+			qryMgr.sdlName, msg.GvbId, gvbCb.status)
+		return sch.SchEnoMismatched
+	}
+	for key := range gvbCb.pending {
+		if eno := qryMgr.qryMgrDelQcb(delQcb4Command, key); eno != DhtEnoNone {
+			log.Warnf("dsGvbStopReq: qryMgrDelQcb failed, sdl: %s, id: %d, eno: %d, key: %x",
+				qryMgr.sdlName, gvbCb.gvbId, eno, key)
+		}
+		delete(gvbCb.pending, key)
+	}
+	log.Infof("dsGvbStopReq: all stopped,  sdl: %s, id: %d", qryMgr.sdlName, gvbCb.gvbId)
+	delete(qryMgr.gvbTab, gvbCb.gvbId)
+	gvbCb.status = sch.GVBS_TERMED
+	return qryMgr.gvbStatusReport(gvbCb, "dsGvbStopReq")
 }
 
 //
@@ -744,11 +847,11 @@ func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrn
 	}
 
 	var (
-		qcb      *qryCtrlBlock = nil
-		qpiList                = make([]*qryPendingInfo, 0)
-		hashList               = make([]*Hash, 0)
-		distList               = make([]int, 0)
-		rutMgr                 = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
+		qcb			*qryCtrlBlock = nil
+		qpiList		= make([]*qryPendingInfo, 0)
+		hashList    = make([]*Hash, 0)
+		distList    = make([]int, 0)
+		rutMgr      = qryMgr.sdl.SchGetTaskObject(RutMgrName).(*RutMgr)
 	)
 
 	if len(msg.Peers) != len(msg.Pcs) {
@@ -1425,6 +1528,81 @@ func (qryMgr *QryMgr) qryMgrResultReport(
 	prd *sch.Provider) DhtErrno {
 
 	//
+	// deal with batch operation, currently it's only get-value-batch supported.
+	//
+
+	dhtEno := DhtEnoNone
+	schEno := sch.SchEnoNone
+
+	if qcb.qryReq.Batch {
+		id := qcb.qryReq.BatchId
+		switch qcb.forWhat {
+		case MID_GETVALUE_REQ :
+			inst, ok := qryMgr.gvbTab[id]
+			if !ok {
+				log.Warnf("qryMgrResultReport: batch not found, sdl: %s, id: %d", qryMgr.sdlName, id)
+				return DhtEnoNotFound
+			}
+			if eno == int(DhtEnoNone) {
+				inst.output<-val
+				inst.got++
+			} else {
+				inst.failed++
+			}
+			inst.getting--
+			delete(inst.pending, qcb.qryReq.Target)
+
+			log.Infof("qryMgrResultReport: gvb, " +
+				"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
+					qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
+
+			if inst.getting == 0 {
+				log.Infof("qryMgrResultReport: gvb over, " +
+					"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
+					qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
+				if inst.failed > 0 {
+					inst.status = sch.GVBS_TERMED
+					if eno := qryMgr.gvbStatusReport(inst, "qryMgrResultReport"); eno != sch.SchEnoNone {
+						log.Errorf("qryMgrResultReport: gvbStatusReport failed, " +
+							"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
+							qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
+						dhtEno = DhtEnoInternal
+					}
+				} else {
+					inst.status = sch.GVBS_DONE
+					if eno := qryMgr.gvbStatusReport(inst, "qryMgrResultReport"); eno != sch.SchEnoNone {
+						log.Errorf("qryMgrResultReport: gvbStatusReport failed, " +
+							"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
+							qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
+						dhtEno = DhtEnoInternal
+					}
+				}
+				delete(qryMgr.gvbTab, id)
+			}
+			if inst.remain > 0 {
+				if dhtEno, schEno = qryMgr.gvbStartNext(inst); dhtEno != DhtEnoNone || schEno != sch.SchEnoNone {
+					log.Errorf("qryMgrResultReport: gvbStartNext failed, "+
+						"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
+						qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
+				}
+			}
+
+		default:
+			log.Errorf("qryMgrResultReport: batch not support, %d, sdl: %s, id: %d",
+				qcb.forWhat, qryMgr.sdlName, id)
+			return DhtEnoMismatched
+		}
+
+		if dhtEno != DhtEnoNone {
+			return dhtEno
+		}
+		if schEno != sch.SchEnoNone {
+			return DhtEnoScheduler
+		}
+		return DhtEnoNone
+	}
+
+	//
 	// notice:
 	//
 	// 0) the target backup in qcb has it's meaning with "forWhat", as:
@@ -1537,12 +1715,78 @@ func (qryMgr *QryMgr) natMapSwitch() DhtErrno {
 }
 
 //
+// report get-value-batch status to datastore manager
+//
+func (qryMgr *QryMgr)gvbStatusReport(gvbCb *gvbCtrlBlock, ctxt string) sch.SchErrno {
+	ind := sch.MsgDhtDsStatusInd {
+		GvbId: gvbCb.gvbId,
+		Status: gvbCb.status,
+		Got: gvbCb.got,
+		Getting: gvbCb.getting,
+		Failed: gvbCb.failed,
+		Remain: gvbCb.remain,
+	}
+	log.Infof("gvbStatusReport: ctxt: %s, ind[id,status,getting,got,failed,remain]:%v",
+		ctxt, ind)
+	msg := new(sch.SchMessage)
+	qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnDsMgr, sch.EvDhtDsGvbStatusInd, &ind)
+	if eno := qryMgr.sdl.SchSendMessage(msg); eno != sch.SchEnoNone {
+		log.Errorf("gvbStatusReport: send EvDhtDsGvbStatusInd failed, sdl: %s, eno: %d",
+			qryMgr.sdlName, eno)
+		return eno
+	}
+	return sch.SchEnoNone
+}
+
+//
+// get-value-batch start to query the next key
+//
+func (qryMgr *QryMgr)gvbStartNext(gvbCb *gvbCtrlBlock) (DhtErrno, sch.SchErrno) {
+	if gvbCb.remain <= 0 {
+		log.Warnf("gvbStartNext: none, sdl: %s", qryMgr.sdlName)
+		return DhtEnoInternal, sch.SchEnoNone
+	}
+	next := gvbCb.head
+	gvbCb.head += 1
+	gvr := sch.MsgDhtMgrGetValueReq {
+		Key: (*gvbCb.keys)[next],
+	}
+	qry := sch.MsgDhtQryMgrQueryStartReq{
+		Msg: &gvr,
+		ForWhat: MID_GETVALUE_REQ,
+		Seq: GetQuerySeqNo(qryMgr.sdlName),
+		Batch: true,
+		BatchId: gvbCb.gvbId,
+	}
+	copy(qry.Target[0:], gvr.Key)
+	if _, dup := gvbCb.pending[qry.Target]; dup {
+		log.Warnf("gvbStartNext: duplicated target, sdl: %s, target: %x", qryMgr.sdlName, gvr.Key)
+		gvbCb.failed += 1
+		gvbCb.remain -= 1
+		return DhtEnoDuplicated, sch.SchEnoNone
+	}
+	if eno := qryMgr.queryStartReq(qryMgr.ptnMe, &qry); eno != sch.SchEnoNone {
+		log.Warnf("gvbStartNext: start query failed, sdl: %s, eno: %d", qryMgr.sdlName, eno)
+		gvbCb.failed += 1
+		gvbCb.remain -= 1
+		return DhtEnoInternal, eno
+	}
+	gvbCb.getting += 1
+	gvbCb.remain -= 1
+	gvbCb.pending[qry.Target] = gvbCb
+	return DhtEnoNone, sch.SchEnoNone
+}
+
+//
 // get unique sequence number all query
 //
+var mapQrySeqLLock sync.Mutex
 var mapQrySeqLock = make(map[string]sync.Mutex, 0)
 
 func GetQuerySeqNo(name string) int64 {
+	mapQrySeqLLock.Lock()
 	qrySeqLock, ok := mapQrySeqLock[name]
+	mapQrySeqLLock.Unlock()
 	if !ok {
 		panic("GetQuerySeqNo: internal error! seems system not ready")
 	}
@@ -1550,3 +1794,4 @@ func GetQuerySeqNo(name string) int64 {
 	defer qrySeqLock.Unlock()
 	return time.Now().UnixNano()
 }
+

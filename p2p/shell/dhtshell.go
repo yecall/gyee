@@ -115,6 +115,9 @@ func (shMgr *DhtShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sc
 	case sch.EvDhtMgrPutValueReq:
 		eno = shMgr.dhtShPutValueReq(msg.Body.(*sch.MsgDhtMgrPutValueReq))
 
+	case sch.EvDhtMgrGetValueBatchReq:
+		eno = shMgr.dhtShGetValueBatchReq(msg.Body.(*sch.MsgDhtMgrGetValueBatchReq))
+
 	case sch.EvDhtMgrGetProviderReq:
 		eno = shMgr.dhtShGetProviderReq(msg.Body.(*sch.MsgDhtMgrGetProviderReq))
 
@@ -336,6 +339,12 @@ func (shMgr *DhtShellManager) dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sc
 func (shMgr *DhtShellManager) dhtShPutValueReq(req *sch.MsgDhtMgrPutValueReq) sch.SchErrno {
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrPutValueReq, req)
+	return shMgr.sdl.SchSendMessage(&msg)
+}
+
+func (shMgr *DhtShellManager) dhtShGetValueBatchReq(req *sch.MsgDhtMgrGetValueBatchReq) sch.SchErrno {
+	msg := sch.SchMessage{}
+	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetValueBatchReq, req)
 	return shMgr.sdl.SchSendMessage(&msg)
 }
 

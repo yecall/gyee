@@ -21,12 +21,13 @@
 package dht
 
 import (
-	"container/list"
 	"path"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+	"fmt"
+	"container/list"
 
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	config "github.com/yeeco/gyee/p2p/config"
@@ -139,6 +140,24 @@ const DsMgrDurInf = time.Duration(0)
 const dsMgrApplyCleanupTimer = true
 
 //
+// batch-get
+//
+const (
+	DsGVBS_NULL	= iota
+	DsGVBS_WORKING
+	DsGVBS_KILLING
+)
+type dsMgrBatchGetInst struct {
+	bgId			int					// batch identity
+	status			int					// status
+	keysTotal		[][]byte			// total batch keys
+	bgSize			int					// number of key in keysTotal
+	bgTimeout		time.Duration		// timeout duration for batch required by user
+	bgChOutput		chan<-[]byte		// output channel, with capacity not less than bgSize
+	tidBg			int					// timer identity for batch
+}
+
+//
 // Data store manager
 //
 type DsMgr struct {
@@ -158,6 +177,8 @@ type DsMgr struct {
 	ldsCfg      LeveldbDatastoreConfig // levelDB stat store configuration
 	tmMgr       *TimerManager          // timer manager
 	tidTick     int                    // tick timer identity
+	bgSeq		int					   // batch-get sequence number
+	bgMap		map[int]*dsMgrBatchGetInst // batch-get map
 }
 
 //
@@ -172,6 +193,7 @@ func NewDsMgr() *DsMgr {
 		ldsCfg:      LeveldbDatastoreConfig{},
 		tmMgr:       NewTimerManager(),
 		tidTick:     sch.SchInvalidTid,
+		bgMap:		 make(map[int]*dsMgrBatchGetInst, 0),
 	}
 
 	dsMgr.tep = dsMgr.dsMgrProc
@@ -241,6 +263,15 @@ func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno
 
 	case sch.EvDhtMgrGetValueReq:
 		eno = dsMgr.localGetValueReq(msg.Body.(*sch.MsgDhtMgrGetValueReq))
+
+	case sch.EvDhtMgrGetValueBatchReq:
+		eno = dsMgr.localGetValueBatchReq(msg.Body.(*sch.MsgDhtMgrGetValueBatchReq))
+
+	case sch.EvDhtDsGvbTimer:
+		eno = dsMgr.gvbTimerHandler(msg.Body.(*dsMgrBatchGetInst))
+
+	case sch.EvDhtDsGvbStatusInd:
+		eno = dsMgr.gvbStatusInd(msg.Body.(*sch.MsgDhtDsStatusInd))
 
 	case sch.EvDhtQryMgrQueryResultInd:
 		eno = dsMgr.qryMgrQueryResultInd(msg.Body.(*sch.MsgDhtQryMgrQueryResultInd))
@@ -488,7 +519,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 		Target:  k,
 		Msg:     msg,
 		ForWhat: MID_PUTVALUE,
-		Seq:     GetQuerySeqNo(dsMgr.sdl.SchGetP2pCfgName()),
+		Seq:     GetQuerySeqNo(dsMgr.sdlName),
 	}
 	schMsg := sch.SchMessage{}
 	dsMgr.sdl.SchMakeMessage(&schMsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtQryMgrQueryStartReq, &qry);
@@ -542,6 +573,200 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 		log.Errorf("localGetValueReq: send message failed, eno: %d", eno)
 		return eno
 	}
+	return sch.SchEnoNone
+}
+
+//
+// local node get-value-batch request handler
+//
+func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch.SchErrno {
+
+	//
+	// try local datastore first
+	//
+
+	var remain *[][]byte
+	if dsMgr.getfromPeer {
+		remain = &msg.Keys
+	} else {
+		remain = &[][]byte{}
+		dsk := DsKey{}
+		for _, k := range msg.Keys {
+			copy(dsk[0:], k)
+			if val := dsMgr.fromStore(&dsk); val != nil && len(val) > 0 {
+				log.Infof("localGetValueBatchReq: get from local ok, sdl: %s, key: %x",
+					dsMgr.sdlName, dsk)
+				msg.ValCh<-val
+			} else {
+				*remain = append(*remain, k)
+			}
+		}
+	}
+
+	if len(*remain) == 0 {
+		log.Infof("localGetValueBatchReq: all got, sdl: %s", dsMgr.sdlName)
+		return sch.SchEnoNone
+	}
+
+	//
+	// build batch and tell query manager to carry it out
+	//
+
+	bg := dsMgrBatchGetInst {
+		bgId: dsMgr.bgSeq,
+		status: DsGVBS_NULL,
+		keysTotal: *remain,
+		bgSize: len(*remain),
+		bgTimeout: msg.Timeout,
+		bgChOutput: msg.ValCh,
+		tidBg: sch.SchInvalidTid,
+	}
+	req := sch.MsgDhtDsGvbStartReq {
+		GvbId: bg.bgId,
+		Keys: &bg.keysTotal,
+		Output: bg.bgChOutput,
+	}
+	td := sch.TimerDescription{
+		Name:  fmt.Sprintf("%s%d", "bgTimer", bg.bgId),
+		Utid:  sch.DhtDsGetValueBatchTimerId,
+		Tmt:   sch.SchTmTypeAbsolute,
+		Dur:   bg.bgTimeout,
+		Extra: &bg,
+	}
+	if eno, tid := dsMgr.sdl.SchSetTimer(dsMgr.ptnMe, &td); eno != sch.SchEnoNone {
+		log.Errorf("localGetValueBatchReq: set timer failed, sdl: %s", dsMgr.sdlName)
+		return eno
+	} else {
+		bg.tidBg = tid
+	}
+
+	schmsg := new(sch.SchMessage)
+	dsMgr.sdl.SchMakeMessage(schmsg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtDsGvbStartReq, &req)
+	if eno := dsMgr.sdl.SchSendMessage(schmsg); eno != sch.SchEnoNone {
+		log.Errorf("localGetValueBatchReq: send EvDhtDsGvbStartReq failed, sdl: %s", dsMgr.sdlName)
+		if eno = dsMgr.sdl.SchKillTimer(dsMgr.ptnMe, bg.tidBg); eno != sch.SchEnoNone {
+			log.Errorf("localGetValueBatchReq: kill timer failed, sdl: %s", dsMgr.sdlName)
+		}
+		return eno
+	}
+
+	dsMgr.bgSeq++
+	bg.status = DsGVBS_WORKING
+	dsMgr.bgMap[bg.bgId] = &bg
+
+	log.Infof("localGetValueBatchReq: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
+		dsMgr.sdlName, bg.bgId, bg.bgSize, bg.bgTimeout)
+
+	return sch.SchEnoNone
+}
+
+//
+// get-value-batch timer expired handler
+//
+func (dsMgr *DsMgr) gvbTimerHandler(inst *dsMgrBatchGetInst) sch.SchErrno {
+	gvbId := inst.bgId
+	gvbCb, ok := dsMgr.bgMap[gvbId];
+	if !ok {
+		log.Errorf("gvbTimerHandler: inst not found, sdl: %s, gvbId: %d", dsMgr.sdlName, gvbId)
+		return sch.SchEnoNotFound
+	}
+	if gvbCb.status != DsGVBS_WORKING {
+		log.Errorf("gvbTimerHandler: status mismatched, sdl: %s, gvbId: %d, status: %d",
+			dsMgr.sdlName, gvbId, gvbCb.status)
+		return sch.SchEnoMismatched
+	}
+	if gvbCb.bgId != gvbId {
+		log.Errorf("gvbTimerHandler: identity mismatched, sdl: %s, gvbId: %d, bgId: %d",
+			dsMgr.sdlName, gvbId, gvbCb.bgId)
+		return sch.SchEnoMismatched
+	}
+
+	log.Infof("gvbTimerHandler: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
+		dsMgr.sdlName, gvbCb.bgId, gvbCb.bgSize, gvbCb.bgTimeout)
+
+	gvbCb.tidBg = sch.SchInvalidTid
+	gvbCb.status = DsGVBS_KILLING
+	req := sch.MsgDhtDsGvbStopReq {
+		GvbId: gvbId,
+	}
+	msg := new(sch.SchMessage)
+	dsMgr.sdl.SchMakeMessage(msg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtDsGvbStopReq, &req)
+	if eno := dsMgr.sdl.SchSendMessage(msg); eno != sch.SchEnoNone {
+		log.Errorf("gvbTimerHandler: send message failed, sdl: %s, eno: %d", dsMgr.sdlName, eno)
+		return eno
+	}
+	return sch.SchEnoNone
+}
+
+//
+// get-value-batch status indication handler
+//
+func (dsMgr *DsMgr) gvbStatusInd(msg *sch.MsgDhtDsStatusInd) sch.SchErrno {
+	sdl := dsMgr.sdlName
+	gvbId := msg.GvbId
+	gvbCb, ok := dsMgr.bgMap[gvbId]
+	if !ok {
+		log.Errorf("gvbStatusInd: inst not found, sdl: %s, gvbId: %d", dsMgr.sdlName, gvbId)
+		return sch.SchEnoNotFound
+	}
+
+	log.Infof("gvbStatusInd: sdl: %s, bgId: %d, status: %d, msg.Status: %d",
+		dsMgr.sdlName, gvbCb.bgId, gvbCb.status, msg.Status)
+
+	switch gvbCb.status {
+	case DsGVBS_WORKING:
+
+		switch msg.Status {
+		case sch.GVBS_WORKING:
+
+			log.Infof("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
+				"[%s, %d, %d, %d, %d, %d, %d]",
+				dsMgr.sdlName, gvbId, msg.Status, msg.Got, msg.Getting, msg.Failed, msg.Remain)
+
+		case sch.GVBS_TERMED, sch.GVBS_DONE:
+
+			log.Infof("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
+				"[%s, %d, %d, %d, %d, %d, %d]",
+				dsMgr.sdlName, gvbId, msg.Status, msg.Got, msg.Getting, msg.Failed, msg.Remain)
+
+			if gvbCb.tidBg != sch.SchInvalidTid {
+				if eno := dsMgr.sdl.SchKillTimer(dsMgr.ptnMe, gvbCb.tidBg); eno != sch.SchEnoNone {
+					log.Errorf("gvbStatusInd: kill timer failed, sdl: %s, status: %d",
+						dsMgr.sdlName, msg.Status)
+				} else {
+					gvbCb.tidBg = sch.SchInvalidTid
+				}
+			}
+			close(gvbCb.bgChOutput)
+			delete(dsMgr.bgMap, gvbId)
+
+		default:
+			log.Errorf("gvbStatusInd: sdl: %s, invalid status: %d", sdl, msg.Status)
+			return sch.SchEnoUserTask
+		}
+
+	case DsGVBS_KILLING:
+
+		switch msg.Status {
+		case sch.GVBS_TERMED, sch.GVBS_DONE:
+
+			log.Infof("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
+				"[%s, %d, %d, %d, %d, %d, %d]",
+				dsMgr.sdlName, gvbId, msg.Status, msg.Got, msg.Getting, msg.Failed, msg.Remain)
+
+			close(gvbCb.bgChOutput)
+			delete(dsMgr.bgMap, gvbId)
+
+		default:
+			log.Errorf("gvbStatusInd: sdl: %s, invalid status: %d", sdl, msg.Status)
+			return sch.SchEnoUserTask
+		}
+
+	default:
+		log.Errorf("gvbStatusInd: sdl: %s, invalid status: %d", sdl, gvbCb.status)
+		return sch.SchEnoUserTask
+	}
+
 	return sch.SchEnoNone
 }
 
@@ -702,11 +927,10 @@ func (dsMgr *DsMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErr
 	// would be sent from the same connection instance until this function called.
 	//
 
-	if msg == nil {
-		dsLog.Debug("rutMgrNearestRsp: invalid message")
-		return sch.SchEnoParameter
+	if msg.Eno != int(DhtEnoNone) {
+		dsLog.Debug("rutMgrNearestRsp: router failed, sdl: %s, eno: %d", dsMgr.sdlName, msg.Eno)
+		return sch.SchEnoUserTask
 	}
-
 	var nodes []*config.Node
 	bns := msg.Peers.([]*rutMgrBucketNode)
 	for idx := 0; idx < len(bns); idx++ {

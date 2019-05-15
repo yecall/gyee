@@ -645,6 +645,12 @@ func (peMgr *PeerManager) peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 			continue
 		}
 
+		localSubnetIp := peMgr.cfg.subNetNodeList[snid].IP
+		localSubnetPort := peMgr.cfg.subNetNodeList[snid].TCP
+		if n.IP.Equal(localSubnetIp) && n.TCP == localSubnetPort {
+			continue
+		}
+
 		if len(peMgr.randoms[snid]) >= peMgr.cfg.subNetMaxPeers[snid] {
 			peerLog.Debug("peMgrDcvFindNodeRsp: too much, some are truncated")
 			continue

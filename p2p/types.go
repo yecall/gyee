@@ -41,4 +41,6 @@ type Message struct {
 var (
 	ErrDhtNotFound                 = errors.New("dht value not found")
 	ErrInsufficientOutChanCapacity = errors.New("output chan capacity insufficient")
+	ErrResourceLimited             = errors.New("underlying resources limited")
+	ErrDhtInternal                 = errors.New("dht internal errors")
 )

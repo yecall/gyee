@@ -186,6 +186,9 @@ func (dhtMgr *DhtMgr) dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 	case sch.EvDhtMgrGetValueRsp:
 		eno = dhtMgr.getValueRsp(msg.Body.(*sch.MsgDhtMgrGetValueRsp))
 
+	case sch.EvDhtMgrGetValueBatchReq:
+		eno = dhtMgr.getValueBatchReq(msg.Body.(*sch.MsgDhtMgrGetValueBatchReq))
+
 	case sch.EvDhtQryMgrQueryStartRsp:
 		eno = dhtMgr.qryMgrQueryStartRsp(msg.Body.(*sch.MsgDhtQryMgrQueryStartRsp))
 
@@ -556,6 +559,14 @@ func (dhtMgr *DhtMgr) getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 		dhtLog.Debug("getValueRsp: callback return: %d", rc)
 	}
 	return sch.SchEnoNone
+}
+
+//
+// batch get handler
+//
+func (dhtMgr *DhtMgr) getValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch.SchErrno {
+	log.Infof("getValueBatchReq: going to dispatch EvDhtMgrGetValueBatchReq")
+	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueBatchReq, msg)
 }
 
 //

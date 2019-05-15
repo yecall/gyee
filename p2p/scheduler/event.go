@@ -395,9 +395,10 @@ const (
 	EvDhtMgrPutValueLocalRsp = EvDhtMgrBase + 9
 	EvDhtMgrGetValueReq    = EvDhtMgrBase + 10
 	EvDhtMgrGetValueRsp    = EvDhtMgrBase + 11
-	EvDhtMgrQueryStopReq   = EvDhtMgrBase + 12
-	EvDhtBlindConnectReq   = EvDhtMgrBase + 13
-	EvDhtBlindConnectRsp   = EvDhtMgrBase + 14
+	EvDhtMgrGetValueBatchReq	= EvDhtMgrBase + 12
+	EvDhtMgrQueryStopReq   = EvDhtMgrBase + 13
+	EvDhtBlindConnectReq   = EvDhtMgrBase + 14
+	EvDhtBlindConnectRsp   = EvDhtMgrBase + 15
 )
 
 // EvDhtMgrGetProviderReq
@@ -442,6 +443,15 @@ type MsgDhtMgrGetValueRsp struct {
 	Eno int    // result code
 	Key []byte // key wanted
 	Val []byte // value
+}
+
+// EvDhtMgrGetValueBatchReq
+const DefaultDhtGetBatchTimeout = time.Second  * 128	// default batch get timeout
+const MaxDhtGetBatchSize = 1024							// max keys can be
+type MsgDhtMgrGetValueBatchReq struct {
+	Keys	[][]byte		// batch keys
+	ValCh	chan<-[]byte	// channel to output values
+	Timeout	time.Duration	// timeout required specified by dht user module
 }
 
 // EvDhtBlindConnectReq
@@ -651,10 +661,12 @@ const (
 
 // EvDhtQryMgrQueryStartReq
 type MsgDhtQryMgrQueryStartReq struct {
-	Target  config.DsKey // can be config.NodeID or [config.DhtKeyLength]byte as a key
-	Msg     interface{}  // original request which results this query
-	ForWhat int          // find-node; get-provider; get-value; put-value; ...
-	Seq     int64        // sequence number
+	Target  	config.DsKey // can be config.NodeID or [config.DhtKeyLength]byte as a key
+	Msg     	interface{}  // original request which results this query
+	ForWhat 	int          // find-node; get-provider; get-value; put-value; ...
+	Seq     	int64        // sequence number
+	Batch		bool		// if owned by batch operation
+	BatchId		int			// batch operation identity
 }
 
 // EvDhtQryMgrQueryStartRsp
@@ -867,13 +879,46 @@ type MsgDhtPrdMgrGetProviderReq struct {
 // DHT data store manager event
 //
 const DhtDsMgrTickTimerId = 0
+const DhtDsGetValueBatchTimerId = 1
 const (
 	EvDhtDsMgrBase      = 2700
 	EvDhtDsMgrTickTimer = EvTimerBase + DhtDsMgrTickTimerId
+	EvDhtDsGvbTimer	  = EvTimerBase + DhtDsGetValueBatchTimerId
 	EvDhtDsMgrAddValReq = EvDhtDsMgrBase + 1
 	EvDhtDsMgrPutValReq = EvDhtDsMgrBase + 2
 	EvDhtDsMgrGetValReq = EvDhtDsMgrBase + 3
+	EvDhtDsGvbStartReq  = EvDhtDsMgrBase + 4
+	EvDhtDsGvbStopReq   = EvDhtDsMgrBase + 5
+	EvDhtDsGvbStatusInd = EvDhtDsMgrBase + 6
 )
+
+// EvDhtDsGvbStartReq
+type MsgDhtDsGvbStartReq struct {
+	GvbId		int				// get-value-batch identity
+	Keys		*[][]byte		// keys of batch
+	Output		chan<-[]byte	// output channel for values got
+}
+
+// EvDhtDsGvbStopReq
+type MsgDhtDsGvbStopReq struct {
+	GvbId		int				// get-value-batch identity
+}
+
+// EvDhtDsGvbStatusInd
+const (
+	GVBS_NULL	= iota			// spare
+	GVBS_WORKING				// in working
+	GVBS_TERMED				// terminated (interrupted)
+	GVBS_DONE					// ok done
+)
+type MsgDhtDsStatusInd struct {
+	GvbId		int				// get-value-batch identitys
+	Status		int				// current sutatus
+	Getting		int				// number of getting
+	Got			int				// number of got
+	Failed		int				// number of failed
+	Remain		int				// number of remain
+}
 
 // EvDhtDsMgrAddValReq
 const Keep4Ever = time.Duration(-1)

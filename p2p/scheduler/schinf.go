@@ -32,51 +32,53 @@ import (
 type SchErrno int
 
 const (
-	SchEnoNone       SchErrno = 0  // none of errors
-	SchEnoParameter  SchErrno = 1  // invalid parameters
-	SchEnoResource   SchErrno = 2  // no resources
-	SchEnoWatchDog   SchErrno = 3  // watch dog
-	SchEnoNotFound   SchErrno = 4  // not found
-	SchEnoInternal   SchErrno = 5  // internal errors
-	SchEnoMismatched SchErrno = 7  // mismatched
-	SchEnoOS         SchErrno = 8  // operating system
-	SchEnoConfig     SchErrno = 9  // configuration
-	SchEnoKilled     SchErrno = 10 // task killed
-	SchEnoNotImpl    SchErrno = 11 // not implemented
-	SchEnoUserTask   SchErrno = 12 // internal user task application
-	SchEnoDuplicated SchErrno = 13 // duplicated
-	SchEnoSuspended  SchErrno = 14 // user task is suspended for some reasons
-	SchEnoUnknown    SchErrno = 15 // unknowns
-	SchEnoPowerOff   SchErrno = 16 // in power off stage
-	SchEnoDone		 SchErrno = 17 // done
-	SchEnoTimeout    SchErrno = 18 // timeout
-	SchEnoMax        SchErrno = 19 // just for bound checking
+	SchEnoNone	SchErrno = iota  // none of errors
+	SchEnoParameter // invalid parameters
+	SchEnoResource // no resources
+	SchEnoWatchDog // watch dog
+	SchEnoNotFound // not found
+	SchEnoInternal // internal errors
+	SchEnoMismatched // mismatched
+	SchEnoOS // operating system
+	SchEnoConfig // configuration
+	SchEnoKilled  // task killed
+	SchEnoNotImpl // not implemented
+	SchEnoUserTask // internal user task application
+	SchEnoDuplicated // duplicated
+	SchEnoSuspended // user task is suspended for some reasons
+	SchEnoPowerOff // in power off stage
+	SchEnoDone // done
+	SchEnoTimeout // timeout
+	SchEnoUnknown // unknowns
+	SchEnoInvalid // just for bound checking
 )
 
 var SchErrnoDescription = []string{
-	"none of errors",
-	"invalid parameters",
-	"resources",
-	"watch dog",
-	"not found",
-	"internal",
-	"mismathced",
-	"os",
-	"configuration",
-	"killed",
-	"not implemented",
-	"user task",
-	"duplicated",
-	"suspended",
-	"not supported",
-	"unknowns",
-	"max value errno can be",
+	"SchEnoNone",
+	"SchEnoParameter",
+	"SchEnoResource",
+	"SchEnoWatchDog",
+	"SchEnoNotFound",
+	"SchEnoInternal",
+	"SchEnoMismatched",
+	"SchEnoOS",
+	"SchEnoConfig",
+	"SchEnoKilled",
+	"SchEnoNotImpl",
+	"SchEnoUserTask",
+	"SchEnoDuplicated",
+	"SchEnoSuspended",
+	"SchEnoPowerOff",
+	"SchEnoDone",
+	"SchEnoTimeout",
+	"SchEnoUnknown",
+	"SchEnoInvalid",
 }
 
 // Errno string
 func (eno SchErrno) SchErrnoString() string {
-	if eno < SchEnoNone || eno >= SchEnoMax {
-		return fmt.Sprintf("Can't be stringzed, invalid eno:%d", eno)
+	if eno < SchEnoNone || eno >= SchEnoInvalid {
+		panic("invalid scheduler errno")
 	}
 	return SchErrnoDescription[eno]
 }

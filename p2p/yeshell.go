@@ -383,7 +383,6 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) ([]*config.Config, *YeShellCon
 
 	bsn := config.P2pSetupBootstrapNodes(thisCfg.DhtBootstrapNodes)
 	thisCfg.dhtBootstrapNodes = append(thisCfg.dhtBootstrapNodes, bsn...)
-	dht.SetBootstrapNodes(thisCfg.dhtBootstrapNodes, thisCfg.Name)
 	dhtCfg.AppType = config.P2P_TYPE_DHT
 	cfg[ChainCfgIdx] = chainCfg
 	cfg[DhtCfgIdx] = dhtCfg
@@ -434,6 +433,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 		yesLog.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
+	dht.SetBootstrapNodes(yesCfg.dhtBootstrapNodes, yeShMgr.dhtInst.SchGetP2pCfgName())
 
 	return &yeShMgr
 }
@@ -791,21 +791,35 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 }
 
 func (yeShMgr *YeShellManager) DhtGetValues(keys [][]byte, out chan<- []byte, timeout time.Duration) error {
+	sdl := yeShMgr.dhtSdlName
 	if cap(out) < len(keys) {
+		log.Warnf("DhtGetValues: mismatched, sdl: %s, cap: %d, len: %d", sdl, cap(out), len(keys))
+		close(out)
 		return ErrInsufficientOutChanCapacity
 	}
-	go func() {
-		// FIXME: remove simple implementation
-		for _, key := range keys {
-			v, err := yeShMgr.DhtGetValue(key)
-			if err != nil {
-				continue
-			}
-			out <- v
-		}
-		//
+	if len(keys) > sch.MaxDhtGetBatchSize {
+		log.Warnf("DhtGetValues: batch too big, sdl: %s, len: %d, max: %d",
+			sdl, len(keys), sch.MaxDhtGetBatchSize)
 		close(out)
-	}()
+		return ErrResourceLimited
+	}
+	dur := timeout
+	if dur <= time.Duration(0) {
+		dur = sch.DefaultDhtGetBatchTimeout
+	}
+	req := sch.MsgDhtMgrGetValueBatchReq {
+		Keys: keys,
+		ValCh: out,
+		Timeout: dur,
+	}
+	msg := new(sch.SchMessage)
+	yeShMgr.dhtInst.SchMakeMessage(msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueBatchReq, &req)
+	if eno := yeShMgr.dhtInst.SchSendMessage(msg); eno != sch.SchEnoNone {
+		log.Errorf("DhtGetValues: scheduler failed, sdl: %s, err: %s", sdl, eno.Error())
+		close(out)
+		return ErrDhtInternal
+	}
+
 	return nil
 }
 

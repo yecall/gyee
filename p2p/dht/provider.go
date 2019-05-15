@@ -550,11 +550,10 @@ func (prdMgr *PrdMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchE
 	// would be sent from the same connection instance until this function called.
 	//
 
-	if msg == nil {
-		prdLog.Debug("rutMgrNearestRsp: invalid message")
-		return sch.SchEnoParameter
+	if msg.Eno != int(DhtEnoNone) {
+		prdLog.Debug("rutMgrNearestRsp: router failed, eno: %d", msg.Eno)
+		return sch.SchEnoUserTask
 	}
-
 	var nodes []*config.Node
 	bns := msg.Peers.([]*rutMgrBucketNode)
 	for idx := 0; idx < len(bns); idx++ {
