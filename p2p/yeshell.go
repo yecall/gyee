@@ -1208,9 +1208,10 @@ _csLoop:
 
 func (yeShMgr *YeShellManager) chainReady4User() {
 	const (
-		hSize = 8
-		hMask = hSize - 1
-		hBackSize = 3
+		hSize = 8 // history size, must be (2^n)
+		hMask = hSize - 1 // mask for rounding
+		hBackSize = 3 // look backward length
+		apnTh = 1 // active peer number threshold when looking backward
 	)
 	if hBackSize > hSize {
 		panic("chainReady4User: invalid configuration")
@@ -1230,7 +1231,7 @@ func (yeShMgr *YeShellManager) chainReady4User() {
 		idx = 0
 		for ; idx < hBackSize; idx++ {
 			hisIdx := (loop + hSize - idx) & hMask
-			if actHis[hisIdx] <= 0 {
+			if actHis[hisIdx] < apnTh {
 				break
 			}
 		}
