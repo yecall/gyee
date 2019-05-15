@@ -88,7 +88,8 @@ func NewNodeWithGenesis(conf *config.Config, genesis *core.Genesis, p2pSvc p2p.S
 	}
 
 	node := &Node{
-		config: conf,
+		config:   conf,
+		filelock: flock.New(filepath.Join(conf.NodeDir, "LOCK")),
 	}
 
 	node.accountManager, err = accounts.NewAccountManager(conf)
@@ -178,8 +179,7 @@ func (n *Node) WaitForShutdown() {
 }
 
 func (n *Node) lockDataDir() error {
-	filelock := flock.New(filepath.Join(n.config.NodeDir, "LOCK"))
-	locked, err := filelock.TryLock()
+	locked, err := n.filelock.TryLock()
 	if err != nil {
 		return err
 	}
