@@ -35,16 +35,22 @@ import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
 	p2pCfg "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/utils/logging"
 )
 
 func main() {
 	var (
+		logPath    = flag.String("logPath", "", "on disk log storage path")
 		localIP    = flag.String("localIP", "0.0.0.0", "node local ip")
 		localPort  = flag.Int("localPort", p2pCfg.DftUdpPort, "node local p2p port")
 		dhtPort    = flag.Int("dhtPort", p2pCfg.DftDhtPort, "node local dht port")
 		ksPassword = flag.String("password", "", "keystore password")
 	)
 	flag.Parse()
+
+	if len(*logPath) > 0 {
+		logging.SetRotationFileLogger(*logPath)
+	}
 
 	//*ksPassword = strings.Split(*ksPassword, "\n")[0]
 	if len(*ksPassword) == 0 {
