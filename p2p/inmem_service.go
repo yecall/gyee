@@ -56,6 +56,7 @@ func NewInmemService() (*InmemService, error) {
 		subscribers:      new(sync.Map),
 		hub:              GetInmemHub(),
 		receiveMessageCh: make(chan Message),
+		readyCh:          make(chan struct{}),
 		quitCh:           make(chan struct{}),
 		outDelay:         1,
 		outMiss:          0,
