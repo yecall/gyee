@@ -520,7 +520,7 @@ func (yeShMgr *YeShellManager) Start() error {
 	}
 
 	yeShMgr.status = yesDhtReady
-
+	go yeShMgr.chainReady4User()
 	go yeShMgr.chainRxProc()
 	go yeShMgr.deDupTickerProc()
 
@@ -565,39 +565,7 @@ func (yeShMgr *YeShellManager) Stop() {
 }
 
 func (yeShMgr *YeShellManager) Ready() {
-	const (
-		hSize = 8
-		hMask = hSize - 1
-		hBackSize = 3
-	)
-	if hBackSize > hSize {
-		panic("Ready: invalid configuration")
-	}
-
-	actHis := [hSize]int{}
-	for loop := 0;;loop++ {
-		log.Infof("Ready: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
-		aps := yeShMgr.ptChainShMgr.GetActivePeerSnapshot()
-		idx := loop & hMask
-		for _, p := range(*aps) {
-			if p.Status == p2psh.PisActive {
-				actHis[idx] += 1
-			}
-		}
-		time.Sleep(time.Second)
-		idx = 0
-		for ; idx < hBackSize; idx++ {
-			hisIdx := (loop + hSize - idx) & hMask
-			if actHis[hisIdx] <= 0 {
-				break
-			}
-		}
-		if idx >= hBackSize {
-			log.Infof("Ready: ok, sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
-			close(yeShMgr.readyCh)
-			break
-		}
-	}
+	<-yeShMgr.readyCh
 }
 
 func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
@@ -1236,6 +1204,43 @@ _csLoop:
 		}
 	}
 	yesLog.Debug("dhtCsProc: exit")
+}
+
+func (yeShMgr *YeShellManager) chainReady4User() {
+	const (
+		hSize = 8
+		hMask = hSize - 1
+		hBackSize = 3
+	)
+	if hBackSize > hSize {
+		panic("chainReady4User: invalid configuration")
+	}
+
+	actHis := [hSize]int{}
+	for loop := 0; !yeShMgr.inStopping ;loop++ {
+		log.Infof("chainReady4User: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+		aps := yeShMgr.ptChainShMgr.GetActivePeerSnapshot()
+		idx := loop & hMask
+		for _, p := range(*aps) {
+			if p.Status == p2psh.PisActive {
+				actHis[idx] += 1
+			}
+		}
+		time.Sleep(time.Second)
+		idx = 0
+		for ; idx < hBackSize; idx++ {
+			hisIdx := (loop + hSize - idx) & hMask
+			if actHis[hisIdx] <= 0 {
+				break
+			}
+		}
+		if idx >= hBackSize {
+			log.Infof("chainReady4User: ok, sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+			close(yeShMgr.readyCh)
+			break
+		}
+	}
+	log.Infof("chainReady4User: exit, sdl: %s", yeShMgr.chainSdlName)
 }
 
 func (yeShMgr *YeShellManager) chainRxProc() {
