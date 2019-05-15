@@ -39,9 +39,10 @@ type InmemService struct {
 	receiveMessageCh chan Message
 	cp               ChainProvider
 
-	lock   sync.RWMutex
-	quitCh chan struct{}
-	wg     sync.WaitGroup
+	lock    sync.RWMutex
+	readyCh chan struct{} // close channel to notify service ready
+	quitCh  chan struct{}
+	wg      sync.WaitGroup
 
 	//用于模拟收发消息的延迟和丢失
 	outDelay int //ms
@@ -81,10 +82,15 @@ func (is *InmemService) Stop() {
 	return
 }
 
+func (is *InmemService) Ready() {
+	<-is.readyCh
+}
+
 func (is *InmemService) loop() {
 	is.wg.Add(1)
 	defer is.wg.Done()
 	//logging.Logger.Info("InmemService loop...")
+	close(is.readyCh)
 	for {
 		select {
 		case <-is.quitCh:

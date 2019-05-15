@@ -196,6 +196,7 @@ type YeShellManager struct {
 	config         *YeShellConfig					// configuration
 	inStopping     bool                             // in stopping procedure
 	status			int								// shell status
+	readyCh        chan struct{}                    // close channel to notify service ready
 	chainInst      *sch.Scheduler                   // chain scheduler pointer
 	chainSdlName   string							// chain scheduler name
 	ptnChainShell  interface{}                      // chain shell manager task node pointer
@@ -560,6 +561,10 @@ func (yeShMgr *YeShellManager) Stop() {
 	yesLog.Debug("Stop: chain stopped")
 
 	log.Info("Stop: chain done", yeShMgr.chainSdlName)
+}
+
+func (yeShMgr *YeShellManager) Ready() {
+	// TODO:
 }
 
 func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {

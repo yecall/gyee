@@ -215,6 +215,10 @@ func (osns *OsnService) Stop() {
 	osns.yeShMgr.Stop()
 }
 
+func (osns *OsnService) Ready() {
+	osns.yeShMgr.Ready()
+}
+
 func (osns *OsnService) Reconfig(reCfg *RecfgCommand) error {
 	return osns.yeShMgr.Reconfig(reCfg)
 }

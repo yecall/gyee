@@ -75,6 +75,9 @@ func main() {
 		log.Crit("node start failure", "err", err)
 	}
 
+	// wait for p2p
+	waitForP2pReady(n)
+
 	// start tx generator
 	var (
 		quitCh = make(chan struct{})
@@ -123,6 +126,13 @@ func loadAccounts(cfg *config.Config, password string) ([]crypto.Signer, []commo
 	}
 	log.Info("accounts loaded for txBot", "cnt", len(signers))
 	return signers, addrs, nil
+}
+
+func waitForP2pReady(n *node.Node) {
+	var startTime = time.Now()
+	n.P2pService().Ready()
+	var endTime = time.Now()
+	log.Error("p2p ready time", "start", startTime, "duration", endTime.Sub(startTime))
 }
 
 func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitCh chan struct{}, wg sync.WaitGroup) {

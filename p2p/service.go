@@ -54,6 +54,8 @@ type ChainProvider interface {
 type Service interface {
 	Start() error
 	Stop()
+	Ready()
+
 	Reconfig(reCfg *RecfgCommand) error
 	BroadcastMessage(message Message) error
 	//如果在多个子网，随机选一个。如果单一子网，直接发布。
