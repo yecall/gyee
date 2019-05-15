@@ -75,6 +75,8 @@ type shellPeerID struct {
 	dir    int                 // direct
 	nodeId config.NodeID       // node identity
 }
+type ShellPeerID = shellPeerID
+type ShellHsInfo = peer.Handshake
 
 type shellPeerInst struct {
 	shellPeerID                         // shell peer identity
@@ -86,9 +88,19 @@ type shellPeerInst struct {
 	txDiscrd    int64                   // number of messages discarded
 }
 
+type ShellPeerSnapshot struct {
+	ShellPeerID                         // shell peer identity
+	HsInfo      *peer.Handshake         // handshake info about peer
+	Status      int                     // active peer instance status
+}
+
 const (
 	pisActive  = iota // active status
 	pisClosing        // in-closing status
+)
+const (
+	PisActive = pisActive
+	PisClosing = pisClosing
 )
 
 type deDupKey struct {
@@ -934,4 +946,19 @@ func (shMgr *ShellManager) deDupKeyCb(el *list.Element, data interface{}) interf
 	}
 	delete(shMgr.deDupKeyMap, *k)
 	return nil
+}
+
+func (shMgr *ShellManager) GetActivePeerSnapshot() *map[ShellPeerID]ShellPeerSnapshot {
+	shMgr.peerLock.Lock()
+	defer shMgr.peerLock.Unlock()
+	smap := make(map[shellPeerID]ShellPeerSnapshot, 0)
+	for k, v := range shMgr.peerActived {
+		s := ShellPeerSnapshot {
+			ShellPeerID: v.shellPeerID,
+			HsInfo: v.hsInfo,
+			Status: v.status,
+		}
+		smap[k] = s
+	}
+	return &smap
 }

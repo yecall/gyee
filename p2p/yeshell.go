@@ -397,6 +397,7 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 	yeShMgr := YeShellManager{
 		name:           yesCfg.Name,
 		inStopping:     false,
+		readyCh:		make(chan struct{}, 1),
 		getValChan:     make(chan *getValueResult, 0),
 		gvk2DurMap:		make(map[yesKey]time.Duration, 0),
 		gvk2ChMap:		make(map[yesKey][]chan *getValueResult, 0),
@@ -564,7 +565,39 @@ func (yeShMgr *YeShellManager) Stop() {
 }
 
 func (yeShMgr *YeShellManager) Ready() {
-	// TODO:
+	const (
+		hSize = 8
+		hMask = hSize - 1
+		hBackSize = 3
+	)
+	if hBackSize > hSize {
+		panic("Ready: invalid configuration")
+	}
+
+	actHis := [hSize]int{}
+	for loop := 0;;loop++ {
+		log.Infof("Ready: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+		aps := yeShMgr.ptChainShMgr.GetActivePeerSnapshot()
+		idx := loop & hMask
+		for _, p := range(*aps) {
+			if p.Status == p2psh.PisActive {
+				actHis[idx] += 1
+			}
+		}
+		time.Sleep(time.Second)
+		idx = 0
+		for ; idx < hBackSize; idx++ {
+			hisIdx := (loop + hSize - idx) & hMask
+			if actHis[hisIdx] <= 0 {
+				break
+			}
+		}
+		if idx >= hBackSize {
+			log.Infof("Ready: ok, sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+			close(yeShMgr.readyCh)
+			break
+		}
+	}
 }
 
 func (yeShMgr *YeShellManager) Reconfig(reCfg *RecfgCommand) error {
