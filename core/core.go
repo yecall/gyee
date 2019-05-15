@@ -602,47 +602,52 @@ func (c *Core) GetChainData(kind string, key []byte) []byte {
 	return nil
 }
 
+func (c *Core) getRemoteChainInfo(kind string, key []byte) (encoded []byte, err error) {
+	for retry := 3; retry > 0; retry-- {
+		c.metrics.p2pChainInfoGet.Mark(1)
+		encoded, err = c.node.P2pService().GetChainInfo(kind, key)
+		if err == nil {
+			c.metrics.p2pChainInfoHit.Mark(1)
+			return encoded, nil
+		}
+		log.Warn("getRemoteChainInfo temporary failure", "kind", kind, "key", key, "err", err)
+	}
+	return nil, err
+}
+
 func (c *Core) GetRemoteLatestHash() (*common.Hash, error) {
-	c.metrics.p2pChainInfoGet.Mark(1)
-	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestH, []byte(""))
+	encoded, err := c.getRemoteChainInfo(ChainDataTypeLatestH, []byte(""))
 	if err != nil {
 		return nil, err
 	}
 	if len(encoded) != common.HashLength {
 		return nil, errors.New(fmt.Sprintf("latest hash length mismatch, got %v", encoded))
 	}
-	c.metrics.p2pChainInfoHit.Mark(1)
 	return new(common.Hash).SetBytes(encoded), nil
 }
 
 func (c *Core) GetRemoteLatestNumber() (uint64, error) {
-	c.metrics.p2pChainInfoGet.Mark(1)
-	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeLatestN, []byte(""))
+	encoded, err := c.getRemoteChainInfo(ChainDataTypeLatestN, []byte(""))
 	if err != nil {
 		return 0, err
 	}
-	c.metrics.p2pChainInfoHit.Mark(1)
 	n := new(big.Int).SetBytes(encoded).Uint64()
 	return n, nil
 }
 
 func (c *Core) GetRemoteBlockByHash(hash common.Hash) (*Block, error) {
-	c.metrics.p2pChainInfoGet.Mark(1)
-	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeBlockH, hash[:])
+	encoded, err := c.getRemoteChainInfo(ChainDataTypeBlockH, hash[:])
 	if err != nil {
 		return nil, err
 	}
-	c.metrics.p2pChainInfoHit.Mark(1)
 	return ParseBlock(encoded)
 }
 
 func (c *Core) GetRemoteBlockByNumber(n uint64) (*Block, error) {
 	key := new(big.Int).SetUint64(n).Bytes()
-	c.metrics.p2pChainInfoGet.Mark(1)
-	encoded, err := c.node.P2pService().GetChainInfo(ChainDataTypeBlockN, key)
+	encoded, err := c.getRemoteChainInfo(ChainDataTypeBlockN, key)
 	if err != nil {
 		return nil, err
 	}
-	c.metrics.p2pChainInfoHit.Mark(1)
 	return ParseBlock(encoded)
 }

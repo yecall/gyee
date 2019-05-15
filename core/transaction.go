@@ -235,6 +235,10 @@ func (t *Transaction) encode(withoutSig bool) ([]byte, error) {
 	}
 	if withoutSig {
 		pb.Signature = nil
+	} else {
+		if len(pb.Signature.Signature) == 0 {
+			log.Error("tx encoded with nil signature", "tx", t)
+		}
 	}
 	return proto.Marshal(pb)
 }
