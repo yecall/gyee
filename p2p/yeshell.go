@@ -1235,7 +1235,7 @@ _rxLoop:
 
 				k := [yesKeyBytes]byte{}
 				copy(k[0:], pkg.Key)
-				if yeShMgr.checkDupKey(k) {
+				if dup, _ := yeShMgr.checkDupKey(k); dup {
 					continue
 				}
 
@@ -1639,7 +1639,8 @@ func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.Node
 		copy(k[0:], msg.Key)
 	}
 
-	if yeShMgr.checkDupKey(k) {
+	if dup, old := yeShMgr.checkDupKey(k); dup {
+		log.Warnf("broadcastTxOsn: duplicated, data: %x, old: %x", msg.Data, old)
 		return errors.New("broadcastTxOsn: duplicated")
 	}
 
@@ -1676,7 +1677,8 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 		copy(k[0:], msg.Key)
 	}
 
-	if yeShMgr.checkDupKey(k) {
+	if dup, old := yeShMgr.checkDupKey(k); dup {
+		log.Warnf("broadcastEvOsn: duplicated, data: %x, old: %x", msg.Data, old)
 		return errors.New("broadcastEvOsn: duplicated")
 	}
 
@@ -1727,8 +1729,7 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 		copy(k[0:], msg.Key)
 	}
 
-	if yeShMgr.checkDupKey(k) {
-		old := yeShMgr.deDupMap[k]
+	if dup, old := yeShMgr.checkDupKey(k); dup {
 		log.Warnf("broadcastBhOsn: duplicated, data: %x, old: %x", msg.Data, old)
 		return errors.New("broadcastBhOsn: duplicated")
 	}
@@ -1770,7 +1771,8 @@ func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.Node
 		copy(k[0:], msg.Key)
 	}
 
-	if yeShMgr.checkDupKey(k) {
+	if dup, old := yeShMgr.checkDupKey(k); dup {
+		log.Warnf("broadcastBkOsn: duplicated, data: %x, old: %x", msg.Data, old)
 		return errors.New("broadcastBkOsn: duplicated")
 	}
 
@@ -1899,11 +1901,11 @@ func (yeShMgr *YeShellManager) GetLocalDhtNode() *config.Node {
 	return &cfg.DhtLocal
 }
 
-func (yeShMgr *YeShellManager) checkDupKey(k yesKey) bool {
+func (yeShMgr *YeShellManager) checkDupKey(k yesKey) (bool, []byte) {
 	yeShMgr.deDupLock.Lock()
 	defer yeShMgr.deDupLock.Unlock()
-	_, dup := yeShMgr.deDupMap[k]
-	return dup
+	val, dup := yeShMgr.deDupMap[k]
+	return dup, val
 }
 
 func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErrno {
