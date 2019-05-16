@@ -30,6 +30,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/yeeco/gyee/log"
@@ -307,7 +308,7 @@ func (b *jsBridge) unlockAccount(call otto.FunctionCall) otto.Value {
 		&rpcpb.UnlockAccountRequest{
 			Address:    address.String(),
 			Passphrase: passphrase.String(),
-			Duration:   300,
+			Duration:   uint64(300 * time.Second),
 		})
 	if err != nil {
 		return jsError(call.Otto, err)
