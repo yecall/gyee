@@ -59,6 +59,10 @@ func Crit(msg string, ctx ...interface{}) {
 // logging API with printf format
 //
 
+func Tracef(fmt string, args ...interface{}) {
+	logging.Logger.Tracef(fmt, args...)
+}
+
 func Debugf(fmt string, args ...interface{}) {
 	logging.Logger.Debugf(fmt, args...)
 }
