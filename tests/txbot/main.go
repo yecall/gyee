@@ -166,7 +166,7 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 Exit:
 	for {
 		// reset inMem nonce if needed
-		if round%100 == 0 {
+		if round%600 == 0 {
 			log.Info("nonce reset")
 			c.TriggerSync()
 			func() {
