@@ -421,6 +421,7 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 	qcb.qryPending = nil
 	qcb.qryActived = make(map[config.NodeID]*qryInstCtrlBlock, qryMgr.qmCfg.maxActInsts)
 	qcb.qryResult = nil
+	qcb.qryTid = sch.SchInvalidTid
 	qcb.rutNtfFlag = nearestReq.NtfReq
 	qcb.status = qsPreparing
 	qcb.width = 0
@@ -676,29 +677,45 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	//
 	// notice: qryMgrQcbPutPending always return DhtEnoNone(with normal parameters), but
 	// some peers planed to be queried might be discarded there, see comments there pls.
+	// and here if qryMgrQcbPutActived failed, it must be caused by scheduler since it's
+	// the first time the qcb try to active instances, if some(one or more) instance(s)
+	// are activated, return ok.
 	//
 
 	var dhtEno = DhtErrno(DhtEnoNone)
+	var why int
 	if dhtEno = qcb.qryMgrQcbPutPending(pendInfo, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
 		if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
-			if eno, insts := qryMgr.qryMgrQcbPutActived(qcb); eno != DhtEnoNone  || insts == 0{
-				log.Debugf("rutNearestRsp: active query failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
-					qryMgr.sdlName, qcb.forWhat, eno, qcb.target)
+			if eno, insts := qryMgr.qryMgrQcbPutActived(qcb); insts == 0 {
+				log.Debugf("rutNearestRsp: active query failed, "+
+					"sdl: %s, forWhat: %d, eno: %d, insts: %d, target: %x",
+					qryMgr.sdlName, qcb.forWhat, eno, insts, qcb.target)
+				why = delQcb4SchedulerErrors
+			} else {
+				qcb.status = qsInited
+				return sch.SchEnoNone
 			}
-			qcb.status = qsInited
-			return sch.SchEnoNone
 		} else {
 			log.Debugf("rutNearestRsp: start timer failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
 				qryMgr.sdlName, qcb.forWhat, dhtEno, qcb.target)
+			why = delQcb4SchedulerErrors
 		}
 	} else {
 		log.Debugf("rutNearestRsp: put query to pending queue failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
 			qryMgr.sdlName, qcb.forWhat, dhtEno, qcb.target)
+		why = delQcb4InteralErrors
 	}
 
+	//
+	// here we failed
+	//
+
 	qryFailed2Sender(dhtEno)
-	qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
-	return sch.SchEnoResource
+	qryMgr.qryMgrDelQcb(why, target)
+	if why == delQcb4SchedulerErrors {
+		return sch.SchEnoResource
+	}
+	return sch.SchEnoUserTask
 }
 
 //
@@ -1183,6 +1200,7 @@ const (
 	delQcb4QryInstResultInd        // query instance result indicated
 	delQcb4InteralErrors           // internal errors while tring to query
 	delQcb4PubAddrSwitch           // public address switching
+	delQcb4SchedulerErrors		// scheduler errors
 )
 
 func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
@@ -1206,6 +1224,8 @@ func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 		strDebug = "delQcb4PubAddrSwitch"
 	case delQcb4Command:
 		strDebug = "delQcb4Command"
+	case delQcb4SchedulerErrors:
+		strDebug = "delQcb4SchedulerErrors"
 	default:
 		log.Debugf("qryMgrDelQcb: parameters mismatched, why: %d", why)
 		return DhtEnoMismatched

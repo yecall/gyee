@@ -99,7 +99,7 @@ type schTmcbNode struct {
 //
 // Timer node pool
 //
-const schTimerNodePoolSize = 2048 // timer node pool size, must be (2^n)
+const schTimerNodePoolSize = 1024 * 16 // timer node pool size, must be (2^n)
 
 //
 // Task struct
