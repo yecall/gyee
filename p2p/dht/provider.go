@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yeeco/gyee/log"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
@@ -487,7 +488,7 @@ func (prdMgr *PrdMgr) getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sc
 	}
 
 	if dhtPrd == nil {
-		dhtLog.Debug("getProviderReq: no providers for key: %x", dsk)
+		log.Debugf("getProviderReq: no providers for key: %x", dsk)
 		return sch.SchEnoNotFound
 	}
 

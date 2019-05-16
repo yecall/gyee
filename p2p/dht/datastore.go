@@ -239,7 +239,7 @@ func (dsMgr *DsMgr) busyMsgFilter(ev int) bool {
 
 func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	dsLog.Debug("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+	log.Debugf("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	if dsMgr.busyMsgFilter(msg.Id) {
 		log.Warnf("dsMgrProc: message filtered out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
@@ -290,10 +290,10 @@ func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno
 
 	default:
 		eno = sch.SchEnoParameter
-		dsLog.Debug("dsMgrProc: unknown message: %d", msg.Id)
+		log.Debugf("dsMgrProc: unknown message: %d", msg.Id)
 	}
 
-	dsLog.Debug("dsMgrProc: get out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+	log.Debugf("dsMgrProc: get out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	return eno
 }
@@ -307,7 +307,7 @@ func (dsMgr *DsMgr) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	// ok to local datastore.
 
 	if eno := dsMgr.ds.Put(k, v, kt); eno != DhtEnoNone {
-		dsLog.Debug("Put: failed, eno: %d", eno)
+		log.Errorf("Put: failed, eno: %d", eno)
 		return DhtEnoDatastore
 	}
 
@@ -318,7 +318,7 @@ func (dsMgr *DsMgr) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 
 		ptm, eno := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 		if eno != TmEnoNone {
-			dsLog.Debug("Put: GetTimer failed, eno: %d", eno)
+			log.Errorf("Put: GetTimer failed, eno: %d", eno)
 			return DhtEnoTimer
 		}
 
@@ -330,12 +330,12 @@ func (dsMgr *DsMgr) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 		tm.to = time.Now().Add(kt)
 		ek := dsMgr.makeExpiredKey(k, tm.to)
 		if eno = dsMgr.dsExp.Put(ek, k, sch.Keep4Ever); eno != DhtEnoNone {
-			dsLog.Debug("Put: failed, eno: %d", eno)
+			log.Errorf("Put: failed, eno: %d", eno)
 			return DhtEnoDatastore
 		}
 
 		if err := dsMgr.tmMgr.StartTimer(tm); err != nil {
-			dsLog.Debug("Put: StartTimer failed, error: %s", err.Error())
+			log.Errorf("Put: StartTimer failed, error: %s", err.Error())
 			dsMgr.ds.Delete(k)
 			dsMgr.dsExp.Delete(ek)
 			return DhtEnoTimer
@@ -367,7 +367,7 @@ func (dsMgr *DsMgr) Delete(k []byte) DhtErrno {
 func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	if ptn == nil {
-		dsLog.Debug("poweron: invalid ptn")
+		log.Errorf("poweron: invalid ptn")
 		return sch.SchEnoInternal
 	}
 
@@ -375,7 +375,7 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 	dsMgr.sdl = sdl
 	dsMgr.sdlName = sdl.SchGetP2pCfgName()
 	if sdl == nil {
-		dsLog.Debug("poweron: invalid sdl")
+		log.Errorf("poweron: invalid sdl")
 		return sch.SchEnoInternal
 	}
 
@@ -387,7 +387,7 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 	if dsMgr.ptnDhtMgr == nil ||
 		dsMgr.ptnQryMgr == nil ||
 		dsMgr.ptnRutMgr == nil {
-		dsLog.Debug("poweron: invalid ptn")
+		log.Errorf("poweron: invalid ptn")
 		return sch.SchEnoInternal
 	}
 
@@ -400,7 +400,7 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 
 		fdc := FileDatastoreConfig{}
 		if eno := dsMgr.getFileDatastoreConfig(&fdc); eno != DhtEnoNone {
-			dsLog.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			log.Errorf("poweron: getFileDatastoreConfig failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -414,45 +414,45 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 
 		ldc := LeveldbDatastoreConfig{}
 		if eno := dsMgr.getLeveldbDatastoreConfig(&ldc); eno != DhtEnoNone {
-			dsLog.Debug("poweron: getFileDatastoreConfig failed, eno: %d", eno)
+			log.Errorf("poweron: getFileDatastoreConfig failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
 		if runtime.GOOS == "windows" {
-			dsLog.Debug("poweron: dht datastore path: %s",
+			log.Tracef("poweron: dht datastore path: %s",
 				strings.Replace(ldc.Path, "/", "\\", -1))
 		} else {
-			dsLog.Debug("poweron: dht datastore path: %s", ldc.Path)
+			log.Tracef("poweron: dht datastore path: %s", ldc.Path)
 		}
 		dsMgr.ds = NewLeveldbDatastore(&ldc)
 
 		ldcExp := ldc
 		ldcExp.Path = path.Join(ldcExp.Path, "expired")
 		if runtime.GOOS == "windows" {
-			dsLog.Debug("poweron: dht expiration datastore path: %s",
+			log.Tracef("poweron: dht expiration datastore path: %s",
 				strings.Replace(ldcExp.Path, "/", "\\", -1))
 		} else {
-			dsLog.Debug("poweron: dht expiration datastore path: %s", ldcExp.Path)
+			log.Tracef("poweron: dht expiration datastore path: %s", ldcExp.Path)
 		}
 		dsMgr.dsExp = NewLeveldbDatastore(&ldcExp)
 
 	} else {
-		dsLog.Debug("poweron: invalid datastore type: %d", dsType)
+		log.Debugf("poweron: invalid datastore type: %d", dsType)
 		return sch.SchEnoNotImpl
 	}
 
 	if dsMgr.ds == nil {
-		dsLog.Debug("poweron: nil datastore")
+		log.Errorf("poweron: nil datastore")
 		return sch.SchEnoUserTask
 	}
 
 	if eno := dsMgr.cleanUpReboot(); eno != DhtEnoNone {
-		dsLog.Debug("poweron: cleanUp failed, eno: %d", eno)
+		log.Warnf("poweron: cleanUp failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
 	if eno := dsMgr.startTickTimer(); eno != DhtEnoNone {
-		dsLog.Debug("poweron: startTickTimer failed, eno: %d", eno)
+		log.Errorf("poweron: startTickTimer failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -463,7 +463,7 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 // poweroff handler
 //
 func (dsMgr *DsMgr) poweroff(ptn interface{}) sch.SchErrno {
-	dsLog.Debug("poweroff: task will be done ...")
+	log.Debugf("poweroff: task will be done ...")
 	dsMgr.ds.Close()
 	dsMgr.dsExp.Close()
 	return dsMgr.sdl.SchTaskDone(dsMgr.ptnMe, dsMgr.name, sch.SchEnoKilled)
@@ -474,7 +474,7 @@ func (dsMgr *DsMgr) poweroff(ptn interface{}) sch.SchErrno {
 //
 func (dsMgr *DsMgr) tickTimerHandler() sch.SchErrno {
 	if err := dsMgr.tmMgr.TickProc(); err != TmEnoNone {
-		dsLog.Debug("TickProc: error: %s", err.Error())
+		log.Debugf("TickProc: error: %s", err.Error())
 		return sch.SchEnoUserTask
 	}
 	return sch.SchEnoNone
@@ -505,7 +505,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 		}
 		return sch.SchEnoUserTask
 	} else {
-		log.Infof("localAddValReq: store ok, eno: %d", eno)
+		log.Debugf("localAddValReq: store ok, eno: %d", eno)
 		dsMgr.localAddValRsp(sch.EvDhtMgrPutValueLocalRsp, k[0:], nil, eno)
 	}
 
@@ -513,7 +513,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	// publish it to our neighbors
 	//
 
-	log.Infof("localAddValReq: publish (key,value) to neighbors")
+	log.Debugf("localAddValReq: publish (key,value) to neighbors")
 
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
@@ -549,7 +549,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 
 	if !dsMgr.getfromPeer {
 		if val := dsMgr.fromStore(&k); val != nil && len(val) > 0 {
-			log.Infof("localGetValueReq: get from local ok, sdl: %s", dsMgr.sdlName)
+			log.Debugf("localGetValueReq: get from local ok, sdl: %s", dsMgr.sdlName)
 			return dsMgr.localGetValRsp(k[0:], val, DhtEnoNone)
 		}
 	}
@@ -558,7 +558,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 	// try to fetch the value from peers
 	//
 
-	log.Infof("localGetValueReq: try to get from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
+	log.Debugf("localGetValueReq: try to get from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
 
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
@@ -585,6 +585,8 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 	// try local datastore first
 	//
 
+	log.Infof("localGetValueBatchReq: batch get, sdl: %s", dsMgr.sdlName)
+
 	var remain *[][]byte
 	if dsMgr.getfromPeer {
 		remain = &msg.Keys
@@ -594,7 +596,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 		for _, k := range msg.Keys {
 			copy(dsk[0:], k)
 			if val := dsMgr.fromStore(&dsk); val != nil && len(val) > 0 {
-				log.Infof("localGetValueBatchReq: get from local ok, sdl: %s, key: %x",
+				log.Debugf("localGetValueBatchReq: get from local ok, sdl: %s, key: %x",
 					dsMgr.sdlName, dsk)
 				msg.ValCh<-val
 			} else {
@@ -604,7 +606,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 	}
 
 	if len(*remain) == 0 {
-		log.Infof("localGetValueBatchReq: all got, sdl: %s", dsMgr.sdlName)
+		log.Debugf("localGetValueBatchReq: all got, sdl: %s", dsMgr.sdlName)
 		return sch.SchEnoNone
 	}
 
@@ -654,7 +656,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 	bg.status = DsGVBS_WORKING
 	dsMgr.bgMap[bg.bgId] = &bg
 
-	log.Infof("localGetValueBatchReq: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
+	log.Debugf("localGetValueBatchReq: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
 		dsMgr.sdlName, bg.bgId, bg.bgSize, bg.bgTimeout)
 
 	return sch.SchEnoNone
@@ -681,7 +683,7 @@ func (dsMgr *DsMgr) gvbTimerHandler(inst *dsMgrBatchGetInst) sch.SchErrno {
 		return sch.SchEnoMismatched
 	}
 
-	log.Infof("gvbTimerHandler: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
+	log.Debugf("gvbTimerHandler: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
 		dsMgr.sdlName, gvbCb.bgId, gvbCb.bgSize, gvbCb.bgTimeout)
 
 	gvbCb.tidBg = sch.SchInvalidTid
@@ -710,7 +712,7 @@ func (dsMgr *DsMgr) gvbStatusInd(msg *sch.MsgDhtDsStatusInd) sch.SchErrno {
 		return sch.SchEnoNotFound
 	}
 
-	log.Infof("gvbStatusInd: sdl: %s, bgId: %d, status: %d, msg.Status: %d",
+	log.Debugf("gvbStatusInd: sdl: %s, bgId: %d, status: %d, msg.Status: %d",
 		dsMgr.sdlName, gvbCb.bgId, gvbCb.status, msg.Status)
 
 	switch gvbCb.status {
@@ -719,13 +721,13 @@ func (dsMgr *DsMgr) gvbStatusInd(msg *sch.MsgDhtDsStatusInd) sch.SchErrno {
 		switch msg.Status {
 		case sch.GVBS_WORKING:
 
-			log.Infof("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
+			log.Debugf("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
 				"[%s, %d, %d, %d, %d, %d, %d]",
 				dsMgr.sdlName, gvbId, msg.Status, msg.Got, msg.Getting, msg.Failed, msg.Remain)
 
 		case sch.GVBS_TERMED, sch.GVBS_DONE:
 
-			log.Infof("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
+			log.Debugf("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
 				"[%s, %d, %d, %d, %d, %d, %d]",
 				dsMgr.sdlName, gvbId, msg.Status, msg.Got, msg.Getting, msg.Failed, msg.Remain)
 
@@ -750,7 +752,7 @@ func (dsMgr *DsMgr) gvbStatusInd(msg *sch.MsgDhtDsStatusInd) sch.SchErrno {
 		switch msg.Status {
 		case sch.GVBS_TERMED, sch.GVBS_DONE:
 
-			log.Infof("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
+			log.Debugf("gvbStatusInd: [sdl, id, status, got, getting, failed, remain]=" +
 				"[%s, %d, %d, %d, %d, %d, %d]",
 				dsMgr.sdlName, gvbId, msg.Status, msg.Got, msg.Getting, msg.Failed, msg.Remain)
 
@@ -787,7 +789,7 @@ func (dsMgr *DsMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) sc
 		return dsMgr.localGetValRsp(msg.Target[0:], msg.Val, DhtErrno(msg.Eno))
 
 	} else {
-		dsLog.Debug("qryMgrQueryResultInd: unknown what's for")
+		log.Debugf("qryMgrQueryResultInd: unknown what's for")
 	}
 
 	return sch.SchEnoMismatched
@@ -808,10 +810,10 @@ func (dsMgr *DsMgr) putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 	for _, v := range pv.Values {
 
 		copy(dsk[0:], v.Key)
-		dsLog.Debug("putValReq: key: %x", dsk)
+		log.Debugf("putValReq: key: %x", dsk)
 
 		if eno := dsMgr.store(&dsk, v.Val, pv.KT); eno != DhtEnoNone {
-			dsLog.Debug("putValReq: store failed, eno: %d", eno)
+			log.Warnf("putValReq: store failed, eno: %d", eno)
 		}
 	}
 
@@ -842,7 +844,7 @@ func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	dsk := DsKey{}
 	copy(dsk[0:], gvReq.Key)
 
-	dsLog.Debug("getValReq: key: %x", dsk)
+	log.Debugf("getValReq: key: %x", dsk)
 
 	rsp2Peer := func() sch.SchErrno {
 
@@ -853,7 +855,7 @@ func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 		dhtPkg := DhtPackage{}
 		if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-			dsLog.Debug("getValReq: GetPackage failed, eno: %d", eno)
+			log.Errorf("getValReq: GetPackage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -888,7 +890,7 @@ func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 
 	prdMgr, ok := dsMgr.sdl.SchGetTaskObject(PrdMgrName).(*PrdMgr)
 	if !ok || prdMgr == nil {
-		dsLog.Debug("getValReq: get provider manager failed")
+		log.Errorf("getValReq: get provider manager failed")
 		return sch.SchEnoInternal
 	}
 
@@ -928,7 +930,7 @@ func (dsMgr *DsMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErr
 	//
 
 	if msg.Eno != int(DhtEnoNone) {
-		dsLog.Debug("rutMgrNearestRsp: router failed, sdl: %s, eno: %d", dsMgr.sdlName, msg.Eno)
+		log.Debugf("rutMgrNearestRsp: router failed, sdl: %s, eno: %d", dsMgr.sdlName, msg.Eno)
 		return sch.SchEnoUserTask
 	}
 	var nodes []*config.Node
@@ -957,7 +959,7 @@ func (dsMgr *DsMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErr
 
 	dhtPkg := DhtPackage{}
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		dsLog.Debug("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		log.Errorf("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -978,7 +980,7 @@ func (dsMgr *DsMgr) qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno
 
 	if msg.Eno != DhtEnoNone.GetEno() {
 
-		log.Warnf("qryStartRsp: errors reported, sdl: %s, eno: %d, forWhat: %d, target: %x",
+		log.Debugf("qryStartRsp: errors reported, sdl: %s, eno: %d, forWhat: %d, target: %x",
 			dsMgr.sdlName, msg.Eno, msg.ForWhat, msg.Target)
 
 		if msg.ForWhat == MID_PUTVALUE {
@@ -993,7 +995,7 @@ func (dsMgr *DsMgr) qryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno
 
 		} else {
 
-			dsLog.Debug("qryStartRsp: unknown what's for")
+			log.Debugf("qryStartRsp: unknown what's for")
 		}
 
 		return sch.SchEnoMismatched
@@ -1024,7 +1026,7 @@ func (dsMgr *DsMgr) fromStore(k *DsKey) []byte {
 	}
 
 	if eno := ddsr.DecDsRecord(&dsr); eno != DhtEnoNone {
-		dsLog.Debug("fromStore: DecDsRecord failed, eno: %d", eno)
+		log.Errorf("fromStore: DecDsRecord failed, eno: %d", eno)
 		return nil
 	}
 
@@ -1044,7 +1046,7 @@ func (dsMgr *DsMgr) store(k *DsKey, v DsValue, kt time.Duration) DhtErrno {
 
 	dsr := new(DsRecord)
 	if eno := ddsr.EncDsRecord(dsr); eno != DhtEnoNone {
-		dsLog.Debug("store: EncDsRecord failed, eno: %d", eno)
+		log.Errorf("store: EncDsRecord failed, eno: %d", eno)
 		return eno
 	}
 
@@ -1072,7 +1074,7 @@ func (dsMgr *DsMgr) localAddValRsp(ev int, key []byte, peers []*config.Node, eno
 			Key:   key,
 		}
 	} else {
-		dsLog.Debug("localAddValRsp: invalid event: %d", ev)
+		log.Debugf("localAddValRsp: invalid event: %d", ev)
 		return sch.SchEnoMismatched
 	}
 
@@ -1086,7 +1088,7 @@ func (dsMgr *DsMgr) localAddValRsp(ev int, key []byte, peers []*config.Node, eno
 //
 func (dsMgr *DsMgr) localGetValRsp(key []byte, val []byte, eno DhtErrno) sch.SchErrno {
 
-	log.Infof("localGetValRsp: sdl: %s, eno: %d, key: %x", dsMgr.sdlName, eno, key)
+	log.Debugf("localGetValRsp: sdl: %s, eno: %d, key: %x", dsMgr.sdlName, eno, key)
 
 	rsp := sch.MsgDhtMgrGetValueRsp{
 		Eno: int(eno),
@@ -1166,7 +1168,7 @@ func (dsMgr *DsMgr) cleanUpReboot() DhtErrno {
 			secondes, err := strconv.ParseInt(string(t), 10, 64)
 
 			if err != nil {
-				dsLog.Debug("cleanUpReboot: invalid time string: %s", string(t))
+				log.Warnf("cleanUpReboot: invalid time string: %s", string(t))
 				continue
 			}
 
@@ -1181,7 +1183,7 @@ func (dsMgr *DsMgr) cleanUpReboot() DhtErrno {
 				tm, err := dsMgr.tmMgr.GetTimer(kt, nil, nil)
 
 				if err != nil {
-					dsLog.Debug("cleanUpReboot: GetTimer failed, error: %s", err.Error())
+					log.Errorf("cleanUpReboot: GetTimer failed, error: %s", err.Error())
 					continue
 				}
 
@@ -1192,7 +1194,7 @@ func (dsMgr *DsMgr) cleanUpReboot() DhtErrno {
 		}
 	} else {
 
-		dsLog.Debug("cleanUpReboot: unknown data store type: %d", dsType)
+		log.Debugf("cleanUpReboot: unknown data store type: %d", dsType)
 		return DhtEnoDatastore
 	}
 
@@ -1210,7 +1212,7 @@ func (dsMgr *DsMgr) startTickTimer() DhtErrno {
 
 	eno, tid := dsMgr.sdl.SchSetTimer(dsMgr.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		dsLog.Debug("startTickTimer: SchSetTimer failed, eno: %d", eno)
+		log.Errorf("startTickTimer: SchSetTimer failed, eno: %d", eno)
 		return DhtEnoScheduler
 	}
 
@@ -1230,7 +1232,7 @@ func (dsMgr *DsMgr) cleanUpTimerCb(el *list.Element, data interface{}) interface
 	err := DhtErrno(DhtEnoNone)
 	tm, ok := data.(*timer)
 	if !ok {
-		dsLog.Debug("cleanUpTimerCb: invalid timer")
+		log.Debugf("cleanUpTimerCb: invalid timer")
 		return DhtEnoMismatched
 	}
 
@@ -1248,7 +1250,7 @@ func (dsMgr *DsMgr) cleanUpTimerCb(el *list.Element, data interface{}) interface
 _cleanUpfailed:
 
 	if err != DhtEnoNone {
-		dsLog.Debug("cleanUpTimerCb: Delete failed, error: %s", err.Error())
+		log.Debugf("cleanUpTimerCb: Delete failed, error: %s", err.Error())
 		return err
 	}
 

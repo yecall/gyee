@@ -175,7 +175,7 @@ func (conMgr *ConMgr) checkMailBox() {
 
 func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	connLog.Debug("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
+	log.Debugf("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	conMgr.checkMailBox()
 
@@ -228,11 +228,11 @@ func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = conMgr.monitorTimer()
 
 	default:
-		connLog.Debug("conMgrProc: unknown event: %d", msg.Id)
+		log.Debugf("conMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
-	connLog.Debug("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
+	log.Debugf("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	return eno
 }
@@ -255,17 +255,17 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	if conMgr.ptnRutMgr == nil || conMgr.ptnQryMgr == nil ||
 		conMgr.ptnLsnMgr == nil || conMgr.ptnDhtMgr == nil {
-		connLog.Debug("poweron: internal errors")
+		log.Errorf("poweron: internal errors")
 		return sch.SchEnoInternal
 	}
 
 	if dhtEno := conMgr.getConfig(); dhtEno != DhtEnoNone {
-		connLog.Debug("poweron: getConfig failed, dhtEno: %d", dhtEno)
+		log.Errorf("poweron: getConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 
 	if conMgr.instCache, _ = lru.NewWithEvict(conMgr.cfg.maxCon, conMgr.onInstEvicted); conMgr.instCache == nil {
-		connLog.Debug("poweron: lru.New failed")
+		log.Errorf("poweron: lru.New failed")
 		return sch.SchEnoUserTask
 	}
 
@@ -277,7 +277,7 @@ func (conMgr *ConMgr) poweron(ptn interface{}) sch.SchErrno {
 		Extra: nil,
 	}
 	if eno, tid := conMgr.sdl.SchSetTimer(conMgr.ptnMe, &td); eno != sch.SchEnoNone {
-		connLog.Debug("poweron: SchSetTimer failed, eno: %d", eno)
+		log.Errorf("poweron: SchSetTimer failed, eno: %d", eno)
 		return eno
 	} else {
 		conMgr.tidMonitor = tid
@@ -672,7 +672,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 // Listener manager status indication handler
 //
 func (conMgr *ConMgr) lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErrno {
-	connLog.Debug("lsnMgrStatusInd: listener manager status reported: %d", msg.Status)
+	log.Debugf("lsnMgrStatusInd: listener manager status reported: %d", msg.Status)
 	if conMgr.pasStatus == pasInNull {
 		if msg.Status == lmsNull || msg.Status == lmsStopped {
 			schMsg := sch.SchMessage{}
@@ -680,7 +680,7 @@ func (conMgr *ConMgr) lsnMgrStatusInd(msg *sch.MsgDhtLsnMgrStatusInd) sch.SchErr
 			return conMgr.sdl.SchSendMessage(&schMsg)
 		}
 	} else {
-		connLog.Debug("lsnMgrStatusInd: discarded for pasStatus: %d", conMgr.pasStatus)
+		log.Debugf("lsnMgrStatusInd: discarded for pasStatus: %d", conMgr.pasStatus)
 	}
 	return sch.SchEnoNone
 }
@@ -721,7 +721,7 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	rsp2Sender := func(eno DhtErrno, dir int) sch.SchErrno {
-		connLog.Debug("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
+		log.Debugf("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
 		*ptrEno = int(eno)
 		*ptrDir = dir
 		msg := sch.SchMessage{}
@@ -743,7 +743,7 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	dupConnProc := func(ci *ConInst) sch.SchErrno {
 		status := ci.getStatus()
-		connLog.Debug("dupConnProc: inst: %s, dir: %d, status: %d, owner: %s", ci.name, ci.dir, status, msg.Name)
+		log.Debugf("dupConnProc: inst: %s, dir: %d, status: %d, owner: %s", ci.name, ci.dir, status, msg.Name)
 		if status == CisInService {
 			return rsp2Sender(DhtErrno(DhtEnoDuplicated), ci.dir)
 		} else if status == CisOutOfService || status == CisClosed {
@@ -768,19 +768,19 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	if yes, ci := isInstInClosing(); yes {
-		connLog.Debug("connctReq: in closing, inst: %s , owner: %s", ci.name, msg.Name)
+		log.Debugf("connctReq: in closing, inst: %s , owner: %s", ci.name, msg.Name)
 		return rsp2Sender(DhtErrno(DhtEnoResource), ci.dir)
 	} else if ci := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != nil {
-		connLog.Debug("connctReq: outbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
+		log.Debugf("connctReq: outbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
 		return dupConnProc(ci)
 	} else if ci := conMgr.lookupInboundConInst(&msg.Peer.ID); ci != nil {
-		connLog.Debug("connctReq: inbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
+		log.Debugf("connctReq: inbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
 		return dupConnProc(ci)
 	}
 
 	ci := newConInst(fmt.Sprintf("%d", conMgr.ciSeq), msg.IsBlind)
 	if eno := conMgr.setupConInst(ci, sender, msg.Peer, nil); eno != DhtEnoNone {
-		connLog.Debug("connctReq: setupConInst failed, inst: %s, dir: %d, owner: %s, eno: %d",
+		log.Errorf("connctReq: setupConInst failed, inst: %s, dir: %d, owner: %s, eno: %d",
 			ci.name, ci.dir, msg.Name, eno)
 		return rsp2Sender(eno, ci.dir)
 	}
@@ -934,11 +934,11 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	cio := conMgr.lookupOutboundConInst(&msg.Peer.ID)
 	cii := conMgr.lookupInboundConInst(&msg.Peer.ID)
 	if cio != nil && conMgr.instInClosing[cio.cid] == nil {
-		connLog.Debug("sendReq: outbound instance selected")
+		log.Debugf("sendReq: outbound instance selected")
 		ci = cio
 	} else if cii != nil && conMgr.instInClosing[cii.cid] == nil {
 		ci = cii
-		connLog.Debug("sendReq: inbound instance selected")
+		log.Debugf("sendReq: inbound instance selected")
 	}
 
 	if ci == nil {
@@ -946,7 +946,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		return sch.SchEnoResource
 	}
 
-	connLog.Debug("sendReq: connection instance found: inst: %s, dir: %d, peer: %s",
+	log.Debugf("sendReq: connection instance found: inst: %s, dir: %d, peer: %s",
 		ci.name, ci.dir, ci.hsInfo.peer.IP.String())
 
 	if curStat := ci.getStatus(); curStat != CisInService {
@@ -988,15 +988,15 @@ func (conMgr *ConMgr) instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 	}
 	cis, _ := conMgr.lookupConInst(&cid)
 	if len(cis) == 0 {
-		connLog.Debug("instStatusInd: none of instances found")
+		log.Debugf("instStatusInd: none of instances found")
 		return sch.SchEnoNotFound
 	}
 	if len(cis) > 1 {
-		connLog.Debug("instStatusInd: too much found, cid: %+v", cid)
+		log.Debugf("instStatusInd: too much found, cid: %+v", cid)
 		panic("instStatusInd: invalid direction")
 	}
 
-	connLog.Debug("instStatusInd: inst: %s, msg.Status: %d, current status: %d",
+	log.Debugf("instStatusInd: inst: %s, msg.Status: %d, current status: %d",
 		cis[0].name, msg.Status, cis[0].getStatus())
 
 	switch msg.Status {
@@ -1014,7 +1014,7 @@ func (conMgr *ConMgr) instStatusInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 	case CisHandshook:
 	case CisInService:
 	default:
-		connLog.Debug("instStatusInd: invalid status: %d", msg.Status)
+		log.Debugf("instStatusInd: invalid status: %d", msg.Status)
 		return sch.SchEnoMismatched
 	}
 
@@ -1074,11 +1074,11 @@ func (conMgr *ConMgr) instCloseRsp(msg *sch.MsgDhtConInstCloseRsp) sch.SchErrno 
 		found = true
 		delete(conMgr.instInClosing, cid)
 		if eno := rsp2Sender(DhtEnoNone, &ci.hsInfo.peer, ci.ptnSrcTsk); eno != sch.SchEnoNone {
-			connLog.Debug("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
+			log.Debugf("instCloseRsp: inst: %s, rsp2Sender failed, eno: %d", ci.name, eno)
 			err = true
 		}
 		if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-			connLog.Debug("instCloseRsp: inst: %s, rutUpdate failed, eno: %d", ci.name, eno)
+			log.Debugf("instCloseRsp: inst: %s, rutUpdate failed, eno: %d", ci.name, eno)
 			err = true
 		}
 	}
@@ -1163,18 +1163,18 @@ func (conMgr *ConMgr) natReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 //
 func (conMgr *ConMgr) natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 	if !nat.NatIsResultOk(msg.Result) {
-		connLog.Debug("natMakeMapRsp: fail reported, msg: %+v", *msg)
+		log.Warnf("natMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
 	proto := strings.ToLower(msg.Proto)
 	if proto == "tcp" {
 		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if conMgr.natTcpResult {
-			connLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			log.Debugf("natMakeMapRsp: public dht addr: %s:%d",
 				msg.PubIp.String(), msg.PubPort)
 			conMgr.pubTcpIp = msg.PubIp
 			conMgr.pubTcpPort = msg.PubPort
 			if eno := conMgr.switch2NatAddr(proto); eno != DhtEnoNone {
-				connLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				log.Warnf("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 			mapChConMgrReady[conMgr.sdl.SchGetP2pCfgName()] <- true
@@ -1184,7 +1184,7 @@ func (conMgr *ConMgr) natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) sch.SchErrno {
 		}
 		return sch.SchEnoNone
 	}
-	connLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	log.Debugf("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1196,18 +1196,18 @@ func (conMgr *ConMgr) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sc
 	if proto == "tcp" {
 		conMgr.natTcpResult = nat.NatIsStatusOk(msg.Status)
 		if conMgr.natTcpResult {
-			connLog.Debug("natPubAddrUpdateInd: public dht addr: %s:%d",
+			log.Debugf("natPubAddrUpdateInd: public dht addr: %s:%d",
 				msg.PubIp.String(), msg.PubPort)
 			if conMgr.pasStatus != pasInNull {
-				connLog.Debug("natPubAddrUpdateInd: had been in switching, pasStatus: %d", conMgr.pasStatus)
+				log.Debugf("natPubAddrUpdateInd: had been in switching, pasStatus: %d", conMgr.pasStatus)
 				return sch.SchEnoMismatched
 			}
 			conMgr.pubTcpIp = msg.PubIp
 			conMgr.pubTcpPort = msg.PubPort
-			connLog.Debug("natPubAddrUpdateInd: enter pasInSwitching, call natMapSwitch")
+			log.Debugf("natPubAddrUpdateInd: enter pasInSwitching, call natMapSwitch")
 			conMgr.pasStatus = pasInSwitching
 			if eno := conMgr.natMapSwitch(); eno != DhtEnoNone {
-				connLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, eno: %d", eno)
+				log.Warnf("natPubAddrUpdateInd: natMapSwitch failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 		} else {
@@ -1216,7 +1216,7 @@ func (conMgr *ConMgr) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) sc
 		}
 		return sch.SchEnoNone
 	}
-	connLog.Debug("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
+	log.Debugf("natPubAddrUpdateInd: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1316,7 +1316,7 @@ func (conMgr *ConMgr) setupConInst(ci *ConInst, srcTask interface{}, peer *confi
 	ci.bootstrapNode = conMgr.cfg.bootstarpNode
 	ci.ptnSrcTsk = srcTask
 	if ci.srcTaskName = ci.sdl.SchGetTaskName(srcTask); len(ci.srcTaskName) == 0 {
-		connLog.Debug("setupConInst: source task without name")
+		log.Errorf("setupConInst: source task without name")
 		return DhtEnoNotFound
 	}
 
@@ -1333,7 +1333,7 @@ func (conMgr *ConMgr) setupConInst(ci *ConInst, srcTask interface{}, peer *confi
 		ci.ptnRutMgr == nil ||
 		ci.ptnDsMgr == nil ||
 		ci.ptnPrdMgr == nil {
-		connLog.Debug("setupConInst: internal errors")
+		log.Errorf("setupConInst: internal errors")
 		return DhtEnoInternal
 	}
 
@@ -1402,7 +1402,7 @@ func (conMgr *ConMgr) instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 			if ci != nil {
 				found = true
 				if eno := rutUpdate(&ci.hsInfo.peer); eno != sch.SchEnoNone {
-					connLog.Debug("instClosedInd: rutUpdate failed, eno: %d", eno)
+					log.Debugf("instClosedInd: rutUpdate failed, eno: %d", eno)
 					err = true
 				}
 				key := instLruKey{
@@ -1411,7 +1411,7 @@ func (conMgr *ConMgr) instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 				}
 				conMgr.instCache.Remove(&key)
 			}
-			connLog.Debug("instClosedInd: found: %t, err: %t", found, err)
+			log.Debugf("instClosedInd: found: %t, err: %t", found, err)
 		}
 	}
 	return sch.SchEnoNone
@@ -1490,7 +1490,7 @@ func (conMgr *ConMgr) onInstEvicted(key interface{}, value interface{}) {
 	k, _ := key.(*instLruKey)
 	ci, _ := value.(instLruValue)
 	if k == nil || ci == nil {
-		connLog.Debug("onInstEvicted: invalid key or value")
+		log.Debugf("onInstEvicted: invalid key or value")
 		return
 	}
 	connLog.ForceDebug("onInstEvicted: send EvDhtConMgrCloseReq, sdl: %s, inst: %s, dir: %d",
@@ -1514,7 +1514,7 @@ func (conMgr *ConMgr) switch2NatAddr(proto string) DhtErrno {
 		conMgr.cfg.local.TCP = uint16(conMgr.pubTcpPort & 0xffff)
 		return DhtEnoNone
 	}
-	connLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
+	log.Debugf("switch2NatAddr: invalid protocol: %s", proto)
 	return DhtEnoParameter
 }
 
@@ -1523,18 +1523,18 @@ func (conMgr *ConMgr) switch2NatAddr(proto string) DhtErrno {
 //
 func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 
-	connLog.Debug("natMapSwitch: swithching begin...")
+	log.Debugf("natMapSwitch: swithching begin...")
 
 	sdl := conMgr.sdl
 	msg := sch.SchMessage{}
 	sdl.SchMakeMessage(&msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchBeg, nil)
 	sdl.SchSendMessage(&msg)
-	connLog.Debug("natMapSwitch: EvDhtConMgrPubAddrSwitchBeg sent")
+	log.Debugf("natMapSwitch: EvDhtConMgrPubAddrSwitchBeg sent")
 
 	msg = sch.SchMessage{}
 	sdl.SchMakeMessage(&msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrPauseReq, nil)
 	sdl.SchSendMessage(&msg)
-	connLog.Debug("natMapSwitch: EvDhtLsnMgrPauseReq sent")
+	log.Debugf("natMapSwitch: EvDhtLsnMgrPauseReq sent")
 
 	conMgr.instInClosing = make(map[conInstIdentity]*ConInst, 0)
 
@@ -1558,9 +1558,9 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 	}
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
 
-	connLog.Debug("natMapSwitch: call natMapSwitchEnd")
+	log.Debugf("natMapSwitch: call natMapSwitchEnd")
 	if eno := conMgr.natMapSwitchEnd(); eno != DhtEnoNone {
-		connLog.Debug("natMapSwitch: natMapSwitchEnd failed, eno: %d", eno)
+		log.Warnf("natMapSwitch: natMapSwitchEnd failed, eno: %d", eno)
 		return eno
 	}
 
@@ -1571,7 +1571,7 @@ func (conMgr *ConMgr) natMapSwitch() DhtErrno {
 // post public address switching proc
 //
 func (conMgr *ConMgr) natMapSwitchEnd() DhtErrno {
-	connLog.Debug("natMapSwitchEnd: enter pasInNull")
+	log.Debugf("natMapSwitchEnd: enter pasInNull")
 	conMgr.pasStatus = pasInNull
 	conMgr.instCache.Purge()
 	conMgr.ibInstTemp = make(map[string]*ConInst, 0)
@@ -1580,12 +1580,12 @@ func (conMgr *ConMgr) natMapSwitchEnd() DhtErrno {
 	msg := sch.SchMessage{}
 	conMgr.sdl.SchMakeMessage(&msg, conMgr.ptnMe, conMgr.ptnLsnMgr, sch.EvDhtLsnMgrResumeReq, nil)
 	conMgr.sdl.SchSendMessage(&msg)
-	connLog.Debug("natMapSwitchEnd: EvDhtLsnMgrResumeReq sent")
+	log.Debugf("natMapSwitchEnd: EvDhtLsnMgrResumeReq sent")
 
 	msg = sch.SchMessage{}
 	conMgr.sdl.SchMakeMessage(&msg, conMgr.ptnMe, conMgr.ptnDhtMgr, sch.EvDhtConMgrPubAddrSwitchEnd, nil)
 	conMgr.sdl.SchSendMessage(&msg)
-	connLog.Debug("natMapSwitchEnd: EvDhtConMgrPubAddrSwitchEnd sent")
+	log.Debugf("natMapSwitchEnd: EvDhtConMgrPubAddrSwitchEnd sent")
 
 	return DhtEnoNone
 }

@@ -105,7 +105,7 @@ const schTimerNodePoolSize = 2048 // timer node pool size, must be (2^n)
 // Task struct
 //
 const schMaxTaskTimer = SchMaxTaskTimer // max timers can be held by one user task
-const schTmqSize = 32					// timer message queue size
+const schTmqSize = 1024					// timer message queue size
 const schTmqFork = true					// do not send timer message to common queue if true
 const schInvalidTid = SchInvalidTid     // invalid timer identity
 const evHistorySize = 64                // round buffer size fo event history
@@ -150,7 +150,7 @@ type schTaskNode struct {
 // internal mode ycp2p, this struct is not exported, any interface to created
 // such a scheduler object is not provided, see it pls.
 //
-const schTaskNodePoolSize = 1024 * 4 // task node pool size, must be (2^n)
+const schTaskNodePoolSize = 1024 * 16 // task node pool size, must be (2^n)
 
 type scheduler struct {
 

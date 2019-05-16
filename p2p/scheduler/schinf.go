@@ -173,7 +173,7 @@ const (
 type SchTimerType int
 
 // Timer description
-const SchMaxTaskTimer = 512 // max timers can be held by one user task
+const SchMaxTaskTimer = 1024 // max timers can be held by one user task
 const SchInvalidTid = -1    // invalid timer identity
 type TimerDescription struct {
 	Name  string        // timer name

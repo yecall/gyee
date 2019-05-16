@@ -728,7 +728,7 @@ func _gvStat(result bool) {
 func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
-		log.Errorf("DhtGetValue: in stopping, sdl: %s", sdl)
+		log.Warnf("DhtGetValue: in stopping, sdl: %s", sdl)
 		return nil, YesEnoInStopping
 	}
 	if yeShMgr.ptDhtConMgr.IsBusy(){
@@ -743,7 +743,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 	ch := make(chan *getValueResult, 1)
 	err := yeShMgr.dhtGetValMapKey(key, GVTO, ch)
 	if err != YesEnoNone && err != YesEnoGetValDup {
-		log.Errorf("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, err: %s",
+		log.Debugf("DhtGetValue: dhtGetValMapKey failed, sdl: %s, key: %x, err: %s",
 			sdl, key, err.Error())
 		return nil, err
 	}
@@ -754,7 +754,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		msg := sch.SchMessage{}
 		yeShMgr.dhtInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnDhtShell, sch.EvDhtMgrGetValueReq, &req)
 		if eno := yeShMgr.dhtInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-			log.Errorf("DhtGetValue: scheduler failed, sdl: %s, key: %x, err: %s",
+			log.Debugf("DhtGetValue: scheduler failed, sdl: %s, key: %x, err: %s",
 				sdl, key, eno.Error())
 			yk := yesKey{}
 			copy(yk[0:], key)
@@ -766,29 +766,29 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		}
 	}
 
-	log.Infof("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+	log.Debugf("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
-		log.Errorf("DhtGetValue: timeout, sdl: %s, key: %x", sdl, key)
+		log.Debugf("DhtGetValue: timeout, sdl: %s, key: %x", sdl, key)
 		if _gvStatistics {
 			_gvStat(false)
 		}
 		return nil, YesEnoTimeout
 	} else if result.eno != dht.DhtEnoNone.GetEno() {
-		log.Errorf("DhtGetValue: dht failed, sdl: %s, eno: %d, key: %x", sdl, result.eno, key)
+		log.Debugf("DhtGetValue: dht failed, sdl: %s, eno: %d, key: %x", sdl, result.eno, key)
 		if _gvStatistics {
 			_gvStat(false)
 		}
 		return nil, YesEnoDhtInteral
 	} else if len(result.value) <= 0 {
-		log.Errorf("DhtGetValue: empty value, sdl: %s, key: %s", sdl, key)
+		log.Debugf("DhtGetValue: empty value, sdl: %s, key: %s", sdl, key)
 		if _gvStatistics {
 			_gvStat(false)
 		}
 		return nil, YesEnoEmptyVal
 	}
 
-	log.Infof("DhtGetValue: ok, sdl: %s, key: %x", sdl, key)
+	log.Debugf("DhtGetValue: ok, sdl: %s, key: %x", sdl, key)
 
 	if _gvStatistics {
 		_gvStat(true)
@@ -832,21 +832,21 @@ func (yeShMgr *YeShellManager) DhtGetValues(keys [][]byte, out chan<- []byte, ti
 func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 	sdl := yeShMgr.dhtSdlName
 	if yeShMgr.inStopping {
-		log.Errorf("DhtSetValue: in stopping, sdl: %s", sdl)
+		log.Warnf("DhtSetValue: in stopping, sdl: %s", sdl)
 		return YesEnoInStopping
 	}
 	if yeShMgr.ptDhtConMgr.IsBusy(){
-		log.Errorf("DhtSetValue: dht busy, sdl: %s", sdl)
+		log.Warnf("DhtSetValue: dht busy, sdl: %s", sdl)
 		return YesEnoResource
 	}
 	if len(key) != yesKeyBytes || len(value) == 0 {
-		log.Errorf("DhtSetValue: invalid pair or value, sdl: %s, key: %x, value: %x", sdl, key, value)
+		log.Debugf("DhtSetValue: invalid pair or value, sdl: %s, key: %x, value: %x", sdl, key, value)
 		return YesEnoParameter
 	}
 
 	ch := make(chan bool, 1)
 	if err := yeShMgr.dhtPutValMapKey(key, PVTO, ch); err != YesEnoNone {
-		log.Errorf("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, err: %s",
+		log.Debugf("DhtSetValue: dhtPutValMapKey failed, sdl: %s, key: %x, err: %s",
 			sdl, key, err.Error())
 		return err
 	}
@@ -870,17 +870,17 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 		return YesEnoScheduler
 	}
 
-	log.Infof("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
+	log.Debugf("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
-		log.Errorf("DhtSetValue: timeout, sdl: %s, key: %x", sdl, key)
+		log.Debugf("DhtSetValue: timeout, sdl: %s, key: %x", sdl, key)
 		return YesEnoTimeout
 	}
 	if result == false {
-		log.Errorf("DhtSetValue: dht failed, sdl: %s, key: %x", sdl, key)
+		log.Debugf("DhtSetValue: dht failed, sdl: %s, key: %x", sdl, key)
 		return YesEnoDhtInteral
 	}
-	log.Infof("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+	log.Debugf("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
 	return nil
 }
 
@@ -1241,7 +1241,7 @@ func (yeShMgr *YeShellManager) chainReady4User() {
 			break
 		}
 	}
-	log.Infof("chainReady4User: exit, sdl: %s", yeShMgr.chainSdlName)
+	log.Infof("chainReady4User: it's over, sdl: %s", yeShMgr.chainSdlName)
 }
 
 func (yeShMgr *YeShellManager) chainRxProc() {
@@ -1413,9 +1413,9 @@ _pvpLoop:
 			}
 			key := result.key
 			if len(key) != yesKeyBytes {
-				log.Errorf("dhtPutValProc: invalid key, sdl: %s")
+				log.Warnf("dhtPutValProc: invalid key, sdl: %s")
 			} else {
-				log.Infof("dhtPutValProc: got from channel, sdl: %s, eno: %d, key: %x",
+				log.Debugf("dhtPutValProc: got from channel, sdl: %s, eno: %d, key: %x",
 					sdl, result.eno, result.key)
 				copy(yk[0:], key)
 				yeShMgr.putValLock.Lock()
@@ -1486,7 +1486,7 @@ _gvpLoop:
 			for key, dur := range yeShMgr.gvk2DurMap {
 				dur = dur - period
 				if dur <= 0 {
-					log.Errorf("dhtGetValProc: timeout, sdl: %s, key: %x", sdl, key)
+					log.Debugf("dhtGetValProc: timeout, sdl: %s, key: %x", sdl, key)
 					if chList, ok := yeShMgr.gvk2ChMap[key]; ok {
 						for _, ch := range chList {
 							close(ch)
@@ -1505,12 +1505,12 @@ _gvpLoop:
 			}
 			key := result.key
 			if len(key) != yesKeyBytes {
-				log.Errorf("dhtGetValProc: invalid key, sdl: %s", sdl)
+				log.Warnf("dhtGetValProc: invalid key, sdl: %s", sdl)
 			} else {
 				copy(yk[0:], key)
 				yeShMgr.getValLock.Lock()
 				if chList, ok := yeShMgr.gvk2ChMap[yk]; ok {
-					log.Infof("dhtGetValProc: got from channel, sdl: %s, eno: %d, key: %x",
+					log.Debugf("dhtGetValProc: got from channel, sdl: %s, eno: %d, key: %x",
 						sdl, result.eno, result.key)
 					for _, ch := range chList {
 						if result.eno == dht.DhtEnoNone.GetEno() {

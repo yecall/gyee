@@ -222,7 +222,7 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
-	log.Infof("startReq: ask connection manager for peer, " +
+	log.Debugf("startReq: ask connection manager for peer, " +
 		"sdl: %s, inst: %s, ForWhat: %d",
 		icb.sdlName, icb.name, icb.qryReq.ForWhat)
 
@@ -303,7 +303,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 		return sch.SchEnoParameter
 	}
 
-	log.Warnf("icbTimerHandler: query instance timer expired, " +
+	log.Debugf("icbTimerHandler: query instance timer expired, " +
 		"sdl: %s, inst: %s, forWhat: %d",
 		qryInst.icb.sdlName, qryInst.icb.name, qryInst.icb.qryReq.ForWhat)
 
@@ -337,7 +337,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	//
 
 	if icb.status == qisWaitResponse {
-		log.Infof("icbTimerHandler: send EvDhtConMgrCloseReq, " +
+		log.Debugf("icbTimerHandler: send EvDhtConMgrCloseReq, " +
 			"sdl: %s, inst: %s, dir: %d, forWhat: %d",
 			icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 		req := sch.MsgDhtConMgrCloseReq{
@@ -348,7 +348,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 		schMsg := sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrCloseReq, &req)
 		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			log.Infof("icbTimerHandler: send EvDhtConMgrCloseReq failed, " +
+			log.Errorf("icbTimerHandler: send EvDhtConMgrCloseReq failed, " +
 				"sdl: %s, inst: %s, dir: %d, forWhat: %d",
 				icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 		}
@@ -368,7 +368,7 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnRutMgr, sch.EvDhtRutMgrUpdateReq, &updateReq)
 	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			log.Infof("icbTimerHandler: send EvDhtRutMgrUpdateReq failed, " +
+			log.Errorf("icbTimerHandler: send EvDhtRutMgrUpdateReq failed, " +
 				"sdl: %s, inst: %s, dir: %d, forWhat: %d",
 				icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 		}
@@ -389,12 +389,12 @@ func (qryInst *QryInst) icbTimerHandler(msg *QryInst) sch.SchErrno {
 	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Infof("icbTimerHandler: send EvDhtRutMgrUpdateReq failed, " +
+		log.Errorf("icbTimerHandler: send EvDhtRutMgrUpdateReq failed, " +
 			"sdl: %s, inst: %s, dir: %d, forWhat: %d",
 			icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 	}
 
-	log.Infof("icbTimerHandler: done instance, " +
+	log.Debugf("icbTimerHandler: done instance, " +
 		"sdl: %s, inst: %s, dir: %d, forWhat: %d",
 		icb.sdlName, icb.name, icb.dir, icb.qryReq.ForWhat)
 
@@ -409,7 +409,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	icb := qryInst.icb
 	sdl := icb.sdl
 
-	log.Infof("connectRsp: " +
+	log.Debugf("connectRsp: " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -439,7 +439,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 
 	if msg.Eno != DhtEnoNone.GetEno() && msg.Eno != DhtEnoDuplicated.GetEno() {
 
-		log.Warnf("connectRsp: done for connect failed, " +
+		log.Debugf("connectRsp: done for connect failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -476,7 +476,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
-	log.Infof("connectRsp: setupQryPkg ok, " +
+	log.Debugf("connectRsp: setupQryPkg ok, " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -655,7 +655,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 				return sch.SchEnoMismatched
 			}
 
-			log.Infof("protoMsgInd: EvDhtConInstGetValRsp, " +
+			log.Debugf("protoMsgInd: EvDhtConInstGetValRsp, " +
 				"sdl: %s, forWhat: %d, inst: %s, key: %x",
 				icb.sdlName, msg.ForWhat, icb.name, icb.target)
 

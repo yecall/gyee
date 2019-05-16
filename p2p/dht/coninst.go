@@ -277,7 +277,7 @@ func (conInst *ConInst) conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = conInst.protoMsgInd(msg.Body.(*sch.MsgDhtQryInstProtoMsgInd))
 
 	default:
-		ciLog.Debug("conInstProc: unknown event: %d", msg.Id)
+		log.Debugf("conInstProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -564,7 +564,7 @@ func (conInst *ConInst) txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno 
 	//
 
 	if s := conInst.getStatus(); s != CisInService {
-		ciLog.Debug("txDataReq: not it CisInService, status: %d", s)
+		log.Debugf("txDataReq: not it CisInService, status: %d", s)
 		return sch.SchEnoUserTask
 	}
 
@@ -584,7 +584,7 @@ func (conInst *ConInst) txDataReq(msg *sch.MsgDhtConInstTxDataReq) sch.SchErrno 
 	}
 
 	if eno := conInst.txPutPending(&pkg); eno != DhtEnoNone {
-		ciLog.Debug("txDataReq: txPutPending failed, eno: %d", eno)
+		log.Debugf("txDataReq: txPutPending failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -603,15 +603,15 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 
 	curStat := conInst.getStatus()
 	if curStat != CisInService {
-		ciLog.Debug("rutMgrNearestRsp: not in CisInService, curStat: %d", curStat)
+		log.Debugf("rutMgrNearestRsp: not in CisInService, curStat: %d", curStat)
 		return sch.SchEnoMismatched
 	}
 
 	if msg == nil {
-		ciLog.Debug("rutMgrNearestRsp: invalid parameters")
+		log.Errorf("rutMgrNearestRsp: invalid parameters")
 		return sch.SchEnoParameter
 	}
-	ciLog.Debug("rutMgrNearestRsp: msg: %+v", msg)
+	log.Debugf("rutMgrNearestRsp: msg: %+v", msg)
 
 	var dhtMsg = DhtMessage{
 		Mid: MID_UNKNOWN,
@@ -619,7 +619,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 	var nodes []*config.Node
 	bns, ok := msg.Peers.([]*rutMgrBucketNode)
 	if !ok {
-		ciLog.Debug("rutMgrNearestRsp: invalid parameters")
+		log.Errorf("rutMgrNearestRsp: invalid parameters")
 		return sch.SchEnoParameter
 	}
 
@@ -636,7 +636,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 
 		findNode, ok := msg.Msg.(*FindNode)
 		if !ok {
-			ciLog.Debug("rutMgrNearestRsp: invalid original message type")
+			log.Errorf("rutMgrNearestRsp: invalid original message type")
 			return sch.SchEnoMismatched
 		}
 
@@ -656,23 +656,23 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 
 	} else if msg.ForWhat == MID_GETPROVIDER_REQ {
 
-		ciLog.Debug("rutMgrNearestRsp: for MID_GETPROVIDER_REQ should not come here")
+		log.Debugf("rutMgrNearestRsp: for MID_GETPROVIDER_REQ should not come here")
 		return sch.SchEnoMismatched
 
 	} else if msg.ForWhat == MID_GETVALUE_REQ {
 
-		ciLog.Debug("rutMgrNearestRsp: for MID_GETVALUE_REQ should not come here")
+		log.Debugf("rutMgrNearestRsp: for MID_GETVALUE_REQ should not come here")
 		return sch.SchEnoMismatched
 
 	} else {
 
-		ciLog.Debug("rutMgrNearestRsp: unknown what's for")
+		log.Debugf("rutMgrNearestRsp: unknown what's for")
 		return sch.SchEnoMismatched
 	}
 
 	dhtPkg := DhtPackage{}
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		ciLog.Debug("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		log.Debugf("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -686,7 +686,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 	}
 
 	if eno := conInst.txPutPending(&txPkg); eno != DhtEnoNone {
-		ciLog.Debug("rutMgrNearestRsp: txPutPending failed, eno: %d", eno)
+		log.Debugf("rutMgrNearestRsp: txPutPending failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -725,7 +725,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 	}
 
 	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
-		ciLog.Debug("txPutPending: trySendingCnt: %d, peer: %s:%d",
+		log.Debugf("txPutPending: trySendingCnt: %d, peer: %s:%d",
 			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 	}
 
@@ -733,7 +733,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 		log.Warnf("txPutPending: pending queue full, inst: %s, hsInfo: %s:%d",
 			conInst.name, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt & 0x1f == 0 {
-			log.Infof("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
+			log.Debugf("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
 				conInst.txqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		}
 		return DhtEnoResource
@@ -743,7 +743,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 		log.Warnf("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt & 0x1f == 0 {
-			log.Infof("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
+			log.Debugf("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
 				conInst.wrqDiscardCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		}
 		return DhtEnoResource
@@ -751,7 +751,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	conInst.txChan <- pkg
 
-	ciLog.Debug("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
+	log.Debugf("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
 		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
 	return DhtEnoNone
@@ -766,7 +766,7 @@ func (conInst *ConInst) txSetPkgTimer(userData interface{}) DhtErrno {
 	if txPkg, ok := userData.(*conInstTxPkg); ok {
 		tid, err := conInst.txDtm.setTimer(userData, conInst.txTmCycle)
 		if tid == nil || err != nil {
-			ciLog.Debug("setTimer: failed")
+			log.Errorf("setTimer: failed")
 			return DhtEnoTimer
 		}
 		txPkg.txTid = tid
@@ -780,19 +780,19 @@ func (conInst *ConInst) txSetPkgTimer(userData interface{}) DhtErrno {
 //
 func (conInst *ConInst) txTimerHandler(userData interface{}) error {
 	if userData == nil {
-		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
+		log.Errorf("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoParameter
 	}
 	txPkg, ok := userData.(*conInstTxPkg)
 	if !ok || txPkg == nil {
-		ciLog.Debug("txTimerHandler: invalid parameter, inst: %s", conInst.name)
+		log.Errorf("txTimerHandler: invalid parameter, inst: %s", conInst.name)
 		return sch.SchEnoMismatched
 	}
 
 	pkgId := txPkgId{txSeq: txPkg.waitSeq}
 	_, ok = conInst.txWaitRsp[pkgId]
 	if !ok {
-		ciLog.Debug("txTimerHandler: not found, seq: %d", txPkg.waitSeq)
+		log.Debugf("txTimerHandler: not found, seq: %d", txPkg.waitSeq)
 		return sch.SchEnoMismatched
 	}
 
@@ -838,7 +838,7 @@ func (conInst *ConInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 		eno, txPkg = conInst.checkTxWaitResponse(MID_GETVALUE_RSP, int64(gvr.Id))
 
 	default:
-		ciLog.Debug("protoMsgInd: invalid indication, for: %d", msg.ForWhat)
+		log.Debugf("protoMsgInd: invalid indication, for: %d", msg.ForWhat)
 		return sch.SchEnoParameter
 	}
 
@@ -863,7 +863,7 @@ func (conInst *ConInst) txSetPending(txPkg *conInstTxPkg) DhtErrno {
 	if txPkg != nil {
 		txPkg.taskName = conInst.sdl.SchGetTaskName(txPkg.task)
 		if len(txPkg.taskName) == 0 {
-			ciLog.Debug("txSetPending: task without name")
+			log.Debugf("txSetPending: task without name")
 			return DhtEnoScheduler
 		}
 		pkgId := txPkgId{txSeq: txPkg.waitSeq}
@@ -1003,7 +1003,7 @@ func (conInst *ConInst) cleanUp(why int) DhtErrno {
 func (conInst *ConInst) connect2Peer() DhtErrno {
 
 	if conInst.dir != ConInstDirOutbound {
-		ciLog.Debug("connect2Peer: mismatched direction: inst: %s, dir: %d",
+		log.Debugf("connect2Peer: mismatched direction: inst: %s, dir: %d",
 			conInst.name, conInst.dir)
 		return DhtEnoInternal
 	}
@@ -1012,7 +1012,7 @@ func (conInst *ConInst) connect2Peer() DhtErrno {
 	dialer := &net.Dialer{Timeout: ciConn2PeerTimeout}
 	addr := &net.TCPAddr{IP: peer.IP, Port: int(peer.TCP)}
 
-	ciLog.Debug("connect2Peer: try to connect, " +
+	log.Debugf("connect2Peer: try to connect, " +
 		"inst: %s, dir: %d, local: %s, remote: %s",
 		conInst.name, conInst.dir,
 		conInst.local.IP.String(),
@@ -1022,7 +1022,7 @@ func (conInst *ConInst) connect2Peer() DhtErrno {
 	var err error
 
 	if conn, err = dialer.Dial("tcp", addr.String()); err != nil {
-		ciLog.Debug("connect2Peer: " +
+		log.Debugf("connect2Peer: " +
 			"dial failed, inst: %s, dir: %d, local: %s, to: %s, err: %s",
 			conInst.name, conInst.dir, conInst.local.IP.String(),
 			addr.String(), err.Error())
@@ -1035,7 +1035,7 @@ func (conInst *ConInst) connect2Peer() DhtErrno {
 	w := conInst.con.(io.Writer)
 	conInst.iow = ggio.NewDelimitedWriter(w)
 
-	ciLog.Debug("connect2Peer: connect ok, " +
+	log.Debugf("connect2Peer: connect ok, " +
 		"inst: %s, dir: %d, local: %s, remote: %s",
 		conInst.name, conInst.dir,
 		conn.LocalAddr().String(),
@@ -1074,7 +1074,7 @@ func (conInst *ConInst) statusReport() DhtErrno {
 //
 func (conInst *ConInst) outboundHandshake() DhtErrno {
 
-	ciLog.Debug("outboundHandshake: begin, inst: %s, dir: %d, local: %s, remote: %s",
+	log.Debugf("outboundHandshake: begin, inst: %s, dir: %d, local: %s, remote: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	dhtMsg := new(DhtMessage)
@@ -1096,7 +1096,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 
 	pbPkg := dhtMsg.GetPbPackage()
 	if pbPkg == nil {
-		ciLog.Debug("outboundHandshake: GetPbPackage failed, " +
+		log.Debugf("outboundHandshake: GetPbPackage failed, " +
 			"inst: %s, dir: %d, local: %s, remote: %s",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 		return DhtEnoSerialization
@@ -1104,7 +1104,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-		ciLog.Debug("outboundHandshake: WriteMsg failed, " +
+		log.Debugf("outboundHandshake: WriteMsg failed, " +
 			"inst: %s, dir: %d, err: %s",
 			conInst.name, conInst.dir, err.Error())
 		return DhtEnoSerialization
@@ -1113,21 +1113,21 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	*pbPkg = pb.DhtPackage{}
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pbPkg); err != nil {
-		ciLog.Debug("outboundHandshake: ReadMsg failed, " +
+		log.Debugf("outboundHandshake: ReadMsg failed, " +
 			"inst: %s, dir: %d, err: %s",
 			conInst.name, conInst.dir, err.Error())
 		return DhtEnoSerialization
 	}
 
 	if *pbPkg.Pid != PID_DHT {
-		ciLog.Debug("outboundHandshake: invalid pid, " +
+		log.Warnf("outboundHandshake: invalid pid, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, pid: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), pbPkg.Pid)
 		return DhtEnoProtocol
 	}
 
 	if *pbPkg.PayloadLength <= 0 {
-		ciLog.Debug("outboundHandshake: invalid payload length, " +
+		log.Debugf("outboundHandshake: invalid payload length, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, length: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
 			*pbPkg.PayloadLength)
@@ -1135,7 +1135,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	}
 
 	if len(pbPkg.Payload) != int(*pbPkg.PayloadLength) {
-		ciLog.Debug("outboundHandshake: payload length mismatched, " +
+		log.Debugf("outboundHandshake: payload length mismatched, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, PlLen: %d, real: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
 			*pbPkg.PayloadLength, len(pbPkg.Payload))
@@ -1149,14 +1149,14 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 
 	*dhtMsg = DhtMessage{}
 	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
-		ciLog.Debug("outboundHandshake: GetMessage failed, " +
+		log.Debugf("outboundHandshake: GetMessage failed, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, eno: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), eno)
 		return eno
 	}
 
 	if dhtMsg.Mid != MID_HANDSHAKE {
-		ciLog.Debug("outboundHandshake: invalid MID, " +
+		log.Debugf("outboundHandshake: invalid MID, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, MID: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), dhtMsg.Mid)
 		return DhtEnoProtocol
@@ -1164,7 +1164,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 
 	hs := dhtMsg.Handshake
 	if hs.Dir != ConInstDirInbound {
-		ciLog.Debug("outboundHandshake: mismatched direction, " +
+		log.Debugf("outboundHandshake: mismatched direction, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, hsdir: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), hs.Dir)
 		return DhtEnoProtocol
@@ -1188,7 +1188,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 		ID:  hs.NodeId,
 	}
 
-	ciLog.Debug("outboundHandshake: end ok, inst: %s, dir: %d, local: %s, remote: %s",
+	log.Debugf("outboundHandshake: end ok, inst: %s, dir: %d, local: %s, remote: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	return DhtEnoNone
@@ -1199,28 +1199,28 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 //
 func (conInst *ConInst) inboundHandshake() DhtErrno {
 
-	ciLog.Debug("inboundHandshake: begin, inst: %s, dir: %d, local: %s, remote: %s",
+	log.Debugf("inboundHandshake: begin, inst: %s, dir: %d, local: %s, remote: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	pkg := new(pb.DhtPackage)
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pkg); err != nil {
-		ciLog.Debug("inboundHandshake: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+		log.Debugf("inboundHandshake: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
 		return DhtEnoSerialization
 	}
 
 	if *pkg.Pid != PID_DHT {
-		ciLog.Debug("inboundHandshake: invalid pid, inst: %s, pid: %d", conInst.name, pkg.Pid)
+		log.Debugf("inboundHandshake: invalid pid, inst: %s, pid: %d", conInst.name, pkg.Pid)
 		return DhtEnoProtocol
 	}
 
 	if *pkg.PayloadLength <= 0 {
-		ciLog.Debug("inboundHandshake: invalid payload length: %d, inst: %s", *pkg.PayloadLength, conInst.name)
+		log.Debugf("inboundHandshake: invalid payload length: %d, inst: %s", *pkg.PayloadLength, conInst.name)
 		return DhtEnoProtocol
 	}
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
-		ciLog.Debug("inboundHandshake: " +
+		log.Debugf("inboundHandshake: " +
 			"payload length mismatched, PlLen: %d, real: %d, inst: %s",
 			*pkg.PayloadLength, len(pkg.Payload), conInst.name)
 		return DhtEnoProtocol
@@ -1233,18 +1233,18 @@ func (conInst *ConInst) inboundHandshake() DhtErrno {
 
 	dhtMsg := new(DhtMessage)
 	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
-		ciLog.Debug("inboundHandshake: GetMessage failed, eno: %d, inst: %s", eno, conInst.name)
+		log.Debugf("inboundHandshake: GetMessage failed, eno: %d, inst: %s", eno, conInst.name)
 		return eno
 	}
 
 	if dhtMsg.Mid != MID_HANDSHAKE {
-		ciLog.Debug("inboundHandshake: invalid MID: %d, inst: %s", dhtMsg.Mid, conInst.name)
+		log.Debugf("inboundHandshake: invalid MID: %d, inst: %s", dhtMsg.Mid, conInst.name)
 		return DhtEnoProtocol
 	}
 
 	hs := dhtMsg.Handshake
 	if hs.Dir != ConInstDirOutbound {
-		ciLog.Debug("inboundHandshake: mismatched direction: %d, inst: %s", hs.Dir, conInst.name)
+		log.Debugf("inboundHandshake: mismatched direction: %d, inst: %s", hs.Dir, conInst.name)
 		return DhtEnoProtocol
 	}
 
@@ -1275,17 +1275,17 @@ func (conInst *ConInst) inboundHandshake() DhtErrno {
 
 	pbPkg := dhtMsg.GetPbPackage()
 	if pbPkg == nil {
-		ciLog.Debug("inboundHandshake: GetPbPackage failed, inst: %s", conInst.name)
+		log.Debugf("inboundHandshake: GetPbPackage failed, inst: %s", conInst.name)
 		return DhtEnoSerialization
 	}
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-		ciLog.Debug("inboundHandshake: WriteMsg failed, err: %s, inst: %s", err.Error(), conInst.name)
+		log.Debugf("inboundHandshake: WriteMsg failed, err: %s, inst: %s", err.Error(), conInst.name)
 		return DhtEnoSerialization
 	}
 
-	ciLog.Debug("inboundHandshake: end ok, inst: %s, dir: %d, local: %s, remote: %s",
+	log.Debugf("inboundHandshake: end ok, inst: %s, dir: %d, local: %s, remote: %s",
 		conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
 	return DhtEnoNone
@@ -1591,12 +1591,12 @@ _rxLoop:
 func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 
 	if msg == nil {
-		ciLog.Debug("dispatch: invalid parameter, " +
+		log.Errorf("dispatch: invalid parameter, " +
 			"inst: %s, local: %+v", conInst.name, *conInst.local)
 		return DhtEnoParameter
 	}
 
-	ciLog.Debug("dispatch: try to dispatch message from peer, " +
+	log.Debugf("dispatch: try to dispatch message from peer, " +
 		"inst: %s, local: %+v, msg: %+v", conInst.name, *conInst.local, *msg)
 
 	var eno = DhtEnoUnknown
@@ -1605,98 +1605,98 @@ func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_HANDSHAKE:
 
-		ciLog.Debug("dispatch: MID_HANDSHAKE is not supported now")
+		log.Debugf("dispatch: MID_HANDSHAKE is not supported now")
 		eno = DhtEnoProtocol
 
 	case MID_FINDNODE:
 
-		ciLog.Debug("dispatch: MID_FINDNODE, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_FINDNODE, inst: %s", conInst.name)
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
 
-		ciLog.Debug("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
 		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
+			log.Debugf("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
+			log.Debugf("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
 		eno = conInst.getValueReq(msg.GetValueReq)
 
 	case MID_GETVALUE_RSP:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
+			log.Debugf("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
+			log.Debugf("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
 		eno = conInst.putProvider(msg.PutProvider)
 
 	case MID_GETPROVIDER_REQ:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
+			log.Debugf("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
 
 		if conInst.bootstrapNode {
-			ciLog.Debug("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
+			log.Debugf("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		ciLog.Debug("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
 
-		ciLog.Debug("dispatch: MID_PING, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_PING, inst: %s", conInst.name)
 		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
 
-		ciLog.Debug("dispatch: MID_PONG, inst: %s", conInst.name)
+		log.Debugf("dispatch: MID_PONG, inst: %s", conInst.name)
 		eno = conInst.getPong(msg.Pong)
 
 	default:
 
-		ciLog.Debug("dispatch: unknown: %d, inst: %s", msg.Mid, conInst.name)
+		log.Debugf("dispatch: unknown: %d, inst: %s", msg.Mid, conInst.name)
 		eno = DhtEnoProtocol
 	}
 
@@ -1860,7 +1860,7 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 	pkgId := txPkgId{txSeq: seq}
 	txPkg, ok := conInst.txWaitRsp[pkgId]
 	if !ok {
-		connLog.Debug("checkTxWaitResponse: not found, mid: %d, seq: %d", mid, seq)
+		log.Debugf("checkTxWaitResponse: not found, mid: %d, seq: %d", mid, seq)
 		return DhtEnoNotFound, nil
 	}
 	if txPkg.responsed != nil {
@@ -1868,7 +1868,7 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 		close(txPkg.responsed)
 	}
 
-	ciLog.Debug("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
+	log.Debugf("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 	if txPkg.responsed != nil && txPkg.txTid != nil {
 		conInst.txDtm.delTimer(txPkg.txTid)
 		txPkg.txTid = nil
@@ -1899,10 +1899,10 @@ func (conInst *ConInst) InstallRxDataCallback(cbf ConInstRxDataCallback) DhtErrn
 	conInst.cbRxLock.Lock()
 	defer conInst.cbRxLock.Unlock()
 	if conInst.cbfRxData != nil {
-		ciLog.Debug("InstallRxDataCallback: old callback will be overlapped")
+		log.Debugf("InstallRxDataCallback: old callback will be overlapped")
 	}
 	if cbf == nil {
-		ciLog.Debug("InstallRxDataCallback: nil callback will be set")
+		log.Debugf("InstallRxDataCallback: nil callback will be set")
 	}
 	conInst.cbfRxData = cbf
 	return DhtEnoNone

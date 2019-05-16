@@ -248,7 +248,7 @@ func (qryMgr *QryMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) s
 //
 func (qryMgr *QryMgr) qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	qryLog.Debug("qryMgrProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
+	log.Tracef("qryMgrProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
@@ -299,11 +299,11 @@ func (qryMgr *QryMgr) qryMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = qryMgr.natPubAddrUpdateInd(msg)
 
 	default:
-		qryLog.Debug("qryMgrProc: unknown event: %d", msg.Id)
+		log.Debugf("qryMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
-	qryLog.Debug("qryMgrProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
+	log.Tracef("qryMgrProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
 
 	return eno
 }
@@ -315,28 +315,28 @@ func (qryMgr *QryMgr) poweron(ptn interface{}) sch.SchErrno {
 	var eno sch.SchErrno
 	qryMgr.ptnMe = ptn
 	if qryMgr.sdl = sch.SchGetScheduler(ptn); qryMgr.sdl == nil {
-		qryLog.Debug("poweron: nil scheduler")
+		log.Errorf("poweron: nil scheduler")
 		return sch.SchEnoInternal
 	}
 	qryMgr.sdlName = qryMgr.sdl.SchGetP2pCfgName()
 	if eno, qryMgr.ptnDhtMgr = qryMgr.sdl.SchGetUserTaskNode(DhtMgrName); eno != sch.SchEnoNone {
-		qryLog.Debug("poweron: get task failed, task: %s", DhtMgrName)
+		log.Errorf("poweron: get task failed, task: %s", DhtMgrName)
 		return eno
 	}
 	if eno, qryMgr.ptnRutMgr = qryMgr.sdl.SchGetUserTaskNode(RutMgrName); eno != sch.SchEnoNone {
-		qryLog.Debug("poweron: get task failed, task: %s", RutMgrName)
+		log.Errorf("poweron: get task failed, task: %s", RutMgrName)
 		return eno
 	}
 	if eno, qryMgr.ptnNatMgr = qryMgr.sdl.SchGetUserTaskNode(nat.NatMgrName); eno != sch.SchEnoNone {
-		qryLog.Debug("poweron: get task failed, task: %s", nat.NatMgrName)
+		log.Errorf("poweron: get task failed, task: %s", nat.NatMgrName)
 		return eno
 	}
 	if eno, qryMgr.ptnDsMgr = qryMgr.sdl.SchGetUserTaskNode(DsMgrName); eno != sch.SchEnoNone {
-		qryLog.Debug("poweron: get task failed, task: %s", DsMgrName)
+		log.Errorf("poweron: get task failed, task: %s", DsMgrName)
 		return eno
 	}
 	if dhtEno := qryMgr.qryMgrGetConfig(); dhtEno != DhtEnoNone {
-		qryLog.Debug("poweron: qryMgrGetConfig failed, dhtEno: %d", dhtEno)
+		log.Errorf("poweron: qryMgrGetConfig failed, dhtEno: %d", dhtEno)
 		return sch.SchEnoUserTask
 	}
 	mapQrySeqLock[qryMgr.sdlName] = sync.Mutex{}
@@ -347,7 +347,7 @@ func (qryMgr *QryMgr) poweron(ptn interface{}) sch.SchErrno {
 // Poweroff handler
 //
 func (qryMgr *QryMgr) poweroff(ptn interface{}) sch.SchErrno {
-	qryLog.Debug("poweroff: task will be done ...")
+	log.Debugf("poweroff: task will be done ...")
 	for _, qcb := range qryMgr.qcbTab {
 		for _, qry := range qcb.qryActived {
 			po := sch.SchMessage{}
@@ -364,7 +364,7 @@ func (qryMgr *QryMgr) poweroff(ptn interface{}) sch.SchErrno {
 //
 func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQueryStartReq) sch.SchErrno {
 	if sender == nil || msg == nil {
-		qryLog.Debug("queryStartReq: invalid prameters, sdl: %s", qryMgr.sdlName)
+		log.Errorf("queryStartReq: invalid prameters, sdl: %s", qryMgr.sdlName)
 		return sch.SchEnoParameter
 	}
 	if msg.ForWhat != MID_PUTVALUE &&
@@ -372,11 +372,11 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 		msg.ForWhat != MID_FINDNODE &&
 		msg.ForWhat != MID_GETPROVIDER_REQ &&
 		msg.ForWhat != MID_GETVALUE_REQ {
-		qryLog.Debug("queryStartReq: unknown what's for")
+		log.Debugf("queryStartReq: unknown what's for")
 		return sch.SchEnoMismatched
 	}
 
-	log.Infof("queryStartReq: sdl: %s, ForWhat: %d, sender: %s, batch: %t, batchId: %d, target: %x",
+	log.Debugf("queryStartReq: sdl: %s, ForWhat: %d, sender: %s, batch: %t, batchId: %d, target: %x",
 		qryMgr.sdlName, msg.ForWhat, qryMgr.sdl.SchGetTaskName(sender), msg.Batch, msg.BatchId, msg.Target)
 
 	var forWhat = msg.ForWhat
@@ -402,7 +402,7 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 	}
 
 	if _, dup := qryMgr.qcbTab[msg.Target]; dup {
-		log.Errorf("queryStartReq: duplicated, sdl: %s, ForWhat: %d, target: %x",
+		log.Debugf("queryStartReq: duplicated, sdl: %s, ForWhat: %d, target: %x",
 			qryMgr.sdlName, msg.ForWhat, msg.Target)
 		rsp.Eno = DhtEnoDuplicated.GetEno()
 		goto _rsp2Sender
@@ -427,7 +427,7 @@ func (qryMgr *QryMgr) queryStartReq(sender interface{}, msg *sch.MsgDhtQryMgrQue
 	qcb.depth = 0
 	qryMgr.qcbTab[msg.Target] = qcb
 
-	log.Infof("queryStartReq: going to fetch nearests for target, " +
+	log.Debugf("queryStartReq: going to fetch nearests for target, " +
 		"sdl: %s, ForWhat: %d, target: %x",
 		qryMgr.sdlName, qcb.forWhat, qcb.target)
 
@@ -480,7 +480,7 @@ func (qryMgr *QryMgr)dsGvbStartReq(msg *sch.MsgDhtDsGvbStartReq) sch.SchErrno {
 		return sch.SchEnoDuplicated
 	}
 
-	log.Infof("dsGvbStartReq: sdl: %s, gvbId: %d, size: %d",
+	log.Debugf("dsGvbStartReq: sdl: %s, gvbId: %d, size: %d",
 		qryMgr.sdlName, msg.GvbId, gvbCb.size)
 
 	gvbCb.status = sch.GVBS_WORKING
@@ -503,7 +503,7 @@ func (qryMgr *QryMgr)dsGvbStartReq(msg *sch.MsgDhtDsGvbStartReq) sch.SchErrno {
 //
 func (qryMgr *QryMgr)dsGvbStopReq(msg *sch.MsgDhtDsGvbStopReq) sch.SchErrno {
 
-	log.Infof("dsGvbStopReq: sdl: %s, gvbId: %d",
+	log.Debugf("dsGvbStopReq: sdl: %s, gvbId: %d",
 		qryMgr.sdlName, msg.GvbId)
 
 	gvbCb, ok := qryMgr.gvbTab[msg.GvbId]
@@ -523,7 +523,7 @@ func (qryMgr *QryMgr)dsGvbStopReq(msg *sch.MsgDhtDsGvbStopReq) sch.SchErrno {
 		}
 		delete(gvbCb.pending, key)
 	}
-	log.Infof("dsGvbStopReq: all stopped,  sdl: %s, id: %d", qryMgr.sdlName, gvbCb.gvbId)
+	log.Debugf("dsGvbStopReq: all stopped,  sdl: %s, id: %d", qryMgr.sdlName, gvbCb.gvbId)
 	delete(qryMgr.gvbTab, gvbCb.gvbId)
 	gvbCb.status = sch.GVBS_TERMED
 	return qryMgr.gvbStatusReport(gvbCb, "dsGvbStopReq")
@@ -544,13 +544,13 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		return sch.SchEnoMismatched
 	}
 
-	log.Infof("rutNearestRsp: sdl: %s, ForWhat: %d, target: %x", qryMgr.sdlName, msg.ForWhat, msg.Target)
+	log.Debugf("rutNearestRsp: sdl: %s, ForWhat: %d, target: %x", qryMgr.sdlName, msg.ForWhat, msg.Target)
 
 	forWhat := msg.ForWhat
 	target := msg.Target
 	qcb, ok := qryMgr.qcbTab[target]
 	if !ok {
-		log.Errorf("rutNearestRsp: qcb not exist, sdl: %s, forWhat: %d, target: %x",
+		log.Debugf("rutNearestRsp: qcb not exist, sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, forWhat, target)
 		return sch.SchEnoNotFound
 	}
@@ -595,7 +595,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	}
 
 	if msg.Eno != DhtEnoNone.GetEno() {
-		log.Warnf("rutNearestRsp: route reports failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
+		log.Debugf("rutNearestRsp: route reports failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
 			qryMgr.sdlName, msg.ForWhat, msg.Eno, msg.Target)
 		qryFailed2Sender(DhtErrno(msg.Eno))
 		qryMgr.qryMgrDelQcb(delQcb4NoSeeds, target)
@@ -642,7 +642,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		if forWhat == MID_FINDNODE ||
 			forWhat == MID_GETPROVIDER_REQ {
 			if bytes.Compare(peer.hash[0:], target[0:]) == 0 {
-				log.Infof("rutNearestRsp: sdl: %s, forWhat: %d, target found: %x",
+				log.Debugf("rutNearestRsp: sdl: %s, forWhat: %d, target found: %x",
 					qryMgr.sdlName, forWhat, target)
 				qryOk2Sender(&peer.node)
 				qryMgr.qryMgrDelQcb(delQcb4TargetInLocal, target)
@@ -682,17 +682,17 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 	if dhtEno = qcb.qryMgrQcbPutPending(pendInfo, qryMgr.qmCfg.maxPendings); dhtEno == DhtEnoNone {
 		if dhtEno = qryMgr.qryMgrQcbStartTimer(qcb); dhtEno == DhtEnoNone {
 			if eno, insts := qryMgr.qryMgrQcbPutActived(qcb); eno != DhtEnoNone  || insts == 0{
-				log.Errorf("rutNearestRsp: active query failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
+				log.Debugf("rutNearestRsp: active query failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
 					qryMgr.sdlName, qcb.forWhat, eno, qcb.target)
 			}
 			qcb.status = qsInited
 			return sch.SchEnoNone
 		} else {
-			log.Errorf("rutNearestRsp: start timer failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
+			log.Debugf("rutNearestRsp: start timer failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
 				qryMgr.sdlName, qcb.forWhat, dhtEno, qcb.target)
 		}
 	} else {
-		log.Errorf("rutNearestRsp: put query to pending queue failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
+		log.Debugf("rutNearestRsp: put query to pending queue failed, sdl: %s, forWhat: %d, eno: %d, target: %x",
 			qryMgr.sdlName, qcb.forWhat, dhtEno, qcb.target)
 	}
 
@@ -723,12 +723,12 @@ func (qryMgr *QryMgr) rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) s
 	qcb := (*qryCtrlBlock)(nil)
 	target := msg.Target
 	if qcb = qryMgr.qcbTab[target]; qcb == nil {
-		qryLog.Debug("rutNotificationInd: target not found: %x", target)
+		log.Debugf("rutNotificationInd: target not found: %x", target)
 		return sch.SchEnoParameter
 	}
 
 	if qcb.status != qsInited {
-		qryLog.Debug("rutNotificationInd: query not inited yet for target: %x", target)
+		log.Debugf("rutNotificationInd: query not inited yet for target: %x", target)
 		return sch.SchEnoUserTask
 	}
 
@@ -746,17 +746,17 @@ func (qryMgr *QryMgr) rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) s
 	qryMgr.qryMgrQcbPutActived(qcb)
 
 	if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
-		qryLog.Debug("rutNotificationInd: internal errors")
+		log.Debugf("rutNotificationInd: internal errors")
 		return sch.SchEnoUserTask
 	}
 
 	if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0 {
 		if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-			qryLog.Debug("rutNotificationInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+			log.Debugf("rutNotificationInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
 		if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
-			qryLog.Debug("rutNotificationInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+			log.Debugf("rutNotificationInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -770,60 +770,60 @@ func (qryMgr *QryMgr) rutNotificationInd(msg *sch.MsgDhtRutMgrNotificationInd) s
 func (qryMgr *QryMgr) instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrno {
 	switch msg.Status {
 	case qisNull:
-		qryLog.Debug("instStatusInd: qisNull")
+		log.Debugf("instStatusInd: qisNull")
 	case qisInited:
-		qryLog.Debug("instStatusInd: qisInited")
+		log.Debugf("instStatusInd: qisInited")
 	case qisWaitConnect:
-		qryLog.Debug("instStatusInd: qisWaitConnect")
+		log.Debugf("instStatusInd: qisWaitConnect")
 	case qisWaitResponse:
-		qryLog.Debug("instStatusInd: qisWaitResponse")
+		log.Debugf("instStatusInd: qisWaitResponse")
 	case qisDoneOk:
-		qryLog.Debug("instStatusInd: qisDoneOk")
+		log.Debugf("instStatusInd: qisDoneOk")
 
 	case qisDone:
-		qryLog.Debug("instStatusInd: qisDone")
+		log.Debugf("instStatusInd: qisDone")
 		qcb, exist := qryMgr.qcbTab[msg.Target]
 		if !exist {
-			qryLog.Debug("instStatusInd: qcb not found")
+			log.Debugf("instStatusInd: qcb not found")
 			return sch.SchEnoNotFound
 		}
 		if dhtEno := qryMgr.qryMgrDelIcb(delQcb4QryInstDoneInd, &msg.Target, &msg.Peer); dhtEno != DhtEnoNone {
-			qryLog.Debug("instStatusInd: qryMgrDelIcb failed, eno: %d", dhtEno)
+			log.Debugf("instStatusInd: qryMgrDelIcb failed, eno: %d", dhtEno)
 			return sch.SchEnoUserTask
 		}
 		if eno, num := qryMgr.qryMgrQcbPutActived(qcb); true {
-			qryLog.Debug("instStatusInd: qryMgrQcbPutActived return with eno: %d, num: %d", eno, num)
+			log.Debugf("instStatusInd: qryMgrQcbPutActived return with eno: %d, num: %d", eno, num)
 		}
 		if qcb.qryPending.Len() > 0 && len(qcb.qryActived) < qryMgr.qmCfg.maxActInsts {
-			qryLog.Debug("instStatusInd: internal errors")
+			log.Debugf("instStatusInd: internal errors")
 			return sch.SchEnoUserTask
 		}
 
 		// if pending queue and active queue all are empty, we just report query
 		// result and end the query.
-		qryLog.Debug("instStatusInd: pending: %d, actived: %d", qcb.qryPending.Len(), len(qcb.qryActived))
+		log.Debugf("instStatusInd: pending: %d, actived: %d", qcb.qryPending.Len(), len(qcb.qryActived))
 
 		if qcb.qryPending.Len() == 0 && len(qcb.qryActived) == 0 {
-			qryLog.Debug("instStatusInd: query done: %x", qcb.target)
+			log.Debugf("instStatusInd: query done: %x", qcb.target)
 			if qcb.forWhat == MID_PUTVALUE || qcb.forWhat == MID_PUTPROVIDER {
 				if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNone.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-					qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+					log.Debugf("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 					return sch.SchEnoUserTask
 				}
 			} else {
 				if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil); dhtEno != DhtEnoNone {
-					qryLog.Debug("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
+					log.Debugf("instStatusInd: qryMgrResultReport failed, dhtEno: %d", dhtEno)
 					return sch.SchEnoUserTask
 				}
 			}
 			if dhtEno := qryMgr.qryMgrDelQcb(delQcb4NoMoreQueries, qcb.target); dhtEno != DhtEnoNone {
-				qryLog.Debug("instStatusInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
+				log.Debugf("instStatusInd: qryMgrDelQcb failed, dhtEno: %d", dhtEno)
 				return sch.SchEnoUserTask
 			}
 		}
 
 	default:
-		qryLog.Debug("instStatusInd: invalid instance status: %d", msg.Status)
+		log.Debugf("instStatusInd: invalid instance status: %d", msg.Status)
 		return sch.SchEnoUserTask
 	}
 
@@ -835,7 +835,7 @@ func (qryMgr *QryMgr) instStatusInd(msg *sch.MsgDhtQryInstStatusInd) sch.SchErrn
 //
 func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrno {
 
-	log.Infof("instResultInd: sdl: %s, forWhat: %d, target: %x", qryMgr.sdlName, msg.ForWhat, msg.Target)
+	log.Debugf("instResultInd: sdl: %s, forWhat: %d, target: %x", qryMgr.sdlName, msg.ForWhat, msg.Target)
 
 	if msg.ForWhat != sch.EvDhtMgrPutValueReq &&
 		msg.ForWhat != sch.EvDhtMgrPutProviderReq &&
@@ -905,14 +905,14 @@ func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrn
 
 	target := msg.Target
 	if qcb = qryMgr.qcbTab[target]; qcb == nil {
-		log.Errorf("instResultInd: not found, sdl: %s, forWhat: %d, target: %x",
+		log.Debugf("instResultInd: not found, sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, msg.ForWhat, target)
 		return sch.SchEnoUserTask
 	}
 
 	icb, ok := qcb.qryActived[from.ID]
 	if !ok || icb == nil {
-		log.Errorf("instResultInd: target not found, sdl: %s, forWhat: %d, target: %x",
+		log.Debugf("instResultInd: target not found, sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, msg.ForWhat, target)
 		return sch.SchEnoUserTask
 	}
@@ -987,7 +987,7 @@ func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrn
 		msg.ForWhat == sch.EvDhtConInstGetProviderRsp ||
 		msg.ForWhat == sch.EvDhtConInstGetValRsp {
 		if qcb.depth > qryMgrQryMaxDepth || len(qcb.qryHistory) >= qryMgrQryMaxWidth {
-			log.Infof("instResultInd: query limited to stop, forWhat: %d, depth: %d, width: %d",
+			log.Debugf("instResultInd: query limited to stop, forWhat: %d, depth: %d, width: %d",
 				msg.ForWhat, qcb.depth, len(qcb.qryHistory))
 			if dhtEno := qryMgr.qryMgrResultReport(qcb, DhtEnoNotFound.GetEno(), nil, nil, nil);
 				dhtEno != DhtEnoNone {
@@ -1059,7 +1059,7 @@ func (qryMgr *QryMgr) instResultInd(msg *sch.MsgDhtQryInstResultInd) sch.SchErrn
 // nat ready to work
 //
 func (qryMgr *QryMgr) natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
-	qryLog.Debug("natMgrReadyInd: nat type: %s", msg.NatType)
+	log.Debugf("natMgrReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		qryMgr.pubTcpIp = qryMgr.qmCfg.local.IP
 		qryMgr.pubTcpPort = int(qryMgr.qmCfg.local.TCP)
@@ -1074,7 +1074,7 @@ func (qryMgr *QryMgr) natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) sch.SchErrno {
 		schMsg := sch.SchMessage{}
 		qryMgr.sdl.SchMakeMessage(&schMsg, qryMgr.ptnMe, qryMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &req)
 		if eno := qryMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			qryLog.Debug("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
+			log.Debugf("natMgrReadyInd: SchSendMessage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 	}
@@ -1088,21 +1088,21 @@ func (qryMgr *QryMgr) natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 	// see comments in function tabMgrNatMakeMapRsp for more please.
 	mmr := msg.Body.(*sch.MsgNatMgrMakeMapRsp)
 	if !nat.NatIsResultOk(mmr.Result) {
-		qryLog.Debug("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
+		log.Debugf("natMakeMapRsp: fail reported, mmr: %+v", *mmr)
 	}
-	qryLog.Debug("natMakeMapRsp: proto: %s, ip:port = %s:%d",
+	log.Debugf("natMakeMapRsp: proto: %s, ip:port = %s:%d",
 		mmr.Proto, mmr.PubIp.String(), mmr.PubPort)
 
 	proto := strings.ToLower(mmr.Proto)
 	if proto == "tcp" {
 		qryMgr.natTcpResult = nat.NatIsStatusOk(mmr.Status)
 		if qryMgr.natTcpResult {
-			qryLog.Debug("natMakeMapRsp: public dht addr: %s:%d",
+			log.Debugf("natMakeMapRsp: public dht addr: %s:%d",
 				mmr.PubIp.String(), mmr.PubPort)
 			qryMgr.pubTcpIp = mmr.PubIp
 			qryMgr.pubTcpPort = mmr.PubPort
 			if eno := qryMgr.switch2NatAddr(proto); eno != DhtEnoNone {
-				qryLog.Debug("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+				log.Debugf("natMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 				return sch.SchEnoUserTask
 			}
 		} else {
@@ -1114,7 +1114,7 @@ func (qryMgr *QryMgr) natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		return qryMgr.sdl.SchSendMessage(msg)
 	}
 
-	qryLog.Debug("natMakeMapRsp: unknown protocol reported: %s", proto)
+	log.Warnf("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1131,25 +1131,25 @@ func (qryMgr *QryMgr) natPubAddrUpdateInd(msg *sch.SchMessage) sch.SchErrno {
 	ind := msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd)
 	proto := strings.ToLower(ind.Proto)
 	if proto != nat.NATP_TCP {
-		qryLog.Debug("natPubAddrUpdateInd: bad protocol: %s", proto)
+		log.Debugf("natPubAddrUpdateInd: bad protocol: %s", proto)
 		return sch.SchEnoParameter
 	}
 
 	oldResult := qryMgr.natTcpResult
 	if qryMgr.natTcpResult = nat.NatIsStatusOk(ind.Status); !qryMgr.natTcpResult {
-		qryLog.Debug("natPubAddrUpdateInd: result bad")
+		log.Debugf("natPubAddrUpdateInd: result bad")
 		return sch.SchEnoNone
 	}
 
-	qryLog.Debug("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+	log.Debugf("natPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
 		ind.Proto, qryMgr.pubTcpIp.String(), qryMgr.pubTcpPort, ind.PubIp.String(), ind.PubPort)
 
 	qryMgr.pubTcpIp = ind.PubIp
 	qryMgr.pubTcpPort = ind.PubPort
 	if !oldResult || !ind.PubIp.Equal(qryMgr.pubTcpIp) || ind.PubPort != qryMgr.pubTcpPort {
-		qryLog.Debug("natPubAddrUpdateInd: call natMapSwitch")
+		log.Debugf("natPubAddrUpdateInd: call natMapSwitch")
 		if eno := qryMgr.natMapSwitch(); eno != DhtEnoNone {
-			qryLog.Debug("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
+			log.Debugf("natPubAddrUpdateInd: natMapSwitch failed, error: %s", eno.Error())
 			return sch.SchEnoUserTask
 		}
 	}
@@ -1207,15 +1207,15 @@ func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 	case delQcb4Command:
 		strDebug = "delQcb4Command"
 	default:
-		qryLog.Debug("qryMgrDelQcb: parameters mismatched, why: %d", why)
+		log.Debugf("qryMgrDelQcb: parameters mismatched, why: %d", why)
 		return DhtEnoMismatched
 	}
 
-	qryLog.Debug("qryMgrDelQcb: why: %s", strDebug)
+	log.Debugf("qryMgrDelQcb: why: %s", strDebug)
 
 	qcb, ok := qryMgr.qcbTab[target]
 	if !ok {
-		qryLog.Debug("qryMgrDelQcb: target not found: %x", target)
+		log.Debugf("qryMgrDelQcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
 
@@ -1255,24 +1255,24 @@ func (qryMgr *QryMgr) qryMgrDelQcb(why int, target config.DsKey) DhtErrno {
 //
 func (qryMgr *QryMgr) qryMgrDelIcb(why int, target *config.DsKey, peer *config.NodeID) DhtErrno {
 
-	qryLog.Debug("qryMgrDelIcb: why: %d", why)
+	log.Debugf("qryMgrDelIcb: why: %d", why)
 
 	if why != delQcb4QryInstDoneInd && why != delQcb4QryInstResultInd {
-		qryLog.Debug("qryMgrDelIcb: why delete?! why: %d", why)
+		log.Debugf("qryMgrDelIcb: why delete?! why: %d", why)
 		return DhtEnoMismatched
 	}
 	qcb, ok := qryMgr.qcbTab[*target]
 	if !ok {
-		qryLog.Debug("qryMgrDelIcb: target not found: %x", target)
+		log.Debugf("qryMgrDelIcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
 	icb, ok := qcb.qryActived[*peer]
 	if !ok {
-		qryLog.Debug("qryMgrDelIcb: target not found: %x", target)
+		log.Debugf("qryMgrDelIcb: target not found: %x", target)
 		return DhtEnoNotFound
 	}
 
-	qryLog.Debug("qryMgrDelIcb: icb: %s", icb.name)
+	log.Debugf("qryMgrDelIcb: icb: %s", icb.name)
 
 	if why == delQcb4QryInstResultInd {
 		eno, ptn := icb.sdl.SchGetUserTaskNode(icb.name)
@@ -1282,7 +1282,7 @@ func (qryMgr *QryMgr) qryMgrDelIcb(why int, target *config.DsKey, peer *config.N
 			po.TgtName = icb.name
 			icb.sdl.SchSendMessage(&po)
 		} else {
-			qryLog.Debug("qryMgrDelIcb: not found, icb: %s", icb.name)
+			log.Debugf("qryMgrDelIcb: not found, icb: %s", icb.name)
 		}
 	}
 	delete(qcb.qryActived, *peer)
@@ -1315,17 +1315,17 @@ func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) 
 	// returned when just some of peers put. currently this function always return ok,
 	// so the "size" should be large enough. if "size" is 0, no limited then.
 	if len(nodes) == 0 || size < 0 {
-		qryLog.Debug("qryMgrQcbPutPending: no pendings to be put")
+		log.Debugf("qryMgrQcbPutPending: no pendings to be put")
 		return DhtEnoParameter
 	}
 
-	qryLog.Debug("qryMgrQcbPutPending: " +
+	log.Debugf("qryMgrQcbPutPending: " +
 		"number of nodes to be put: %d, size(zero is unlimited): %d", len(nodes), size)
 
 	li := qcb.qryPending
 	for _, n := range nodes {
 		if _, dup := qcb.qryHistory[n.node.ID]; dup {
-			qryLog.Debug("qryMgrQcbPutPending: duplicated, n: %+v", n)
+			log.Debugf("qryMgrQcbPutPending: duplicated, n: %+v", n)
 			continue
 		}
 		pb := true
@@ -1342,7 +1342,7 @@ func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) 
 			}
 		}
 		if pb {
-			qryLog.Debug("qryMgrQcbPutPending: PushBack, n: %+v", n)
+			log.Debugf("qryMgrQcbPutPending: PushBack, n: %+v", n)
 			li.PushBack(n)
 		}
 	}
@@ -1360,7 +1360,7 @@ func (qcb *qryCtrlBlock) qryMgrQcbPutPending(nodes []*qryPendingInfo, size int) 
 func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 
 	if qcb.qryPending == nil || qcb.qryPending.Len() == 0 {
-		log.Infof("qryMgrQcbPutActived: no pending, sdl: %s", qryMgr.sdlName)
+		log.Debugf("qryMgrQcbPutActived: no pending, sdl: %s", qryMgr.sdlName)
 		return DhtEnoNotFound, 0
 	}
 
@@ -1376,7 +1376,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 
 	for el := qcb.qryPending.Front(); el != nil; el = el.Next() {
 		if len(qcb.qryActived) >= qryMgr.qmCfg.maxActInsts {
-			log.Infof("qryMgrQcbPutActived: full, sdl: %s, forWhat: %d, max: %d",
+			log.Debugf("qryMgrQcbPutActived: full, sdl: %s, forWhat: %d, max: %d",
 				qryMgr.sdlName, qcb.forWhat, qryMgr.qmCfg.maxActInsts)
 			break
 		}
@@ -1412,7 +1412,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 			depth:      pending.depth,
 		}
 
-		log.Infof("qryMgrQcbPutActived: sdl: %s, ForWhat: %d, target: %x",
+		log.Debugf("qryMgrQcbPutActived: sdl: %s, ForWhat: %d, target: %x",
 			qryMgr.sdlName, icb.qryReq.ForWhat, qcb.target)
 
 		qryInst := NewQryInst()
@@ -1468,7 +1468,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qcb.qryActived[icb.to.ID] = &icb
 		qcb.qryHistory[icb.to.ID] = pending
 
-		log.Infof("qryMgrQcbPutActived: EvSchPoweron and EvDhtQryInstStartReq sent, " +
+		log.Debugf("qryMgrQcbPutActived: EvSchPoweron and EvDhtQryInstStartReq sent, " +
 			"sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, qcb.forWhat, qcb.target)
 	}
@@ -1477,7 +1477,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		qcb.qryPending.Remove(el)
 	}
 
-	log.Infof("qryMgrQcbPutActived: " +
+	log.Debugf("qryMgrQcbPutActived: " +
 		"sdl: %s, forWhat: %d, pending: %d, actived: %d, history: %d, target: %x",
 		qryMgr.sdlName, qcb.forWhat, qcb.qryPending.Len(), len(qcb.qryActived), len(qcb.qryHistory), qcb.target)
 
@@ -1498,7 +1498,7 @@ func (qryMgr *QryMgr) qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
 	tid := sch.SchInvalidTid
 	eno := sch.SchEnoUnknown
 	if eno, tid = qryMgr.sdl.SchSetTimer(qryMgr.ptnMe, &td); eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		qryLog.Debug("qryMgrQcbStartTimer: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("qryMgrQcbStartTimer: SchSetTimer failed, eno: %d", eno)
 		return DhtEnoScheduler
 	}
 	qcb.qryTid = tid
@@ -1509,7 +1509,7 @@ func (qryMgr *QryMgr) qryMgrQcbStartTimer(qcb *qryCtrlBlock) DhtErrno {
 // Query control block timer handler
 //
 func (qryMgr *QryMgr) qcbTimerHandler(qcb *qryCtrlBlock) sch.SchErrno {
-	log.Errorf("qcbTimerHandler: timeout, " +
+	log.Debugf("qcbTimerHandler: timeout, " +
 		"sdl: %s, status: %d, forWhat: %d, width: %d, depth: %d, target: %x",
 		qryMgr.sdlName,	qcb.status, qcb.forWhat, qcb.width, qcb.depth, qcb.target)
 	qryMgr.qryMgrResultReport(qcb, DhtEnoTimeout.GetEno(), nil, nil, nil)
@@ -1552,12 +1552,12 @@ func (qryMgr *QryMgr) qryMgrResultReport(
 			inst.getting--
 			delete(inst.pending, qcb.qryReq.Target)
 
-			log.Infof("qryMgrResultReport: gvb, " +
+			log.Debugf("qryMgrResultReport: gvb, " +
 				"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
 					qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
 
 			if inst.getting == 0 {
-				log.Infof("qryMgrResultReport: gvb over, " +
+				log.Debugf("qryMgrResultReport: gvb over, " +
 					"sdl: %s, id: %d, staus: %d, getting: %d, got: %d, failed: %d, remain: %d",
 					qryMgr.sdlName, id, inst.status, inst.getting, inst.got, inst.failed, inst.remain)
 				if inst.failed > 0 {
@@ -1649,7 +1649,7 @@ func (qryMgr *QryMgr) qryMgrResultReport(
 		}
 	}
 
-	log.Infof("qryMgrResultReport: sdl: %s, eno: %d, ForWhat: %d, task: %s, target: %x",
+	log.Debugf("qryMgrResultReport: sdl: %s, eno: %d, ForWhat: %d, task: %s, target: %x",
 		qryMgr.sdlName, ind.Eno, ind.ForWhat, qryMgr.sdl.SchGetTaskName(qcb.ptnOwner), ind.Target)
 
 	msg := new(sch.SchMessage)
@@ -1670,7 +1670,7 @@ func (qryMgr *QryMgr) switch2NatAddr(proto string) DhtErrno {
 		qryMgr.qmCfg.local.TCP = uint16(qryMgr.pubTcpPort & 0xffff)
 		return DhtEnoNone
 	}
-	qryLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
+	log.Debugf("switch2NatAddr: invalid protocol: %s", proto)
 	return DhtEnoParameter
 }
 
@@ -1678,7 +1678,7 @@ func (qryMgr *QryMgr) switch2NatAddr(proto string) DhtErrno {
 // start nat map switching procedure
 //
 func (qryMgr *QryMgr) natMapSwitch() DhtErrno {
-	qryLog.Debug("natMapSwitch: entered")
+	log.Debugf("natMapSwitch: entered")
 	for k, qcb := range qryMgr.qcbTab {
 		fw := qcb.forWhat
 		ind := sch.MsgDhtQryMgrQueryResultInd{
@@ -1694,22 +1694,22 @@ func (qryMgr *QryMgr) natMapSwitch() DhtErrno {
 			qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qcb.ptnOwner, sch.EvDhtQryMgrQueryResultInd, &ind)
 			qryMgr.sdl.SchSendMessage(&msg)
 		}
-		qryLog.Debug("natMapSwitch: EvDhtQryMgrQueryResultInd sent")
+		log.Debugf("natMapSwitch: EvDhtQryMgrQueryResultInd sent")
 
 		if eno := qryMgr.qryMgrDelQcb(delQcb4PubAddrSwitch, k); eno != DhtEnoNone {
-			qryLog.Debug("natMapSwitch: qryMgrDelQcb failed, eno: %d", eno)
+			log.Debugf("natMapSwitch: qryMgrDelQcb failed, eno: %d", eno)
 			return eno
 		}
-		qryLog.Debug("natMapSwitch: qcb deleted, key: %x", k)
+		log.Debugf("natMapSwitch: qcb deleted, key: %x", k)
 	}
 
-	qryLog.Debug("natMapSwitch: call switch2NatAddr")
+	log.Debugf("natMapSwitch: call switch2NatAddr")
 	qryMgr.switch2NatAddr(nat.NATP_TCP)
 
 	msg := sch.SchMessage{}
 	qryMgr.sdl.SchMakeMessage(&msg, qryMgr.ptnMe, qryMgr.ptnDhtMgr, sch.EvDhtQryMgrPubAddrSwitchInd, nil)
 	qryMgr.sdl.SchSendMessage(&msg)
-	qryLog.Debug("natMapSwitch: EvDhtQryMgrPubAddrSwitchInd sent")
+	log.Debugf("natMapSwitch: EvDhtQryMgrPubAddrSwitchInd sent")
 
 	return DhtEnoNone
 }
@@ -1726,7 +1726,7 @@ func (qryMgr *QryMgr)gvbStatusReport(gvbCb *gvbCtrlBlock, ctxt string) sch.SchEr
 		Failed: gvbCb.failed,
 		Remain: gvbCb.remain,
 	}
-	log.Infof("gvbStatusReport: ctxt: %s, ind[id,status,getting,got,failed,remain]:%v",
+	log.Debugf("gvbStatusReport: ctxt: %s, ind[id,status,getting,got,failed,remain]:%v",
 		ctxt, ind)
 	msg := new(sch.SchMessage)
 	qryMgr.sdl.SchMakeMessage(msg, qryMgr.ptnMe, qryMgr.ptnDsMgr, sch.EvDhtDsGvbStatusInd, &ind)
