@@ -59,6 +59,11 @@ func genTestTxs(t *testing.T,
 			signers[i] = signer
 		}
 	}
+	log.Info("wait for p2p ready")
+	for _, n := range nodes {
+		n.P2pService().Ready()
+	}
+	log.Info("p2p ready")
 	time.Sleep(30 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	log.Info("send tx start")
