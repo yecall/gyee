@@ -33,6 +33,7 @@ import (
 
 func main() {
 	var (
+		chainID     = flag.Int("chainID", 1, "chainID")
 		genKey      = flag.Bool("genkey", false, "generate node key to file")
 		writeNodeID = flag.Bool("writenodeid", false, "write out the node's id and quit")
 		nodeDataDir = flag.String("nodeDataDir", "", "node data directory")
@@ -94,6 +95,7 @@ func main() {
 	}
 
 	nodeCfg := p2p.DefaultYeShellConfig
+	nodeCfg.ChainId = uint32(*chainID)
 	nodeCfg.LocalNodeIp = *localIP
 	nodeCfg.LocalTcpPort = (uint16)(*localPort & 0xffff)
 	nodeCfg.LocalUdpPort = (uint16)(*localPort & 0xffff)
