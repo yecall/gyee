@@ -135,6 +135,7 @@ type DhtMessage struct {
 }
 
 type Handshake struct {
+	ChainId   uint32		// chain identity
 	Dir       int           // direct
 	NodeId    config.NodeID // node identity
 	IP        net.IP        // ip address
@@ -492,6 +493,7 @@ func (dhtMsg *DhtMessage) GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) Dh
 
 	hs := new(Handshake)
 
+	hs.ChainId = *pbMsg.ChainId
 	hs.Dir = int(*pbMsg.Dir)
 
 	if len(pbMsg.NodeId) != cap(hs.NodeId) {
@@ -840,6 +842,9 @@ func (dhtMsg *DhtMessage) GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 	}
 	*pbMsg.MsgType = pb.DhtMessage_MID_HANDSHAKE
 	hs := dhtMsg.Handshake
+
+	pbHs.ChainId = new(uint32)
+	*pbHs.ChainId = hs.ChainId
 
 	pbHs.Dir = new(int32)
 	*pbHs.Dir = int32(hs.Dir)

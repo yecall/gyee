@@ -182,6 +182,7 @@ type Config struct {
 	CfgName            string                            // configureation name
 	Version            string                            // p2p version
 	Name               string                            // node name
+	ChainId			   uint32							 // chain identity
 	PrivateKey         *ecdsa.PrivateKey                 // node private key
 	PublicKey          *ecdsa.PublicKey                  // node public key
 	NetworkType        int                               // p2p network type
@@ -257,6 +258,7 @@ type Cfg4PeerListener struct {
 // Configuration about peer manager
 type Cfg4PeerManager struct {
 	CfgName            string                            // p2p configuration name
+	ChainId			   uint32							 // chain identity
 	NetworkType        int                               // p2p network type
 	IP                 net.IP                            // ip address
 	Port               uint16                            // tcp port number
@@ -329,6 +331,7 @@ type Cfg4DhtLsnManager struct {
 
 // Configuration about dht connection manager
 type Cfg4DhtConManager struct {
+	ChainId		  uint32		// chain identity
 	Local         *Node         // pointer to local node specification
 	BootstrapNode bool          // bootstrap node flag
 	MaxCon        int           // max number of connection
@@ -1022,6 +1025,7 @@ func P2pConfig4PeerListener(name string) *Cfg4PeerListener {
 func P2pConfig4PeerManager(name string) *Cfg4PeerManager {
 	return &Cfg4PeerManager{
 		CfgName:            name,
+		ChainId:			config[name].ChainId,
 		NetworkType:        config[name].NetworkType,
 		IP:                 config[name].Local.IP,
 		Port:               config[name].Local.TCP,
@@ -1102,6 +1106,7 @@ func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 
 // Get configuration for dht connection manager
 func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
+	config[name].ChainId = config[name].ChainId
 	config[name].DhtConCfg.Local = &config[name].DhtLocal
 	config[name].DhtConCfg.BootstrapNode = config[name].BootstrapNode
 	return &config[name].DhtConCfg

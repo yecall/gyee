@@ -27,13 +27,13 @@ import (
 	"sync"
 	"time"
 
-	ggio "github.com/gogo/protobuf/io"
 	"github.com/pkg/errors"
+	ggio "github.com/gogo/protobuf/io"
+	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	"github.com/yeeco/gyee/log"
 )
 
 //
@@ -75,6 +75,7 @@ type ConInst struct {
 	sdl           *sch.Scheduler    // pointer to scheduler
 	sdlName       string            // scheduler name
 	name          string            // task name
+	chainId		  uint32			// chain identity
 	bootstrapNode bool              // bootstrap node flag
 	tep           sch.SchUserTaskEp // task entry
 	local         *config.Node      // pointer to local node specification
@@ -1080,6 +1081,7 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	dhtMsg := new(DhtMessage)
 	dhtMsg.Mid = MID_HANDSHAKE
 	dhtMsg.Handshake = &Handshake{
+		ChainId: conInst.chainId,
 		Dir:      ConInstDirOutbound,
 		NodeId:   conInst.local.ID,
 		IP:       conInst.local.IP,
@@ -1163,11 +1165,18 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	}
 
 	hs := dhtMsg.Handshake
+	if hs.ChainId != conInst.chainId {
+		log.Warnf("outboundHandshake: mismatched chain identity, " +
+			"inst: %s, local: %s, remote: %s, id:[%d,%d]",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			conInst.chainId, hs.ChainId)
+		return DhtEnoMismatched
+	}
 	if hs.Dir != ConInstDirInbound {
 		log.Debugf("outboundHandshake: mismatched direction, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, hsdir: %d",
 			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), hs.Dir)
-		return DhtEnoProtocol
+		return DhtEnoMismatched
 	}
 
 	//

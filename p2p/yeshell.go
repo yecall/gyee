@@ -260,6 +260,7 @@ type YeShellConfig struct {
 	localSnid         []config.SubNetworkID               // local sub network identities
 	localNode         map[config.SubNetworkID]config.Node // local sub nodes
 	dhtBootstrapNodes []*config.Node                      // dht bootstarp nodes
+	chainId			  uint32							  // chain identity
 }
 
 const (
@@ -334,6 +335,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) ([]*config.Config, *YeShellCon
 
 	chainCfg.AppType = config.P2P_TYPE_CHAIN
 	chainCfg.Name = yesCfg.Name
+	chainCfg.ChainId = yesCfg.chainId
 	chainCfg.NodeDataDir = yesCfg.NodeDataDir
 	chainCfg.DhtFdsCfg.Path = yesCfg.NodeDataDir
 	if yesCfg.NodeDatabase != "" {

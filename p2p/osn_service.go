@@ -108,6 +108,7 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 		panic("OsnServiceConfig: must be P2P_TYPE_ALL")
 	}
 	cfg.AppType = config.P2pAppType(p2p.AppType)
+	cfg.chainId = yc.Chain.ChainID
 
 	if len(p2p.Name) != 0 {
 		cfg.Name = p2p.Name

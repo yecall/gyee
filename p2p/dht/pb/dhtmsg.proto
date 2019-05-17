@@ -106,15 +106,16 @@ message DhtMessage {
     }
 
     message Handshake {
-        required int32          Dir             = 1;    // direction
-        required bytes          NodeId          = 2;    // node identity
-        required bytes          IP              = 3;    // ip address
-        required uint32         UDP             = 4;    // udp port number
-        required uint32         TCP             = 5;    // tcp port number
-        required uint32         ProtoNum        = 6;    // number of protocols
-        repeated Protocol       Protocols       = 7;    // protocol table
-        required uint64         Id              = 8;    // message identity
-        optional bytes          Extra           = 9;    // extra info, reserved
+        required uint32         ChainId         = 1;    // chain identity
+        required int32          Dir             = 2;    // direction
+        required bytes          NodeId          = 3;    // node identity
+        required bytes          IP              = 4;    // ip address
+        required uint32         UDP             = 5;    // udp port number
+        required uint32         TCP             = 6;    // tcp port number
+        required uint32         ProtoNum        = 7;    // number of protocols
+        repeated Protocol       Protocols       = 8;    // protocol table
+        required uint64         Id              = 9;    // message identity
+        optional bytes          Extra           = 10;    // extra info, reserved
     }
     message FindNode {
         required Node           From            = 1;    // from whom

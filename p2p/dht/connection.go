@@ -82,6 +82,7 @@ const (
 // Connection manager configuration
 //
 type conMgrCfg struct {
+	chainId		  uint32		// chain identity
 	local         *config.Node  // pointer to local node specification
 	bootstarpNode bool          // bootstrap node flag
 	maxCon        int           // max number of connection
@@ -1239,6 +1240,7 @@ func (conMgr *ConMgr) monitorTimer() sch.SchErrno {
 //
 func (conMgr *ConMgr) getConfig() DhtErrno {
 	cfg := config.P2pConfig4DhtConManager(conMgr.sdl.SchGetP2pCfgName())
+	conMgr.cfg.chainId = cfg.ChainId
 	conMgr.cfg.local = cfg.Local
 	conMgr.cfg.bootstarpNode = cfg.BootstrapNode
 	conMgr.cfg.maxCon = cfg.MaxCon
@@ -1313,6 +1315,7 @@ func (conMgr *ConMgr) setupConInst(ci *ConInst, srcTask interface{}, peer *confi
 
 	ci.sdl = conMgr.sdl
 	ci.sdlName = conMgr.sdl.SchGetP2pCfgName()
+	ci.chainId = conMgr.cfg.chainId
 	ci.bootstrapNode = conMgr.cfg.bootstarpNode
 	ci.ptnSrcTsk = srcTask
 	if ci.srcTaskName = ci.sdl.SchGetTaskName(srcTask); len(ci.srcTaskName) == 0 {

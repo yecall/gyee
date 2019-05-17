@@ -28,6 +28,7 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/golang/protobuf/proto"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	pb "github.com/yeeco/gyee/p2p/peer/pb"
@@ -108,6 +109,7 @@ type Protocol struct {
 // Handshake message
 //
 type Handshake struct {
+	ChainId   uint32		// chain identity
 	Snid      SubNetworkID  // sub network identity
 	Dir       int           // direct
 	NodeId    config.NodeID // node identity
@@ -255,11 +257,6 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 	}
 
 	pbHS := pbMsg.Handshake
-	if upkg.verifyInbound(inst, pbHS) != true {
-		tcpmsgLog.Debug("putHandshakeOutbound: verifyInbound failed")
-		return nil, PeMgrEnoVerify
-	}
-
 	if pbHS == nil {
 		tcpmsgLog.Debug("getHandshakeInbound: " +
 			"invalid handshake message pointer: %p",
@@ -267,22 +264,34 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 		return nil, PeMgrEnoMessage
 	}
 
+	if upkg.verifyInbound(inst, pbHS) != true {
+		log.Warnf("putHandshakeOutbound: verifyInbound failed")
+		return nil, PeMgrEnoVerify
+	}
+
+	if *pbHS.ChainId != inst.chainId {
+		log.Warnf("getHandshakeInbound:" +
+			"chain id mismatched:%d, %d",
+			inst.chainId, *pbHS.ChainId)
+		return nil, PeMgrEnoMismatched
+	}
+
 	if len(pbHS.NodeId) != config.NodeIDBytes {
-		tcpmsgLog.Debug("getHandshakeInbound:" +
+		log.Warnf("getHandshakeInbound:" +
 			"invalid node identity length: %d",
 			len(pbHS.NodeId))
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pbHS.ProtoNum > MaxProtocols {
-		tcpmsgLog.Debug("getHandshakeInbound:" +
+		log.Warnf("getHandshakeInbound:" +
 			"too much protocols: %d",
 			*pbHS.ProtoNum)
 		return nil, PeMgrEnoMessage
 	}
 
 	if int(*pbHS.ProtoNum) != len(pbHS.Protocols) {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Warnf("getHandshakeInbound: " +
 			"number of protocols mismathced, ProtoNum: %d, real: %d",
 			int(*pbHS.ProtoNum), len(pbHS.Protocols))
 		return nil, PeMgrEnoMessage
@@ -311,6 +320,7 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 func (upkg *P2pPackage) putHandshakeOutbound(inst *PeerInstance, hs *Handshake) PeMgrErrno {
 
 	pbHandshakeMsg := new(pb.P2PMessage_Handshake)
+	pbHandshakeMsg.ChainId = &hs.ChainId
 	pbHandshakeMsg.SubNetId = append(pbHandshakeMsg.SubNetId, hs.Snid[:]...)
 	pbHandshakeMsg.NodeId = append(pbHandshakeMsg.NodeId, hs.NodeId[:]...)
 	pbHandshakeMsg.IP = append(pbHandshakeMsg.IP, hs.IP...)

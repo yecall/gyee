@@ -163,6 +163,7 @@ const (
 // peer manager configuration
 type peMgrConfig struct {
 	cfgName            string                            // p2p configuration name
+	chainId			   uint32							 // chain identity
 	ip                 net.IP                            // ip address
 	port               uint16                            // tcp port number
 	udp                uint16                            // udp port number, used with handshake procedure
@@ -410,6 +411,7 @@ func (peMgr *PeerManager) peMgrPoweron(ptn interface{}) PeMgrErrno {
 
 	peMgr.cfg = peMgrConfig{
 		cfgName:       cfg.CfgName,
+		chainId:	   cfg.ChainId,
 		ip:            cfg.IP,
 		port:          cfg.Port,
 		udp:           cfg.UDP,
@@ -734,6 +736,7 @@ func (peMgr *PeerManager) peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 	peMgr.ibInstSeq++
 	peInst.name = peInst.name + fmt.Sprintf("_inbound_%s",
 		fmt.Sprintf("%d_", peMgr.ibInstSeq)+peInst.raddr.String())
+	peInst.chainId = peMgr.cfg.chainId
 
 	var tskDesc = sch.SchTaskDescription{
 		Name:   peInst.name,
@@ -1781,6 +1784,7 @@ func (peMgr *PeerManager) peMgrCreateOutboundInst(snid *config.SubNetworkID, nod
 
 	peMgr.obInstSeq++
 	peInst.name = peInst.name + fmt.Sprintf("_Outbound_%s", fmt.Sprintf("%d", peMgr.obInstSeq))
+	peInst.chainId = peMgr.cfg.chainId
 	tskDesc := sch.SchTaskDescription{
 		Name:   peInst.name,
 		MbSize: PeInstMailboxSize,
@@ -2308,6 +2312,7 @@ type PeerInstance struct {
 	sdl    *sch.Scheduler      // pointer to scheduler
 	peMgr  *PeerManager        // pointer to peer manager
 	name   string              // name
+	chainId uint32			   // chain identity
 	tep    sch.SchUserTaskEp   // entry
 	ptnMe  interface{}         // the instance task node pointer
 	ptnMgr interface{}         // the peer manager task node pointer
@@ -2794,6 +2799,7 @@ func (pi *PeerInstance) piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 
 	// write outbound handshake to remote peer
 	hs2peer := Handshake{}
+	hs2peer.ChainId = inst.chainId
 	hs2peer.Snid = inst.snid
 	hs2peer.NodeId = inst.localNode.ID
 	hs2peer.IP = append(hs2peer.IP, inst.localNode.IP...)
@@ -2816,6 +2822,7 @@ func (pi *PeerInstance) piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 	var hs = new(Handshake)
 
 	// write outbound handshake to remote peer
+	hs.ChainId = inst.chainId
 	hs.Snid = pi.snid
 	hs.NodeId = pi.localNode.ID
 	hs.IP = append(hs.IP, pi.localNode.IP...)
