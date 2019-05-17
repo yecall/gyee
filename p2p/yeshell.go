@@ -523,7 +523,9 @@ func (yeShMgr *YeShellManager) Start() error {
 	}
 
 	yeShMgr.status = yesDhtReady
-	go yeShMgr.chainReady4User()
+	if yeShMgr.config.BootstrapNode == false {
+		go yeShMgr.chainReady4User()
+	}
 	go yeShMgr.chainRxProc()
 	go yeShMgr.deDupTickerProc()
 
