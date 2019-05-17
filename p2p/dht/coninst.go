@@ -1107,8 +1107,9 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
 		log.Debugf("outboundHandshake: WriteMsg failed, " +
-			"inst: %s, dir: %d, err: %s",
-			conInst.name, conInst.dir, err.Error())
+			"inst: %s, dir: %d, local: %s, remote: %s, error: %s",
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1116,15 +1117,17 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pbPkg); err != nil {
 		log.Debugf("outboundHandshake: ReadMsg failed, " +
-			"inst: %s, dir: %d, err: %s",
-			conInst.name, conInst.dir, err.Error())
+			"inst: %s, dir: %d, local: %s, remote: %s, error: %s",
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			err.Error())
 		return DhtEnoSerialization
 	}
 
 	if *pbPkg.Pid != PID_DHT {
-		log.Warnf("outboundHandshake: invalid pid, " +
+		log.Debugf("outboundHandshake: invalid pid, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, pid: %d",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), pbPkg.Pid)
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			pbPkg.Pid)
 		return DhtEnoProtocol
 	}
 
@@ -1153,14 +1156,16 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
 		log.Debugf("outboundHandshake: GetMessage failed, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, eno: %d",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), eno)
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			eno)
 		return eno
 	}
 
 	if dhtMsg.Mid != MID_HANDSHAKE {
 		log.Debugf("outboundHandshake: invalid MID, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, MID: %d",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), dhtMsg.Mid)
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			dhtMsg.Mid)
 		return DhtEnoProtocol
 	}
 
@@ -1175,7 +1180,8 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	if hs.Dir != ConInstDirInbound {
 		log.Debugf("outboundHandshake: mismatched direction, " +
 			"inst: %s, dir: %d, local: %s, remote: %s, hsdir: %d",
-			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(), hs.Dir)
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			hs.Dir)
 		return DhtEnoMismatched
 	}
 
@@ -1214,24 +1220,34 @@ func (conInst *ConInst) inboundHandshake() DhtErrno {
 	pkg := new(pb.DhtPackage)
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.ior.ReadMsg(pkg); err != nil {
-		log.Debugf("inboundHandshake: ReadMsg failed, inst: %s, err: %s", conInst.name, err.Error())
+		log.Debugf("inboundHandshake: ReadMsg failed, " +
+			"inst: %s, local: %s, remote: %s, error: %s",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			err.Error())
 		return DhtEnoSerialization
 	}
 
 	if *pkg.Pid != PID_DHT {
-		log.Debugf("inboundHandshake: invalid pid, inst: %s, pid: %d", conInst.name, pkg.Pid)
+		log.Debugf("inboundHandshake: invalid pid, " +
+			"inst: %s, local: %s, remote: %s, pid: %d",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			pkg.Pid)
 		return DhtEnoProtocol
 	}
 
 	if *pkg.PayloadLength <= 0 {
-		log.Debugf("inboundHandshake: invalid payload length: %d, inst: %s", *pkg.PayloadLength, conInst.name)
+		log.Debugf("inboundHandshake: invalid payload length, " +
+			"inst: %s, local: %s, remote: %s, PayloadLength: %d",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			*pkg.PayloadLength)
 		return DhtEnoProtocol
 	}
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
-		log.Debugf("inboundHandshake: " +
-			"payload length mismatched, PlLen: %d, real: %d, inst: %s",
-			*pkg.PayloadLength, len(pkg.Payload), conInst.name)
+		log.Debugf("inboundHandshake: payload length mismatched, " +
+			"inst: %s, local: %s, remote: %s, PayloadLength: %d, real: %d",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			*pkg.PayloadLength, len(pkg.Payload))
 		return DhtEnoProtocol
 	}
 
@@ -1242,19 +1258,36 @@ func (conInst *ConInst) inboundHandshake() DhtErrno {
 
 	dhtMsg := new(DhtMessage)
 	if eno := dhtPkg.GetMessage(dhtMsg); eno != DhtEnoNone {
-		log.Debugf("inboundHandshake: GetMessage failed, eno: %d, inst: %s", eno, conInst.name)
+		log.Debugf("inboundHandshake: GetMessage failed, " +
+			"inst: %s, local: %s, remote: %s, eno: %d",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			eno)
 		return eno
 	}
 
 	if dhtMsg.Mid != MID_HANDSHAKE {
-		log.Debugf("inboundHandshake: invalid MID: %d, inst: %s", dhtMsg.Mid, conInst.name)
+		log.Debugf("inboundHandshake: invalid MID, " +
+			"inst: %s, local: %s, remote: %s, mid: %d",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			dhtMsg.Mid)
 		return DhtEnoProtocol
 	}
 
 	hs := dhtMsg.Handshake
 	if hs.Dir != ConInstDirOutbound {
-		log.Debugf("inboundHandshake: mismatched direction: %d, inst: %s", hs.Dir, conInst.name)
+		log.Debugf("inboundHandshake: mismatched direction, " +
+			"inst: %s, local: %s, remote: %s, dir: %d",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			hs.Dir)
 		return DhtEnoProtocol
+	}
+
+	if hs.ChainId != conInst.chainId {
+		log.Warnf("inboundHandshake: mismatched chain identity, " +
+			"inst: %s, local: %s, remote: %s, id:[%d,%d]",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			conInst.chainId, hs.ChainId)
+		return DhtEnoMismatched
 	}
 
 	conInst.hsInfo.peer = config.Node{
@@ -1268,6 +1301,7 @@ func (conInst *ConInst) inboundHandshake() DhtErrno {
 	*dhtMsg = DhtMessage{}
 	dhtMsg.Mid = MID_HANDSHAKE
 	dhtMsg.Handshake = &Handshake{
+		ChainId:  conInst.chainId,
 		Dir:      ConInstDirInbound,
 		NodeId:   conInst.local.ID,
 		IP:       conInst.local.IP,
@@ -1284,13 +1318,18 @@ func (conInst *ConInst) inboundHandshake() DhtErrno {
 
 	pbPkg := dhtMsg.GetPbPackage()
 	if pbPkg == nil {
-		log.Debugf("inboundHandshake: GetPbPackage failed, inst: %s", conInst.name)
+		log.Debugf("inboundHandshake: GetPbPackage failed, " +
+			"inst: %s, local: %s, remote: %s",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 		return DhtEnoSerialization
 	}
 
 	conInst.con.SetDeadline(time.Now().Add(conInst.hsTimeout))
 	if err := conInst.iow.WriteMsg(pbPkg); err != nil {
-		log.Debugf("inboundHandshake: WriteMsg failed, err: %s, inst: %s", err.Error(), conInst.name)
+		log.Debugf("inboundHandshake: WriteMsg failed, " +
+			"inst: %s, local: %s, remote: %s, error: %s",
+			conInst.name, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			err.Error())
 		return DhtEnoSerialization
 	}
 

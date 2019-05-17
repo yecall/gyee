@@ -1106,7 +1106,7 @@ func P2pConfig4DhtLsnManager(name string) *Cfg4DhtLsnManager {
 
 // Get configuration for dht connection manager
 func P2pConfig4DhtConManager(name string) *Cfg4DhtConManager {
-	config[name].ChainId = config[name].ChainId
+	config[name].DhtConCfg.ChainId = config[name].ChainId
 	config[name].DhtConCfg.Local = &config[name].DhtLocal
 	config[name].DhtConCfg.BootstrapNode = config[name].BootstrapNode
 	return &config[name].DhtConCfg

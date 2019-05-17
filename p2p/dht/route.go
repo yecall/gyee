@@ -1463,7 +1463,7 @@ func (rutMgr *RutMgr) showRoute(tag string) {
 		new := GetNumberOfBucketNode(rutMgr.sdlName)
 		if old != new {
 			log.Infof("showRoute: sdl: %s, numberOfBucketNode: %d",
-				rutMgr.sdlName, GetNumberOfBucketNode(rutMgr.sdlName))
+				rutMgr.sdlName, new)
 		}
 	}
 
