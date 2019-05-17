@@ -240,6 +240,7 @@ type YeShellConfig struct {
 	// about p2p, see config.Config please.
 	AppType           config.P2pAppType                   // application type
 	Name              string                              // node name, should be unique
+	ChainId			  uint32							  // chain identity
 	Validator         bool                                // validator flag
 	BootstrapNode     bool                                // bootstrap node flag
 	BootstrapNodes    []string                            // bootstrap nodes
@@ -260,7 +261,6 @@ type YeShellConfig struct {
 	localSnid         []config.SubNetworkID               // local sub network identities
 	localNode         map[config.SubNetworkID]config.Node // local sub nodes
 	dhtBootstrapNodes []*config.Node                      // dht bootstarp nodes
-	chainId			  uint32							  // chain identity
 }
 
 const (
@@ -335,7 +335,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) ([]*config.Config, *YeShellCon
 
 	chainCfg.AppType = config.P2P_TYPE_CHAIN
 	chainCfg.Name = yesCfg.Name
-	chainCfg.ChainId = yesCfg.chainId
+	chainCfg.ChainId = yesCfg.ChainId
 	chainCfg.NodeDataDir = yesCfg.NodeDataDir
 	chainCfg.DhtFdsCfg.Path = yesCfg.NodeDataDir
 	if yesCfg.NodeDatabase != "" {
@@ -1222,7 +1222,7 @@ func (yeShMgr *YeShellManager) chainReady4User() {
 
 	actHis := [hSize]int{}
 	for loop := 0; !yeShMgr.inStopping ;loop++ {
-		log.Debugf("chainReady4User: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+		log.Infof("chainReady4User: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
 		aps := yeShMgr.ptChainShMgr.GetActivePeerSnapshot()
 		idx := loop & hMask
 		for _, p := range(*aps) {
