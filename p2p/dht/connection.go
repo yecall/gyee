@@ -1314,7 +1314,7 @@ func (conMgr *ConMgr) lookupInboundConInst(nid *config.NodeID) *ConInst {
 func (conMgr *ConMgr) setupConInst(ci *ConInst, srcTask interface{}, peer *config.Node, msg interface{}) DhtErrno {
 
 	ci.sdl = conMgr.sdl
-	ci.sdlName = conMgr.sdl.SchGetP2pCfgName()
+	ci.sdlName = conMgr.sdlName
 	ci.chainId = conMgr.cfg.chainId
 	ci.bootstrapNode = conMgr.cfg.bootstarpNode
 	ci.ptnSrcTsk = srcTask

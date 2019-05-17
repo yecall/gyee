@@ -705,11 +705,13 @@ func (shMgr *ShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sch.Sc
 	}
 	pai, ok := shMgr.peerActived[spid]
 	if !ok {
-		log.Debugf("getChainDataFromPeer: active peer not found, spid: %+v", spid)
+		log.Debugf("getChainDataFromPeer: active peer not found, sdl: %s, spid: %+v",
+			shMgr.sdlName, spid)
 		return sch.SchEnoNotFound
 	}
 	if pai.status != pisActive {
-		log.Debugf("getChainDataFromPeer: peer not active, spid: %+v", spid)
+		log.Debugf("getChainDataFromPeer: peer not active, sdl: %s, spid: %+v",
+			shMgr.sdlName, spid)
 		return sch.SchEnoNotFound
 	}
 	return sch.SchEnoNone
@@ -808,11 +810,13 @@ func (shMgr *ShellManager) getChainData2Peer(spi *shellPeerInst, req *sch.MsgShe
 
 func (shMgr *ShellManager) putChainData2Peer(spi *shellPeerInst, rsp *sch.MsgShellGetChainInfoRsp) error {
 	if len(spi.txChan) >= cap(spi.txChan) {
-		log.Debugf("putChainData2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
-			spi.snid, spi.dir, spi.nodeId)
-		if spi.txDiscrd += 1; spi.txDiscrd&0x1f == 0 {
-			log.Debugf("putChainData2Peer：sind: %x, dir: %d, txDiscrd: %d",
-				spi.snid, spi.dir, spi.txDiscrd)
+		log.Debugf("putChainData2Peer: discarded, tx queue full, " +
+			"sdl: %s, snid: %x, dir: %d, peer: %x",
+			shMgr.sdlName, spi.snid, spi.dir, spi.nodeId)
+		if spi.txDiscrd += 1; spi.txDiscrd & 0x1f == 0 {
+			log.Debugf("putChainData2Peer：total lost, " +
+				"sdl: %s, sind: %x, dir: %d, txDiscrd: %d",
+				shMgr.sdlName, spi.snid, spi.dir, spi.txDiscrd)
 		}
 		return sch.SchEnoResource
 	}
@@ -824,7 +828,9 @@ func (shMgr *ShellManager) putChainData2Peer(spi *shellPeerInst, rsp *sch.MsgShe
 	}
 	upkg := new(peer.P2pPackage)
 	if eno := upkg.PutChainData(spi.pi, &pcd, false); eno != peer.PeMgrEnoNone {
-		log.Debugf("putChainData2Peer: CheckKey failed, eno: %d", eno)
+		log.Debugf("putChainData2Peer: PutChainData failed, " +
+			"sdl: %s, eno: %d",
+			shMgr.sdlName, eno)
 		return errors.New("putChainData2Peer: ReportKey failed")
 	}
 	spi.txChan <- upkg
@@ -853,10 +859,16 @@ func (shMgr *ShellManager)getChainInfoReq(msg *sch.MsgShellGetChainInfoReq) sch.
 			if err := shMgr.getChainData2Peer(pe, msg); err != nil {
 				log.Debugf("getChainInfoReq: getChainData2Peer failed, error: %s", err.Error())
 				failCount += 1
+				continue
 			}
+			log.Debugf("getChainInfoReq: put to queue ok, " +
+				"sdl: %s, peer: %v",
+				shMgr.sdlName, *pe.hsInfo)
 		}
 	}
 	if failCount == len(shMgr.peerActived) {
+		log.Debugf("getChainInfoReq: failed, failCount: %d, peers: %d",
+			failCount, len(shMgr.peerActived))
 		return sch.SchEnoResource
 	}
 	return sch.SchEnoNone
@@ -876,11 +888,12 @@ func (shMgr *ShellManager)getChainInfoRsp(msg *sch.MsgShellGetChainInfoRsp) sch.
 	defer shMgr.peerLock.Unlock()
 	pai, ok := shMgr.peerActived[pid]
 	if !ok || pai == nil {
-		log.Debugf("getChainInfoRsp: peer not found: %+v", *peerInfo)
+		log.Debugf("getChainInfoRsp: peer not found, sdl: %s, %+v", shMgr.sdlName, *peerInfo)
 		return sch.SchEnoNotFound
 	}
 	if err := shMgr.putChainData2Peer(pai, msg); err != nil {
-		log.Debugf("getChainInfoRsp: putChainData2Peer failed, error: %s", err.Error())
+		log.Debugf("getChainInfoRsp: putChainData2Peer failed, sdl: %s, error: %s",
+			shMgr.sdlName, err.Error())
 		return sch.SchEnoResource
 	}
 	return sch.SchEnoNone

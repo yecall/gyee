@@ -721,11 +721,11 @@ func _gvStat(result bool) {
 	defer _gvStatLock.Unlock()
 	if result {
 		if _gvOkCount++; _gvOkCount & 0x7f == 0 {
-			p2plog.Debug("_gvStat: ok: %d", _gvOkCount)
+			log.Debugf("_gvStat: ok: %d", _gvOkCount)
 		}
 	} else {
 		if _gvFailedCount++; _gvFailedCount & 0x7f == 0 {
-			p2plog.Debug("_gvStat: failed: %d", _gvFailedCount)
+			log.Debugf("_gvStat: failed: %d", _gvFailedCount)
 		}
 	}
 }
@@ -895,7 +895,7 @@ func (yeShMgr *YeShellManager) RegChainProvider(cp ChainProvider) {
 
 func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, error) {
 	if key == nil || len(key) > GCIKEY_LEN || len(kind) == 0 {
-		yesLog.Debug("GetChainInfo: invalid invalid (kind,key) pair, sdl: %s, kind: %s, key: %x",
+		log.Debugf("GetChainInfo: invalid invalid (kind,key) pair, sdl: %s, kind: %s, key: %x",
 			yeShMgr.chainSdlName, kind, key)
 		return nil, YesEnoParameter
 	}
@@ -907,12 +907,12 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 
 	yeShMgr.gciLock.Lock()
 	if _, dup := yeShMgr.gciMap[kex]; dup {
-		yesLog.Debug("GetChainInfo: duplicated, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
+		log.Debugf("GetChainInfo: duplicated, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		yeShMgr.gciLock.Unlock()
 		return nil, YesEnoGcdDup
 	}
 	if len(yeShMgr.gciMap) > GCIBS {
-		yesLog.Debug("GetChainInfo: too much, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
+		log.Debugf("GetChainInfo: too much, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		yeShMgr.gciLock.Unlock()
 		return nil, YesEnoGcdFull
 	}
@@ -935,29 +935,13 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 	msg := sch.SchMessage{}
 	yeShMgr.chainInst.SchMakeMessage(&msg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell, sch.EvShellGetChainInfoReq, &req)
 	if eno := yeShMgr.chainInst.SchSendMessage(&msg); eno != sch.SchEnoNone {
-		yesLog.Debug("GetChainInfo: SchSendMessage failed, sdl: %s, kind: %s, key: %x, eno: %d",
+		log.Debugf("GetChainInfo: SchSendMessage failed, sdl: %s, kind: %s, key: %x, eno: %d",
 			yeShMgr.chainSdlName, kind, key, eno)
 		return nil, YesEnoScheduler
 	}
 
 	chainData := ([]byte)(nil)
 	gcdOk := false
-
-	_dbgch := make(chan bool, 1)
-	go func() {
-		_dbgtm := time.NewTimer(GCITO + time.Second * 4)
-		defer _dbgtm.Stop()
-		for {
-			select {
-			case <-_dbgtm.C:
-				panic("why")
-			case <-_dbgch:
-				return
-			}
-		}
-	}()
-
-
 	select {
 	case <-vex.gcdTimer.C:
 		yeShMgr.gciLock.Lock()
@@ -966,23 +950,21 @@ func (yeShMgr *YeShellManager) GetChainInfo(kind string, key []byte) ([]byte, er
 			close(vex.gcdChan)
 		}
 		yeShMgr.gciLock.Unlock()
-		yesLog.Debug("GetChainInfo: timeout, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
-		close(_dbgch)
+		log.Debugf("GetChainInfo: timeout, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		return nil, YesEnoTimeout
 	case chainData, gcdOk = <-vex.gcdChan:
-		close(_dbgch)
-		yesLog.Debug("GetChainInfo: gcdChan got, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
+		log.Debugf("GetChainInfo: gcdChan got, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 	}
 
 	if !gcdOk{
-		yesLog.Debug("GetChainInfo: failed, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
+		log.Debugf("GetChainInfo: failed, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		return nil, YesEnoChClosed
 	}
 	if  len(chainData) == 0 {
-		yesLog.Debug("GetChainInfo: empty, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
+		log.Debugf("GetChainInfo: empty, sdl: %s, kind: %s, key: %x", yeShMgr.chainSdlName, kind, key)
 		return nil, YesEnoEmptyVal
 	}
-	yesLog.Debug("GetChainInfo: ok, sdl: %s, kind: %s, key: %x, data: %x",
+	log.Tracef("GetChainInfo: ok, sdl: %s, kind: %s, key: %x, data: %x",
 		yeShMgr.chainSdlName, kind, key, chainData)
 	return chainData, nil
 }
@@ -1967,14 +1949,17 @@ func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 
 	msg := peer.ExtMessage{}
 	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
-		yesLog.Debug("getChainDataFromPeer: GetExtMessage failed, eno: %d", eno)
+		log.Debugf("getChainDataFromPeer: GetExtMessage failed, " +
+			"sdl: %s, eno: %d",
+			yeShMgr.chainSdlName, eno)
 		return sch.SchEnoUserTask
 	}
 
 	if yeShMgr.cp != nil {
 		data := yeShMgr.cp.GetChainData(msg.Gcd.Name, msg.Gcd.Key)
 
-		yesLog.Debug("getChainDataFromPeer: cp: sdl: %s, kind: %s, key: %x, data: %x",
+		log.Debugf("getChainDataFromPeer: get from cp, " +
+			"sdl: %s, kind: %s, key: %x, data: %x",
 			yeShMgr.chainSdlName, msg.Gcd.Name, msg.Gcd.Key, data)
 
 		if len(data) > 0 {
@@ -1988,7 +1973,11 @@ func (yeShMgr *YeShellManager) getChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 			schMsg := sch.SchMessage{}
 			yeShMgr.chainInst.SchMakeMessage(&schMsg, &sch.PseudoSchTsk, yeShMgr.ptnChainShell,
 				sch.EvShellGetChainInfoRsp, &rsp)
-			yeShMgr.chainInst.SchSendMessage(&schMsg)
+			if yeShMgr.chainInst.SchSendMessage(&schMsg) != sch.SchEnoNone {
+				log.Errorf("getChainDataFromPeer: get from cp, " +
+					"sdl: %s, kind: %s, key: %x, data: %x",
+					yeShMgr.chainSdlName, msg.Gcd.Name, msg.Gcd.Key, data)
+			}
 			return sch.SchEnoNone
 		}
 	}
@@ -2008,7 +1997,9 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 
 	msg := peer.ExtMessage{}
 	if eno := upkg.GetExtMessage(&msg); eno != peer.PeMgrEnoNone {
-		yesLog.Debug("putChainDataFromPeer: GetExtMessage failed, eno: %d", eno)
+		log.Debugf("putChainDataFromPeer: GetExtMessage failed, " +
+			"sdl: %s, eno: %d",
+			yeShMgr.chainSdlName, eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -2020,11 +2011,15 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 
 	vex, ok := yeShMgr.gciMap[kex]
 	if !ok {
-		yesLog.Debug("putChainDataFromPeer: not found, name: %s, key: %x", kex.key, kex.name)
+		log.Debugf("putChainDataFromPeer: not found, " +
+			"sdl: %s, name: %s, key: %x",
+			yeShMgr.chainSdlName, kex.name, kex.key )
 		return sch.SchEnoNotFound
 	}
 	if vex.gcdSeq != msg.Pcd.Seq {
-		yesLog.Debug("putChainDataFromPeer: sequence mismatch")
+		log.Debugf("putChainDataFromPeer: sequence mismatch, " +
+			"sdl: %s, seq:[%d,%d], name: %s, key: %x",
+			yeShMgr.chainSdlName, vex.gcdSeq, msg.Pcd.Seq, kex.name, kex.key )
 		return sch.SchEnoMismatched
 	}
 
@@ -2037,8 +2032,10 @@ func (yeShMgr *YeShellManager) putChainDataFromPeer(rxPkg *peer.P2pPackageRx) sc
 		return sch.SchEnoNone
 	}
 
-	yesLog.Debug("putChainDataFromPeer: discarded, seq: %d, name: %s, key: %x",
-		msg.Pcd.Seq, msg.Pcd.Name, msg.Pcd.Key)
+	log.Debugf("putChainDataFromPeer: discarded, " +
+		"sdl: %s, seq: %d, name: %s, key: %x",
+		yeShMgr.chainSdlName, msg.Pcd.Seq, msg.Pcd.Name, msg.Pcd.Key)
+
 	return sch.SchEnoNone
 }
 
