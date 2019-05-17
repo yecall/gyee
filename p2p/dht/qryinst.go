@@ -99,7 +99,7 @@ func (qryInst *QryInst) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage)
 //
 func (qryInst *QryInst) qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	qiLog.Debug("qryInstProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
+	log.Tracef("qryInstProc: ptn: %p, msg.Id: %d", ptn, msg.Id)
 	var eno = sch.SchEnoUnknown
 
 	switch msg.Id {
@@ -126,11 +126,11 @@ func (qryInst *QryInst) qryInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 		eno = qryInst.conInstTxInd(msg.Body.(*sch.MsgDhtConInstTxInd))
 
 	default:
-		qiLog.Debug("qryInstProc: unknown event: %d", msg.Id)
+		log.Debugf("qryInstProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
-	qiLog.Debug("qryInstProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
+	log.Tracef("qryInstProc: get out, ptn: %p, msg.Id: %d", ptn, msg.Id)
 
 	return eno
 }
@@ -542,10 +542,15 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
 		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
 			log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
-				"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
-				icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
+				"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
+				icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
 			return eno
 		}
+
+		log.Debug("connectRsp: send EvDhtConMgrSendReq ok, " +
+			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
+			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
+
 		return sch.SchEnoNone
 	}
 

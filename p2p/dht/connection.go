@@ -175,7 +175,7 @@ func (conMgr *ConMgr) checkMailBox() {
 
 func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	log.Debugf("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
+	log.Tracef("conMgrProc: sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	conMgr.checkMailBox()
 
@@ -232,7 +232,7 @@ func (conMgr *ConMgr) conMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = sch.SchEnoParameter
 	}
 
-	log.Debugf("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
+	log.Tracef("conMgrProc: get out, sdl: %s, msg.Id: %d", conMgr.sdlName, msg.Id)
 
 	return eno
 }

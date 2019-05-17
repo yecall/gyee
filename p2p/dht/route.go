@@ -63,7 +63,7 @@ const (
 	HashByteLength         = config.DhtKeyLength // 32 bytes(256 bits) hash applied
 	HashBitLength          = HashByteLength * 8  // hash bits
 	rutMgrMaxLatency       = time.Second * 60    // max latency in metric
-	rutMgrMaxNofifee       = 128                 // max notifees could be
+	rutMgrMaxNofifee       = 512                 // max notifees could be
 	rutMgrUpdate4Handshake = 0                   // update for handshaking
 	rutMgrUpdate4Closed    = 1                   // update for connection instance closed
 	rutMgrUpdate4Query     = 2                   // update for query result

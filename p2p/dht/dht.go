@@ -132,7 +132,7 @@ func (dhtMgr *DhtMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) s
 //
 func (dhtMgr *DhtMgr) dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	log.Debugf("dhtMgrProc: name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
+	log.Tracef("dhtMgrProc: name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
 
 	var eno = sch.SchEnoUnknown
 
@@ -233,10 +233,10 @@ func (dhtMgr *DhtMgr) dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 
 	default:
 		eno = sch.SchEnoParameter
-		log.Debugf("dhtMgrProc: invalid event, id: %d", msg.Id)
+		log.Warnf("dhtMgrProc: invalid event, id: %d", msg.Id)
 	}
 
-	log.Debugf("dhtMgrProc: get out, name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
+	log.Tracef("dhtMgrProc: get out, name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
 
 	return eno
 }

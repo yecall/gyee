@@ -86,7 +86,7 @@ func (shMgr *DhtShellManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMe
 //
 func (shMgr *DhtShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	log.Debugf("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
+	log.Tracef("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
 
 	eno := sch.SchEnoUnknown
 
@@ -129,7 +129,7 @@ func (shMgr *DhtShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sc
 		eno = sch.SchEnoParameter
 	}
 
-	log.Debugf("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
+	log.Tracef("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
 
 	return eno
 }
@@ -154,7 +154,7 @@ func (shMgr *DhtShellManager) poweroff(ptn interface{}) sch.SchErrno {
 
 func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchErrno {
 
-	log.Debugf("dhtShEventInd: event type: %d", ind.Evt)
+	log.Tracef("dhtShEventInd: event type: %d", ind.Evt)
 
 	evt := ind.Evt
 	msg := ind.Msg
@@ -199,11 +199,11 @@ func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchEr
 		return shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
 
 	default:
-		log.Debugf("dhtTestEventCallback: unknown event type: %d", evt)
+		log.Warnf("dhtShEventInd: unknown event type: %d", evt)
 		return sch.SchEnoParameter
 	}
 
-	log.Debugf("dhtTestEventCallback: event put to channel, type: %d", evt)
+	log.Tracef("dhtShEventInd: event put to channel, type: %d", evt)
 
 	if eno == sch.SchEnoNone {
 		shMgr.evChan <- ind

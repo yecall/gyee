@@ -239,7 +239,7 @@ func (dsMgr *DsMgr) busyMsgFilter(ev int) bool {
 
 func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	log.Debugf("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+	log.Tracef("dsMgrProc: name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	if dsMgr.busyMsgFilter(msg.Id) {
 		log.Warnf("dsMgrProc: message filtered out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
@@ -293,7 +293,7 @@ func (dsMgr *DsMgr) dsMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno
 		log.Debugf("dsMgrProc: unknown message: %d", msg.Id)
 	}
 
-	log.Debugf("dsMgrProc: get out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
+	log.Tracef("dsMgrProc: get out, name: %s, msg.Id: %d", dsMgr.name, msg.Id)
 
 	return eno
 }

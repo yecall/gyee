@@ -245,7 +245,7 @@ func (conInst *ConInst) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage)
 func (conInst *ConInst) conInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if msg.Id != sch.EvDhtConInstTxDataReq && msg.Id != sch.EvDhtQryInstProtoMsgInd {
-		ciLog.ForceDebug("conInstProc: sdl: %s, inst: %s, msg.Id: %d", conInst.sdlName, conInst.name, msg.Id)
+		log.Tracef("conInstProc: sdl: %s, inst: %s, msg.Id: %d", conInst.sdlName, conInst.name, msg.Id)
 	}
 
 	var eno = sch.SchEnoUnknown
@@ -282,7 +282,7 @@ func (conInst *ConInst) conInstProc(ptn interface{}, msg *sch.SchMessage) sch.Sc
 	}
 
 	if msg.Id != sch.EvDhtConInstTxDataReq && msg.Id != sch.EvDhtQryInstProtoMsgInd {
-		ciLog.ForceDebug("conInstProc: get out, sdl: %s, inst: %s, msg.Id: %d", conInst.sdlName, conInst.name, msg.Id)
+		log.Tracef("conInstProc: get out, sdl: %s, inst: %s, msg.Id: %d", conInst.sdlName, conInst.name, msg.Id)
 	}
 
 	return eno
@@ -1590,13 +1590,7 @@ _rxLoop:
 //
 func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 
-	if msg == nil {
-		log.Errorf("dispatch: invalid parameter, " +
-			"inst: %s, local: %+v", conInst.name, *conInst.local)
-		return DhtEnoParameter
-	}
-
-	log.Debugf("dispatch: try to dispatch message from peer, " +
+	log.Tracef("dispatch: try to dispatch message from peer, " +
 		"inst: %s, local: %+v, msg: %+v", conInst.name, *conInst.local, *msg)
 
 	var eno = DhtEnoUnknown

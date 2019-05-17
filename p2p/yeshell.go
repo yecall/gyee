@@ -388,6 +388,7 @@ func YeShellConfigToP2pCfg(yesCfg *YeShellConfig) ([]*config.Config, *YeShellCon
 	cfg[ChainCfgIdx] = chainCfg
 	cfg[DhtCfgIdx] = dhtCfg
 	YeShellCfg[yesCfg.Name] = thisCfg
+	yesCfg.dhtBootstrapNodes = thisCfg.dhtBootstrapNodes
 
 	return cfg, &thisCfg
 }
@@ -429,13 +430,15 @@ func NewYeShellManager(yesCfg *YeShellConfig) *YeShellManager {
 		yesLog.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
+	yeShMgr.chainSdlName = yeShMgr.chainInst.SchGetP2pCfgName()
 
 	yeShMgr.dhtInst, eno = p2psh.P2pCreateInstance(cfg[DhtCfgIdx])
 	if eno != sch.SchEnoNone || yeShMgr.dhtInst == nil {
 		yesLog.Debug("NewYeShellManager: failed, eno: %d, error: %s", eno, eno.Error())
 		return nil
 	}
-	dht.SetBootstrapNodes(yesCfg.dhtBootstrapNodes, yeShMgr.dhtInst.SchGetP2pCfgName())
+	yeShMgr.dhtSdlName = yeShMgr.dhtInst.SchGetP2pCfgName()
+	dht.SetBootstrapNodes(yesCfg.dhtBootstrapNodes, yeShMgr.dhtSdlName)
 
 	return &yeShMgr
 }
@@ -454,7 +457,6 @@ func (yeShMgr *YeShellManager) Start() error {
 		yesLog.Debug("Start: failed, eno: %d, error: %s", eno, eno.Error())
 		return eno
 	}
-	yeShMgr.dhtSdlName = yeShMgr.dhtInst.SchGetP2pCfgName()
 
 	eno, yeShMgr.ptnDhtShell = yeShMgr.dhtInst.SchGetUserTaskNode(sch.DhtShMgrName)
 	if eno != sch.SchEnoNone || yeShMgr.ptnDhtShell == nil {
@@ -480,7 +482,6 @@ func (yeShMgr *YeShellManager) Start() error {
 		p2psh.P2pStop(yeShMgr.dhtInst, stopCh)
 		return eno
 	}
-	yeShMgr.chainSdlName = yeShMgr.chainInst.SchGetP2pCfgName()
 
 	yeShMgr.status = yesDhtStart
 

@@ -183,7 +183,7 @@ func (shMgr *ShellManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessa
 // Shell manager entry
 //
 func (shMgr *ShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	log.Debugf("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
+	log.Tracef("shMgrProc: name: %s, msg.Id: %d", shMgr.name, msg.Id)
 	eno := sch.SchEnoUnknown
 	switch msg.Id {
 	case sch.EvSchPoweron:
@@ -212,7 +212,7 @@ func (shMgr *ShellManager) shMgrProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		log.Debugf("shMgrProc: unknown event: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
-	log.Debugf("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
+	log.Tracef("shMgrProc: get out, name: %s, msg.Id: %d", shMgr.name, msg.Id)
 	return eno
 }
 
