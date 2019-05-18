@@ -159,8 +159,8 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		minTxPerEvent:     1,
 		maxEventPerEvent:  len(validatorList),
 		minEventPerEvent:  2,
-		maxPeriodForEvent: 2000,
-		minPeriodForEvent: 20,
+		maxPeriodForEvent: 10 * time.Second,
+		minPeriodForEvent: 100 * time.Millisecond,
 	}
 
 	//tetris.prepare()
@@ -349,8 +349,7 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		t.txsAccepted = append(t.txsAccepted, tx)
 
 		if len(t.txsAccepted) > t.params.maxTxPerEvent {
-			ok, _ := t.MajorityBeatTime()
-			if ok {
+			if t.MajorityBeatReceived() {
 				t.sendEvent()
 			} else {
 				//t.txsAccepted = t.txsAccepted[10:]
@@ -992,8 +991,12 @@ func (t *Tetris) knowWell(x, y *Event) bool {
 	return false
 }
 
+func (t *Tetris) MajorityBeatReceived() bool {
+	return len(t.heartBeat) >= t.params.superMajority-1
+}
+
 func (t *Tetris) MajorityBeatTime() (ok bool, duration time.Duration) {
-	if len(t.heartBeat) < t.params.superMajority-1 {
+	if !t.MajorityBeatReceived() {
 		return false, 0
 	}
 

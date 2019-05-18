@@ -17,6 +17,10 @@
 
 package tetris2
 
+import (
+	"time"
+)
+
 type Params struct {
 	f                 int
 	superMajority     int
@@ -24,6 +28,6 @@ type Params struct {
 	minTxPerEvent     int
 	maxEventPerEvent  int
 	minEventPerEvent  int
-	maxPeriodForEvent int //ms
-	minPeriodForEvent int
+	maxPeriodForEvent time.Duration
+	minPeriodForEvent time.Duration
 }
