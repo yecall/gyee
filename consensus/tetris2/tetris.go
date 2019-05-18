@@ -380,18 +380,25 @@ func (t *Tetris) receiveTicker(ttime time.Time) {
 }
 
 func (t *Tetris) receiveTx(tx common.Hash) {
-	if !t.txsCache.Contains(tx) {
-		t.Metrics.AddTxIn(1)
-		t.txsCache.Add(tx, true)
-		t.txsAccepted = append(t.txsAccepted, tx)
-
-		if len(t.txsAccepted) >= t.params.maxTxPerEvent {
-			if t.MajorityBeatReceived() {
-				t.sendEvent()
-			} else {
-				//t.txsAccepted = t.txsAccepted[10:]
-			}
+	if t.txsCache.Contains(tx) {
+		// drop duplicated
+		return
+	}
+	var eventFull = len(t.txsAccepted) >= t.params.maxTxPerEvent
+	if eventFull {
+		timeSinceLast := time.Now().Sub(t.lastSendTime)
+		if timeSinceLast < t.params.minPeriodForEvent {
+			// too many tx in a short time, drop
+			// TODO: metrics
+			return
 		}
+	}
+	t.Metrics.AddTxIn(1)
+	t.txsCache.Add(tx, true)
+	t.txsAccepted = append(t.txsAccepted, tx)
+
+	if eventFull && t.MajorityBeatReceived() {
+		t.sendEvent()
 	}
 }
 
