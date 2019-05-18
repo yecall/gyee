@@ -31,6 +31,7 @@ import (
 	"github.com/yeeco/gyee/common/address"
 	"github.com/yeeco/gyee/consensus"
 	"github.com/yeeco/gyee/crypto"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/utils"
 	"github.com/yeeco/gyee/utils/logging"
 )
@@ -171,7 +172,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 func (t *Tetris) Start() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	//logging.Logger.Info("Tetris Start...")
+	//log.Info("Tetris Start...")
 	go t.loop()
 	return nil
 }
@@ -179,7 +180,7 @@ func (t *Tetris) Start() error {
 func (t *Tetris) Stop() error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	//logging.Logger.Info("Tetris Stop...")
+	//log.Info("Tetris Stop...")
 	close(t.quitCh)
 	t.wg.Wait()
 	return nil
@@ -219,11 +220,11 @@ func (t *Tetris) OnTxSealed(height uint64, txs []common.Hash) {
 func (t *Tetris) loop() {
 	t.wg.Add(1)
 	defer t.wg.Done()
-	//logging.Logger.Info("Tetris loop...")
+	//log.Info("Tetris loop...")
 	for {
 		select {
 		case <-t.quitCh:
-			//logging.Logger.Info("Tetris loop end.")
+			//log.Info("Tetris loop end.")
 			return
 
 		case eventMsg := <-t.EventCh:
@@ -288,7 +289,7 @@ func (t *Tetris) sendPlaceholderEvent() {
 }
 
 func (t *Tetris) sendEvent() {
-	//logging.Logger.Info("sendEvent:", t.vid, "txs:",len(t.txsAccepted))
+	//log.Info("sendEvent:", t.vid, "txs:",len(t.txsAccepted))
 	if t.validators[t.vid] == nil { //self has quit the validators
 		return
 	}
@@ -337,14 +338,6 @@ func (t *Tetris) receiveTicker(ttime time.Time) {
 func (t *Tetris) receiveTx(tx common.Hash) {
 	if !t.txsCache.Contains(tx) {
 		t.Metrics.AddTxIn(1)
-		//if t.txCount%30000 == 0 {
-		//	//logging.Logger.WithFields(logrus.Fields{
-		//	//	"vid":     t.vid[0:4],
-		//	//	"n":       t.n,
-		//	//	"c":       t.txCount,
-		//	//	"pending": t.eventPending.Len(),
-		//	//}).Info("Tx count")
-		//}
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
 
@@ -374,13 +367,13 @@ func (t *Tetris) checkEvent(event *Event) bool {
 
 	pk, err := event.RecoverPublicKey(t.signer)
 	if err != nil {
-		logging.Logger.Warn("event check error.", err)
+		log.Warn("event check error", err)
 		return false
 	}
 
 	addr, err := t.core.AddressFromPublicKey(pk)
 	if err != nil {
-		logging.Logger.Warn("can not get address from public key.", err)
+		log.Warn("can not get address from public key", err)
 		return false
 	}
 
@@ -391,7 +384,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 			t.eventCache.Add(event.Hash(), event) //if it is parent, should cache for following task
 			t.possibleNewReady = true
 		}
-		//logging.Logger.Warn("the sender of event is not validators.", event.vid[2:4])
+		//log.Warn("the sender of event is not validators.", event.vid[2:4])
 		return false
 	}
 
@@ -406,7 +399,7 @@ func (t *Tetris) checkEvent(event *Event) bool {
 		event.vote = 0
 		event.committable = COMMITTABLE_UNDECIDED
 	} else {
-		logging.Logger.Warn("fail for sign verification", event.vid)
+		log.Warn("signature verification failed", event.vid)
 		return false
 	}
 
@@ -422,7 +415,7 @@ func (t *Tetris) receiveEvent(event *Event) {
 	}
 	if event.Body.N <= t.h {
 		//discard old enough event
-		logging.Logger.Debug("event too old, discard.", event.Body.N, t.h)
+		log.Debug("event too old, discard", "N", event.Body.N, "h", t.h)
 		return
 	}
 
@@ -505,7 +498,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 				if !ev.ready {
 					for _, peh := range ev.Body.E {
 						if peh == HASH0 {
-							logging.Logger.Warn("It should not come here")
+							log.Warn("It should not come here")
 							continue
 						}
 						_, ok := t.eventCache.Get(peh)
@@ -521,7 +514,7 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 									t.Metrics.AddTrafficOut(32)
 									t.Metrics.AddEventRequest(1)
 									er.count++
-									//logging.Logger.Info("resend request for ", er.count, er.time)
+									//log.Info("resend request for ", er.count, er.time)
 								}
 
 							} else {
@@ -541,7 +534,8 @@ func (t *Tetris) addReceivedEventToTetris(event *Event) {
 	end := time.Now()
 	duration := end.Sub(begin)
 	if duration > 10*time.Millisecond {
-		logging.Logger.Info(t.vid[2:4], "pending process:", duration.Nanoseconds(), " unpend:", len(newReady))
+		log.Info("tetris process too long", "vid", vidSignature(t.vid),
+			"time", duration, "unpend", len(newReady))
 	}
 
 	if len(newReady) > 0 {
@@ -689,12 +683,12 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 	n := me.Body.N
 
 	if !me.ready {
-		//logging.Logger.Warn("update: event not ready", me.vid, me.Body.N)
+		//log.Warn("update: event not ready", me.vid, me.Body.N)
 		return false
 	}
 
 	if n <= t.h {
-		logging.Logger.Info("update: event.n<t.n", me.vid, me.Body.N)
+		log.Info("update: event.n<t.n", "me", me.vid, "N", me.Body.N)
 		return false
 	}
 
@@ -722,17 +716,18 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 					}
 				} else {
 					//It is ok and possible here, when pme is below base.
-					//logging.Logger.Debug("parent not in tetris.")
+					//log.Debug("parent not in tetris.")
 				}
 			} else {
 				//event not existed, it is possible when eventCache overflow! It will cause problems!
-				logging.Logger.Warn("eventCache no existed:", e)
+				log.Warn("eventCache no existed", e)
 				continue
 			}
 		}
 		me.round = maxr
 		if me.round == ROUND_UNDECIDED {
-			logging.Logger.Warn("me.round undecided,", t.vid[2:4], me.vid[2:4], me.Body.N)
+			log.Warn("me.round undecided", "tvid", vidSignature(t.vid), "me", vidSignature(me.vid),
+				"num", me.Body.N)
 			//for _, e := range me.Body.E {
 			//	pei, ok := t.eventCache.Get(e)
 			//	if ok {
@@ -749,11 +744,11 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 			//			}
 			//		} else {
 			//			//It is ok and possible here, when pme is below base.
-			//			//logging.Logger.Debug("parent not in tetris.")
+			//			//log.Debug("parent not in tetris.")
 			//		}
 			//	} else {
 			//		//event not existed, it is possible when eventCache overflow! It will cause problems!
-			//		logging.Logger.Warn("eventCache no existed:", e)
+			//		log.Warn("eventCache no existed:", e)
 			//		continue
 			//	}
 			//}
@@ -781,7 +776,7 @@ func (t *Tetris) update(me *Event, fromAll bool) (foundNew bool) {
 				newWitness = true
 			}
 		} else {
-			logging.Logger.Warn("pme==nil, It is impossible to here!")
+			log.Warn("pme==nil, It is impossible to here!")
 		}
 	}
 
@@ -909,7 +904,7 @@ func (t *Tetris) consensusComputing() {
 			if w.Body.T > lastEvent {
 				lastEvent = w.Body.T
 			}
-			cs = append(cs, w.vid[VidStrStart:VidStrStart+3])
+			cs = append(cs, vidSignature(w.vid))
 			for _, tx := range w.Body.Tx {
 				if t.txsCommitted.Contains(tx) {
 					continue
@@ -947,7 +942,7 @@ func (t *Tetris) consensusComputing() {
 	end := time.Now()
 	duration := end.Sub(begin)
 	if duration > 10*time.Millisecond {
-		//logging.Logger.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
+		//log.Info(t.vid[2:4], "tx order:", duration.Nanoseconds())
 	}
 
 	o := &consensus.Output{
@@ -1066,7 +1061,7 @@ func (t *Tetris) validatorRotate(joins []string, quits []string) bool {
 						me.updateKnow(pe)
 					} else {
 						//it is possible for pending event, ignore it safely.
-						//logging.Logger.Info("not in eventcache:", peh, t.eventCache.Len(), t.vid[2:4])
+						//log.Info("not in eventcache:", peh, t.eventCache.Len(), t.vid[2:4])
 					}
 				}
 			}
@@ -1084,7 +1079,7 @@ func (t *Tetris) validatorRotate(joins []string, quits []string) bool {
 //Print info for debug
 func (t *Tetris) DebugPrint() {
 	fmt.Println()
-	fmt.Println("t.vid:", t.vid[2:4], "t.h:", t.h, "t.n", t.n)
+	fmt.Println("t.vid:", vidSignature(t.vid), "t.h:", t.h, "t.n", t.n)
 	fmt.Println("tx:", t.Metrics.TxIn, "event:", t.Metrics.EventIn, "parent:", t.Metrics.ParentEventIn, "requst", t.Metrics.EventRequest)
 	fmt.Println("txCh:", len(t.TxsCh), "eventCh:", len(t.EventCh), "sendCh:", len(t.SendEventCh))
 
@@ -1160,7 +1155,7 @@ func (t *Tetris) DebugPrintDetail() {
 					pei, ok := t.eventCache.Get(peh)
 					if ok {
 						pe := pei.(*Event)
-						fmt.Print(pe.vid[2:4], ":", pe.Body.N, ", ")
+						fmt.Print(vidSignature(pe.vid), ":", pe.Body.N, ", ")
 					} else {
 						fmt.Print("*, ")
 					}
@@ -1174,6 +1169,10 @@ func (t *Tetris) DebugPrintDetail() {
 		fmt.Println()
 	}
 	fmt.Println()
+}
+
+func vidSignature(vid string) string {
+	return vid[VidStrStart : VidStrStart+3]
 }
 
 /*
