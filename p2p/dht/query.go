@@ -1818,7 +1818,8 @@ func GetQuerySeqNo(name string) int64 {
 	qrySeqLock, ok := mapQrySeqLock[name]
 	mapQrySeqLLock.Unlock()
 	if !ok {
-		panic("GetQuerySeqNo: internal error! seems system not ready")
+		log.Errorf("GetQuerySeqNo: internal error! seems system not ready")
+		return -1
 	}
 	qrySeqLock.Lock()
 	defer qrySeqLock.Unlock()

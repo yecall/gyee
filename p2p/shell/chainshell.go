@@ -161,7 +161,7 @@ func NewShellMgr() *ShellManager {
 	}
 
 	if shMgr.deDup {
-		shMgr.tmDedup = dht.NewTimerManager()
+		shMgr.tmDedup = dht.NewTimerManager(shMgr.sdlName, ShMgrName)
 		shMgr.deDupKeyMap = make(map[config.DsKey]interface{}, 0)
 		shMgr.deDupMap = make(map[deDupKey]*deDupVal, 0)
 		shMgr.deDupTiker = time.NewTicker(dht.OneTick)
@@ -374,7 +374,8 @@ func (shMgr *ShellManager) peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchEr
 	// this would never happen since a peer instance would never kill himself in
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
-	panic("peerCloseInd: should never be called!!!")
+	log.Errorf("peerCloseInd: should never be called, sdl: %s", shMgr.sdlName)
+	return sch.SchEnoUserTask
 }
 
 func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
@@ -728,7 +729,7 @@ func (shMgr *ShellManager) deDupTimerCb(el *list.Element, data interface{}) inte
 	ddk, ok := data.(*deDupKey)
 	if !ok {
 		log.Errorf("deDupTimerCb: invalid timer data")
-		panic("deDupTimerCb: invalid data")
+		return errors.New("deDupTimerCb: invalid data")
 	}
 
 	if ddv, ok := shMgr.deDupMap[*ddk]; ok {
@@ -878,6 +879,7 @@ func (shMgr *ShellManager)getChainInfoRsp(msg *sch.MsgShellGetChainInfoRsp) sch.
 	peerInfo, ok := msg.Peer.(*peer.PeerInfo)
 	if !ok {
 		panic("getChainInfoRsp: invalid peer info pointer")
+		return sch.SchEnoUserTask
 	}
 	pid := shellPeerID {
 		snid: peerInfo.Snid,
@@ -955,7 +957,7 @@ func (shMgr *ShellManager) deDupKeyCb(el *list.Element, data interface{}) interf
 	k, ok := data.(*config.DsKey)
 	if !ok {
 		log.Errorf("deDupKeyCb: invalid timer data")
-		panic("deDupKeyCb: invalid timer data")
+		return errors.New("deDupKeyCb: invalid timer data")
 	}
 	delete(shMgr.deDupKeyMap, *k)
 	return nil

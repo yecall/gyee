@@ -378,7 +378,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 
 	if conInst.dir == ConInstDirOutbound {
 		if conInst.con != nil {
-			panic("handshakeReq: dirty connection")
+			log.Errorf("handshakeReq: dirty connection, sdl: %s", conInst.sdlName)
 		}
 		conInst.updateStatus(CisConnecting)
 		conInst.statusReport()
@@ -432,7 +432,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 		} else {
 			log.Debugf("handshakeReq: sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
-			panic("handshakeReq: invalid direction")
+			hsCh<-DhtEnoInternal
 		}
 	}()
 
@@ -450,7 +450,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 		return rsp2ConMgr()
 	case hsEno, ok := <-hsCh:
 		if !ok {
-			panic("handshakeReq: impossible result")
+			log.Errorf("handshakeReq: impossible result, sdl: %s", conInst.sdlName)
+			hsEno = DhtEnoInternal
 		}
 		if hsEno != DhtEnoNone {
 			cleanUp()
@@ -1400,9 +1401,9 @@ _txLoop:
 
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			log.Debugf("txProc: mismatched type, sdl: %s, inst: %s, dir: %d",
+			log.Errorf("txProc: mismatched type, sdl: %s, inst: %s, dir: %d",
 				conInst.sdlName, conInst.name, conInst.dir)
-			panic("txProc: internal errors")
+			goto _checkDone
 		}
 
 		pbPkg = new(pb.DhtPackage)
@@ -2036,7 +2037,8 @@ func (dtm *DiffTimerManager) setTimer(ud interface{}, tv int) (tid interface{}, 
 			el = el.Next()
 		}
 		if tid == nil {
-			panic("setTimer: tell me why...")
+			log.Debugf("setTimer: impossible nil timer")
+			err = errors.New("setTimer: impossible nil timer")
 		}
 	}
 	return tid, err

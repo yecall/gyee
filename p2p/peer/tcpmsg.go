@@ -214,28 +214,28 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 	pkg := new(pb.P2PPackage)
 
 	if err := inst.ior.ReadMsg(pkg); err != nil {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Debugf("getHandshakeInbound: " +
 			"ReadMsg faied, err: %s",
 			err.Error())
 		return nil, PeMgrEnoOs
 	}
 
 	if *pkg.Pid != PID_P2P {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Debugf("getHandshakeInbound: " +
 			"not a p2p package, pid: %d",
 			*pkg.Pid)
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pkg.PayloadLength <= 0 {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Debugf("getHandshakeInbound: " +
 			"invalid payload length: %d",
 			*pkg.PayloadLength)
 		return nil, PeMgrEnoMessage
 	}
 
 	if len(pkg.Payload) != int(*pkg.PayloadLength) {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Debugf("getHandshakeInbound: " +
 			"payload length mismatched, PlLen: %d, real: %d",
 			*pkg.PayloadLength, len(pkg.Payload))
 		return nil, PeMgrEnoMessage
@@ -243,14 +243,14 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 
 	pbMsg := new(pb.P2PMessage)
 	if err := proto.Unmarshal(pkg.Payload, pbMsg); err != nil {
-		tcpmsgLog.Debug("getHandshakeInbound:" +
+		log.Debugf("getHandshakeInbound:" +
 			"Unmarshal failed, err: %s",
 			err.Error())
 		return nil, PeMgrEnoMessage
 	}
 
 	if *pbMsg.Mid != MID_HANDSHAKE {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Debugf("getHandshakeInbound: " +
 			"it's not a handshake message, mid: %d",
 			*pbMsg.Mid)
 		return nil, PeMgrEnoMessage
@@ -258,7 +258,7 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 
 	pbHS := pbMsg.Handshake
 	if pbHS == nil {
-		tcpmsgLog.Debug("getHandshakeInbound: " +
+		log.Debugf("getHandshakeInbound: " +
 			"invalid handshake message pointer: %p",
 			pbHS)
 		return nil, PeMgrEnoMessage
@@ -338,7 +338,7 @@ func (upkg *P2pPackage) putHandshakeOutbound(inst *PeerInstance, hs *Handshake) 
 	}
 
 	if upkg.signOutbound(inst, pbHandshakeMsg) != true {
-		tcpmsgLog.Debug("putHandshakeOutbound: signOutbound failed")
+		log.Debugf("putHandshakeOutbound: signOutbound failed")
 		return PeMgrEnoSign
 	}
 
@@ -349,7 +349,7 @@ func (upkg *P2pPackage) putHandshakeOutbound(inst *PeerInstance, hs *Handshake) 
 
 	payload, err1 := proto.Marshal(pbMsg)
 	if err1 != nil {
-		tcpmsgLog.Debug("putHandshakeOutbound: Marshal failed, err: %s", err1.Error())
+		log.Debugf("putHandshakeOutbound: Marshal failed, err: %s", err1.Error())
 		return PeMgrEnoMessage
 	}
 
@@ -372,7 +372,7 @@ func (upkg *P2pPackage) putHandshakeOutbound(inst *PeerInstance, hs *Handshake) 
 	inst.iow = ggio.NewDelimitedWriter(w)
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
-		tcpmsgLog.Debug("putHandshakeOutbound: Write failed, err: %s", err.Error())
+		log.Debugf("putHandshakeOutbound: Write failed, err: %s", err.Error())
 		return PeMgrEnoOs
 	}
 
@@ -394,7 +394,7 @@ func (upkg *P2pPackage) ping(inst *PeerInstance, ping *Pingpong, write bool) PeM
 	pbPing.Ping.Extra = append(pbPing.Ping.Extra, ping.Extra...)
 	payload, err := proto.Marshal(&pbPing)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("ping: empty payload")
+		log.Debugf("ping: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -424,7 +424,7 @@ func (upkg *P2pPackage) ping(inst *PeerInstance, ping *Pingpong, write bool) PeM
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("ping: Write failed, err: %s", err.Error())
+			log.Debugf("ping: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -448,7 +448,7 @@ func (upkg *P2pPackage) pong(inst *PeerInstance, pong *Pingpong, write bool) PeM
 	pbPong.Pong.Extra = append(pbPong.Pong.Extra, pong.Extra...)
 	payload, err := proto.Marshal(&pbPong)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("pong: empty payload")
+		log.Debugf("pong: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -475,7 +475,7 @@ func (upkg *P2pPackage) pong(inst *PeerInstance, pong *Pingpong, write bool) PeM
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("pong: Write failed, err: %s", err.Error())
+			log.Debugf("pong: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -497,7 +497,7 @@ func (upkg *P2pPackage) CheckKey(inst *PeerInstance, chkk *CheckKey, write bool)
 	pbChkk.CheckKey.Extra = append(pbChkk.CheckKey.Extra, chkk.Extra...)
 	payload, err := proto.Marshal(&pbChkk)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("CheckKey: empty payload")
+		log.Debugf("CheckKey: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -532,7 +532,7 @@ func (upkg *P2pPackage) CheckKey(inst *PeerInstance, chkk *CheckKey, write bool)
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("CheckKey: Write failed, err: %s", err.Error())
+			log.Debugf("CheckKey: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -558,7 +558,7 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 
 	payload, err := proto.Marshal(&pbRptk)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("ReportKey: empty payload")
+		log.Debugf("ReportKey: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -591,7 +591,7 @@ func (upkg *P2pPackage) ReportKey(inst *PeerInstance, rptk *ReportKey, write boo
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("ReportKey: Write failed, err: %s", err.Error())
+			log.Debugf("ReportKey: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -617,7 +617,7 @@ func (upkg *P2pPackage) GetChainData(inst *PeerInstance, gcd *GetChainData, writ
 
 	payload, err := proto.Marshal(&pbGcd)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("GetChainData: empty payload")
+		log.Debugf("GetChainData: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -650,7 +650,7 @@ func (upkg *P2pPackage) GetChainData(inst *PeerInstance, gcd *GetChainData, writ
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("GetChainData: Write failed, err: %s", err.Error())
+			log.Debugf("GetChainData: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -679,7 +679,7 @@ func (upkg *P2pPackage) PutChainData(inst *PeerInstance, pcd *PutChainData, writ
 
 	payload, err := proto.Marshal(&pbPcd)
 	if len(payload) == 0 || err != nil {
-		tcpmsgLog.Debug("PutChainData: empty payload")
+		log.Debugf("PutChainData: empty payload")
 		return PeMgrEnoMessage
 	}
 
@@ -712,7 +712,7 @@ func (upkg *P2pPackage) PutChainData(inst *PeerInstance, pcd *PutChainData, writ
 		}
 
 		if err := inst.iow.WriteMsg(&pbPkg); err != nil {
-			tcpmsgLog.Debug("PutChainData: Write failed, err: %s", err.Error())
+			log.Debugf("PutChainData: Write failed, err: %s", err.Error())
 			return PeMgrEnoOs
 		}
 	}
@@ -726,7 +726,7 @@ func (upkg *P2pPackage) PutChainData(inst *PeerInstance, pcd *PutChainData, writ
 
 func (upkg *P2pPackage) SendPackage(inst *PeerInstance) PeMgrErrno {
 	if inst == nil {
-		tcpmsgLog.Debug("SendPackage: invalid parameter")
+		log.Debugf("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 	pbPkg := new(pb.P2PPackage)
@@ -746,12 +746,12 @@ func (upkg *P2pPackage) SendPackage(inst *PeerInstance) PeMgrErrno {
 		err = inst.conn.SetWriteDeadline(time.Time{})
 	}
 	if err != nil {
-		tcpmsgLog.Debug("SendPackage: SetWriteDeadline failed, err: %s", err.Error())
+		log.Debugf("SendPackage: SetWriteDeadline failed, err: %s", err.Error())
 		return PeMgrEnoOs
 	}
 
 	if err := inst.iow.WriteMsg(pbPkg); err != nil {
-		tcpmsgLog.Debug("SendPackage: Write failed, err: %s", err.Error())
+		log.Debugf("SendPackage: Write failed, err: %s", err.Error())
 		return PeMgrEnoOs
 	}
 	return PeMgrEnoNone
@@ -762,7 +762,7 @@ func (upkg *P2pPackage) SendPackage(inst *PeerInstance) PeMgrErrno {
 //
 func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 	if inst == nil {
-		tcpmsgLog.Debug("RecvPackage: invalid parameter")
+		log.Debugf("RecvPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 	err := (error)(nil)
@@ -772,19 +772,19 @@ func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 		err = inst.conn.SetReadDeadline(time.Time{})
 	}
 	if err != nil {
-		tcpmsgLog.Debug("RecvPackage: SetReadDeadline failed, err: %s", err.Error())
+		log.Debugf("RecvPackage: SetReadDeadline failed, err: %s", err.Error())
 		return PeMgrEnoOs
 	}
 
 	pkg := new(pb.P2PPackage)
 	if err := inst.ior.ReadMsg(pkg); err != nil {
-		tcpmsgLog.Debug("RecvPackage: ReadMsg failed, err: %s", err.Error())
+		log.Debugf("RecvPackage: ReadMsg failed, err: %s", err.Error())
 		return PeMgrEnoOs
 	}
 
 	pid := uint32(*pkg.Pid)
 	if pid != uint32(PID_P2P) && pid != uint32(PID_EXT) {
-		tcpmsgLog.Debug("RecvPackage: " +
+		log.Debugf("RecvPackage: " +
 			"Invalid protocol identity: %d",
 			pid)
 		return PeMgrEnoMessage
@@ -811,12 +811,12 @@ func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 //
 func (upkg *P2pPackage) GetMessage(pmsg *P2pMessage) PeMgrErrno {
 	if pmsg == nil {
-		tcpmsgLog.Debug("GetMessage: invalid parameter")
+		log.Debugf("GetMessage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 	pbMsg := new(pb.P2PMessage)
 	if err := proto.Unmarshal(upkg.Payload, pbMsg); err != nil {
-		tcpmsgLog.Debug("GetMessage: Unmarshal failed, err: %s", err.Error())
+		log.Debugf("GetMessage: Unmarshal failed, err: %s", err.Error())
 		return PeMgrEnoMessage
 	}
 
@@ -847,7 +847,7 @@ func (upkg *P2pPackage) GetMessage(pmsg *P2pMessage) PeMgrErrno {
 		pong.Extra = append(pong.Extra, pbMsg.Pong.Extra...)
 
 	} else {
-		tcpmsgLog.Debug("GetMessage: unknown message identity: %d", pmsg.Mid)
+		log.Debugf("GetMessage: unknown message identity: %d", pmsg.Mid)
 		return PeMgrEnoMessage
 	}
 
@@ -859,12 +859,12 @@ func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 	// message, except those "CheckKey" and "ReportKey" messages, which are applied for
 	// the deduplication function implemented currently in p2p.
 	if extMsg == nil {
-		tcpmsgLog.Debug("GetExtMessage: invalid parameter")
+		log.Debugf("GetExtMessage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 	pbMsg := new(pb.ExtMessage)
 	if err := proto.Unmarshal(upkg.Payload, pbMsg); err != nil {
-		tcpmsgLog.Debug("GetExtMessage:  Unmarshal failed, err: %s", err.Error())
+		log.Debugf("GetExtMessage:  Unmarshal failed, err: %s", err.Error())
 		return PeMgrEnoMessage
 	}
 	extMsg.Mid = uint32(*pbMsg.Mid)
@@ -895,7 +895,7 @@ func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 		pcd.Data = append(pcd.Data, pbMsg.PutChainData.Data...)
 		extMsg.Pcd = pcd
 	} else {
-		tcpmsgLog.Debug("GetExtMessage: " +
+		log.Debugf("GetExtMessage: " +
 			"unknown message identity: %d",
 			extMsg.Mid)
 		return PeMgrEnoMessage
@@ -907,7 +907,7 @@ func (upkg *P2pPackage) GetExtMessage(extMsg *ExtMessage) PeMgrErrno {
 func (upkg *P2pPackage) signOutbound(inst *PeerInstance, hs *pb.P2PMessage_Handshake) bool {
 	r, s, err := config.P2pSign(&inst.priKey, hs.NodeId)
 	if err != nil {
-		tcpmsgLog.Debug("signOutbound: P2pSign failed, error: %s", err.Error())
+		log.Debugf("signOutbound: P2pSign failed, error: %s", err.Error())
 		return false
 	}
 	hs.SignR = new(int32)
@@ -955,6 +955,6 @@ func (pcd *PutChainData) String() string {
 
 func (upkg *P2pPackage) DebugPeerPackage() {
 	if tcpmsgLog.debug__ {
-		tcpmsgLog.Debug("DebugPeerPackage: %s", upkg.String())
+		log.Debugf("DebugPeerPackage: %s", upkg.String())
 	}
 }

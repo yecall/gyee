@@ -69,6 +69,7 @@ const (
 //
 type PrdMgr struct {
 	sdl       *sch.Scheduler    // pointer to scheduler
+	sdlName   string			// scheduler instance name
 	name      string            // my name
 	tep       sch.SchUserTaskEp // task entry
 	ptnMe     interface{}       // pointer to task node of myself
@@ -108,7 +109,6 @@ func NewPrdMgr() *PrdMgr {
 	prdMgr := PrdMgr{
 		name:   PrdMgrName,
 		clrTid: sch.SchInvalidTid,
-		tmMgr:  NewTimerManager(),
 	}
 
 	prdMgr.tep = prdMgr.prdMgrProc
@@ -178,6 +178,9 @@ func (prdMgr *PrdMgr) prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 func (prdMgr *PrdMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	prdMgr.sdl = sch.SchGetScheduler(ptn)
+	prdMgr.sdlName = prdMgr.sdl.SchGetP2pCfgName()
+	prdMgr.tmMgr = NewTimerManager(prdMgr.sdlName, PrdMgrName)
+
 	prdMgr.ptnMe = ptn
 	_, prdMgr.ptnQryMgr = prdMgr.sdl.SchGetUserTaskNode(QryMgrName)
 	_, prdMgr.ptnDhtMgr = prdMgr.sdl.SchGetUserTaskNode(DsMgrName)

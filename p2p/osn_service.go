@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/yeeco/gyee/log"
 	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"
 	"github.com/yeeco/gyee/p2p/shell"
@@ -100,12 +101,14 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	// TODO: 对参数进行检查
 	yc, ok := cfgFromFie.(*yeeCfg.Config)
 	if !ok {
-		panic("OsnServiceConfig: invalid configuration type")
+		log.Errorf("OsnServiceConfig: invalid configuration type")
+		return errors.New("OsnServiceConfig: invalid configuration type")
 	}
 
 	p2p := yc.P2p
 	if p2p.AppType != int(config.P2P_TYPE_ALL) {
-		panic("OsnServiceConfig: must be P2P_TYPE_ALL")
+		log.Errorf("OsnServiceConfig: must be P2P_TYPE_ALL")
+		return errors.New("OsnServiceConfig: must be P2P_TYPE_ALL")
 	}
 	cfg.AppType = config.P2pAppType(p2p.AppType)
 	cfg.ChainId = yc.Chain.ChainID
@@ -113,7 +116,7 @@ func OsnServiceConfig(cfg *YeShellConfig, cfgFromFie interface{}) error {
 	if len(p2p.Name) != 0 {
 		cfg.Name = p2p.Name
 	} else {
-		yeelog.Logger.Infof("OsnServiceConfig: default Name: %s", cfg.Name)
+		log.Infof("OsnServiceConfig: default Name: %s", cfg.Name)
 	}
 
 	cfg.Validator = p2p.Validator

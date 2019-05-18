@@ -191,7 +191,6 @@ func NewDsMgr() *DsMgr {
 		getfromPeer: false,
 		fdsCfg:      FileDatastoreConfig{},
 		ldsCfg:      LeveldbDatastoreConfig{},
-		tmMgr:       NewTimerManager(),
 		tidTick:     sch.SchInvalidTid,
 		bgMap:		 make(map[int]*dsMgrBatchGetInst, 0),
 	}
@@ -374,6 +373,8 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 	sdl := sch.SchGetScheduler(ptn)
 	dsMgr.sdl = sdl
 	dsMgr.sdlName = sdl.SchGetP2pCfgName()
+	dsMgr.tmMgr = NewTimerManager(dsMgr.sdlName, DsMgrName)
+
 	if sdl == nil {
 		log.Errorf("poweron: invalid sdl")
 		return sch.SchEnoInternal

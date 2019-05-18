@@ -26,6 +26,7 @@ import (
 	"net"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
@@ -180,7 +181,7 @@ func NewUdpMsg() *UdpMsg {
 //
 func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) UdpMsgErrno {
 	if pbuf == nil || bytes == 0 || from == nil {
-		udpmsgLog.Debug("SetRawMessage: invalid parameter(s)")
+		log.Debugf("SetRawMessage: invalid parameter(s)")
 		return UdpMsgEnoParameter
 	}
 	pum.Eno = UdpMsgEnoNone
@@ -196,7 +197,7 @@ func (pum *UdpMsg) SetRawMessage(pbuf *[]byte, bytes int, from *net.UDPAddr) Udp
 func (pum *UdpMsg) Decode() UdpMsgErrno {
 	pum.Msg = new(pb.UdpMessage)
 	if err := proto.Unmarshal((*pum.Pbuf)[0:pum.Len], pum.Msg); err != nil {
-		udpmsgLog.Debug("Decode: " +
+		log.Debugf("Decode: " +
 			"Unmarshal failed, err: %s",
 			err.Error())
 		return UdpMsgEnoDecodeFailed
@@ -218,7 +219,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 
 	mt := pum.GetDecodedMsgType()
 	if mt == UdpMsgTypeUnknown {
-		udpmsgLog.Debug("GetDecodedMsg: " +
+		log.Debugf("GetDecodedMsg: " +
 			"GetDecodedMsgType failed, mt: %d",
 			mt)
 		return nil
@@ -234,7 +235,7 @@ func (pum *UdpMsg) GetDecodedMsg() interface{} {
 	var ok bool
 
 	if f, ok = funcMap[mt]; !ok {
-		udpmsgLog.Debug("GetDecodedMsg: " +
+		log.Debugf("GetDecodedMsg: " +
 			"invalid message type: %d",
 			mt)
 		return nil
@@ -260,7 +261,7 @@ func (pum *UdpMsg) GetDecodedMsgType() UdpMsgType {
 
 	key = pum.Msg.GetMsgType()
 	if val, ok = pbMap[key]; !ok {
-		udpmsgLog.Debug("GetDecodedMsgType: invalid message type")
+		log.Debugf("GetDecodedMsgType: invalid message type")
 		return UdpMsgTypeUnknown
 	}
 	return val
@@ -429,12 +430,12 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 	} else if *pum.Msg.MsgType == pb.UdpMessage_NEIGHBORS {
 		ipv4 = net.IP(pum.Msg.Neighbors.From.IP).To4()
 	} else {
-		udpmsgLog.Debug("CheckUdpMsgFromPeer: invalid message type: %d", *pum.Msg.MsgType)
+		log.Debugf("CheckUdpMsgFromPeer: invalid message type: %d", *pum.Msg.MsgType)
 		return UdpMsgEnoMessage
 	}
 
 	if !ipv4.Equal(from.IP.To4()) {
-		udpmsgLog.Debug("CheckUdpMsgFromPeer: address mitched, source: %s, reported: %s", from.IP.String(), ipv4.String())
+		log.Debugf("CheckUdpMsgFromPeer: address mitched, source: %s, reported: %s", from.IP.String(), ipv4.String())
 		return UdpMsgEnoMessage
 	}
 	return UdpMsgEnoNone
@@ -448,7 +449,7 @@ func (pum *UdpMsg) CheckUdpMsgFromPeer(from *net.UDPAddr, chkAddr bool) UdpMsgEr
 func (pum *UdpMsg) EncodePbMsg() UdpMsgErrno {
 	var err error
 	if *pum.Pbuf, err = proto.Marshal(pum.Msg); err != nil {
-		udpmsgLog.Debug("Encode: " +
+		log.Debugf("Encode: " +
 			"Marshal failed, err: %s",
 			err.Error())
 		pum.Eno = UdpMsgEnoEncodeFailed
@@ -485,7 +486,7 @@ func (pum *UdpMsg) Encode(t int, msg interface{}) UdpMsgErrno {
 	}
 
 	if eno != UdpMsgEnoNone {
-		udpmsgLog.Debug("Encode: failed, type: %d", t)
+		log.Debugf("Encode: failed, type: %d", t)
 	}
 
 	pum.Eno = eno
@@ -548,7 +549,7 @@ func (pum *UdpMsg) EncodePing(ping *Ping) UdpMsgErrno {
 
 	if buf, err = proto.Marshal(pbm); err != nil {
 
-		udpmsgLog.Debug("EncodePing: fialed, err: %s", err.Error())
+		log.Debugf("EncodePing: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -612,7 +613,7 @@ func (pum *UdpMsg) EncodePong(pong *Pong) UdpMsgErrno {
 
 	if buf, err = proto.Marshal(pbm); err != nil {
 
-		udpmsgLog.Debug("EncodePong: fialed, err: %s", err.Error())
+		log.Debugf("EncodePong: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -698,7 +699,7 @@ func (pum *UdpMsg) EncodeFindNode(fn *FindNode) UdpMsgErrno {
 
 	if buf, err = proto.Marshal(pbm); err != nil {
 
-		udpmsgLog.Debug("EncodeFindNode: fialed, err: %s", err.Error())
+		log.Debugf("EncodeFindNode: fialed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -776,7 +777,7 @@ func (pum *UdpMsg) EncodeNeighbors(ngb *Neighbors) UdpMsgErrno {
 	var buf []byte
 
 	if buf, err = proto.Marshal(pbm); err != nil {
-		udpmsgLog.Debug("EncodeNeighbors: failed, err: %s", err.Error())
+		log.Debugf("EncodeNeighbors: failed, err: %s", err.Error())
 		return UdpMsgEnoEncodeFailed
 	}
 
@@ -942,15 +943,15 @@ func (pum *UdpMsg) DebugMessageFromPeer() {
 	if udpmsgLog.debug__ {
 		switch pum.typ {
 		case UdpMsgTypePing:
-			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
+			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
 		case UdpMsgTypePong:
-			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
+			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
 		case UdpMsgTypeFindNode:
-			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
+			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
 		case UdpMsgTypeNeighbors:
-			udpmsgLog.Debug("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
+			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
 		default:
-			udpmsgLog.Debug("DebugMessageFromPeer: invalid message type: %d", pum.typ)
+			log.Debugf("DebugMessageFromPeer: invalid message type: %d", pum.typ)
 		}
 	}
 }
@@ -959,15 +960,15 @@ func (pum *UdpMsg) DebugMessageToPeer() {
 	if udpmsgLog.debug__ {
 		switch pum.typ {
 		case UdpMsgTypePing:
-			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
+			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
 		case UdpMsgTypePong:
-			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
+			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
 		case UdpMsgTypeFindNode:
-			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
+			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
 		case UdpMsgTypeNeighbors:
-			udpmsgLog.Debug("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
+			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
 		default:
-			udpmsgLog.Debug("DebugMessageToPeer: invalid message type: %d", pum.typ)
+			log.Debugf("DebugMessageToPeer: invalid message type: %d", pum.typ)
 		}
 	}
 }

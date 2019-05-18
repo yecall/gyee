@@ -34,6 +34,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
+	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
@@ -186,7 +187,7 @@ func (db *nodeDB) node(snid SubNetworkID, id NodeID) *Node {
 	}
 	node := new(Node)
 	if err := DecodeBytes(blob, node, nil); err != nil {
-		ndbLog.Debug("node: DecodeBytes failed")
+		log.Debugf("node: DecodeBytes failed")
 		return nil
 	}
 	node.sha = *TabNodeId2Hash(id)
@@ -364,7 +365,7 @@ func nextNode(it iterator.Iterator) (*Node, *SubNetworkID) {
 		var n Node
 		var snid = AnySubNet
 		if err := DecodeBytes(it.Value(), &n, &snid); err != nil {
-			ndbLog.Debug("nextNode: DecodeBytes failed")
+			log.Debugf("nextNode: DecodeBytes failed")
 			continue
 		}
 		return &n, &snid

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/log"
 )
 
 // Scheduler interface errnos
@@ -78,7 +79,7 @@ var SchErrnoDescription = []string{
 // Errno string
 func (eno SchErrno) SchErrnoString() string {
 	if eno < SchEnoNone || eno >= SchEnoInvalid {
-		panic("invalid scheduler errno")
+		return fmt.Sprintf("invalid scheduler errno: %d", eno)
 	}
 	return SchErrnoDescription[eno]
 }
@@ -305,7 +306,7 @@ func (sdl *Scheduler) SchMakeMessage(msg *SchMessage, s, r interface{}, id int, 
 	// to access the body again after this function called, or the body will be
 	// modified(corrupted).
 	if msg == nil || s == nil || r == nil {
-		panic(fmt.Sprintf("SchMakeMessage: invalid message, sdl: %s", sdl.p2pCfg.CfgName))
+		log.Debugf("SchMakeMessage: invalid message, sdl: %s", sdl.p2pCfg.CfgName)
 		return SchEnoParameter
 	}
 	msg.sender = s.(*schTaskNode)
