@@ -370,7 +370,8 @@ func (bp *BlockPool) handleNewSignature(blk *Block) {
 		return
 	}
 	if changed {
-		log.Info("block signature added", "H", currBlock.Number(), "cnt", len(currBlock.signatureMap), "hash", currBlock.Hash())
+		log.Info("block signature added", "H", currBlock.Number(),
+			"cnt", len(currBlock.signatureMap), "txs", len(currBlock.body.RawTransactions), "hash", currBlock.Hash())
 		bp.cacheHash2Blk.Add(currBlock.Hash(), currBlock)
 		// TODO: less disk write
 		putHeader(bp.chain.storage, currBlock.pbHeader)
@@ -416,7 +417,8 @@ func (bp *BlockPool) syncLoop() {
 			log.Warn("failed to get remote block", "err", err)
 			return
 		}
-		log.Info("[sync] got remote block", "H", b.Number(), "hash", b.Hash())
+		log.Info("[sync] got remote block", "H", b.Number(),
+			"txs", len(b.body.RawTransactions), "hash", b.Hash())
 		bp.processBlock(b)
 		h++
 	}
