@@ -1196,18 +1196,18 @@ _csLoop:
 
 func (yeShMgr *YeShellManager) chainReady4User() {
 	const (
-		hSize = 8			// history size, must be (2^n)
-		hMask = hSize - 1	// mask for rounding
-		hBackSize = 3		// look backward length
-		apnTh = 1			// active peer number threshold when looking backward
-		forever = true		// observe forever
+		hSize = 8					// history size, must be (2^n)
+		hMask = hSize - 1			// mask for rounding
+		hBackSize = 3				// look backward length
+		apnTh = 1					// active peer number threshold when looking backward
+		forever = true				// observe forever
 		brDelay = time.Second		// delay before ready to check
 		arDelay = time.Second * 4	// dealy after ready to check
+		showAlways = false			// show always
 	)
 	ready := false
 	actHis := [hSize]int{}
 	for loop := 0; !yeShMgr.inStopping ;loop++ {
-		log.Infof("ActivePeerSnapshot: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
 		aps := yeShMgr.ptChainShMgr.GetActivePeerSnapshot()
 		idx := loop & hMask
 		actHis[idx] = 0
@@ -1216,6 +1216,13 @@ func (yeShMgr *YeShellManager) chainReady4User() {
 				actHis[idx] += 1
 			}
 		}
+
+		if !ready || showAlways {
+			log.Infof("ActivePeerSnapshot: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+		} else if actHis[idx] != actHis[(idx + hSize - 1)&hMask]{
+			log.Infof("ActivePeerSnapshot: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+		}
+
 		idx = 0
 		for ; idx < hBackSize; idx++ {
 			hisIdx := (loop + hSize - idx) & hMask
