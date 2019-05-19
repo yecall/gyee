@@ -230,25 +230,17 @@ func P2pStart(sdl *sch.Scheduler) sch.SchErrno {
 	//
 
 	if what == config.P2P_TYPE_CHAIN {
-
 		var pmEno peer.PeMgrErrno
-
 		peMgr := sdl.SchGetTaskObject(sch.PeerMgrName).(*peer.PeerManager)
-		log.Errorf("P2pStart: wait peer manager inited, inst: %s", sdl.SchGetP2pCfgName())
+		log.Debugf("P2pStart: wait peer manager inited, inst: %s", sdl.SchGetP2pCfgName())
 		pmEno = peMgr.PeMgrInited()
-		log.Errorf("P2pStart: get out, peEno: %d, inst: %s", pmEno, sdl.SchGetP2pCfgName())
-
 		if pmEno != peer.PeMgrEnoNone {
 			log.Errorf("P2pStart: pmEno: %d", pmEno)
 			return sch.SchEnoUserTask
 		}
 
-		//
-		// start peer manager
-		//
-
+		log.Debugf("P2pStart: start peer manager, inst: %s", sdl.SchGetP2pCfgName())
 		pmEno = peMgr.PeMgrStart()
-
 		if pmEno != peer.PeMgrEnoNone {
 			log.Errorf("P2pStart: PeMgrStart failed, pmEno: %d", pmEno)
 			return sch.SchEnoUserTask

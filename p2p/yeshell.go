@@ -1207,7 +1207,7 @@ func (yeShMgr *YeShellManager) chainReady4User() {
 	ready := false
 	actHis := [hSize]int{}
 	for loop := 0; !yeShMgr.inStopping ;loop++ {
-		log.Infof("chainReady4User: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
+		log.Infof("ActivePeerSnapshot: sdl: %s, actHis: %v", yeShMgr.chainSdlName, actHis)
 		aps := yeShMgr.ptChainShMgr.GetActivePeerSnapshot()
 		idx := loop & hMask
 		actHis[idx] = 0
