@@ -1278,8 +1278,8 @@ _rxLoop:
 				k := [yesKeyBytes]byte{}
 				copy(k[0:], pkg.Key)
 				if dup, old := yeShMgr.checkDupKey(k); dup {
-					log.Debugf("chainRxProc: duplicated, sdl: %s, delta: %f, data: %x, old: %x",
-						yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), pkg.Payload, old)
+					log.Debugf("chainRxProc: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
+						yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, pkg.Payload, old)
 					continue
 				}
 
@@ -1684,8 +1684,8 @@ func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.Node
 	}
 
 	if dup, old := yeShMgr.checkDupKey(k); dup {
-		log.Infof("broadcastTxOsn: duplicated, sdl: %s, delta: %f, data: %x, old: %x",
-			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), msg.Data, old)
+		log.Infof("broadcastTxOsn: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
+			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, msg.Data, old)
 		return errors.New("broadcastTxOsn: duplicated")
 	}
 
@@ -1725,8 +1725,8 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 	}
 
 	if dup, old := yeShMgr.checkDupKey(k); dup {
-		log.Infof("broadcastEvOsn: duplicated, sdl: %s, delta: %f, data: %x, old: %x",
-			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), msg.Data, old)
+		log.Infof("broadcastEvOsn: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
+			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, msg.Data, old)
 		return errors.New("broadcastEvOsn: duplicated")
 	}
 
@@ -1781,8 +1781,8 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 	}
 
 	if dup, old := yeShMgr.checkDupKey(k); dup {
-		log.Infof("broadcastBhOsn: duplicated, sdl: %s, delta: %f, data: %x, old: %x",
-			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), msg.Data, old)
+		log.Infof("broadcastBhOsn: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
+			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, msg.Data, old)
 		return errors.New("broadcastBhOsn: duplicated")
 	}
 
@@ -1826,8 +1826,8 @@ func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.Node
 	}
 
 	if dup, old := yeShMgr.checkDupKey(k); dup {
-		log.Infof("broadcastBkOsn: duplicated, sdl: %s, delta: %f, data: %x, old: %x",
-			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), msg.Data, old)
+		log.Infof("broadcastBkOsn: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
+			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, msg.Data, old)
 		return errors.New("broadcastBkOsn: duplicated")
 	}
 
@@ -1892,7 +1892,7 @@ func (yeShMgr *YeShellManager) deDupTimerCb(el *list.Element, data interface{}) 
 		log.Debugf("deDupTimerCb: invalid key, sdl: %s", yeShMgr.chainSdlName)
 		return errors.New("deDupTimerCb: invalid key")
 	} else if dmv, ok := yeShMgr.deDupMap[*key]; !ok {
-		log.Infof("deDupTimerCb: not found, sdl: %x, key: %x",
+		log.Debugf("deDupTimerCb: not found, sdl: %x, key: %x",
 			yeShMgr.chainSdlName, *key)
 		return errors.New("deDupTimerCb: not found")
 	} else {

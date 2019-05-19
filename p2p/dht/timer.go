@@ -199,45 +199,37 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 	xm := -1
 	xs := -1
 	r := -1
-	sp := -1
-	mp := -1
-	hp := -1
-	dp := -1
 	if d := tm.t >> xdTickMaskBits; d > 0 {
 		xd = absTicks >> xdTickMaskBits
 		r = absTicks & ((1 << xdTickMaskBits) - 1)
-		dp = (mgr.dp + xd) & (xdayCycle - 1)
-		if mgr.dTmList[dp] == nil {
-			mgr.dTmList[dp] = list.New()
+		if mgr.dTmList[xd] == nil {
+			mgr.dTmList[xd] = list.New()
 		}
-		targetLi = mgr.dTmList[dp]
+		targetLi = mgr.dTmList[xd]
 		targetEl = targetLi.PushBack(tm)
 	} else if h := tm.t >> xhTickMaskBits; h > 0 {
 		xh = absTicks >> xhTickMaskBits
 		r = absTicks & ((1 << xhTickMaskBits) - 1)
-		hp = (mgr.hp + xh) & (xhourCycle - 1)
-		if mgr.hTmList[hp] == nil {
-			mgr.hTmList[hp] = list.New()
+		if mgr.hTmList[xh] == nil {
+			mgr.hTmList[xh] = list.New()
 		}
-		targetLi = mgr.hTmList[hp]
+		targetLi = mgr.hTmList[xh]
 		targetEl = targetLi.PushBack(tm)
 	} else if m := tm.t >> xmTickMaskBits; m > 0 {
 		xm = absTicks >> xmTickMaskBits
 		r = absTicks & ((1 << xmTickMaskBits) - 1)
-		mp = (mgr.mp + xm) & (xminuteCycle - 1)
-		if mgr.mTmList[mp] == nil {
-			mgr.mTmList[mp] = list.New()
+		if mgr.mTmList[xm] == nil {
+			mgr.mTmList[xm] = list.New()
 		}
-		targetLi = mgr.mTmList[mp]
+		targetLi = mgr.mTmList[xm]
 		targetEl = targetLi.PushBack(tm)
 	} else {
 		xs = tm.t
 		r = 0
-		sp = (mgr.sp + xs) & (xsecondCycle - 1)
-		if mgr.sTmList[sp] == nil {
-			mgr.sTmList[sp] = list.New()
+		if mgr.sTmList[xs] == nil {
+			mgr.sTmList[xs] = list.New()
 		}
-		targetLi = mgr.sTmList[sp]
+		targetLi = mgr.sTmList[xs]
 		targetEl = targetLi.PushBack(tm)
 	}
 	tm.s = xs
@@ -251,8 +243,8 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 	if mgr.tag == yeShellManagerTag {
 		key := tm.data.(*config.DsKey)
 		log.Debugf("StartTimer: sdl: %s, " +
-			"t: %d, r: %d, s: %d, m: %d, h: %d, d: %d, _sp: %d, _mp: %d, _hp: %d, _dp: %d, key: %x",
-			mgr.sdl, tm.r, tm.t, tm.s, tm.m, tm.h, tm.d, sp, mp, hp, dp, *key)
+			"t: %d, r: %d, s: %d, m: %d, h: %d, d: %d, key: %x",
+			mgr.sdl, tm.r, tm.t, tm.s, tm.m, tm.h, tm.d, *key)
 	}
 
 	return TmEnoNone
