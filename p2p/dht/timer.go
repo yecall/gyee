@@ -199,24 +199,22 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 	xm := -1
 	xs := -1
 	r := -1
-	if d := tm.t >> xdTickMaskBits; d > 0 {
-		xd = absTicks >> xdTickMaskBits
+
+	if xd = (absTicks >> xdTickMaskBits) & (xdayCycle - 1); xd != mgr.dp {
 		r = absTicks & ((1 << xdTickMaskBits) - 1)
 		if mgr.dTmList[xd] == nil {
 			mgr.dTmList[xd] = list.New()
 		}
 		targetLi = mgr.dTmList[xd]
 		targetEl = targetLi.PushBack(tm)
-	} else if h := tm.t >> xhTickMaskBits; h > 0 {
-		xh = absTicks >> xhTickMaskBits
+	} else if xh = (absTicks >> xhTickMaskBits) & (xhourCycle - 1); xh != mgr.hp {
 		r = absTicks & ((1 << xhTickMaskBits) - 1)
 		if mgr.hTmList[xh] == nil {
 			mgr.hTmList[xh] = list.New()
 		}
 		targetLi = mgr.hTmList[xh]
 		targetEl = targetLi.PushBack(tm)
-	} else if m := tm.t >> xmTickMaskBits; m > 0 {
-		xm = absTicks >> xmTickMaskBits
+	} else if xm = (absTicks >> xmTickMaskBits) & (xminuteCycle - 1); xm != mgr.mp {
 		r = absTicks & ((1 << xmTickMaskBits) - 1)
 		if mgr.mTmList[xm] == nil {
 			mgr.mTmList[xm] = list.New()
@@ -224,7 +222,7 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 		targetLi = mgr.mTmList[xm]
 		targetEl = targetLi.PushBack(tm)
 	} else {
-		xs = tm.t
+		xs = absTicks & (xsecondCycle - 1)
 		r = 0
 		if mgr.sTmList[xs] == nil {
 			mgr.sTmList[xs] = list.New()
@@ -232,6 +230,7 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 		targetLi = mgr.sTmList[xs]
 		targetEl = targetLi.PushBack(tm)
 	}
+
 	tm.s = xs
 	tm.m = xm
 	tm.h = xh

@@ -1381,7 +1381,7 @@ func (sdl *scheduler) schStopTaskEx(ptn *schTaskNode) SchErrno {
 	// clean the user task control block
 	//
 
-	log.Debugf("schStopTaskEx: clean task control block, sdl: %s, task: %s",
+	log.Debugf("schStopTaskEx: clean task more, sdl: %s, task: %s",
 		sdl.p2pCfg.CfgName, ptn.task.name)
 
 	if eno = sdl.schTcbClean(&ptn.task); eno != SchEnoNone {
