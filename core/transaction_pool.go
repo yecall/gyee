@@ -193,6 +193,8 @@ func (tp *TransactionPool) TxBroadcast(tx *Transaction) error {
 		log.Error("TxBroadcast encode", "err", err)
 		return err
 	}
+	log.Debug("TxBroadcast", "from", tx.From().Hex(), "N", tx.Nonce(),
+		"to", tx.To().Hex(), "a", tx.Amount().String())
 	go func(msg p2p.Message) {
 		tp.core.metrics.p2pMsgSent.Mark(1)
 		err = tp.core.node.P2pService().BroadcastMessage(msg)
