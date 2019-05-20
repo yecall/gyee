@@ -51,6 +51,10 @@ type SealEvent struct {
 	txs    []common.Hash
 }
 
+type DropEvent struct {
+	txs []common.Hash
+}
+
 type Tetris struct {
 	core   ICore
 	signer crypto.Signer
@@ -69,6 +73,7 @@ type Tetris struct {
 	ParentEventCh chan []byte
 	TxsCh         chan common.Hash
 	SealCh        chan *SealEvent
+	DropCh        chan *DropEvent
 
 	//Output Channel
 	OutputCh       chan *consensus.Output
@@ -117,6 +122,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		ParentEventCh: make(chan []byte, 10),
 		TxsCh:         make(chan common.Hash, 2000),
 		SealCh:        make(chan *SealEvent, 100),
+		DropCh:        make(chan *DropEvent, 100),
 
 		OutputCh:       make(chan *consensus.Output, 10),
 		SendEventCh:    make(chan []byte, 10),
@@ -216,6 +222,12 @@ func (t *Tetris) OnTxSealed(height uint64, txs []common.Hash) {
 	}
 }
 
+func (t *Tetris) OnTxDropped(txs []common.Hash) {
+	t.DropCh <- &DropEvent{
+		txs: txs,
+	}
+}
+
 func (t *Tetris) loop() {
 	t.wg.Add(1)
 	defer t.wg.Done()
@@ -255,6 +267,9 @@ func (t *Tetris) loop() {
 
 		case seal := <-t.SealCh:
 			t.receiveSeal(seal)
+
+		case drop := <-t.DropCh:
+			t.receiveDrop(drop)
 
 		case time := <-t.ticker.C:
 			t.receiveTicker(time)
@@ -360,6 +375,12 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 
 func (t *Tetris) receiveSeal(event *SealEvent) {
 	// TODO:
+}
+
+func (t *Tetris) receiveDrop(drop *DropEvent) {
+	for _, h := range drop.txs {
+		t.txsCache.Remove(h)
+	}
 }
 
 func (t *Tetris) checkEvent(event *Event) bool {

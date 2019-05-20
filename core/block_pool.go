@@ -297,7 +297,14 @@ func (bp *BlockPool) handleSealRequest(req *sealRequest) {
 			break
 		}
 		// engine output not ordered by nonce
-		txs := organizeTxs(currState, req.txs)
+		txs, txDrop := organizeTxs(currState, req.txs)
+		if len(txDrop) > 0 {
+			var drop = make([]common.Hash, 0, len(txDrop))
+			for i := range txDrop {
+				drop = append(drop, *(txDrop[i].Hash()))
+			}
+			bp.core.engine.OnTxDropped(drop)
+		}
 		// build next block
 		nextBlock, err := bp.chain.BuildNextBlock(currBlock, req.t, txs)
 		if err != nil {

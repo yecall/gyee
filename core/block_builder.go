@@ -25,7 +25,7 @@ import (
 	"github.com/yeeco/gyee/log"
 )
 
-func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
+func organizeTxs(state state.AccountTrie, txs Transactions) (out Transactions, dropped Transactions) {
 	txsRoot := DeriveHash(txs)
 	log.Info("organizeTxs", "cnt", len(txs), "txsRoot", txsRoot)
 	var (
@@ -77,5 +77,5 @@ func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
 			break
 		}
 	}
-	return output
+	return output, txs
 }
