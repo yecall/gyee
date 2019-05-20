@@ -1250,12 +1250,25 @@ func (yeShMgr *YeShellManager) chainReady4User() {
 }
 
 func (yeShMgr *YeShellManager) chainRxProc() {
-	// statistics
+	rxCount := 0
+	gcdCount := 0
+	pcdCount := 0
+	dupCount := 0
 	txCount := 0
 	evCount := 0
 	bhCount := 0
 	bkCount := 0
 	xxCount := 0
+	subCount := make(map[string]int64, 0)
+	showStat := func() {
+		log.Debugf("chainRxProc: stat, " +
+			"sdl: %s, " +
+			"rxCount:%d, gcdCount:%d, pcdCount:%d, dupCount:%d, " +
+			"txCount:%d, evCount:%d, bhCount:%d, bkCount:%d, xxCount:%d, subCount:%+v",
+			yeShMgr.chainSdlName,
+			rxCount, gcdCount, pcdCount, dupCount,
+			txCount, evCount, bhCount, bkCount, xxCount, subCount)
+	}
 
 _rxLoop:
 	for {
@@ -1263,21 +1276,28 @@ _rxLoop:
 		case pkg, ok := <-yeShMgr.chainRxChan:
 
 			if !ok {
-				log.Debugf("chainRxProc: channel closed")
+				log.Debugf("chainRxProc: channel closed, sdl: %s", yeShMgr.chainSdlName)
 				break _rxLoop
 			}
 
+			if rxCount++; rxCount & 0x3f == 0 {
+				showStat()
+			}
+
 			if pkg.ProtoId != int(peer.PID_EXT) {
-				log.Debugf("chainRxProc: invalid protocol identity: %d", pkg.ProtoId)
+				log.Debugf("chainRxProc: invalid protocol identity, sdl: %s, pid: %d",
+					yeShMgr.chainSdlName, pkg.ProtoId)
 				continue
 			}
 
 			if pkg.MsgId == int(p2psh.MID_GCD) {
 
+				gcdCount++
 				yeShMgr.getChainDataFromPeer(pkg)
 
 			} else if pkg.MsgId == int(p2psh.MID_PCD) {
 
+				pcdCount++
 				yeShMgr.putChainDataFromPeer(pkg)
 
 			} else {
@@ -1287,6 +1307,7 @@ _rxLoop:
 				if dup, old := yeShMgr.checkDupKey(k); dup {
 					log.Debugf("chainRxProc: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
 						yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, pkg.Payload, old)
+					dupCount++
 					continue
 				}
 
@@ -1316,6 +1337,12 @@ _rxLoop:
 						sub, _ := key.(*Subscriber)
 						sub.MsgChan <- msg
 
+						if cnt, ok := subCount[msg.MsgType]; ok {
+							subCount[msg.MsgType] = cnt + 1
+						} else {
+							subCount[msg.MsgType] = 1
+						}
+
 						exclude := pkg.PeerInfo.NodeId
 						err := error(nil)
 						switch msg.MsgType {
@@ -1328,6 +1355,9 @@ _rxLoop:
 						case MessageTypeBlock:
 							err = yeShMgr.broadcastBkOsn(&msg, &exclude)
 						default:
+							log.Debugf("chainRxProc: invalid message type, " +
+								"sdl: %s, msg: %s",
+								yeShMgr.chainSdlName, msg.MsgType)
 							err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
 						}
 						return err == nil

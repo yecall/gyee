@@ -547,7 +547,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 			return eno
 		}
 
-		log.Debug("connectRsp: send EvDhtConMgrSendReq ok, " +
+		log.Debugf("connectRsp: send EvDhtConMgrSendReq ok, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
 

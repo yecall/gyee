@@ -714,6 +714,7 @@ func (peMgr *PeerManager) peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	*peInst = peerInstDefault
 	peInst.sdl = peMgr.sdl
+	peInst.sdlName = peMgr.sdl.SchGetP2pCfgName()
 	peInst.peMgr = peMgr
 	peInst.tep = peInst.peerInstProc
 	peInst.ptnMgr = peMgr.ptnMe
@@ -1758,6 +1759,7 @@ func (peMgr *PeerManager) peMgrCreateOutboundInst(snid *config.SubNetworkID, nod
 
 	*peInst = peerInstDefault
 	peInst.sdl = peMgr.sdl
+	peInst.sdlName = peMgr.sdl.SchGetP2pCfgName()
 	peInst.peMgr = peMgr
 	peInst.tep = peInst.peerInstProc
 	peInst.ptnMgr = peMgr.ptnMe
@@ -2316,6 +2318,7 @@ const PeInstPingpongCycle = time.Second * 16 // pingpong period
 
 type PeerInstance struct {
 	sdl    *sch.Scheduler      // pointer to scheduler
+	sdlName	string			   // scheduler instance name
 	peMgr  *PeerManager        // pointer to peer manager
 	name   string              // name
 	chainId uint32			   // chain identity
@@ -2934,6 +2937,18 @@ func (peMgr *PeerManager) ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
+type txPkgKey struct {
+	pid	uint32
+	mid	uint32
+}
+type txStat struct {
+	txTryCnt		int64
+	txppOkCnt		int64
+	txppFailedCnt	int64
+	txdatOkCnt		int64
+	txdatFailedCnt	int64
+	txPkgCnt		map[txPkgKey]int64
+}
 func piTx(pi *PeerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
@@ -2953,8 +2968,9 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		// might had fired pi.txDone and been blocked by pi.txExit. panic is called
 		// for such a overload system, see scheduler please.
 
-		log.Debugf("piTx: ask4Close, send EvPeCloseReq. inst: %s snid: %x, dir: %d, peer: %s",
-			pi.name, pi.snid, pi.dir, pi.node.IP.String())
+		log.Debugf("piTx: ask4Close, send EvPeCloseReq, " +
+			"sdl: %s, inst: %s snid: %x, dir: %d, peer: %s",
+			pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		pi.txEno = eno
 		why := sch.PEC_FOR_TXERROR
@@ -2978,6 +2994,9 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		okData bool
 		ppkg   *P2pPackage
 		upkg   *P2pPackage
+		stat	= txStat {
+			txPkgCnt: make(map[txPkgKey]int64, 0),
+		}
 	)
 
 _txLoop:
@@ -2987,8 +3006,9 @@ _txLoop:
 		isData = false
 		okPP = false
 		okData = false
-		ppkg = (*P2pPackage)(nil)
-		upkg = (*P2pPackage)(nil)
+		ppkg = nil
+		upkg = nil
+		txpk := txPkgKey{}
 
 		select {
 		case ppkg, okPP = <-pi.ppChan:
@@ -3000,6 +3020,7 @@ _txLoop:
 		}
 
 		// check if any pendings or done
+		stat.txTryCnt++
 		if isPP {
 
 			if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
@@ -3013,26 +3034,33 @@ _txLoop:
 
 				if eno := ppkg.SendPackage(pi); eno == PeMgrEnoNone {
 
-					pi.txOkCnt += 1
+					pi.txOkCnt++
+					stat.txppOkCnt++
 
 				} else {
 
-					pi.txFailedCnt += 1
+					pi.txFailedCnt++
+					stat.txppFailedCnt++
 					ask4Close(eno)
 				}
+
+				txpk.pid = ppkg.Pid
+				txpk.mid = ppkg.Mid
 			}
 
 		} else if isData {
 
 			if !okData {
-				log.Debugf("piTx: done, inst: %s, snid: %x, dir: %d",
-					pi.name, pi.snid, pi.dir)
+				log.Debugf("piTx: done, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d",
+					pi.sdlName, pi.name, pi.snid, pi.dir)
 				break _txLoop
 			}
 
 			if upkg == nil {
-				log.Debugf("piTx: nil package, inst: %s, snid: %x, dir: %d",
-					pi.name, pi.snid, pi.dir)
+				log.Debugf("piTx: nil package, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d",
+					pi.sdlName, pi.name, pi.snid, pi.dir)
 				continue
 			}
 
@@ -3046,25 +3074,52 @@ _txLoop:
 
 			if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
 
-				pi.txOkCnt += 1
-
+				pi.txOkCnt++
+				stat.txdatOkCnt++
 			} else {
 
-				pi.txFailedCnt += 1
+				pi.txFailedCnt++
+				stat.txdatFailedCnt++
 				ask4Close(eno)
 			}
+
+			txpk.pid = upkg.Pid
+			txpk.mid = upkg.Mid
 		}
 
-		if pi.txSeq & 0x3ff == 0 {
-			log.Debugf("piTx: inst: %s, snid: %x, dir: %d, txSeq: %d, txOkCnt: %d, txFailedCnt: %d",
-				pi.name, pi.snid, pi.dir, pi.txSeq, pi.txOkCnt, pi.txFailedCnt)
+		if cnt, ok := stat.txPkgCnt[txpk]; ok {
+			stat.txPkgCnt[txpk] = cnt + 1
+		} else {
+			stat.txPkgCnt[txpk] = 1
+		}
+
+		if stat.txTryCnt & 0x3ff == 0 {
+			log.Debugf("piTx: " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, txOkCnt: %d, txFailedCnt: %d " +
+				"stat: %+v",
+				pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq, pi.txOkCnt, pi.txFailedCnt,
+				stat)
 		}
 	}
 
-	log.Debugf("piTx: exit, inst: %s, snid: %x, dir: %d", pi.name, pi.snid, pi.dir)
+	log.Debugf("piTx: exit, " +
+		"sdl: %s, inst: %s, snid: %x, dir: %d",
+		pi.sdlName, pi.name, pi.snid, pi.dir)
+
 	return PeMgrEnoNone
 }
 
+type rxPkgKey = txPkgKey
+type rxStat struct {
+	rxTryCnt		int64
+	rxTmpErrCnt		int64
+	rxErrCnt		int64
+	rxOkCnt			int64
+	rxDiscardCnt	int64
+	rxPidErrCnt		int64
+	rxChCnt			int64
+	rxPkgCnt		map[rxPkgKey]int64
+}
 func piRx(pi *PeerInstance) PeMgrErrno {
 
 	// This function is "go" when an instance of peer is activated to work,
@@ -3079,13 +3134,17 @@ func piRx(pi *PeerInstance) PeMgrErrno {
 
 	var done PeMgrErrno = PeMgrEnoNone
 	var ok = true
+	var stat = rxStat{
+		rxPkgCnt: make(map[rxPkgKey]int64, 0),
+	}
 
 _rxLoop:
 	for {
 		select {
 		case done, ok = <-pi.rxDone:
-			log.Debugf("piRx: done, inst: %s, snid: %x, dir: %d, done with: %d",
-				pi.name, pi.snid, pi.dir, done)
+			log.Debugf("piRx: done, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d, done with: %d",
+				pi.sdlName, pi.name, pi.snid, pi.dir, done)
 			if ok {
 				close(pi.rxDone)
 			}
@@ -3100,13 +3159,21 @@ _rxLoop:
 		}
 
 		// try reading the peer
+		if stat.rxTryCnt++; stat.rxTryCnt & 0x3ff == 0 {
+			log.Debugf("piRx: stat, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d, ip: %s, stat: %+v",
+				pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String(), stat)
+		}
+
 		upkg := new(P2pPackage)
 		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
 
 			if eno == PeMgrEnoNetTemporary {
 
-				log.Debugf("piRx: PeMgrEnoNetTemporary, inst: %s, snid: %x, dir: %d, ip: %s",
-					pi.name, pi.snid, pi.dir, pi.node.IP.String())
+				log.Debugf("piRx: PeMgrEnoNetTemporary, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, ip: %s",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String())
+				stat.rxTmpErrCnt++
 
 			} else {
 				// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
@@ -3115,8 +3182,9 @@ _rxLoop:
 				// is closed for some reasons(for example the user close the peer), in this case,
 				// we would get an error;
 
-				log.Debugf("piRx: error, send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
-					pi.name, pi.snid, pi.dir, pi.node.IP.String())
+				log.Debugf("piRx: error, send EvPeCloseReq, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, ip: %s",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 				why := sch.PEC_FOR_RXERROR
 				pi.rxEno = eno
@@ -3137,6 +3205,7 @@ _rxLoop:
 				msg := sch.SchMessage{}
 				pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 				pi.sdl.SchSendMessage(&msg)
+				stat.rxErrCnt++
 			}
 
 			continue
@@ -3144,23 +3213,38 @@ _rxLoop:
 
 		upkg.DebugPeerPackage()
 
+		rxpk := rxPkgKey{
+			pid: upkg.Pid,
+			mid: upkg.Mid,
+		}
+		stat.rxOkCnt++
+
 		if upkg.Pid == uint32(PID_P2P) {
 
 			msg := sch.SchMessage{}
 			pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPeRxDataInd, upkg)
 			pi.sdl.SchSendMessage(&msg)
 
+			if cnt, ok := stat.rxPkgCnt[rxpk]; ok {
+				stat.rxPkgCnt[rxpk] = cnt + 1
+			} else {
+				stat.rxPkgCnt[rxpk] = 1
+			}
+
 		} else if upkg.Pid == uint32(PID_EXT) {
 
 			if len(pi.rxChan) >= cap(pi.rxChan) {
 
-				log.Debugf("piRx: queue full, inst: %s, snid: %x, dir: %d",
-					pi.name, pi.snid, pi.dir)
+				log.Debugf("piRx: queue full, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d",
+					pi.sdlName, pi.name, pi.snid, pi.dir)
 
 				if pi.rxDiscard += 1; pi.rxDiscard&0x1f == 0 {
-					log.Debugf("piRx: inst: %s, snid: %x, dir: %d, rxDiscard: %d",
-						pi.name, pi.snid, pi.dir, pi.rxDiscard)
+					log.Debugf("piRx: stat, " +
+						"sdl: %s, inst: %s, snid: %x, dir: %d, rxDiscard: %d",
+						pi.sdlName, pi.name, pi.snid, pi.dir, pi.rxDiscard)
 				}
+				stat.rxDiscardCnt++
 
 			} else {
 
@@ -3186,18 +3270,29 @@ _rxLoop:
 
 				pi.rxChan <- &pkgCb
 
-				if pi.rxOkCnt += 1; pi.rxOkCnt&0x3ff == 0 {
-					log.Debugf("piRx: inst: %s, snid: %x, dir: %d, rxOkCnt: %d",
-						pi.name, pi.snid, pi.dir, pi.rxOkCnt)
+				if pi.rxOkCnt += 1; pi.rxOkCnt & 0x3ff == 0 {
+					log.Debugf("piRx: stat, " +
+						"sdl: %s, inst: %s, snid: %x, dir: %d, rxOkCnt: %d",
+						pi.sdlName, pi.name, pi.snid, pi.dir, pi.rxOkCnt)
+				}
+
+				stat.rxChCnt++
+				if cnt, ok := stat.rxPkgCnt[rxpk]; ok {
+					stat.rxPkgCnt[rxpk] = cnt + 1
+				} else {
+					stat.rxPkgCnt[rxpk] = 1
 				}
 			}
 		} else {
-			log.Debugf("piRx: discarded, inst: %s, snid: %x, dir: %d,  pid: %d",
-				pi.name, pi.snid, pi.dir, upkg.Pid)
+			log.Debugf("piRx: invalid pid, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d,  pid: %d",
+				pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Pid)
+			stat.rxPidErrCnt++
 		}
 	}
 
-	log.Debugf("piRx: exit, inst: %s, snid: %x, dir: %d", pi.name, pi.snid, pi.dir)
+	log.Debugf("piRx: exit, sdl: %s, inst: %s, snid: %x, dir: %d",
+		pi.sdlName, pi.name, pi.snid, pi.dir)
 	return done
 }
 
