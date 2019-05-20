@@ -93,11 +93,7 @@ type conMgrCfg struct {
 //
 // Connection cache key and value
 //
-type instLruKey struct {
-	peer config.NodeID // peer node identity
-	dir  ConInstDir    // direction
-}
-
+type instLruKey *ConInst
 type instLruValue *ConInst
 
 //
@@ -580,11 +576,7 @@ func (conMgr *ConMgr) handshakeRsp(msg *sch.MsgDhtConInstHandshakeRsp) sch.SchEr
 	//
 	// update instance cache
 	//
-	key := instLruKey{
-		peer: msg.Peer.ID,
-		dir:  msg.Dir,
-	}
-	conMgr.instCache.Add(&key, ci)
+	conMgr.instCache.Add(ci, ci)
 
 	//
 	// update the route manager
@@ -953,11 +945,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		log.Warnf("sendReq: can't send in status: %d", curStat)
 		return sch.SchEnoResource
 	}
-	key := instLruKey{
-		peer: ci.hsInfo.peer.ID,
-		dir:  ci.dir,
-	}
-	conMgr.instCache.Add(&key, ci)
+	conMgr.instCache.Add(ci, ci)
 	pkg := conInstTxPkg{
 		task:       msg.Task,
 		responsed:  nil,
@@ -1403,11 +1391,7 @@ func (conMgr *ConMgr) instClosedInd(msg *sch.MsgDhtConInstStatusInd) sch.SchErrn
 					log.Debugf("instClosedInd: rutUpdate failed, eno: %d", eno)
 					err = true
 				}
-				key := instLruKey{
-					peer: ci.hsInfo.peer.ID,
-					dir:  ci.dir,
-				}
-				conMgr.instCache.Remove(&key)
+				conMgr.instCache.Remove(ci)
 			}
 			log.Debugf("instClosedInd: found: %t, err: %t", found, err)
 		}
@@ -1487,8 +1471,10 @@ func (conMgr *ConMgr) onInstEvicted(key interface{}, value interface{}) {
 		log.Debugf("onInstEvicted: invalid key or value")
 		return
 	}
+
 	log.Debugf("onInstEvicted: send EvDhtConMgrCloseReq, sdl: %s, inst: %s, dir: %d",
 		conMgr.sdlName, ci.name, ci.dir)
+
 	req := sch.MsgDhtConMgrCloseReq{
 		Task: ConMgrName,
 		Peer: &ci.hsInfo.peer,
@@ -1496,7 +1482,11 @@ func (conMgr *ConMgr) onInstEvicted(key interface{}, value interface{}) {
 	}
 	msg := sch.SchMessage{}
 	conMgr.sdl.SchMakeMessage(&msg, conMgr.ptnMe, ci.ptnMe, sch.EvDhtConMgrCloseReq, &req)
-	conMgr.sdl.SchSendMessage(&msg)
+	if eno := conMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {
+		log.Debugf("onInstEvicted: send EvDhtConMgrCloseReq failed," +
+			"sdl: %s, inst: %s, dir: %d, eno: %d",
+			conMgr.sdlName, ci.name, ci.dir, eno)
+	}
 }
 
 //

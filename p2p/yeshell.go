@@ -1788,8 +1788,9 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 	}
 
 	if dup, old := yeShMgr.checkDupKey(k); dup {
-		log.Infof("broadcastBhOsn: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
-			yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, msg.Data, old)
+		remain := old.stamp.Add(yeShMgr.config.DedupTime).Sub(time.Now()).Seconds()
+		log.Infof("broadcastBhOsn: duplicated, sdl: %s, remain: %f, key: %x, data: %x, old: %x",
+			yeShMgr.chainSdlName, remain, k, msg.Data, old)
 		return errors.New("broadcastBhOsn: duplicated")
 	}
 

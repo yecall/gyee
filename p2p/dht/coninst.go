@@ -486,7 +486,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 // service startup
 //
 func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno {
-	log.Debugf("startUpReq: enter, start rx/tx and confrim peMgr, " +
+	log.Debugf("startUpReq: enter, start rx/tx and confirm peMgr, " +
 		"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
