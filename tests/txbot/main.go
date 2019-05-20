@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -167,7 +168,7 @@ Exit:
 	for {
 		// reset inMem nonce if needed
 		if round%40 == 0 {
-			log.Info("nonce reset")
+			log.Info("nonce reset start")
 			c.TriggerSync()
 			func() {
 				var ticker = time.NewTicker(time.Second)
@@ -184,15 +185,27 @@ Exit:
 					}
 				}
 			}()
-			nonces = make([]uint64, len(signers))
+			newNonces := make([]uint64, len(signers))
 			for i, addr := range addrs {
 				account := c.Chain().LastBlock().GetAccount(addr)
 				if account == nil {
-					nonces[i] = 0
+					newNonces[i] = 0
 				} else {
-					nonces[i] = account.Nonce()
+					newNonces[i] = account.Nonce()
 				}
 			}
+			var sb = new(strings.Builder)
+			for i, oldN := range nonces {
+				newN := newNonces[i]
+				if oldN != newN {
+					_, err := fmt.Fprintf(sb, "%d:[%d -> %d]", i, oldN, newN)
+					if err != nil {
+						log.Error("format nonce reset change", err)
+					}
+				}
+			}
+			log.Info("nonce reset result", sb.String())
+			nonces = newNonces
 		}
 		// batch transfer
 		for i, signer := range signers {
