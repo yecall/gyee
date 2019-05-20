@@ -162,11 +162,11 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 	// generator loop
 	round := int(0)
 	totalTxs := int(0)
-	ticker := time.NewTicker(1000 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 Exit:
 	for {
 		// reset inMem nonce if needed
-		if round%10 == 0 {
+		if round%40 == 0 {
 			log.Info("nonce reset")
 			c.TriggerSync()
 			func() {
