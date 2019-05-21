@@ -39,6 +39,8 @@ import (
 	"github.com/yeeco/gyee/utils/logging"
 )
 
+const NonceResetSeconds = 600
+
 func main() {
 	var (
 		logPath    = flag.String("logPath", "", "on disk log storage path")
@@ -171,53 +173,60 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address,
 	round := int(0)
 	totalTxs := int(0)
 	ticker := time.NewTicker(batchInterval)
+
+	resetCount := NonceResetSeconds * batchCnt * 1000 / int(batchInterval)
+	var nonceResetFunc = func() {
+		log.Info("nonce reset start")
+		c.TriggerSync()
+		func() {
+			var ticker = time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+				}
+				if c.IsSyncing() {
+					log.Info("wait for sync")
+				} else {
+					log.Info("sync finished")
+					return
+				}
+			}
+		}()
+		newNonces := make([]uint64, len(signers))
+		for i, addr := range addrs {
+			account := c.Chain().LastBlock().GetAccount(addr)
+			if account == nil {
+				newNonces[i] = 0
+			} else {
+				newNonces[i] = account.Nonce()
+			}
+		}
+		var sb = new(strings.Builder)
+		for i, oldN := range nonces {
+			newN := newNonces[i]
+			if oldN != newN {
+				_, err := fmt.Fprintf(sb, "%d:[%d -> %d]", i, oldN, newN)
+				if err != nil {
+					log.Error("format nonce reset change", err)
+				}
+			}
+		}
+		log.Info("nonce reset result", sb.String())
+		nonces = newNonces
+	}
 Exit:
 	for {
-		// reset inMem nonce if needed
-		if round%40 == 0 {
-			log.Info("nonce reset start")
-			c.TriggerSync()
-			func() {
-				var ticker = time.NewTicker(time.Second)
-				defer ticker.Stop()
-				for {
-					select {
-					case <-ticker.C:
-					}
-					if c.IsSyncing() {
-						log.Info("wait for sync")
-					} else {
-						log.Info("sync finished")
-						return
-					}
-				}
-			}()
-			newNonces := make([]uint64, len(signers))
-			for i, addr := range addrs {
-				account := c.Chain().LastBlock().GetAccount(addr)
-				if account == nil {
-					newNonces[i] = 0
-				} else {
-					newNonces[i] = account.Nonce()
-				}
-			}
-			var sb = new(strings.Builder)
-			for i, oldN := range nonces {
-				newN := newNonces[i]
-				if oldN != newN {
-					_, err := fmt.Fprintf(sb, "%d:[%d -> %d]", i, oldN, newN)
-					if err != nil {
-						log.Error("format nonce reset change", err)
-					}
-				}
-			}
-			log.Info("nonce reset result", sb.String())
-			nonces = newNonces
-		}
 		// batch transfer
-		for i, signer := range signers {
-			for j, toAddr := range addrs {
+		for j, toAddr := range addrs {
+			for i, signer := range signers {
+				// reset inMem nonce if needed
+				if totalTxs%resetCount == 0 {
+					nonceResetFunc()
+				}
+				// batch pause if needed
 				if totalTxs%batchCnt == 0 {
+					log.Info("Total txs sent", totalTxs)
 					// batch reached
 					select {
 					case <-quitCh:
@@ -243,7 +252,6 @@ Exit:
 				totalTxs++
 			}
 		}
-		log.Info("Total txs sent", totalTxs)
 		round++
 	}
 	log.Info("Total txs sent", totalTxs)
