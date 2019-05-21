@@ -2311,7 +2311,7 @@ const PeInstDirInbound = 0  // inbound connection
 const PeInstDirOutbound = 1 // outbound connection
 
 const PeInstMailboxSize = 512                // mailbox size
-const PeInstMaxP2packages = 512              // max p2p packages pending to be sent
+const PeInstMaxP2packages = 1024              // max p2p packages pending to be sent
 const PeInstMaxPings = 8                     // max pings pending to be sent
 const PeInstMaxPingpongCnt = 4               // max pingpong counter value
 const PeInstPingpongCycle = time.Second * 16 // pingpong period

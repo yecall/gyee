@@ -1279,7 +1279,9 @@ _rxLoop:
 		case pkg, ok := <-yeShMgr.chainRxChan:
 
 			if !ok {
-				log.Debugf("chainRxProc: channel closed, sdl: %s", yeShMgr.chainSdlName)
+				log.Debugf("chainRxProc: channel closed, " +
+				"sdl: %s",
+				yeShMgr.chainSdlName)
 				break _rxLoop
 			}
 
@@ -1288,12 +1290,14 @@ _rxLoop:
 			}
 
 
-			log.Debugf("chainRxProc: from chainRxChan, sdl: %s, pid: %d, mid: %d, key: %x",
+			log.Debugf("chainRxProc: from chainRxChan, " +
+				"sdl: %s, pid: %d, mid: %d, key: %x",
 				yeShMgr.chainSdlName, pkg.ProtoId, pkg.MsgId, pkg.Key)
 
 
 			if pkg.ProtoId != int(peer.PID_EXT) {
-				log.Debugf("chainRxProc: invalid protocol identity, sdl: %s, pid: %d, key: %x",
+				log.Debugf("chainRxProc: invalid protocol identity, " +
+					"sdl: %s, pid: %d, key: %x",
 					yeShMgr.chainSdlName, pkg.ProtoId, pkg.Key)
 				continue
 			}
@@ -1313,7 +1317,8 @@ _rxLoop:
 				k := [yesKeyBytes]byte{}
 				copy(k[0:], pkg.Key)
 				if dup, old := yeShMgr.checkDupKey(k); dup {
-					log.Debugf("chainRxProc: duplicated, sdl: %s, delta: %f, key: %x, data: %x, old: %x",
+					log.Debugf("chainRxProc: duplicated, " +
+						"sdl: %s, delta: %f, key: %x, data: %x, old: %x",
 						yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, pkg.Payload, old)
 					dupCount++
 					continue
@@ -1370,7 +1375,8 @@ _rxLoop:
 						yeShMgr.chainSdlName, msg.MsgType, k)
 				}
 				if forwardError != nil {
-					log.Debugf("chainRxProc: sdl: %s, forwardError: %s, key: %s",
+					log.Debugf("chainRxProc: forward error: " +
+						"sdl: %s, forwardError: %s, key: %s",
 						yeShMgr.chainSdlName, forwardError.Error(), k)
 				}
 			}
