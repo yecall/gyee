@@ -46,12 +46,16 @@ func main() {
 		localPort  = flag.Int("localPort", p2pCfg.DftUdpPort, "node local p2p port")
 		dhtPort    = flag.Int("dhtPort", p2pCfg.DftDhtPort, "node local dht port")
 		ksPassword = flag.String("password", "", "keystore password")
+		batch      = flag.Int("batch", 20, "tx batch send count")
+		batchTime  = flag.Int("batchTime", 1000, "milliseconds slept between batch send")
 	)
 	flag.Parse()
 
 	if len(*logPath) > 0 {
 		logging.SetRotationFileLogger(*logPath)
 	}
+
+	log.Warn("batch send", "batchCnt", *batch, "intervalMs", *batchTime, "tps", *batch * 1000 / *batchTime)
 
 	//*ksPassword = strings.Split(*ksPassword, "\n")[0]
 	if len(*ksPassword) == 0 {
@@ -90,7 +94,8 @@ func main() {
 		quitCh = make(chan struct{})
 		wg     sync.WaitGroup
 	)
-	go genTxs(n, signers, addrs, quitCh, wg)
+	var batchInterval = time.Millisecond * time.Duration(*batchTime)
+	go genTxs(n, signers, addrs, *batch, batchInterval, quitCh, wg)
 
 	n.WaitForShutdown()
 
@@ -142,7 +147,9 @@ func waitForP2pReady(n *node.Node) {
 	log.Error("p2p ready time", "start", startTime, "duration", endTime.Sub(startTime))
 }
 
-func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitCh chan struct{}, wg sync.WaitGroup) {
+func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address,
+	batchCnt int, batchInterval time.Duration,
+	quitCh chan struct{}, wg sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
 
@@ -163,7 +170,7 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address, quitC
 	// generator loop
 	round := int(0)
 	totalTxs := int(0)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(batchInterval)
 Exit:
 	for {
 		// reset inMem nonce if needed
@@ -209,14 +216,17 @@ Exit:
 		}
 		// batch transfer
 		for i, signer := range signers {
-			select {
-			case <-quitCh:
-				ticker.Stop()
-				break Exit
-			case <-ticker.C:
-				// send txs
-			}
 			for j, toAddr := range addrs {
+				if totalTxs%batchCnt == 0 {
+					// batch reached
+					select {
+					case <-quitCh:
+						ticker.Stop()
+						break Exit
+					case <-ticker.C:
+						// send txs
+					}
+				}
 				if j == i {
 					continue
 				}
