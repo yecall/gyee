@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -37,6 +36,10 @@ import (
 	"github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	p2psh "github.com/yeeco/gyee/p2p/shell"
+
+
+	"github.com/yeeco/gyee/common"
+	sha3 "github.com/yeeco/gyee/crypto/hash"
 )
 
 //
@@ -1284,9 +1287,14 @@ _rxLoop:
 				showStat()
 			}
 
+
+			log.Debugf("chainRxProc: from chainRxChan, sdl: %s, pid: %d, mid: %d, key: %x",
+				yeShMgr.chainSdlName, pkg.ProtoId, pkg.MsgId, pkg.Key)
+
+
 			if pkg.ProtoId != int(peer.PID_EXT) {
-				log.Debugf("chainRxProc: invalid protocol identity, sdl: %s, pid: %d",
-					yeShMgr.chainSdlName, pkg.ProtoId)
+				log.Debugf("chainRxProc: invalid protocol identity, sdl: %s, pid: %d, key: %x",
+					yeShMgr.chainSdlName, pkg.ProtoId, pkg.Key)
 				continue
 			}
 
@@ -1325,43 +1333,45 @@ _rxLoop:
 					xxCount++
 				}
 
+				msg := Message{
+					MsgType: msgType,
+					From:    fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
+					Key:     pkg.Key,
+					Data:    pkg.Payload,
+				}
+
 				if subList, ok := yeShMgr.subscribers.Load(msgType); ok {
 					subList.(*sync.Map).Range(func(key, value interface{}) bool {
-						msg := Message{
-							MsgType: msgType,
-							From:    fmt.Sprintf("%x", pkg.PeerInfo.NodeId),
-							Key:     pkg.Key,
-							Data:    pkg.Payload,
-						}
-
 						sub, _ := key.(*Subscriber)
 						sub.MsgChan <- msg
-
 						if cnt, ok := subCount[msg.MsgType]; ok {
 							subCount[msg.MsgType] = cnt + 1
 						} else {
 							subCount[msg.MsgType] = 1
 						}
-
-						exclude := pkg.PeerInfo.NodeId
-						err := error(nil)
-						switch msg.MsgType {
-						case MessageTypeTx:
-							err = yeShMgr.broadcastTxOsn(&msg, &exclude)
-						case MessageTypeEvent:
-							err = yeShMgr.broadcastEvOsn(&msg, &exclude, false)
-						case MessageTypeBlockHeader:
-							err = yeShMgr.broadcastBhOsn(&msg, &exclude)
-						case MessageTypeBlock:
-							err = yeShMgr.broadcastBkOsn(&msg, &exclude)
-						default:
-							log.Debugf("chainRxProc: invalid message type, " +
-								"sdl: %s, msg: %s",
-								yeShMgr.chainSdlName, msg.MsgType)
-							err = errors.New(fmt.Sprintf("chainRxProc: invalid message type: %s", msg.MsgType))
-						}
-						return err == nil
+						return true
 					})
+				}
+
+				exclude := pkg.PeerInfo.NodeId
+				forwardError := (error)(nil)
+				switch msgType {
+				case MessageTypeTx:
+					forwardError = yeShMgr.broadcastTxOsn(&msg, &exclude)
+				case MessageTypeEvent:
+					forwardError = yeShMgr.broadcastEvOsn(&msg, &exclude, false)
+				case MessageTypeBlockHeader:
+					forwardError = yeShMgr.broadcastBhOsn(&msg, &exclude)
+				case MessageTypeBlock:
+					forwardError = yeShMgr.broadcastBkOsn(&msg, &exclude)
+				default:
+					log.Debugf("chainRxProc: invalid message type, "+
+						"sdl: %s, msg: %s, key: %x",
+						yeShMgr.chainSdlName, msg.MsgType, k)
+				}
+				if forwardError != nil {
+					log.Debugf("chainRxProc: sdl: %s, forwardError: %s, key: %s",
+						yeShMgr.chainSdlName, forwardError.Error(), k)
 				}
 			}
 		}
@@ -1714,7 +1724,8 @@ func (yeShMgr *YeShellManager) broadcastTxOsn(msg *Message, exclude *config.Node
 	// need not to throw it into dht;
 	k := yesKey{}
 	if len(msg.Key) == 0 {
-		k = sha256.Sum256(msg.Data)
+		h := new(common.Hash).SetBytes(sha3.Sha3256(msg.Data))
+		k  = (yesKey)(*h)
 		msg.Key = append(msg.Key, k[0:]...)
 	} else {
 		copy(k[0:], msg.Key)
@@ -1756,7 +1767,8 @@ func (yeShMgr *YeShellManager) broadcastEvOsn(msg *Message, exclude *config.Node
 	thisCfg := yeShMgr.config
 	k := yesKey{}
 	if len(msg.Key) == 0 {
-		k = sha256.Sum256(msg.Data)
+		h := new(common.Hash).SetBytes(sha3.Sha3256(msg.Data))
+		k  = (yesKey)(*h)
 		msg.Key = append(msg.Key, k[0:]...)
 	} else {
 		copy(k[0:], msg.Key)
@@ -1813,7 +1825,8 @@ func (yeShMgr *YeShellManager) broadcastBhOsn(msg *Message, exclude *config.Node
 	// need not to throw Bh into dht;
 	k := yesKey{}
 	if len(msg.Key) == 0 {
-		k = sha256.Sum256(msg.Data)
+		h := new(common.Hash).SetBytes(sha3.Sha3256(msg.Data))
+		k  = (yesKey)(*h)
 		msg.Key = append(msg.Key, k[0:]...)
 	} else {
 		copy(k[0:], msg.Key)
@@ -1859,7 +1872,8 @@ func (yeShMgr *YeShellManager) broadcastBkOsn(msg *Message, exclude *config.Node
 
 	k := yesKey{}
 	if len(msg.Key) == 0 {
-		k = sha256.Sum256(msg.Data)
+		h := new(common.Hash).SetBytes(sha3.Sha3256(msg.Data))
+		k  = (yesKey)(*h)
 		msg.Key = append(msg.Key, k[0:]...)
 	} else {
 		copy(k[0:], msg.Key)

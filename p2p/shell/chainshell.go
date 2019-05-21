@@ -342,9 +342,14 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 					continue
 				}
 
+				log.Debugf("peerActiveInd: rxProc, from rxChan, sdl: %s, peer: %s, mid: %d, key: %x",
+					shMgr.sdlName, peerInfo.IP.String(), rxPkg.MsgId, rxPkg.Key)
+
 				if rxPkg.MsgId == int(MID_CHKK) {
 
 					if eno := shMgr.checkKeyFromPeer(rxPkg); eno != sch.SchEnoNone {
+						log.Debugf("peerActiveInd: rxProc: CHKK from peer discarded, eno: %d, key: %x",
+							eno, rxPkg.Key)
 						stat.ckFailedCount++
 					} else {
 						stat.ckOkCount++
@@ -353,6 +358,8 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 				} else if rxPkg.MsgId == int(MID_RPTK) {
 
 					if eno := shMgr.reportKeyFromPeer(rxPkg); eno != sch.SchEnoNone {
+						log.Debugf("peerActiveInd: rxProc: RPTK from peer discarded, eno: %d, key: %x",
+							eno, rxPkg.Key)
 						stat.rkFailedCount++
 					} else {
 						stat.rkOkCount++
@@ -361,7 +368,8 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 				} else if rxPkg.MsgId == int(MID_GCD) {
 
 					if eno := shMgr.getChainDataFromPeer(rxPkg); eno != sch.SchEnoNone {
-						log.Debugf("peerActiveInd: rxProc: GCD from peer discarded, eno: %d", eno)
+						log.Debugf("peerActiveInd: rxProc: GCD from peer discarded, eno: %d, key: %x",
+							eno, rxPkg.Key)
 						stat.gcdFailedCount++
 					} else {
 						shMgr.rxChan <- rxPkg
@@ -372,7 +380,8 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 				} else if rxPkg.MsgId == int(MID_PCD) {
 
 					if eno := shMgr.putChainDataFromPeer(rxPkg); eno != sch.SchEnoNone {
-						log.Debugf("peerActiveInd: rxProc: PCD from peer discarded, eno: %d", eno)
+						log.Debugf("peerActiveInd: rxProc: PCD from peer discarded, eno: %d, key: %x",
+							eno, rxPkg.Key)
 						stat.pcdFailedCount++
 					} else {
 						shMgr.rxChan <- rxPkg
@@ -388,6 +397,8 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					if skm == SKM_OK {
 
+						log.Debugf("peerActiveInd: rxProc, to shMgr.rxChan, key: %x", k)
+
 						shMgr.rxChan <- rxPkg
 						stat.skmOkCount++
 						stat.rxChainCount++
@@ -399,7 +410,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					} else if skm == SKM_FAILED {
 
-						log.Debugf("peerActiveInd: rxProc: setKeyMap failed")
+						log.Debugf("peerActiveInd: rxProc: setKeyMap failed, key: %x", k)
 						stat.skmFailedCount++
 					}
 				}

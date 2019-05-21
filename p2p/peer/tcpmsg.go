@@ -62,7 +62,7 @@ const MaxProtocols = config.MaxProtocols
 const (
 	PID_P2P     = pb.ProtocolId_PID_P2P // p2p internal
 	PID_EXT     = pb.ProtocolId_PID_EXT // external protocol
-	PID_UNKNOWN = -1
+	PID_UNKNOWN = -1 // invalid protocol identity
 )
 
 //
@@ -87,6 +87,7 @@ const (
 
 	// invalid MID
 	MID_INVALID = pb.MessageId_MID_INVALID
+	MID_INVALID_EX = 0xFF
 )
 
 //
@@ -792,17 +793,23 @@ func (upkg *P2pPackage) RecvPackage(inst *PeerInstance) PeMgrErrno {
 
 	upkg.Pid = pid
 	upkg.PayloadLength = *pkg.PayloadLength
-	if upkg.Pid == uint32(PID_EXT) {
+
+	if pkg.ExtMid != nil {
 		upkg.Mid = uint32(*pkg.ExtMid)
-		if len(pkg.ExtKey) > 0 {
-			upkg.Key = append(upkg.Key[0:], pkg.ExtKey...)
-		} else {
-			upkg.Key = make([]byte, 0)
-		}
+	} else {
+		upkg.Mid = MID_INVALID_EX
 	}
+
+	if len(pkg.ExtKey) > 0 {
+		upkg.Key = append(upkg.Key[0:], pkg.ExtKey...)
+	} else {
+		upkg.Key = make([]byte, 0)
+	}
+
 	if upkg.PayloadLength > 0 {
 		upkg.Payload = append(upkg.Payload, pkg.Payload...)
 	}
+
 	return PeMgrEnoNone
 }
 

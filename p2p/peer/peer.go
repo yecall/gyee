@@ -3074,9 +3074,21 @@ _txLoop:
 
 			if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
 
+				log.Debugf("piTx: SendPackage ok, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, " +
+					"key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq,
+					upkg.Key)
+
 				pi.txOkCnt++
 				stat.txdatOkCnt++
 			} else {
+
+				log.Debugf("piTx: SendPackage failed, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, " +
+					"key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq,
+					upkg.Key)
 
 				pi.txFailedCnt++
 				stat.txdatFailedCnt++
@@ -3094,7 +3106,7 @@ _txLoop:
 		}
 
 		if stat.txTryCnt & 0x3ff == 0 {
-			log.Debugf("piTx: " +
+			log.Debugf("piTx: stat, " +
 				"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, txOkCnt: %d, txFailedCnt: %d " +
 				"stat: %+v",
 				pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq, pi.txOkCnt, pi.txFailedCnt,
@@ -3236,17 +3248,21 @@ _rxLoop:
 			if len(pi.rxChan) >= cap(pi.rxChan) {
 
 				log.Debugf("piRx: queue full, " +
-					"sdl: %s, inst: %s, snid: %x, dir: %d",
-					pi.sdlName, pi.name, pi.snid, pi.dir)
+					"sdl: %s, inst: %s, snid: %x, dir: %d, key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Key)
 
-				if pi.rxDiscard += 1; pi.rxDiscard&0x1f == 0 {
-					log.Debugf("piRx: stat, " +
-						"sdl: %s, inst: %s, snid: %x, dir: %d, rxDiscard: %d",
-						pi.sdlName, pi.name, pi.snid, pi.dir, pi.rxDiscard)
+				if pi.rxDiscard += 1; pi.rxDiscard & 0x1f == 0 {
+					log.Debugf("piRx: stat, discarded, " +
+						"sdl: %s, inst: %s, snid: %x, dir: %d, rxDiscard: %d, key: %x",
+						pi.sdlName, pi.name, pi.snid, pi.dir, pi.rxDiscard, upkg.Key)
 				}
 				stat.rxDiscardCnt++
 
 			} else {
+
+				log.Debugf("piRx: put into channel, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Key)
 
 				peerInfo := PeerInfo{}
 				pkgCb := P2pPackageRx{}
