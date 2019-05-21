@@ -57,7 +57,11 @@ func main() {
 		logging.SetRotationFileLogger(*logPath)
 	}
 
-	log.Warn("batch send", "batchCnt", *batch, "intervalMs", *batchTime, "tps", *batch * 1000 / *batchTime)
+	var (
+		tps = *batch * 1000 / *batchTime
+		resetCount = NonceResetSeconds * *batch * 1000 / *batchTime
+	)
+	log.Warn("batch send", "batchCnt", *batch, "intervalMs", *batchTime, "tps", tps, "resetCount", resetCount)
 
 	//*ksPassword = strings.Split(*ksPassword, "\n")[0]
 	if len(*ksPassword) == 0 {
@@ -97,7 +101,7 @@ func main() {
 		wg     sync.WaitGroup
 	)
 	var batchInterval = time.Millisecond * time.Duration(*batchTime)
-	go genTxs(n, signers, addrs, *batch, batchInterval, quitCh, wg)
+	go genTxs(n, signers, addrs, *batch, batchInterval, resetCount, quitCh, wg)
 
 	n.WaitForShutdown()
 
@@ -150,7 +154,7 @@ func waitForP2pReady(n *node.Node) {
 }
 
 func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address,
-	batchCnt int, batchInterval time.Duration,
+	batchCnt int, batchInterval time.Duration, resetCount int,
 	quitCh chan struct{}, wg sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
@@ -170,11 +174,9 @@ func genTxs(n *node.Node, signers []crypto.Signer, addrs []common.Address,
 	time.Sleep(20 * time.Second)
 
 	// generator loop
-	round := int(0)
 	totalTxs := int(0)
 	ticker := time.NewTicker(batchInterval)
 
-	resetCount := NonceResetSeconds * batchCnt * 1000 / int(batchInterval)
 	var nonceResetFunc = func() {
 		log.Info("nonce reset start")
 		c.TriggerSync()
@@ -252,7 +254,6 @@ Exit:
 				totalTxs++
 			}
 		}
-		round++
 	}
 	log.Info("Total txs sent", totalTxs)
 }
