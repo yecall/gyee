@@ -235,7 +235,7 @@ func (accepter *acceptTskCtrlBlock) peerAcceptProc(ptn interface{}, _ *sch.SchMe
 		accepter.sdl.SchTaskDone(ptn, accepter.name, sch.SchEnoInternal)
 		return sch.SchEnoInternal
 	}
-	log.Debugf("PeerAcceptProc: inited ok, tring to accept ...")
+	log.Debugf("PeerAcceptProc: inited ok, tring to accept...")
 
 	stop := false
 

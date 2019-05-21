@@ -373,14 +373,14 @@ taskDone:
 	// free task node
 	//
 
-	log.Debugf("schCommonTask: free task node, sdl: %s, task: %s",
-		sdl.p2pCfg.CfgName, ptn.task.name)
+	log.Debugf("schCommonTask: free task node, sdl: %s",
+		sdl.p2pCfg.CfgName)
 
 	if eno := sdl.schRetTaskNode(ptn); eno != SchEnoNone {
 
 		panic(fmt.Sprintf("schCommonTask: " +
-			"schRetTaskNode failed, eno: %d, task: %s",
-			eno, ptn.task.name))
+			"schRetTaskNode failed, sdl: %s, eno: %d",
+			sdl.p2pCfg.CfgName, eno))
 	}
 
 	return SchEnoNone
@@ -1358,6 +1358,7 @@ func (sdl *scheduler) schStopTaskEx(ptn *schTaskNode) SchErrno {
 	log.Debugf("schStopTaskEx: clean task more, sdl: %s, task: %s",
 		sdl.p2pCfg.CfgName, ptn.task.name)
 
+	temp := ptn.task.name
 	if eno = sdl.schTcbClean(&ptn.task); eno != SchEnoNone {
 		log.Errorf("schStopTaskEx: " +
 			"schTcbClean faild, eno: %d, task: %s",
@@ -1366,7 +1367,7 @@ func (sdl *scheduler) schStopTaskEx(ptn *schTaskNode) SchErrno {
 	}
 
 	log.Debugf("schStopTaskEx: all ok, sdl: %s, task: %s",
-		sdl.p2pCfg.CfgName, ptn.task.name)
+		sdl.p2pCfg.CfgName, temp)
 
 	return SchEnoNone
 }
@@ -2067,7 +2068,7 @@ func (sdl *scheduler) schGetTaskMailboxSpace(ptn *schTaskNode) int {
 //
 func (sdl *scheduler) schSchedulerStart(tsd []TaskStaticDescription, tpo []string) (eno SchErrno, name2Ptn *map[string]interface{}) {
 
-	log.Debugf("schSchedulerStart: going to start ycp2p scheduler ...")
+	log.Debugf("schSchedulerStart: going to start ycp2p scheduler...")
 
 	if len(tsd) <= 0 {
 		log.Debugf("schSchedulerStart: static task table is empty")
