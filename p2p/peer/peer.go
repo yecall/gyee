@@ -35,35 +35,10 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	tab "github.com/yeeco/gyee/p2p/discover/table"
 	um "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type peerLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var peerLog = peerLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log peerLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log peerLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // Peer manager errno
 const (
@@ -587,14 +562,6 @@ func (peMgr *PeerManager) peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	if rsp == nil {
 		log.Debugf("peMgrDcvFindNodeRsp: invalid message")
 		return PeMgrEnoParameter
-	}
-
-	if peerLog.debug__ {
-		dbgStr := fmt.Sprintf("peMgrDcvFindNodeRsp: snid: %x, nodes: ", rsp.Snid)
-		for idx := 0; idx < len(rsp.Nodes); idx++ {
-			dbgStr = dbgStr + rsp.Nodes[idx].IP.String() + ","
-		}
-		log.Debugf(dbgStr)
 	}
 
 	if peMgr.dynamicSubNetIdExist(&rsp.Snid) != true {
@@ -2265,17 +2232,6 @@ func (peMgr *PeerManager) peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	}
 
 	peMgr.tidFindNode[*snid] = tid
-
-	if peerLog.debug__ {
-		dbgStr := fmt.Sprintf("peMgrAsk4More: ptn: %p, updated snid_tid: [%x,%d], now: ",
-			peMgr.ptnMe, *snid, tid)
-		for k, v := range peMgr.tidFindNode {
-			snid_tid := fmt.Sprintf("[%x,%d],", k, v)
-			dbgStr = dbgStr + snid_tid
-		}
-		log.Debugf(dbgStr)
-	}
-
 	return PeMgrEnoNone
 }
 

@@ -37,27 +37,10 @@ import (
 	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	um "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type tabLogger struct {
-	debug__ bool
-}
-
-var tabLog = tabLogger{
-	debug__: false,
-}
-
-func (log tabLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // errno

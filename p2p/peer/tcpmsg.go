@@ -30,26 +30,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	pb "github.com/yeeco/gyee/p2p/peer/pb"
 )
 
-//
-// debug
-//
-type tcpmsgLogger struct {
-	debug__ bool
-}
-
-var tcpmsgLog = tcpmsgLogger{
-	debug__: false,
-}
-
-func (log tcpmsgLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Max protocols supported
@@ -934,14 +917,10 @@ func (upkg *P2pPackage) verifyInbound(inst *PeerInstance, hs *pb.P2PMessage_Hand
 }
 
 func (upkg *P2pPackage) String() string {
-	if !tcpmsgLog.debug__ {
-		return ""
-	} else {
-		strPkg := fmt.Sprintf("P2pPackage: Key: %x\n", upkg.Key)
-		strPkg += fmt.Sprintf("\tPid: %d, Mid: %d, PayloadLength: %d",
-			upkg.Pid, upkg.Mid, upkg.PayloadLength)
-		return strPkg
-	}
+	strPkg := fmt.Sprintf("P2pPackage: Key: %x\n", upkg.Key)
+	strPkg += fmt.Sprintf("\tPid: %d, Mid: %d, PayloadLength: %d",
+		upkg.Pid, upkg.Mid, upkg.PayloadLength)
+	return strPkg
 }
 
 func (ck *CheckKey) String() string {
@@ -961,7 +940,5 @@ func (pcd *PutChainData) String() string {
 }
 
 func (upkg *P2pPackage) DebugPeerPackage() {
-	if tcpmsgLog.debug__ {
-		log.Debugf("DebugPeerPackage: %s", upkg.String())
-	}
+	log.Debugf("DebugPeerPackage: %s", upkg.String())
 }

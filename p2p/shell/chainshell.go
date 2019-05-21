@@ -31,40 +31,14 @@ import (
 	"github.com/pkg/errors"
 	config "github.com/yeeco/gyee/p2p/config"
 	dht "github.com/yeeco/gyee/p2p/dht"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	peer "github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type chainShellLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var chainLog = chainShellLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log chainShellLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log chainShellLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // chain shell
 //
-
 const (
 	ShMgrName  = sch.ShMgrName // name registered in scheduler
 	rxChanSize = 128           // total rx chan capacity
@@ -270,7 +244,7 @@ func (shMgr *ShellManager) powerOn(ptn interface{}) sch.SchErrno {
 }
 
 func (shMgr *ShellManager) powerOff(ptn interface{}) sch.SchErrno {
-	chainLog.Debug("powerOff: task will be done ...")
+	log.Debugf("powerOff: task will be done ...")
 	close(shMgr.deDupDone)
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, shMgr.name, sch.SchEnoPowerOff)
 }

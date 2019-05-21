@@ -30,26 +30,9 @@ import (
 	config "github.com/yeeco/gyee/p2p/config"
 	tab "github.com/yeeco/gyee/p2p/discover/table"
 	um "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type ngbLogger struct {
-	debug__ bool
-}
-
-var ngbLog = ngbLogger{
-	debug__: false,
-}
-
-func (log ngbLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // errno
 const (

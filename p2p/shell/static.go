@@ -23,38 +23,17 @@ package shell
 import (
 	"time"
 
+	log "github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	dht "github.com/yeeco/gyee/p2p/dht"
 	dcv "github.com/yeeco/gyee/p2p/discover"
 	ngb "github.com/yeeco/gyee/p2p/discover/neighbor"
 	tab "github.com/yeeco/gyee/p2p/discover/table"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	peer "github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type staticTaskLogger struct {
-	debug__ bool
-}
-
-var stLog = staticTaskLogger{
-	debug__: false,
-}
-
-func SwitchStaticDebugFlag(flag bool) {
-	stLog.debug__ = flag
-}
-
-func (log staticTaskLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // watch dog is not implemented
@@ -108,7 +87,7 @@ func P2pCreateStaticTaskTab(what P2pType) []sch.TaskStaticDescription {
 		}
 	}
 
-	stLog.Debug("P2pCreateStaticTaskTab: invalid type: %d", what)
+	log.Debugf("P2pCreateStaticTaskTab: invalid type: %d", what)
 
 	return nil
 }
@@ -276,45 +255,78 @@ func P2pStop(sdl *sch.Scheduler, ch chan bool) sch.SchErrno {
 	sdl.SchSetPoweroffStage()
 
 	for loop := 0; loop < len(staticTasks); loop++ {
+
 		taskName := staticTasks[loop]
 		powerOff.TgtName = taskName
+
 		if sdl.SchTaskExist(taskName) != true {
-			log.Infof("P2pStop: inst: %s, type: %d, task not exist: %s", p2pInstName, appType, taskName)
+
+			log.Infof("P2pStop: remain tasks, " +
+				"inst: %s, type: %d, task not exist: %s",
+				p2pInstName, appType, taskName)
+
 			continue
 		}
 
-		log.Infof("P2pStop: EvSchPoweroff will be sent to inst: %s, type: %d, task: %s",
+		log.Infof("P2pStop: EvSchPoweroff will be sent, " +
+			"inst: %s, type: %d, task: %s",
 			p2pInstName, appType, taskName)
 
-		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff); eno != sch.SchEnoNone {
-			log.Infof("P2pStop: SchSendMessageByName failed, inst: %s, type: %d, eno: %d, task: %s",
+		if eno := sdl.SchSendMessageByName(taskName, sch.RawSchTaskName, &powerOff);
+		eno != sch.SchEnoNone {
+
+			log.Infof("P2pStop: SchSendMessageByName failed, " +
+				"inst: %s, type: %d, eno: %d, task: %s",
 				p2pInstName, appType, eno, taskName)
+
 		} else {
-			log.Infof("P2pStop: send EvSchPoweroff ok, inst: %s, type: %d, eno: %d, task: %s",
+
+			log.Infof("P2pStop: send EvSchPoweroff ok, " +
+				"inst: %s, type: %d, eno: %d, task: %s",
 				p2pInstName, appType, eno, taskName)
+
 			for sdl.SchTaskExist(taskName) {
-				log.Infof("P2pStop: waiting inst: %s, type: %d, task: %s", p2pInstName, appType, taskName)
+
+				log.Infof("P2pStop: waiting, "  +
+				"inst: %s, type: %d, task: %s",
+				p2pInstName, appType, taskName)
+
 				time.Sleep(time.Millisecond * 500)
 			}
-			log.Infof("P2pStop: done, inst: %s, type: %d, task: %s", p2pInstName, appType, taskName)
+
+			log.Infof("P2pStop: done, " +
+				"inst: %s, type: %d, task: %s",
+				p2pInstName, appType, taskName)
 		}
 	}
 
-	log.Infof("P2pStop: inst: %s, type: %d, total tasks: %d", p2pInstName, appType, sdl.SchGetTaskNumber())
-	log.Infof("P2pStop: inst: %s, wait all tasks to be done ...", p2pInstName)
+	log.Infof("P2pStop: dymaincs, " +
+		"inst: %s, type: %d, total tasks: %d",
+		p2pInstName, appType, sdl.SchGetTaskNumber())
+
+	log.Infof("P2pStop: wait all tasks to be done, inst: %s, ",
+		p2pInstName)
 
 	if true {
 		seconds := 0
 		for {
+
 			time.Sleep(time.Second)
 			seconds++
+
 			tasks := sdl.SchGetTaskNumber()
 			if tasks == 0 {
-				log.Infof("P2pStop: inst: %s, type: %d, all tasks are done", p2pInstName, appType)
+
+				log.Infof("P2pStop: all tasks are done, " +
+					"inst: %s, type: %d ",
+					p2pInstName, appType)
+
 				break
 			}
+
 			tkNames := sdl.SchShowTaskName()
-			log.Infof("P2pStop: wait seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
+			log.Infof("P2pStop: wait " +
+				"seconds: %d, inst: %s, type: %d, remain tasks: %d, names: %s",
 				seconds, p2pInstName, appType, tasks, tkNames)
 		}
 	} else {

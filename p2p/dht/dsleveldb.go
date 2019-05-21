@@ -23,6 +23,7 @@ package dht
 import (
 	"time"
 
+	"github.com/yeeco/gyee/log"
 	p2plog "github.com/yeeco/gyee/p2p/logger"
 	"github.com/yeeco/gyee/persistent"
 )
@@ -67,7 +68,7 @@ func NewLeveldbDatastore(cfg *LeveldbDatastoreConfig) *LeveldbDatastore {
 	}
 	ls, err := persistent.NewLevelStorage(cfg.Path)
 	if err != nil {
-		dsdbLog.Debug("NewLeveldbDatastore: failed, error: %s", err.Error())
+		log.Debugf("NewLeveldbDatastore: failed, error: %s", err.Error())
 		return nil
 	}
 	ds.ls = ls
@@ -76,7 +77,7 @@ func NewLeveldbDatastore(cfg *LeveldbDatastoreConfig) *LeveldbDatastore {
 
 func (lds *LeveldbDatastore) Put(k []byte, v DsValue, kt time.Duration) DhtErrno {
 	if err := lds.ls.Put(k[0:], v.([]byte)); err != nil {
-		dsdbLog.Debug("Put: failed, error: %s", err.Error())
+		log.Debugf("Put: failed, error: %s", err.Error())
 		return DhtEnoDatastore
 	}
 	return DhtEnoNone
@@ -86,7 +87,7 @@ func (lds *LeveldbDatastore) Get(k []byte) (eno DhtErrno, value DsValue) {
 	err := error(nil)
 	value, err = lds.ls.Get(k[0:])
 	if err != nil {
-		dsdbLog.Debug("Get: failed, error: %s", err.Error())
+		log.Debugf("Get: failed, error: %s", err.Error())
 		eno = DhtEnoDatastore
 		value = nil
 	} else {
@@ -97,7 +98,7 @@ func (lds *LeveldbDatastore) Get(k []byte) (eno DhtErrno, value DsValue) {
 
 func (lds *LeveldbDatastore) Delete(k []byte) DhtErrno {
 	if err := lds.ls.Del(k[0:]); err != nil {
-		dsdbLog.Debug("Delete: failed, error: %s", err.Error())
+		log.Debugf("Delete: failed, error: %s", err.Error())
 		return DhtEnoDatastore
 	}
 	return DhtEnoNone
@@ -105,7 +106,7 @@ func (lds *LeveldbDatastore) Delete(k []byte) DhtErrno {
 
 func (lds *LeveldbDatastore) Close() DhtErrno {
 	if err := lds.ls.Close(); err != nil {
-		dsdbLog.Debug("Close: failed, error: %s", err.Error())
+		log.Debugf("Close: failed, error: %s", err.Error())
 		return DhtEnoDatastore
 	}
 	return DhtEnoNone

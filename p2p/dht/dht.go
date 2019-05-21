@@ -24,27 +24,10 @@ import (
 	"fmt"
 	"sync"
 
-	p2plog "github.com/yeeco/gyee/p2p/logger"
-	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type dhtLogger struct {
-	debug__ bool
-}
-
-var dhtLog = dhtLogger{
-	debug__: false,
-}
-
-func (log dhtLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Dht manager name registered in scheduler

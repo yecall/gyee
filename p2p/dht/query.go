@@ -30,28 +30,11 @@ import (
 	"time"
 
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type qryMgrLogger struct {
-	debug__ bool
-}
-
-var qryLog = qryMgrLogger{
-	debug__: false,
-}
-
-func (log qryMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Constants

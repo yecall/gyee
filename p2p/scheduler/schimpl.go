@@ -28,34 +28,8 @@ import (
 	"time"
 
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	log "github.com/yeeco/gyee/log"
 )
-
-//
-// debug
-//
-type schLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var schLog = schLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log schLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log schLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Pseudo task node for external module to send event
@@ -1490,9 +1464,7 @@ func (sdl *scheduler) schSendMsg(msg *schMessage) (eno SchErrno) {
 		case EvSchDone:
 		default:
 			if msg.Keep == SchMsgKeepFromNone {
-				if schLog.debug__ {
-					log.Debugf("schSendMsg: in power off stage, sdl: %s, mid: %d", sdlName, msg.Id)
-				}
+				log.Debugf("schSendMsg: in power off stage, sdl: %s, mid: %d", sdlName, msg.Id)
 				sdl.lock.Unlock()
 				return mscb(msg, SchEnoPowerOff)
 			}

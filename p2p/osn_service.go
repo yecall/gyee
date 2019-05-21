@@ -31,7 +31,6 @@ import (
 	"github.com/yeeco/gyee/log"
 	yeeCfg "github.com/yeeco/gyee/config"
 	"github.com/yeeco/gyee/p2p/config"
-	"github.com/yeeco/gyee/p2p/shell"
 	yeelog "github.com/yeeco/gyee/utils/logging"
 )
 
@@ -203,8 +202,6 @@ func NewOsnService(cfg *YeShellConfig) (*OsnService, error) {
 	osns := OsnService{
 		yeShCfg: *cfg,
 	}
-	config.SwitchConfigDebugFlag(cfg.BootstrapNode)
-	shell.SwitchStaticDebugFlag(cfg.BootstrapNode)
 	if osns.yeShMgr = NewYeShellManager(&osns.yeShCfg); osns.yeShMgr == nil {
 		return nil, errors.New("NewOsnService: NewYeShellManager failed")
 	}

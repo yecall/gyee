@@ -23,26 +23,8 @@ package discover
 import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
-
-//
-// debug
-//
-type dcvLogger struct {
-	debug__ bool
-}
-
-var dcvLog = dcvLogger{
-	debug__: false,
-}
-
-func (log dcvLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // errno
 const (

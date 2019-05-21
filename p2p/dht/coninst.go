@@ -32,34 +32,9 @@ import (
 	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type coninstLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var ciLog = coninstLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log coninstLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log coninstLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // package identity
@@ -508,19 +483,6 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 // Instance-close-request handler
 //
 func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
-
-	if ciLog.debugForce__ {
-		conInst.doneCnt++
-		if len(conInst.doneWhy) == 0 {
-			conInst.doneWhy = make([]int, 0)
-		}
-		conInst.doneWhy = append(conInst.doneWhy, msg.Why)
-		if conInst.doneCnt > 1 {
-			log.Debugf("closeReq: sdl: %s, inst: %s, doneCnt: %d, doneWhy: %d",
-				conInst.sdlName, conInst.name, conInst.doneCnt, conInst.doneWhy)
-		}
-	}
-
 	if status := conInst.getStatus(); status >= CisClosed {
 		log.Debugf("closeReq: sdl: %s, inst: %s, dir: %d, why: %d, status mismatched: %d",
 			conInst.sdlName, conInst.name, conInst.dir, msg.Why, status)
@@ -631,7 +593,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 	if msg.ForWhat == MID_FINDNODE {
 
 		if msg.Msg == nil {
-			ciLog.Debug("rutMgrNearestRsp: original message is nil")
+			log.Debugf("rutMgrNearestRsp: original message is nil")
 			return sch.SchEnoMismatched
 		}
 

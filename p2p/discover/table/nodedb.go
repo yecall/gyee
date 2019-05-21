@@ -36,25 +36,8 @@ import (
 
 	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
 
-//
-// debug
-//
-type ndbLogger struct {
-	debug__ bool
-}
-
-var ndbLog = ndbLogger{
-	debug__: false,
-}
-
-func (log ndbLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // node database

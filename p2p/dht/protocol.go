@@ -25,28 +25,12 @@ import (
 	"net"
 	"time"
 
+	"github.com/yeeco/gyee/log"
 	"github.com/golang/protobuf/proto"
 	"github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
 
-//
-// debug
-//
-type protoLogger struct {
-	debug__ bool
-}
-
-var protoLog = protoLogger{
-	debug__: false,
-}
-
-func (log protoLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Protocol
@@ -257,23 +241,23 @@ type DhtProviderStoreRecord struct {
 func (dhtPkg *DhtPackage) GetMessage(dhtMsg *DhtMessage) DhtErrno {
 
 	if dhtMsg == nil {
-		protoLog.Debug("GetMessage: invalid parameters")
+		log.Debugf("GetMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
 	if dhtPkg.Pid != uint32(PID_DHT) {
-		protoLog.Debug("GetMessage: invalid pid: %d", dhtPkg.Pid)
+		log.Debugf("GetMessage: invalid pid: %d", dhtPkg.Pid)
 		return DhtEnoMismatched
 	}
 
 	if dhtPkg.PayloadLength == 0 || int(dhtPkg.PayloadLength) != len(dhtPkg.Payload) {
-		protoLog.Debug("GetMessage: invalid payload")
+		log.Debugf("GetMessage: invalid payload")
 		return DhtEnoSerialization
 	}
 
 	pbMsg := new(pb.DhtMessage)
 	if err := proto.Unmarshal(dhtPkg.Payload, pbMsg); err != nil {
-		protoLog.Debug("GetMessage: Unmarshal failed, err: %s", err.Error())
+		log.Debugf("GetMessage: Unmarshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -283,51 +267,51 @@ func (dhtPkg *DhtPackage) GetMessage(dhtMsg *DhtMessage) DhtErrno {
 	switch mid {
 
 	case pb.DhtMessage_MID_HANDSHAKE:
-		protoLog.Debug("GetMessage: DhtMessage_MID_HANDSHAKE")
+		log.Debugf("GetMessage: DhtMessage_MID_HANDSHAKE")
 		eno = dhtMsg.GetHandshakeMessage(pbMsg.Handshake)
 
 	case pb.DhtMessage_MID_FINDNODE:
-		protoLog.Debug("GetMessage: DhtMessage_MID_FINDNODE")
+		log.Debugf("GetMessage: DhtMessage_MID_FINDNODE")
 		eno = dhtMsg.GetFindNodeMessage(pbMsg.FindNode)
 
 	case pb.DhtMessage_MID_NEIGHBORS:
-		protoLog.Debug("GetMessage: DhtMessage_MID_NEIGHBORS")
+		log.Debugf("GetMessage: DhtMessage_MID_NEIGHBORS")
 		eno = dhtMsg.GetNeighborsMessage(pbMsg.Neighbors)
 
 	case pb.DhtMessage_MID_PUTVALUE:
-		protoLog.Debug("GetMessage: DhtMessage_MID_PUTVALUE")
+		log.Debugf("GetMessage: DhtMessage_MID_PUTVALUE")
 		eno = dhtMsg.GetPutValueMessage(pbMsg.PutValue)
 
 	case pb.DhtMessage_MID_GETVALUE_REQ:
-		protoLog.Debug("GetMessage: DhtMessage_MID_GETVALUE_REQ")
+		log.Debugf("GetMessage: DhtMessage_MID_GETVALUE_REQ")
 		eno = dhtMsg.GetGetValueReqMessage(pbMsg.GetValueReq)
 
 	case pb.DhtMessage_MID_GETVALUE_RSP:
-		protoLog.Debug("GetMessage: DhtMessage_MID_GETVALUE_RSP")
+		log.Debugf("GetMessage: DhtMessage_MID_GETVALUE_RSP")
 		eno = dhtMsg.GetGetValueRspMessage(pbMsg.GetValueRsp)
 
 	case pb.DhtMessage_MID_PUTPROVIDER:
-		protoLog.Debug("GetMessage: DhtMessage_MID_PUTPROVIDER")
+		log.Debugf("GetMessage: DhtMessage_MID_PUTPROVIDER")
 		eno = dhtMsg.GetPutProviderMessage(pbMsg.PutProvider)
 
 	case pb.DhtMessage_MID_GETPROVIDER_REQ:
-		protoLog.Debug("GetMessage: DhtMessage_MID_GETPROVIDER_REQ")
+		log.Debugf("GetMessage: DhtMessage_MID_GETPROVIDER_REQ")
 		eno = dhtMsg.GetGetProviderReqMessage(pbMsg.GetProviderReq)
 
 	case pb.DhtMessage_MID_GETPROVIDER_RSP:
-		protoLog.Debug("GetMessage: DhtMessage_MID_GETPROVIDER_RSP")
+		log.Debugf("GetMessage: DhtMessage_MID_GETPROVIDER_RSP")
 		eno = dhtMsg.GetGetProviderRspMessage(pbMsg.GetProviderRsp)
 
 	case pb.DhtMessage_MID_PING:
-		protoLog.Debug("GetMessage: DhtMessage_MID_PING")
+		log.Debugf("GetMessage: DhtMessage_MID_PING")
 		eno = dhtMsg.GetPingMessage(pbMsg.Ping)
 
 	case pb.DhtMessage_MID_PONG:
-		protoLog.Debug("GetMessage: DhtMessage_MID_PONG")
+		log.Debugf("GetMessage: DhtMessage_MID_PONG")
 		eno = dhtMsg.GetPongMessage(pbMsg.Pong)
 
 	default:
-		protoLog.Debug("GetMessage: invalid mid: %d", mid)
+		log.Debugf("GetMessage: invalid mid: %d", mid)
 		return DhtEnoSerialization
 	}
 
@@ -413,7 +397,7 @@ func (dhtMsg *DhtMessage) GetPackage(dhtPkg *DhtPackage) DhtErrno {
 		eno = dhtMsg.GetPongPackage(dhtPkg)
 
 	default:
-		protoLog.Debug("GetPackage: invalid mid: %d", mid)
+		log.Debugf("GetPackage: invalid mid: %d", mid)
 		return DhtEnoSerialization
 	}
 
@@ -487,7 +471,7 @@ func (dhtMsg *DhtMessage) GetPbPackage() *pb.DhtPackage {
 func (dhtMsg *DhtMessage) GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetHandshakeMessage: invalid parameters")
+		log.Debugf("GetHandshakeMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -524,7 +508,7 @@ func (dhtMsg *DhtMessage) GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) Dh
 	}
 
 	if !dhtSup {
-		protoLog.Debug("GetHandshakeMessage: DHT not supported")
+		log.Debugf("GetHandshakeMessage: DHT not supported")
 		return DhtEnoNotSup
 	}
 
@@ -541,7 +525,7 @@ func (dhtMsg *DhtMessage) GetHandshakeMessage(pbMsg *pb.DhtMessage_Handshake) Dh
 func (dhtMsg *DhtMessage) GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetFindNodeMessage: invalid parameters")
+		log.Debugf("GetFindNodeMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -566,7 +550,7 @@ func (dhtMsg *DhtMessage) GetFindNodeMessage(pbMsg *pb.DhtMessage_FindNode) DhtE
 func (dhtMsg *DhtMessage) GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetNeighborsMessage: invalid parameters")
+		log.Debugf("GetNeighborsMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -594,7 +578,7 @@ func (dhtMsg *DhtMessage) GetNeighborsMessage(pbMsg *pb.DhtMessage_Neighbors) Dh
 func (dhtMsg *DhtMessage) GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetPutValueMessage: invalid parameters")
+		log.Debugf("GetPutValueMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -627,7 +611,7 @@ func (dhtMsg *DhtMessage) GetPutValueMessage(pbMsg *pb.DhtMessage_PutValue) DhtE
 func (dhtMsg *DhtMessage) GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetGetValueReqMessage: invalid parameters")
+		log.Debugf("GetGetValueReqMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -656,7 +640,7 @@ func (dhtMsg *DhtMessage) GetGetValueReqMessage(pbMsg *pb.DhtMessage_GetValueReq
 func (dhtMsg *DhtMessage) GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetGetValueRspMessage: invalid parameters")
+		log.Debugf("GetGetValueRspMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -690,7 +674,7 @@ func (dhtMsg *DhtMessage) GetGetValueRspMessage(pbMsg *pb.DhtMessage_GetValueRsp
 func (dhtMsg *DhtMessage) GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetPutProviderMessage: invalid parameters")
+		log.Debugf("GetPutProviderMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -724,7 +708,7 @@ func (dhtMsg *DhtMessage) GetPutProviderMessage(pbMsg *pb.DhtMessage_PutProvider
 func (dhtMsg *DhtMessage) GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProviderReq) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetGetProviderReqMessage: invalid parameters")
+		log.Debugf("GetGetProviderReqMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -750,7 +734,7 @@ func (dhtMsg *DhtMessage) GetGetProviderReqMessage(pbMsg *pb.DhtMessage_GetProvi
 func (dhtMsg *DhtMessage) GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProviderRsp) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetGetProviderRspMessage: invalid parameters")
+		log.Debugf("GetGetProviderRspMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -783,7 +767,7 @@ func (dhtMsg *DhtMessage) GetGetProviderRspMessage(pbMsg *pb.DhtMessage_GetProvi
 func (dhtMsg *DhtMessage) GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetPingMessage: invalid parameters")
+		log.Debugf("GetPingMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -807,7 +791,7 @@ func (dhtMsg *DhtMessage) GetPingMessage(pbMsg *pb.DhtMessage_Ping) DhtErrno {
 func (dhtMsg *DhtMessage) GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 
 	if pbMsg == nil {
-		protoLog.Debug("GetPongMessage: invalid parameters")
+		log.Debugf("GetPongMessage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -831,7 +815,7 @@ func (dhtMsg *DhtMessage) GetPongMessage(pbMsg *pb.DhtMessage_Pong) DhtErrno {
 func (dhtMsg *DhtMessage) GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetHandshakePackage: invalid parameters")
+		log.Debugf("GetHandshakePackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -873,7 +857,7 @@ func (dhtMsg *DhtMessage) GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetHandshakePackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetHandshakePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -890,7 +874,7 @@ func (dhtMsg *DhtMessage) GetHandshakePackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetFindNodePackage: invalid parameters")
+		log.Debugf("GetFindNodePackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -911,7 +895,7 @@ func (dhtMsg *DhtMessage) GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetFindNodePackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetFindNodePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -928,7 +912,7 @@ func (dhtMsg *DhtMessage) GetFindNodePackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetNeighborsPackage: invalid parameters")
+		log.Debugf("GetNeighborsPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -953,7 +937,7 @@ func (dhtMsg *DhtMessage) GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetNeighborsPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetNeighborsPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -970,7 +954,7 @@ func (dhtMsg *DhtMessage) GetNeighborsPackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetPutValuePackage: invalid parameters")
+		log.Debugf("GetPutValuePackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -999,7 +983,7 @@ func (dhtMsg *DhtMessage) GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetPutValuePackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetPutValuePackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1016,7 +1000,7 @@ func (dhtMsg *DhtMessage) GetPutValuePackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetGetValueReqPackage: invalid parameters")
+		log.Debugf("GetGetValueReqPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1038,7 +1022,7 @@ func (dhtMsg *DhtMessage) GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetGetValueReqPackage: failed, err: %s", err.Error())
+		log.Debugf("GetGetValueReqPackage: failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1055,7 +1039,7 @@ func (dhtMsg *DhtMessage) GetGetValueReqPackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetGetValueRspPackage: invalid parameters")
+		log.Debugf("GetGetValueRspPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1085,7 +1069,7 @@ func (dhtMsg *DhtMessage) GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetGetValueRspPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetGetValueRspPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1102,7 +1086,7 @@ func (dhtMsg *DhtMessage) GetGetValueRspPackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetPutProviderPackage: invalid parameters")
+		log.Debugf("GetPutProviderPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1131,7 +1115,7 @@ func (dhtMsg *DhtMessage) GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetPutProviderPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetPutProviderPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1148,7 +1132,7 @@ func (dhtMsg *DhtMessage) GetPutProviderPackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetGetProviderReqPackage: invalid parameters")
+		log.Debugf("GetGetProviderReqPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1169,7 +1153,7 @@ func (dhtMsg *DhtMessage) GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno 
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetGetProviderReqPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetGetProviderReqPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1186,7 +1170,7 @@ func (dhtMsg *DhtMessage) GetGetProviderReqPackage(dhtPkg *DhtPackage) DhtErrno 
 func (dhtMsg *DhtMessage) GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetGetProviderRspPackage: invalid parameters")
+		log.Debugf("GetGetProviderRspPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1218,7 +1202,7 @@ func (dhtMsg *DhtMessage) GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno 
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetGetProviderRspPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetGetProviderRspPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1235,7 +1219,7 @@ func (dhtMsg *DhtMessage) GetGetProviderRspPackage(dhtPkg *DhtPackage) DhtErrno 
 func (dhtMsg *DhtMessage) GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetPingPackage: invalid parameters")
+		log.Debugf("GetPingPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1255,7 +1239,7 @@ func (dhtMsg *DhtMessage) GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetPingPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetPingPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1272,7 +1256,7 @@ func (dhtMsg *DhtMessage) GetPingPackage(dhtPkg *DhtPackage) DhtErrno {
 func (dhtMsg *DhtMessage) GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	if dhtPkg == nil {
-		protoLog.Debug("GetPongPackage: invalid parameters")
+		log.Debugf("GetPongPackage: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1292,7 +1276,7 @@ func (dhtMsg *DhtMessage) GetPongPackage(dhtPkg *DhtPackage) DhtErrno {
 
 	pl, err := proto.Marshal(&pbMsg)
 	if err != nil {
-		protoLog.Debug("GetPongPackage: Marshal failed, err: %s", err.Error())
+		log.Debugf("GetPongPackage: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1314,12 +1298,12 @@ func (dhtDsRec *DhtDatastoreRecord) EncDsRecord(dsr *DsRecord) DhtErrno {
 	// much are took into account. See DecDsRecord also please.
 
 	if dsr == nil {
-		protoLog.Debug("EncDsRecord: invalid parameters")
+		log.Debugf("EncDsRecord: invalid parameters")
 		return DhtEnoParameter
 	}
 
 	if len(dhtDsRec.Key) != cap(dsr.Key) {
-		protoLog.Debug("EncDsRecord: key length mismatched")
+		log.Debugf("EncDsRecord: key length mismatched")
 		return DhtEnoMismatched
 	}
 	copy(dsr.Key[0:], dhtDsRec.Key)
@@ -1332,7 +1316,7 @@ func (dhtDsRec *DhtDatastoreRecord) EncDsRecord(dsr *DsRecord) DhtErrno {
 
 	val, err := proto.Marshal(&pbr)
 	if err != nil {
-		protoLog.Debug("EncDsRecord: Marshal failed, err: %s", err.Error())
+		log.Debugf("EncDsRecord: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 	dsr.Value = val
@@ -1346,18 +1330,18 @@ func (dhtDsRec *DhtDatastoreRecord) EncDsRecord(dsr *DsRecord) DhtErrno {
 func (dhtDsRec *DhtDatastoreRecord) DecDsRecord(dsr *DsRecord) DhtErrno {
 
 	if dsr == nil {
-		protoLog.Debug("DecDsRecord: invalid parameters")
+		log.Debugf("DecDsRecord: invalid parameters")
 		return DhtEnoParameter
 	}
 
 	pbdpr := pb.DhtRecord{}
 	if err := proto.Unmarshal(dsr.Value.([]byte), &pbdpr); err != nil {
-		protoLog.Debug("DecDsRecord: Unmarshal failed, err: %s", err.Error())
+		log.Debugf("DecDsRecord: Unmarshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
 	if bytes.Equal(pbdpr.Key, dsr.Key[0:]) != true {
-		protoLog.Debug("DecDsRecord: key mismatched")
+		log.Debugf("DecDsRecord: key mismatched")
 		return DhtEnoMismatched
 	}
 
@@ -1374,7 +1358,7 @@ func (dhtDsRec *DhtDatastoreRecord) DecDsRecord(dsr *DsRecord) DhtErrno {
 func (dhtPsRec *DhtProviderStoreRecord) EncPsRecord(psr *PsRecord) DhtErrno {
 
 	if psr == nil {
-		protoLog.Debug("EncPsRecord: invalid parameters")
+		log.Debugf("EncPsRecord: invalid parameters")
 		return DhtEnoParameter
 	}
 
@@ -1399,7 +1383,7 @@ func (dhtPsRec *DhtProviderStoreRecord) EncPsRecord(psr *PsRecord) DhtErrno {
 
 	val, err := proto.Marshal(pbdpr)
 	if err != nil {
-		protoLog.Debug("EncPsRecord: Marshal failed, err: %s", err.Error())
+		log.Debugf("EncPsRecord: Marshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
@@ -1415,18 +1399,18 @@ func (dhtPsRec *DhtProviderStoreRecord) EncPsRecord(psr *PsRecord) DhtErrno {
 func (dhtPsRec *DhtProviderStoreRecord) DecPsRecord(psr *PsRecord) DhtErrno {
 
 	if psr == nil {
-		protoLog.Debug("DecPsRecord: invalid parameters")
+		log.Debugf("DecPsRecord: invalid parameters")
 		return DhtEnoParameter
 	}
 
 	pbdpr := pb.DhtProviderRecord{}
 	if err := proto.Unmarshal(psr.Value.([]byte), &pbdpr); err != nil {
-		protoLog.Debug("DecPsRecord: Unmarshal failed, err: %s", err.Error())
+		log.Debugf("DecPsRecord: Unmarshal failed, err: %s", err.Error())
 		return DhtEnoSerialization
 	}
 
 	if bytes.Equal(pbdpr.Key, psr.Key[0:]) != true {
-		protoLog.Debug("DecPsRecord：key mismatched")
+		log.Debugf("DecPsRecord：key mismatched")
 		return DhtEnoMismatched
 	}
 

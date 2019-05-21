@@ -41,33 +41,12 @@ import (
 	"strings"
 	"time"
 
-	p2plog "github.com/yeeco/gyee/p2p/logger"
+	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type cfgLogger struct {
-	debug__ bool
-}
-
-var cfgLog = cfgLogger{
-	debug__: false,
-}
-
-func SwitchConfigDebugFlag(flag bool) {
-	cfgLog.debug__ = flag
-}
-
-func (log cfgLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // errno
 type P2pCfgErrno int
-
 const (
 	P2pCfgEnoNone P2pCfgErrno = iota
 	P2pCfgEnoParameter
@@ -573,65 +552,65 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	// is overlapped directly here in this function.
 
 	if cfg == nil {
-		cfgLog.Debug("P2pSetConfig: invalid configuration")
+		log.Debugf("P2pSetConfig: invalid configuration")
 		return name, P2pCfgEnoParameter
 	}
 
 	if cfg.PrivateKey == nil {
-		cfgLog.Debug("P2pSetConfig: private key is empty")
+		log.Debugf("P2pSetConfig: private key is empty")
 	}
 
 	if cfg.PublicKey == nil {
-		cfgLog.Debug("P2pSetConfig: public key is empty")
+		log.Debugf("P2pSetConfig: public key is empty")
 	}
 
 	if m1, m2, m3 := len(cfg.SubNetIdList) == len(cfg.SubNetMaxPeers),
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxInBounds),
 		len(cfg.SubNetIdList) == len(cfg.SubNetMaxOutbounds); !(m1 && m2 && m3) {
-		cfgLog.Debug("P2pSetConfig: invalid sub network configuration")
+		log.Debugf("P2pSetConfig: invalid sub network configuration")
 		return name, P2pCfgEnoParameter
 	}
 
 	for key, maxPeers := range cfg.SubNetMaxPeers {
 		if maxPeers < cfg.SubNetMaxOutbounds[key]+cfg.SubNetMaxInBounds[key] {
-			cfgLog.Debug("P2pSetConfig: invalid sub network configuration")
+			log.Debugf("P2pSetConfig: invalid sub network configuration")
 			return name, P2pCfgEnoParameter
 		}
 	}
 
 	if len(cfg.Name) == 0 {
-		cfgLog.Debug("P2pSetConfig: node name is empty")
+		log.Debugf("P2pSetConfig: node name is empty")
 	}
 
 	if cap(cfg.BootstrapNodes) == 0 {
-		cfgLog.Debug("P2pSetConfig: BootstrapNodes is empty")
+		log.Debugf("P2pSetConfig: BootstrapNodes is empty")
 	}
 
 	if cap(cfg.StaticNodes) == 0 {
-		cfgLog.Debug("P2pSetConfig: StaticNodes empty")
+		log.Debugf("P2pSetConfig: StaticNodes empty")
 	}
 
 	if len(cfg.NodeDataDir) == 0 /*|| path.IsAbs(cfg.NodeDataDir) == false*/ {
-		cfgLog.Debug("P2pSetConfig: invalid data directory")
+		log.Debugf("P2pSetConfig: invalid data directory")
 		return name, P2pCfgEnoDataDir
 	}
 
 	if len(cfg.NodeDatabase) == 0 {
-		cfgLog.Debug("P2pSetConfig: invalid database name")
+		log.Debugf("P2pSetConfig: invalid database name")
 		return name, P2pCfgEnoDatabase
 	}
 
 	if cfg.Local.IP == nil {
-		cfgLog.Debug("P2pSetConfig: invalid ip address")
+		log.Debugf("P2pSetConfig: invalid ip address")
 		return name, P2pCfgEnoIpAddr
 	}
-	cfgLog.Debug("P2pSetConfig: [ip, udp, tcp]=[%s, %d, %d]",
+	log.Debugf("P2pSetConfig: [ip, udp, tcp]=[%s, %d, %d]",
 		cfg.Local.IP.String(), cfg.Local.UDP, cfg.Local.TCP)
 
 	name = strings.TrimSpace(name)
 	if len(name) == 0 {
 		if len(cfg.CfgName) == 0 {
-			cfgLog.Debug("P2pSetConfig: empty configuration name")
+			log.Debugf("P2pSetConfig: empty configuration name")
 			return name, P2pCfgEnoParameter
 		}
 		name = cfg.CfgName
@@ -644,16 +623,16 @@ func P2pSetConfig(name string, cfg *Config) (string, P2pCfgErrno) {
 	}
 
 	if _, dup := config[name]; dup {
-		cfgLog.Debug("P2pSetConfig: duplicated configuration name: %s", name)
-		cfgLog.Debug("P2pSetConfig: old configuration: %+v", *config[name])
-		cfgLog.Debug("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
+		log.Debugf("P2pSetConfig: duplicated configuration name: %s", name)
+		log.Debugf("P2pSetConfig: old configuration: %+v", *config[name])
+		log.Debugf("P2pSetConfig: overlapped by new configuration: %+v", *cfg)
 	}
 
 	if p2pSetupLocalNodeId(cfg) != P2pCfgEnoNone {
-		cfgLog.Debug("P2pSetConfig: invalid ip address")
+		log.Debugf("P2pSetConfig: invalid ip address")
 		return name, P2pCfgEnoNodeId
 	}
-	cfgLog.Debug("P2pSetConfig: local node identity: \n\t%s", P2pNodeId2HexString(cfg.Local.ID))
+	log.Debugf("P2pSetConfig: local node identity: \n\t%s", P2pNodeId2HexString(cfg.Local.ID))
 
 	cfg.DhtLocal.ID = cfg.Local.ID
 	config[name] = cfg
@@ -680,7 +659,7 @@ func P2pSubNetId2HexString(id SubNetworkID) string {
 func P2pHexString2NodeId(hex string) *NodeID {
 	var nid = NodeID{byte(0)}
 	if len(hex) != NodeIDBytes*2 {
-		cfgLog.Debug("P2pHexString2NodeId: invalid length: %d", len(hex))
+		log.Debugf("P2pHexString2NodeId: invalid length: %d", len(hex))
 		return nil
 	}
 	for cidx, c := range hex {
@@ -691,7 +670,7 @@ func P2pHexString2NodeId(hex string) *NodeID {
 		} else if c >= 'A' && c <= 'F' {
 			c = c - 'A' + 10
 		} else {
-			cfgLog.Debug("P2pHexString2NodeId: invalid string: %s", hex)
+			log.Debugf("P2pHexString2NodeId: invalid string: %s", hex)
 			return nil
 		}
 		bidx := cidx >> 1
@@ -744,7 +723,7 @@ func P2pGetLocalIpAddr() net.IP {
 	dftIp := net.IPv4(127, 0, 0, 1)
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		cfgLog.Debug("P2pGetLocalIpAddr: failed, error: %s", err.Error())
+		log.Debugf("P2pGetLocalIpAddr: failed, error: %s", err.Error())
 		return dftIp
 	}
 	for idx := 0; idx < len(addrs); idx++ {
@@ -779,7 +758,7 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 	if cfg.NodeDataDir == "" {
 		key, err := GenerateKey()
 		if err != nil {
-			cfgLog.Debug("p2pBuildPrivateKey: GenerateKey failed, err: %s", err.Error())
+			log.Debugf("p2pBuildPrivateKey: GenerateKey failed, err: %s", err.Error())
 			return nil
 		}
 		return key
@@ -787,30 +766,30 @@ func p2pBuildPrivateKey(cfg *Config) *ecdsa.PrivateKey {
 
 	keyFile := filepath.Join(cfg.NodeDataDir, cfg.Name, KeyFileName)
 	if key, err := LoadECDSA(keyFile); err == nil {
-		cfgLog.Debug("p2pBuildPrivateKey: private key loaded ok from file: %s", keyFile)
+		log.Debugf("p2pBuildPrivateKey: private key loaded ok from file: %s", keyFile)
 		return key
 	}
 
 	key, err := GenerateKey()
 	if err != nil {
-		cfgLog.Debug("p2pBuildPrivateKey: GenerateKey failed, err: %s", err.Error())
+		log.Debugf("p2pBuildPrivateKey: GenerateKey failed, err: %s", err.Error())
 		return nil
 	}
 
 	instanceDir := filepath.Join(cfg.NodeDataDir, cfg.Name)
 	if _, err := os.Stat(instanceDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(instanceDir, 0700); err != nil {
-			cfgLog.Debug("p2pBuildPrivateKey: MkdirAll failed, err: %s, path: %s",
+			log.Debugf("p2pBuildPrivateKey: MkdirAll failed, err: %s, path: %s",
 				err.Error(), instanceDir)
 			return key
 		}
 	}
 
 	if err := SaveECDSA(keyFile, key); err != nil {
-		cfgLog.Debug("p2pBuildPrivateKey: SaveECDSA failed, err: %s", err.Error())
+		log.Debugf("p2pBuildPrivateKey: SaveECDSA failed, err: %s", err.Error())
 	}
 
-	cfgLog.Debug("p2pBuildPrivateKey: key save ok to file: %s", keyFile)
+	log.Debugf("p2pBuildPrivateKey: key save ok to file: %s", keyFile)
 	return key
 }
 
@@ -819,7 +798,7 @@ func p2pPubkey2NodeId(pub *ecdsa.PublicKey) *NodeID {
 	var id NodeID
 	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	if len(pbytes)-1 != len(id) {
-		cfgLog.Debug("p2pPubkey2NodeId: invalid public key for node identity")
+		log.Debugf("p2pPubkey2NodeId: invalid public key for node identity")
 		return nil
 	}
 	copy(id[:], pbytes[1:])
@@ -836,18 +815,18 @@ func p2pSetupLocalNodeId(cfg *Config) P2pCfgErrno {
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	} else if cfg.PublicKey == nil {
 		if cfg.PrivateKey = p2pBuildPrivateKey(cfg); cfg.PrivateKey == nil {
-			cfgLog.Debug("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
+			log.Debugf("p2pSetupLocalNodeId: p2pBuildPrivateKey failed")
 			return P2pCfgEnoPrivateKye
 		}
 		cfg.PublicKey = &cfg.PrivateKey.PublicKey
 	} else {
-		cfgLog.Debug("p2pSetupLocalNodeId: nil private key")
+		log.Debugf("p2pSetupLocalNodeId: nil private key")
 		return P2pCfgEnoPrivateKye
 	}
 
 	pnid := p2pPubkey2NodeId(cfg.PublicKey)
 	if pnid == nil {
-		cfgLog.Debug("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
+		log.Debugf("p2pSetupLocalNodeId: p2pPubkey2NodeId failed")
 		return P2pCfgEnoPublicKye
 	}
 
@@ -892,7 +871,7 @@ func P2pSignBigInt(bi *big.Int) int {
 func P2pSign(priKey *ecdsa.PrivateKey, data []byte) (r, s *big.Int, err error) {
 	r, s, err = ecdsa.Sign(rand.Reader, priKey, data)
 	if err != nil {
-		cfgLog.Debug("P2pSign: failed, error: %s", err.Error())
+		log.Debugf("P2pSign: failed, error: %s", err.Error())
 	}
 	return
 }
@@ -948,13 +927,13 @@ func P2pSetupBootstrapNodes(urls []string) []*Node {
 	for idx, url := range urls {
 		strs := strings.Split(url, "@")
 		if len(strs) != 2 {
-			cfgLog.Debug("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
+			log.Debugf("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
 			return nil
 		}
 		strNodeId := strs[0]
 		strs = strings.Split(strs[1], ":")
 		if len(strs) != 3 {
-			cfgLog.Debug("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
+			log.Debugf("P2pSetupBootstrapNodes: invalid bootstrap url: %s", url)
 			return nil
 		}
 
@@ -963,7 +942,7 @@ func P2pSetupBootstrapNodes(urls []string) []*Node {
 		strTcpPort := strs[2]
 		pid := P2pHexString2NodeId(strNodeId)
 		if pid == nil {
-			cfgLog.Debug("P2pSetupBootstrapNodes: P2pHexString2NodeId failed, strNodeId: %s", strNodeId)
+			log.Debugf("P2pSetupBootstrapNodes: P2pHexString2NodeId failed, strNodeId: %s", strNodeId)
 			return nil
 		}
 
@@ -971,14 +950,14 @@ func P2pSetupBootstrapNodes(urls []string) []*Node {
 		copy(bsn[idx].ID[:], (*pid)[:])
 		bsn[idx].IP = net.ParseIP(strIp)
 		if port, err := strconv.Atoi(strUdpPort); err != nil {
-			cfgLog.Debug("P2pSetupBootstrapNodes: Atoi for UDP port failed, err: %s", err.Error())
+			log.Debugf("P2pSetupBootstrapNodes: Atoi for UDP port failed, err: %s", err.Error())
 			return nil
 		} else {
 			bsn[idx].UDP = uint16(port)
 		}
 
 		if port, err := strconv.Atoi(strTcpPort); err != nil {
-			cfgLog.Debug("P2pSetupBootstrapNodes: Atoi for TCP port failed, err: %s", err.Error())
+			log.Debugf("P2pSetupBootstrapNodes: Atoi for TCP port failed, err: %s", err.Error())
 			return nil
 		} else {
 			bsn[idx].TCP = uint16(port)
@@ -1190,14 +1169,14 @@ func P2pIsValidNatType(natt string) bool {
 
 func P2pSetupNatType(cfg *Config, natType string, gwIp string) P2pCfgErrno {
 	if P2pIsValidNatType(natType) != true {
-		cfgLog.Debug("P2pSetupNat: invalid nat type: %s", natType)
+		log.Debugf("P2pSetupNat: invalid nat type: %s", natType)
 		return P2pCfgEnoNat
 	}
 	natt := strings.TrimSpace(natType)
 	if natt == strings.ToLower(NATT_PMP) {
 		gwIp = strings.TrimSpace(gwIp)
 		if len(gwIp) == 0 {
-			cfgLog.Debug("")
+			log.Debugf("")
 			return P2pCfgEnoNat
 		}
 		cfg.NatCfg.GwIp = net.ParseIP(gwIp)

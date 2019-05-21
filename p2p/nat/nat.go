@@ -28,32 +28,14 @@ import (
 
 	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type natMgrLogger struct {
-	debug__ bool
-}
-
-var natLog = natMgrLogger{
-	debug__: false,
-}
-
-func (log natMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // errno
 //
 type NatEno int
-
 const (
 	NatEnoNone = NatEno(iota)
 	NatEnoParameter

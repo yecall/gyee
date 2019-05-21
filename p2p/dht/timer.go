@@ -26,30 +26,13 @@ import (
 	"time"
 
 	"github.com/yeeco/gyee/log"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	config "github.com/yeeco/gyee/p2p/config"
 )
 
-//
-// debug
-//
+// tags
 const (
 	yeShellManagerTag = "yeShMgr"
 )
-
-type tmMgrLogger struct {
-	debug__ bool
-}
-
-var tmLog = tmMgrLogger{
-	debug__: false,
-}
-
-func (log tmMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 const (
 	oneTick      = time.Second // unit tick to driver the timer manager

@@ -31,27 +31,10 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type dsLogger struct {
-	debug__ bool
-}
-
-var dsLog = dsLogger{
-	debug__: false,
-}
-
-func (log dsLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Datastore key

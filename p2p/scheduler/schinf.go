@@ -220,7 +220,7 @@ func (sdl *Scheduler) SchStartTaskEx(ptn interface{}) SchErrno {
 // Stop caller task or other task in async
 func (sdl *Scheduler) SchStopTask(ptn interface{}, name string) SchErrno {
 	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), name, SchEnoKilled); eno != SchEnoNone {
-		schLog.Debug("SchStopTask: SchTaskDone failed, eno: %d", eno)
+		log.Debugf("SchStopTask: SchTaskDone failed, eno: %d", eno)
 		return eno
 	}
 	return SchEnoNone
@@ -357,7 +357,7 @@ func (sdl *Scheduler) SchSetUserDataArea(ptn interface{}, uda interface{}) SchEr
 
 // Set the power off stage flag to tell the scheduler it's going to be turn off
 func (sdl *Scheduler) SchSetPoweroffStage() SchErrno {
-	schLog.Debug("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
+	log.Debugf("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
 	return sdl.schSetPoweroffStage()
 }
 

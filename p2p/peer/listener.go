@@ -26,33 +26,14 @@ import (
 
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type lsnMgrLogger struct {
-	debug__ bool
-}
-
-var lsnLog = lsnMgrLogger{
-	debug__: false,
-}
-
-func (log lsnMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // peer listen manager
 //
-
 const PeerLsnMgrName = sch.PeerLsnMgrName
-
 type ListenerManager struct {
 	sdl        *sch.Scheduler           // pointer to scheduler
 	name       string                   // name
@@ -281,9 +262,7 @@ acceptLoop:
 		}
 
 		conn, err := listener.Accept()
-		if lsnLog.debug__ {
-			log.Debugf("PeerAcceptProc: get out from Accept()")
-		}
+		log.Debugf("PeerAcceptProc: get out from Accept()")
 
 		if err != nil && !err.(net.Error).Temporary() {
 			log.Debugf("PeerAcceptProc: break loop for non-temporary error while accepting, " +

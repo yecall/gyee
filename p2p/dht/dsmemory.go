@@ -22,26 +22,8 @@ package dht
 
 import (
 	"time"
-
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
 
-//
-// debug
-//
-type dsmemLogger struct {
-	debug__ bool
-}
-
-var dsmemLog = dsmemLogger{
-	debug__: false,
-}
-
-func (log dsmemLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Data store based on "map" in memory, for test only

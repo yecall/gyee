@@ -31,27 +31,10 @@ import (
 	mrand "math/rand"
 
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type rutMgrLogger struct {
-	debug__ bool
-}
-
-var rutLog = rutMgrLogger{
-	debug__: false,
-}
-
-func (log rutMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Constants

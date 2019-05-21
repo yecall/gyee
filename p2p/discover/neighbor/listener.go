@@ -32,26 +32,9 @@ import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	umsg "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type lsnMgrLogger struct {
-	debug__ bool
-}
-
-var lsnLog = lsnMgrLogger{
-	debug__: false,
-}
-
-func (log lsnMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // the listener task name
 const LsnMgrName = sch.NgbLsnName

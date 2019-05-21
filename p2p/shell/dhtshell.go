@@ -22,7 +22,6 @@ package shell
 
 import (
 	dht "github.com/yeeco/gyee/p2p/dht"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
@@ -30,20 +29,6 @@ import (
 //
 // debug
 //
-type dhtShellLogger struct {
-	debug__ bool
-}
-
-var dhtLog = dhtShellLogger{
-	debug__: false,
-}
-
-func (log dhtShellLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
 const (
 	dhtShMgrName     = sch.DhtShMgrName // name registered in scheduler
 	ShMgrMailboxSize = 1024 * 8			// mailbox size

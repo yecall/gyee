@@ -29,25 +29,7 @@ import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/discover/udpmsg/pb"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 )
-
-//
-// debug
-//
-type udpmsgLogger struct {
-	debug__ bool
-}
-
-var udpmsgLog = udpmsgLogger{
-	debug__: false,
-}
-
-func (log udpmsgLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // message type
 const (
@@ -854,121 +836,101 @@ func (n *Node) Srting() string {
 }
 
 func (ping *Ping) String() string {
-	if !udpmsgLog.debug__ {
-		return ""
-	} else {
-		strPing := "Ping:\n"
-		From := "From: " + ping.From.Srting() + "\n"
-		To := "To: " + ping.To.Srting() + "\n"
-		FromSubNetId := "FromSubNetId: "
-		for idx := 0; idx < len(ping.FromSubNetId); idx++ {
-			FromSubNetId += fmt.Sprintf("%x", ping.FromSubNetId[idx]) + ","
-		}
-		FromSubNetId += "\n"
-		SubNetId := "SubNetId: " + fmt.Sprintf("%x", ping.SubNetId) + "\n"
-		Id := "Id: " + fmt.Sprintf("%d", ping.Id) + "\n"
-		Expiration := "Expiration: " + fmt.Sprintf("%d", ping.Expiration) + "\n"
-		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
-		return strPing
+	strPing := "Ping:\n"
+	From := "From: " + ping.From.Srting() + "\n"
+	To := "To: " + ping.To.Srting() + "\n"
+	FromSubNetId := "FromSubNetId: "
+	for idx := 0; idx < len(ping.FromSubNetId); idx++ {
+		FromSubNetId += fmt.Sprintf("%x", ping.FromSubNetId[idx]) + ","
 	}
+	FromSubNetId += "\n"
+	SubNetId := "SubNetId: " + fmt.Sprintf("%x", ping.SubNetId) + "\n"
+	Id := "Id: " + fmt.Sprintf("%d", ping.Id) + "\n"
+	Expiration := "Expiration: " + fmt.Sprintf("%d", ping.Expiration) + "\n"
+	strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
+	return strPing
 }
 
 func (pong *Pong) String() string {
-	if !udpmsgLog.debug__ {
-		return ""
-	} else {
-		strPing := "Pong:\n"
-		From := "From: " + pong.From.Srting() + "\n"
-		To := "To: " + pong.To.Srting() + "\n"
-		FromSubNetId := "FromSubNetId: "
-		for idx := 0; idx < len(pong.FromSubNetId); idx++ {
-			FromSubNetId += fmt.Sprintf("%x", pong.FromSubNetId[idx]) + ","
-		}
-		FromSubNetId += "\n"
-		SubNetId := "SubNetId: " + fmt.Sprintf("%x", pong.SubNetId) + "\n"
-		Id := "Id: " + fmt.Sprintf("%d", pong.Id) + "\n"
-		Expiration := "Expiration: " + fmt.Sprintf("%d", pong.Expiration) + "\n"
-		strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
-		return strPing
+	strPing := "Pong:\n"
+	From := "From: " + pong.From.Srting() + "\n"
+	To := "To: " + pong.To.Srting() + "\n"
+	FromSubNetId := "FromSubNetId: "
+	for idx := 0; idx < len(pong.FromSubNetId); idx++ {
+		FromSubNetId += fmt.Sprintf("%x", pong.FromSubNetId[idx]) + ","
 	}
+	FromSubNetId += "\n"
+	SubNetId := "SubNetId: " + fmt.Sprintf("%x", pong.SubNetId) + "\n"
+	Id := "Id: " + fmt.Sprintf("%d", pong.Id) + "\n"
+	Expiration := "Expiration: " + fmt.Sprintf("%d", pong.Expiration) + "\n"
+	strPing += From + To + FromSubNetId + SubNetId + Id + Expiration
+	return strPing
 }
 
 func (findnode *FindNode) String() string {
-	if !udpmsgLog.debug__ {
-		return ""
-	} else {
-		strPing := "FindNode:\n"
-		From := "From: " + findnode.From.Srting() + "\n"
-		To := "To: " + findnode.To.Srting() + "\n"
-		FromSubNetId := "FromSubNetId: "
-		for idx := 0; idx < len(findnode.FromSubNetId); idx++ {
-			FromSubNetId += fmt.Sprintf("%x", findnode.FromSubNetId[idx]) + ","
-		}
-		FromSubNetId += "\n"
-		MaskBits := "MaskBits: " + fmt.Sprintf("%d", findnode.MaskBits) + "\n"
-		SubNetId := "SubNetId: " + fmt.Sprintf("%x", findnode.SubNetId) + "\n"
-		Target := "Target: " + fmt.Sprintf("%x", findnode.Target) + "\n"
-		Id := "Id: " + fmt.Sprintf("%d", findnode.Id) + "\n"
-		Expiration := "Expiration: " + fmt.Sprintf("%d", findnode.Expiration) + "\n"
-		strPing += From + To + FromSubNetId + MaskBits + SubNetId + Target + Id + Expiration
-		return strPing
+	strPing := "FindNode:\n"
+	From := "From: " + findnode.From.Srting() + "\n"
+	To := "To: " + findnode.To.Srting() + "\n"
+	FromSubNetId := "FromSubNetId: "
+	for idx := 0; idx < len(findnode.FromSubNetId); idx++ {
+		FromSubNetId += fmt.Sprintf("%x", findnode.FromSubNetId[idx]) + ","
 	}
+	FromSubNetId += "\n"
+	MaskBits := "MaskBits: " + fmt.Sprintf("%d", findnode.MaskBits) + "\n"
+	SubNetId := "SubNetId: " + fmt.Sprintf("%x", findnode.SubNetId) + "\n"
+	Target := "Target: " + fmt.Sprintf("%x", findnode.Target) + "\n"
+	Id := "Id: " + fmt.Sprintf("%d", findnode.Id) + "\n"
+	Expiration := "Expiration: " + fmt.Sprintf("%d", findnode.Expiration) + "\n"
+	strPing += From + To + FromSubNetId + MaskBits + SubNetId + Target + Id + Expiration
+	return strPing
 }
 
 func (neighbors *Neighbors) String() string {
-	if !udpmsgLog.debug__ {
-		return ""
-	} else {
-		strPing := "Neighbors:\n"
-		From := "From: " + neighbors.From.Srting() + "\n"
-		To := "To: " + neighbors.To.Srting() + "\n"
-		FromSubNetId := "FromSubNetId: "
-		for idx := 0; idx < len(neighbors.FromSubNetId); idx++ {
-			FromSubNetId += fmt.Sprintf("%x", neighbors.FromSubNetId[idx]) + ","
-		}
-		FromSubNetId += "\n"
-		SubNetId := "SubNetId: " + fmt.Sprintf("%x", neighbors.SubNetId) + "\n"
-		Nodes := "Nodes:"
-		for idx := 0; idx < len(neighbors.Nodes); idx++ {
-			Nodes += neighbors.Nodes[idx].Srting() + "\n"
-		}
-		Id := "Id: " + fmt.Sprintf("%d", neighbors.Id) + "\n"
-		Expiration := "Expiration: " + fmt.Sprintf("%d", neighbors.Expiration) + "\n"
-		strPing += From + To + FromSubNetId + SubNetId + Nodes + Id + Expiration
-		return strPing
+	strPing := "Neighbors:\n"
+	From := "From: " + neighbors.From.Srting() + "\n"
+	To := "To: " + neighbors.To.Srting() + "\n"
+	FromSubNetId := "FromSubNetId: "
+	for idx := 0; idx < len(neighbors.FromSubNetId); idx++ {
+		FromSubNetId += fmt.Sprintf("%x", neighbors.FromSubNetId[idx]) + ","
 	}
+	FromSubNetId += "\n"
+	SubNetId := "SubNetId: " + fmt.Sprintf("%x", neighbors.SubNetId) + "\n"
+	Nodes := "Nodes:"
+	for idx := 0; idx < len(neighbors.Nodes); idx++ {
+		Nodes += neighbors.Nodes[idx].Srting() + "\n"
+	}
+	Id := "Id: " + fmt.Sprintf("%d", neighbors.Id) + "\n"
+	Expiration := "Expiration: " + fmt.Sprintf("%d", neighbors.Expiration) + "\n"
+	strPing += From + To + FromSubNetId + SubNetId + Nodes + Id + Expiration
+	return strPing
 }
 
 func (pum *UdpMsg) DebugMessageFromPeer() {
-	if udpmsgLog.debug__ {
-		switch pum.typ {
-		case UdpMsgTypePing:
-			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
-		case UdpMsgTypePong:
-			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
-		case UdpMsgTypeFindNode:
-			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
-		case UdpMsgTypeNeighbors:
-			log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
-		default:
-			log.Debugf("DebugMessageFromPeer: invalid message type: %d", pum.typ)
-		}
+	switch pum.typ {
+	case UdpMsgTypePing:
+		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
+	case UdpMsgTypePong:
+		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
+	case UdpMsgTypeFindNode:
+		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
+	case UdpMsgTypeNeighbors:
+		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
+	default:
+		log.Debugf("DebugMessageFromPeer: invalid message type: %d", pum.typ)
 	}
 }
 
 func (pum *UdpMsg) DebugMessageToPeer() {
-	if udpmsgLog.debug__ {
-		switch pum.typ {
-		case UdpMsgTypePing:
-			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
-		case UdpMsgTypePong:
-			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
-		case UdpMsgTypeFindNode:
-			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
-		case UdpMsgTypeNeighbors:
-			log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
-		default:
-			log.Debugf("DebugMessageToPeer: invalid message type: %d", pum.typ)
-		}
+	switch pum.typ {
+	case UdpMsgTypePing:
+		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
+	case UdpMsgTypePong:
+		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
+	case UdpMsgTypeFindNode:
+		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
+	case UdpMsgTypeNeighbors:
+		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
+	default:
+		log.Debugf("DebugMessageToPeer: invalid message type: %d", pum.typ)
 	}
 }

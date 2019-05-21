@@ -29,38 +29,13 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	log "github.com/yeeco/gyee/log"
 	lru "github.com/hashicorp/golang-lru"
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
-	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type connLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var connLog = connLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log connLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log connLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Connection manager name registered in scheduler
