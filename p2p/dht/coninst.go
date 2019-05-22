@@ -1146,9 +1146,17 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 			hs.Dir)
 		return DhtEnoMismatched
 	}
+	if hs.NodeId != conInst.hsInfo.peer.ID {
+		log.Debugf("outboundHandshake: mismatched node identity, " +
+			"inst: %s, dir: %d, local: %s, remote: %s, " +
+			"hsdir: %d, req-id: %x, hs-id: %x",
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			hs.Dir, conInst.hsInfo.peer.ID, hs.NodeId)
+		return DhtEnoMismatched
+	}
 
 	//
-	// notice: when try outbound, the peer(conInst.hsInfo.peer) is alway known
+	// notice0: when try outbound, the peer(conInst.hsInfo.peer) is always known
 	// before the handshaking, but here after the handshaking ok, we update the
 	// peer according what we obtained in the procedure as following, and this
 	// can be different from that we had believed it would be. the connection
@@ -1156,6 +1164,8 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	// it's the case, we return failed, so the connection manager would drop
 	// this connection later). see function handshakeRsp in connection.go for
 	// detail please.
+	// notice1: we had filter out those node identities which are mismatched to
+	// what's wanted, see above statements.
 	//
 
 	conInst.hsInfo.peer = config.Node{
