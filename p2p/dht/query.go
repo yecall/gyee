@@ -41,10 +41,10 @@ import (
 //
 const (
 	QryMgrName        = sch.DhtQryMgrName                         	// query manage name registered in shceduler
-	QryMgrMailboxSize = 1024 * 24								  		// mail box size
+	QryMgrMailboxSize = 1024 * 128							  		// mail box size
 	qryMgrMaxPendings = 512                                       		// max pendings can be held in the list, 0 is unlimited
-	qryMgrMaxActInsts = 32                                        		// max concurrent actived instances for one query
-	qryMgrQryExpired  = time.Second * 60                          	// duration to get expired for a query
+	qryMgrMaxActInsts = 8                                        		// max concurrent actived instances for one query
+	qryMgrQryExpired  = time.Second * 48                          	// duration to get expired for a query
 	qryMgrQryMaxWidth = 64                                        		// not the true "width", the max number of peers queryied
 	qryMgrQryMaxDepth = 8                                         		// the max depth for a query
 	qryInstExpired    = time.Second * 16                          	// duration to get expired for a query instance
