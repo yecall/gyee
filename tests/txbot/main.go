@@ -48,7 +48,7 @@ func main() {
 		localPort  = flag.Int("localPort", p2pCfg.DftUdpPort, "node local p2p port")
 		dhtPort    = flag.Int("dhtPort", p2pCfg.DftDhtPort, "node local dht port")
 		ksPassword = flag.String("password", "", "keystore password")
-		batch      = flag.Int("batch", 20, "tx batch send count")
+		batch      = flag.Int("batch", 100, "tx batch send count")
 		batchTime  = flag.Int("batchTime", 1000, "milliseconds slept between batch send")
 	)
 	flag.Parse()

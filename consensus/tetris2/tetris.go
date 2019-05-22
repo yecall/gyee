@@ -161,7 +161,7 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 	tetris.params = &Params{
 		f:                 (len(validatorList) - 1) / 3,
 		superMajority:     2*len(validatorList)/3 + 1,
-		maxTxPerEvent:     100,
+		maxTxPerEvent:     1000,
 		minTxPerEvent:     1,
 		maxEventPerEvent:  len(validatorList),
 		minEventPerEvent:  2,
@@ -363,7 +363,7 @@ func (t *Tetris) receiveTx(tx common.Hash) {
 		t.txsCache.Add(tx, true)
 		t.txsAccepted = append(t.txsAccepted, tx)
 
-		if len(t.txsAccepted) > t.params.maxTxPerEvent {
+		if len(t.txsAccepted) >= t.params.maxTxPerEvent {
 			if t.MajorityBeatReceived() {
 				t.sendEvent()
 			} else {
