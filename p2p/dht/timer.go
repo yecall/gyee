@@ -131,7 +131,7 @@ func (mgr *TimerManager) GetTimer(dur time.Duration, dat interface{}, tcb TimerC
 	}
 
 	if mgr.tag == yeShellManagerTag {
-		log.Debugf("GetTimer: sdl: %s, " +
+		log.Tracef("GetTimer: sdl: %s, " +
 			"t: %d, r: %d, s: %d, m: %d, h: %d, d: %d, sp: %d, mp: %d, hp: %d, dp: %d",
 			mgr.sdl, tm.r, tm.t, tm.s, tm.m, tm.h, tm.d, mgr.sp, mgr.mp, mgr.hp, mgr.dp, )
 	}
@@ -165,7 +165,7 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 
 	if mgr.tag == yeShellManagerTag {
 		key := tm.data.(*config.DsKey)
-		log.Debugf("StartTimer: sdl: %s, " +
+		log.Tracef("StartTimer: sdl: %s, " +
 			"t: %d, r: %d, s: %d, m: %d, h: %d, d: %d, sp: %d, mp: %d, hp: %d, dp: %d, key: %x",
 			mgr.sdl, tm.t, tm.r, tm.s, tm.m, tm.h, tm.d, mgr.sp, mgr.mp, mgr.hp, mgr.dp, *key)
 	}
@@ -224,7 +224,7 @@ func (mgr *TimerManager) StartTimer(ptm interface{}) error {
 
 	if mgr.tag == yeShellManagerTag {
 		key := tm.data.(*config.DsKey)
-		log.Debugf("StartTimer: sdl: %s, " +
+		log.Tracef("StartTimer: sdl: %s, " +
 			"t: %d, r: %d, s: %d, m: %d, h: %d, d: %d, key: %x",
 			mgr.sdl, tm.r, tm.t, tm.s, tm.m, tm.h, tm.d, *key)
 	}

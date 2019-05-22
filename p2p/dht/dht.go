@@ -521,7 +521,6 @@ func (dhtMgr *DhtMgr) putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 // get value request handler
 //
 func (dhtMgr *DhtMgr) getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	log.Debugf("getValueReq: going to dispatch EvDhtMgrGetValueReq")
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueReq, msg)
 }
 
@@ -548,7 +547,6 @@ func (dhtMgr *DhtMgr) getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 // batch get handler
 //
 func (dhtMgr *DhtMgr) getValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch.SchErrno {
-	log.Debugf("getValueBatchReq: going to dispatch EvDhtMgrGetValueBatchReq")
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueBatchReq, msg)
 }
 

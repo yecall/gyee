@@ -262,7 +262,7 @@ acceptLoop:
 		}
 
 		conn, err := listener.Accept()
-		log.Debugf("PeerAcceptProc: get out from Accept()")
+		log.Tracef("PeerAcceptProc: get out from Accept()")
 
 		if err != nil && !err.(net.Error).Temporary() {
 			log.Debugf("PeerAcceptProc: break loop for non-temporary error while accepting, " +

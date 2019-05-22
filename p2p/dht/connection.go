@@ -692,7 +692,7 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	rsp2Sender := func(eno DhtErrno, dir int) sch.SchErrno {
-		log.Debugf("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
+		log.Tracef("rsp2Sender: eno: %d, ev: %d, dir: %d, owner: %s", eno, rspEvent, dir, msg.Name)
 		*ptrEno = int(eno)
 		*ptrDir = dir
 		msg := sch.SchMessage{}
@@ -714,7 +714,7 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 
 	dupConnProc := func(ci *ConInst) sch.SchErrno {
 		status := ci.getStatus()
-		log.Debugf("dupConnProc: inst: %s, dir: %d, status: %d, owner: %s", ci.name, ci.dir, status, msg.Name)
+		log.Tracef("dupConnProc: inst: %s, dir: %d, status: %d, owner: %s", ci.name, ci.dir, status, msg.Name)
 		if status == CisInService {
 			return rsp2Sender(DhtErrno(DhtEnoDuplicated), ci.dir)
 		} else if status == CisOutOfService || status == CisClosed {
@@ -739,13 +739,13 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 	}
 
 	if yes, ci := isInstInClosing(); yes {
-		log.Debugf("connctReq: in closing, inst: %s , owner: %s", ci.name, msg.Name)
+		log.Tracef("connctReq: in closing, inst: %s , owner: %s", ci.name, msg.Name)
 		return rsp2Sender(DhtErrno(DhtEnoResource), ci.dir)
 	} else if ci := conMgr.lookupOutboundConInst(&msg.Peer.ID); ci != nil {
-		log.Debugf("connctReq: outbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
+		log.Tracef("connctReq: outbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
 		return dupConnProc(ci)
 	} else if ci := conMgr.lookupInboundConInst(&msg.Peer.ID); ci != nil {
-		log.Debugf("connctReq: inbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
+		log.Tracef("connctReq: inbound duplicated, inst: %s, owner: %s", ci.name, msg.Name)
 		return dupConnProc(ci)
 	}
 
@@ -772,7 +772,7 @@ func (conMgr *ConMgr) connctReq(msg *sch.MsgDhtConMgrConnectReq) sch.SchErrno {
 		return rsp2Sender(DhtErrno(DhtEnoScheduler), ci.dir)
 	}
 
-	log.Debugf("connctReq: outbound instance, sdl: %s, inst: %s, dir: %d, owner: %s, ip: %s",
+	log.Tracef("connctReq: outbound instance, sdl: %s, inst: %s, dir: %d, owner: %s, ip: %s",
 		conMgr.sdlName, ci.name, ci.dir, msg.Name, msg.Peer.IP.String())
 
 	ci.ptnMe = ptn
@@ -901,11 +901,11 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	cio := conMgr.lookupOutboundConInst(&msg.Peer.ID)
 	cii := conMgr.lookupInboundConInst(&msg.Peer.ID)
 	if cio != nil && conMgr.instInClosing[cio.cid] == nil {
-		log.Debugf("sendReq: outbound instance selected")
+		log.Tracef("sendReq: outbound instance selected")
 		ci = cio
 	} else if cii != nil && conMgr.instInClosing[cii.cid] == nil {
 		ci = cii
-		log.Debugf("sendReq: inbound instance selected")
+		log.Tracef("sendReq: inbound instance selected")
 	}
 
 	if ci == nil {
@@ -913,7 +913,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		return sch.SchEnoResource
 	}
 
-	log.Debugf("sendReq: connection instance found: inst: %s, dir: %d, peer: %s",
+	log.Tracef("sendReq: connection instance found: inst: %s, dir: %d, peer: %s",
 		ci.name, ci.dir, ci.hsInfo.peer.IP.String())
 
 	if curStat := ci.getStatus(); curStat != CisInService {

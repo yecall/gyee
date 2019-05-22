@@ -780,7 +780,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		}
 	}
 
-	log.Debugf("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
+	log.Tracef("DhtGetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
 		log.Debugf("DhtGetValue: timeout, sdl: %s, key: %x", sdl, key)
@@ -802,7 +802,7 @@ func (yeShMgr *YeShellManager) DhtGetValue(key []byte) ([]byte, error) {
 		return nil, YesEnoEmptyVal
 	}
 
-	log.Debugf("DhtGetValue: ok, sdl: %s, key: %x", sdl, key)
+	log.Tracef("DhtGetValue: ok, sdl: %s, key: %x", sdl, key)
 
 	if _gvStatistics {
 		_gvStat(true)
@@ -884,7 +884,7 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 		return YesEnoScheduler
 	}
 
-	log.Debugf("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
+	log.Tracef("DhtSetValue: pending, sdl: %s, key: %x", sdl, key)
 	result, ok := <-ch
 	if !ok {
 		log.Debugf("DhtSetValue: timeout, sdl: %s, key: %x", sdl, key)
@@ -894,7 +894,7 @@ func (yeShMgr *YeShellManager) DhtSetValue(key []byte, value []byte) error {
 		log.Debugf("DhtSetValue: dht failed, sdl: %s, key: %x", sdl, key)
 		return YesEnoDhtInteral
 	}
-	log.Debugf("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
+	log.Tracef("DhtSetValue: ok, sdl: %s, key: %x", sdl, key)
 	return nil
 }
 
@@ -1125,7 +1125,7 @@ func (yeShMgr *YeShellManager) dhtEvProc() {
 			eno = sch.SchEnoParameter
 		}
 
-		log.Debugf("evHandler: get out, event: %d", evi.Evt)
+		log.Tracef("evHandler: get out, event: %d", evi.Evt)
 
 		return eno
 	}
@@ -1151,31 +1151,31 @@ func (yeShMgr *YeShellManager) dhtCsProc() {
 		switch csi.Status {
 
 		case dht.CisNull:
-			log.Debugf("dhtCsProc: CisNull, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisNull, peer: %x", *csi.Peer)
 
 		case dht.CisConnecting:
-			log.Debugf("dhtCsProc: CisConnecting, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisConnecting, peer: %x", *csi.Peer)
 
 		case dht.CisConnected:
-			log.Debugf("dhtCsProc: CisConnected, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisConnected, peer: %x", *csi.Peer)
 
 		case dht.CisAccepted:
-			log.Debugf("dhtCsProc: CisAccepted, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisAccepted, peer: %x", *csi.Peer)
 
 		case dht.CisInHandshaking:
-			log.Debugf("dhtCsProc: CisInHandshaking, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisInHandshaking, peer: %x", *csi.Peer)
 
 		case dht.CisHandshook:
-			log.Debugf("dhtCsProc: CisHandshook, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisHandshook, peer: %x", *csi.Peer)
 
 		case dht.CisInService:
-			log.Debugf("dhtCsProc: CisInService, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisInService, peer: %x", *csi.Peer)
 
 		case dht.CisOutOfService:
-			log.Debugf("dhtCsProc: CisOutOfService, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisOutOfService, peer: %x", *csi.Peer)
 
 		case dht.CisClosed:
-			log.Debugf("dhtCsProc: CisClosed, peer: %x", *csi.Peer)
+			log.Tracef("dhtCsProc: CisClosed, peer: %x", *csi.Peer)
 
 		default:
 			log.Debugf("dhtCsProc: invalid connection status: %d", csi.Status)
@@ -1290,7 +1290,7 @@ _rxLoop:
 			}
 
 
-			log.Debugf("chainRxProc: from chainRxChan, " +
+			log.Tracef("chainRxProc: from chainRxChan, " +
 				"sdl: %s, pid: %d, mid: %d, key: %x",
 				yeShMgr.chainSdlName, pkg.ProtoId, pkg.MsgId, pkg.Key)
 
@@ -1317,7 +1317,7 @@ _rxLoop:
 				k := [yesKeyBytes]byte{}
 				copy(k[0:], pkg.Key)
 				if dup, old := yeShMgr.checkDupKey(k); dup {
-					log.Debugf("chainRxProc: duplicated, " +
+					log.Tracef("chainRxProc: duplicated, " +
 						"sdl: %s, delta: %f, key: %x, data: %x, old: %x",
 						yeShMgr.chainSdlName, time.Now().Sub(old.stamp).Seconds(), k, pkg.Payload, old)
 					dupCount++
@@ -1468,7 +1468,7 @@ _pvpLoop:
 			if len(key) != yesKeyBytes {
 				log.Warnf("dhtPutValProc: invalid key, sdl: %s")
 			} else {
-				log.Debugf("dhtPutValProc: got from channel, sdl: %s, eno: %d, key: %x",
+				log.Tracef("dhtPutValProc: got from channel, sdl: %s, eno: %d, key: %x",
 					sdl, result.eno, result.key)
 				copy(yk[0:], key)
 				yeShMgr.putValLock.Lock()
@@ -1674,7 +1674,7 @@ func (yeShMgr *YeShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProvide
 
 func (yeShMgr *YeShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
 	sdl := yeShMgr.dhtSdlName
-	log.Debugf("dhtMgrPutValueLocalRsp: sdl: %s, msg: %+v", sdl, *msg)
+	log.Tracef("dhtMgrPutValueLocalRsp: sdl: %s, msg: %+v", sdl, *msg)
 	pvr := putValueResult {
 		eno: msg.Eno,
 		key: msg.Key,
@@ -1687,20 +1687,19 @@ func (yeShMgr *YeShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) 
 	// see function dhtMgrPutValueLocalRsp for more please, an event EvDhtMgrPutValueLocalRsp should
 	// had received before this EvDhtMgrPutValueRsp.
 	sdl := yeShMgr.dhtSdlName
-	log.Debugf("dhtMgrPutValueRsp: sdl: %s, eno: %d, key: %x, peers: %d",
+	log.Tracef("dhtMgrPutValueRsp: sdl: %s, eno: %d, key: %x, peers: %d",
 		sdl, msg.Eno, msg.Key, len(msg.Peers))
 	return sch.SchEnoNone
 }
 
 func (yeShMgr *YeShellManager) dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
-	log.Debugf("dhtMgrGetValueRsp: msg: %+v", *msg)
+	log.Tracef("dhtMgrGetValueRsp: msg: %+v", *msg)
 	gvr := getValueResult{
 		eno: msg.Eno,
 		key: msg.Key,
 		value: msg.Val,
 	}
 	yeShMgr.getValChan<-&gvr
-
 	return sch.SchEnoNone
 }
 
@@ -1958,7 +1957,7 @@ func (yeShMgr *YeShellManager) deDupTimerCb(el *list.Element, data interface{}) 
 		return errors.New("deDupTimerCb: not found")
 	} else {
 		delta := time.Now().Sub(dmv.stamp).Seconds()
-		log.Debugf("deDupTimerCb: found, sdl: %s, delta: %f, key: %x",
+		log.Tracef("deDupTimerCb: found, sdl: %s, delta: %f, key: %x",
 			yeShMgr.chainSdlName, delta, *key)
 		delete(yeShMgr.deDupMap, *key)
 		return nil
@@ -1975,7 +1974,7 @@ func (yeShMgr *YeShellManager) setDedupTimer(key yesKey, data []byte) error {
 		return errors.New(fmt.Sprintf("setDedupTimer: invalid key length: %d", len(key)))
 	}
 
-	log.Debugf("setDedupTimer: sdl: %s, dur(s): %f", yeShMgr.chainSdlName, thisCfg.DedupTime.Seconds())
+	log.Tracef("setDedupTimer: sdl: %s, dur(s): %f", yeShMgr.chainSdlName, thisCfg.DedupTime.Seconds())
 	tm, err := yeShMgr.tmDedup.GetTimer(thisCfg.DedupTime, nil, yeShMgr.deDupTimerCb)
 	if err != dht.TmEnoNone {
 		log.Errorf("setDedupTimer: GetTimer failed, error: %s", err.Error())

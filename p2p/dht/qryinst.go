@@ -177,7 +177,7 @@ func (qryInst *QryInst) powerOn(ptn interface{}) sch.SchErrno {
 // Power off handler
 //
 func (qryInst *QryInst) powerOff(ptn interface{}) sch.SchErrno {
-	log.Debugf("powerOff: task will be done, " +
+	log.Tracef("powerOff: task will be done, " +
 		"sdl: %s, inst: %s",
 		qryInst.icb.sdlName, qryInst.icb.name)
 	return qryInst.icb.sdl.SchTaskDone(qryInst.icb.ptnInst, qryInst.icb.name, sch.SchEnoKilled)
@@ -196,7 +196,7 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("startReq: ask connection manager for peer, " +
+	log.Tracef("startReq: ask connection manager for peer, " +
 		"sdl: %s, inst: %s, ForWhat: %d",
 		icb.sdlName, icb.name, icb.qryReq.ForWhat)
 
@@ -383,7 +383,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	icb := qryInst.icb
 	sdl := icb.sdl
 
-	log.Debugf("connectRsp: " +
+	log.Tracef("connectRsp: " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -450,7 +450,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("connectRsp: setupQryPkg ok, " +
+	log.Tracef("connectRsp: setupQryPkg ok, " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -521,7 +521,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 			return eno
 		}
 
-		log.Debugf("connectRsp: send EvDhtConMgrSendReq ok, " +
+		log.Tracef("connectRsp: send EvDhtConMgrSendReq ok, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
 
@@ -750,12 +750,12 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 //
 func (qryInst *QryInst) conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
 	if msg == nil {
-		log.Debugf("conInstTxInd： invalid parameter, " +
+		log.Tracef("conInstTxInd: invalid parameter, " +
 			"sdl: %s, inst: %s",
 			qryInst.icb.sdlName, qryInst.icb.name)
 		return sch.SchEnoParameter
 	}
-	log.Debugf("conInstTxInd：" +
+	log.Tracef("conInstTxInd: " +
 		"sdl: %s, inst: %s, msg: %+v",
 		qryInst.icb.sdlName, qryInst.icb.name, *msg)
 	return sch.SchEnoNone

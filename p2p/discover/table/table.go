@@ -2110,7 +2110,7 @@ func (tabMgr *TableManager) tabBucketAddNode(n *um.Node, lastQuery *time.Time, l
 		return TabMgrEnoParameter
 	}
 
-	log.Debugf("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
+	log.Tracef("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
 
 	if lastPong == nil {
 		var veryOld = time.Time{}
@@ -2382,7 +2382,7 @@ func (tabMgr *TableManager) tabActiveBoundInst() TabMgrErrno {
 				NodeId: pn.ID,
 			}
 			if eno := tabMgr.tabDiscoverResp(&umNode); eno != TabMgrEnoNone {
-				log.Debugf("tabActiveBoundInst: tabDiscoverResp failed, eno: %d", eno)
+				log.Tracef("tabActiveBoundInst: tabDiscoverResp failed, eno: %d", eno)
 			}
 			continue
 		}

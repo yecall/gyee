@@ -574,7 +574,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 		log.Errorf("rutMgrNearestRsp: invalid parameters")
 		return sch.SchEnoParameter
 	}
-	log.Debugf("rutMgrNearestRsp: msg: %+v", msg)
+	log.Tracef("rutMgrNearestRsp: msg: %+v", msg)
 
 	var dhtMsg = DhtMessage{
 		Mid: MID_UNKNOWN,
@@ -687,7 +687,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 		return DhtEnoMismatched
 	}
 
-	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
+	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0x3ff == 0 {
 		log.Debugf("txPutPending: trySendingCnt: %d, peer: %s:%d",
 			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 	}
@@ -714,7 +714,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	conInst.txChan <- pkg
 
-	log.Debugf("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
+	log.Tracef("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
 		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
 	return DhtEnoNone
@@ -1391,7 +1391,7 @@ _txLoop:
 			break _txLoop
 		}
 
-		if conInst.txPkgCnt++; conInst.txPkgCnt & 0xff == 0 {
+		if conInst.txPkgCnt++; conInst.txPkgCnt & 0x3ff == 0 {
 			log.Debugf("txProc: sdl: %s, inst: %s, dir: %d, txPkgCnt: %d",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.txPkgCnt)
 		}
@@ -1499,7 +1499,7 @@ _rxLoop:
 			break _rxLoop
 		}
 
-		if conInst.rxPkgCnt++; conInst.rxPkgCnt & 0xff == 0 {
+		if conInst.rxPkgCnt++; conInst.rxPkgCnt & 0x3ff == 0 {
 			log.Debugf("rxProc: sdl: %s, inst: %s, dir: %d, rxPkgCnt: %d",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.rxPkgCnt)
 		}
@@ -1609,93 +1609,93 @@ func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_HANDSHAKE:
 
-		log.Debugf("dispatch: MID_HANDSHAKE is not supported now")
+		log.Tracef("dispatch: MID_HANDSHAKE is not supported now")
 		eno = DhtEnoProtocol
 
 	case MID_FINDNODE:
 
-		log.Debugf("dispatch: MID_FINDNODE, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_FINDNODE, inst: %s", conInst.name)
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
 
-		log.Debugf("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
 		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
 		eno = conInst.getValueReq(msg.GetValueReq)
 
 	case MID_GETVALUE_RSP:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
 		eno = conInst.putProvider(msg.PutProvider)
 
 	case MID_GETPROVIDER_REQ:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
 
-		log.Debugf("dispatch: MID_PING, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PING, inst: %s", conInst.name)
 		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
 
-		log.Debugf("dispatch: MID_PONG, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PONG, inst: %s", conInst.name)
 		eno = conInst.getPong(msg.Pong)
 
 	default:
@@ -1872,7 +1872,7 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 		close(txPkg.responsed)
 	}
 
-	log.Debugf("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
+	log.Tracef("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 	if txPkg.responsed != nil && txPkg.txTid != nil {
 		conInst.txDtm.delTimer(txPkg.txTid)
 		txPkg.txTid = nil

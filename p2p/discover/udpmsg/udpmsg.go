@@ -908,29 +908,29 @@ func (neighbors *Neighbors) String() string {
 func (pum *UdpMsg) DebugMessageFromPeer() {
 	switch pum.typ {
 	case UdpMsgTypePing:
-		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
+		log.Tracef("DebugMessageFromPeer: %s", pum.pum.(*Ping).String())
 	case UdpMsgTypePong:
-		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
+		log.Tracef("DebugMessageFromPeer: %s", pum.pum.(*Pong).String())
 	case UdpMsgTypeFindNode:
-		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
+		log.Tracef("DebugMessageFromPeer: %s", pum.pum.(*FindNode).String())
 	case UdpMsgTypeNeighbors:
-		log.Debugf("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
+		log.Tracef("DebugMessageFromPeer: %s", pum.pum.(*Neighbors).String())
 	default:
-		log.Debugf("DebugMessageFromPeer: invalid message type: %d", pum.typ)
+		log.Tracef("DebugMessageFromPeer: invalid message type: %d", pum.typ)
 	}
 }
 
 func (pum *UdpMsg) DebugMessageToPeer() {
 	switch pum.typ {
 	case UdpMsgTypePing:
-		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
+		log.Tracef("DebugMessageToPeer: %s", pum.pum.(*Ping).String())
 	case UdpMsgTypePong:
-		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
+		log.Tracef("DebugMessageToPeer: %s", pum.pum.(*Pong).String())
 	case UdpMsgTypeFindNode:
-		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
+		log.Tracef("DebugMessageToPeer: %s", pum.pum.(*FindNode).String())
 	case UdpMsgTypeNeighbors:
-		log.Debugf("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
+		log.Tracef("DebugMessageToPeer: %s", pum.pum.(*Neighbors).String())
 	default:
-		log.Debugf("DebugMessageToPeer: invalid message type: %d", pum.typ)
+		log.Tracef("DebugMessageToPeer: invalid message type: %d", pum.typ)
 	}
 }

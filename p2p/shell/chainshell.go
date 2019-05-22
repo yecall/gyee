@@ -320,7 +320,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 					continue
 				}
 
-				log.Debugf("peerActiveInd: rxProc, from rxChan, " +
+				log.Tracef("peerActiveInd: rxProc, from rxChan, " +
 					"sdl: %s, peer: %s, mid: %d, key: %x",
 					shMgr.sdlName, peerInfo.IP.String(), rxPkg.MsgId, rxPkg.Key)
 
@@ -380,7 +380,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					if skm == SKM_OK {
 
-						log.Debugf("peerActiveInd: rxProc, to shMgr.rxChan, " +
+						log.Tracef("peerActiveInd: rxProc, to shMgr.rxChan, " +
 							"sdl: %s, key: %x",
 							shMgr.sdlName, k)
 
@@ -390,7 +390,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					} else if skm == SKM_DUPLICATED {
 
-						log.Debugf("peerActiveInd: rxProc: duplicated, " +
+						log.Tracef("peerActiveInd: rxProc: duplicated, " +
 							"sdl: %s, key: %x",
 							shMgr.sdlName,k)
 						stat.skmFailedCount++
@@ -572,7 +572,7 @@ func (shMgr *ShellManager) broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchEr
 						} else {
 							sendFailed++
 						}
-						log.Debugf("broadcastReq: send2Peer result, " +
+						log.Tracef("broadcastReq: send2Peer result, " +
 							"sdl: %s, eno: %d, key: %x",
 							shMgr.sdlName, eno, key)
 					} else {
@@ -582,12 +582,12 @@ func (shMgr *ShellManager) broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchEr
 						} else {
 							chkkFailed++
 						}
-						log.Debugf("broadcastReq: checkKey result, " +
+						log.Tracef("broadcastReq: checkKey result, " +
 							"sdl: %s, eno: %d, key: %x",
 							shMgr.sdlName, eno, key)
 					}
 			} else {
-				log.Debugf("broadcastReq: excluded, " +
+				log.Tracef("broadcastReq: excluded, " +
 					"sdl: %s, key: %x",
 					shMgr.sdlName, key)
 				exclude++
@@ -718,7 +718,7 @@ func (shMgr *ShellManager) checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("checkKeyFromPeer: %s", msg.Chkk.String())
+	log.Tracef("checkKeyFromPeer: %s", msg.Chkk.String())
 
 	key := config.DsKey{}
 	copy(key[0:], rxPkg.Key)
@@ -777,7 +777,7 @@ func (shMgr *ShellManager) reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchEr
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("reportKeyFromPeer: %s", msg.Rptk.String())
+	log.Tracef("reportKeyFromPeer: %s", msg.Rptk.String())
 
 	spid := shellPeerID{
 		snid:   rxPkg.PeerInfo.Snid,
@@ -858,20 +858,15 @@ func (shMgr *ShellManager) deDupTimerCb(el *list.Element, data interface{}) inte
 		log.Errorf("deDupTimerCb: invalid timer data, sdl: %s", shMgr.sdlName)
 		return errors.New("deDupTimerCb: invalid data")
 	}
-
-	if ddv, ok := shMgr.deDupMap[*ddk]; ok {
-
-		log.Debugf("deDupTimerCb: sdl: %s, ddk: %+v",
+	if _, ok := shMgr.deDupMap[*ddk]; ok {
+		log.Tracef("deDupTimerCb: sdl: %s, key: %x, peer: %x",
 			shMgr.sdlName, ddk.key, ddk.peer)
-
-		shMgr.tmDedup.KillTimer(ddv.timer)
 		delete(shMgr.deDupMap, *ddk)
 		return nil
 	}
-
 	return errors.New(fmt.Sprintf("deDupTimerCb: not found, " +
-		"sdl: %s, ddk: %+v",
-		shMgr.sdlName, *ddk))
+		"sdl: %s, key: %x, peer: %x",
+		shMgr.sdlName, ddk.key, ddk.peer))
 }
 
 func (shMgr *ShellManager) checkKey2Peer(spi *shellPeerInst, ddk *deDupKey) error {
@@ -904,7 +899,6 @@ func (shMgr *ShellManager) checkKey2Peer(spi *shellPeerInst, ddk *deDupKey) erro
 }
 
 func (shMgr *ShellManager) reportKey2Peer(spi *shellPeerInst, key *config.DsKey, status int32) error {
-
 	if len(spi.txChan) >= cap(spi.txChan) {
 		log.Debugf("reportKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.hsInfo.Snid, spi.hsInfo.Dir, spi.hsInfo.NodeId)

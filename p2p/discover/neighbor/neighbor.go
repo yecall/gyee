@@ -968,16 +968,13 @@ func (ngbMgr *NeighborManager) setupConfig() sch.SchErrno {
 }
 
 func (ngbMgr *NeighborManager) checkDestNode(dst *um.Node, snid config.SubNetworkID) bool {
-	if snid == config.AnySubNet {
-		return true
-	}
-
-	if ngbMgr.bootstrap && ngbMgr.cfg.ID == dst.NodeId {
+	if ngbMgr.bootstrap {
+		return ngbMgr.cfg.ID == dst.NodeId
+	} else if snid == config.AnySubNet {
 		return true
 	} else if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
 		return me.ID == dst.NodeId
 	}
-
 	return false
 }
 

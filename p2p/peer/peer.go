@@ -270,7 +270,7 @@ func (peMgr *PeerManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessag
 
 func (peMgr *PeerManager) peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	log.Debugf("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
+	log.Tracef("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
 	if peMgr.msgFilter(msg) != PeMgrEnoNone {
 		log.Debugf("peerMgrProc: filtered out, id: %d", msg.Id)
@@ -346,7 +346,7 @@ func (peMgr *PeerManager) peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 		eno = PeMgrEnoParameter
 	}
 
-	log.Debugf("peerMgrProc: get out, name: %s, msg.Id: %d", peMgr.name, msg.Id)
+	log.Tracef("peerMgrProc: get out, name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
 	if eno != PeMgrEnoNone {
 		schEno = sch.SchEnoUserTask
@@ -882,7 +882,7 @@ func (peMgr *PeerManager) peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrEr
 		if tmPeers, exist := peMgr.tmLastOCR[*snid]; exist {
 			if t, ok := tmPeers[n.ID]; ok {
 				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
-					log.Debugf("peMgrDynamicSubNetOutbound: too early, " +
+					log.Tracef("peMgrDynamicSubNetOutbound: too early, " +
 						"snid: %x, peer: %x", *snid, n.IP.String())
 					continue
 				}
@@ -1768,7 +1768,7 @@ func (peMgr *PeerManager) peMgrCreateOutboundInst(snid *config.SubNetworkID, nod
 		UserDa: peInst,
 	}
 
-	log.Debugf("peMgrCreateOutboundInst: inst: %s, snid: %x, peer: %s",
+	log.Tracef("peMgrCreateOutboundInst: inst: %s, snid: %x, peer: %s",
 		peInst.name, *snid, node.IP.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc); eno != sch.SchEnoNone || ptnInst == nil {
@@ -1828,7 +1828,7 @@ func (peMgr *PeerManager) peMgrKillInst(kip *kiParameters, why interface{}) PeMg
 	dir := kip.dir
 	why = why.(string)
 
-	log.Debugf("peMgrKillInst: inst: %s, dir: %d, state: %d, why: %s",
+	log.Tracef("peMgrKillInst: inst: %s, dir: %d, state: %d, why: %s",
 		kip.name, kip.dir, kip.state, why)
 
 	if why == PKI_FOR_FAILED_INST_CFM {
@@ -1963,7 +1963,7 @@ func (peMgr *PeerManager) peMgrCatHandler(msg interface{}) PeMgrErrno {
 	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvDcvFindNodeRsp, &r)
 	peMgr.sdl.SchSendMessage(&schMsg)
-	log.Debugf("peMgrCatHandler: EvDcvFindNodeRsp sent, peer: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
+	log.Tracef("peMgrCatHandler: EvDcvFindNodeRsp sent, peer: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
 	return PeMgrEnoNone
 }
 
@@ -2393,7 +2393,7 @@ func (pi *PeerInstance) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage)
 
 func (pi *PeerInstance) peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	log.Debugf("peerInstProc: inst: %s, msg.Id: %d", pi.name, msg.Id)
+	log.Tracef("peerInstProc: inst: %s, msg.Id: %d", pi.name, msg.Id)
 
 	var eno PeMgrErrno
 
@@ -2430,7 +2430,7 @@ func (pi *PeerInstance) peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = PeMgrEnoParameter
 	}
 
-	log.Debugf("peerInstProc: get out, inst: %s, msg.Id: %d", pi.name, msg.Id)
+	log.Tracef("peerInstProc: get out, inst: %s, msg.Id: %d", pi.name, msg.Id)
 
 	if eno != PeMgrEnoNone {
 		return sch.SchEnoUserTask
@@ -2476,7 +2476,7 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 		eno  PeMgrErrno = PeMgrEnoNone
 	)
 
-	log.Debugf("piConnOutReq: outbound inst: %s, snid: %x, try to dial target: %s",
+	log.Tracef("piConnOutReq: outbound inst: %s, snid: %x, try to dial target: %s",
 		pi.name, pi.snid, addr.String())
 
 	pi.dialer.Timeout = pi.cto
@@ -2491,7 +2491,7 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 		pi.raddr = conn.RemoteAddr().(*net.TCPAddr)
 		pi.state = peInstStateConnected
 
-		log.Debugf("piConnOutReq: dial ok, laddr: %s, raddr: %s",
+		log.Tracef("piConnOutReq: dial ok, laddr: %s, raddr: %s",
 			pi.laddr.String(),
 			pi.raddr.String())
 	}
@@ -2516,7 +2516,7 @@ func (pi *PeerInstance) piHandshakeReq(_ interface{}) PeMgrErrno {
 		return PeMgrEnoInternal
 	}
 
-	log.Debugf("piHandshakeReq: inst: %s, dir: %d", pi.name, pi.dir)
+	log.Tracef("piHandshakeReq: inst: %s, dir: %d", pi.name, pi.dir)
 
 	if pi.state != peInstStateConnected && pi.state != peInstStateAccepted {
 		log.Debugf("piHandshakeReq: instance mismatched, inst: %s, dir: %d, state: %d",
@@ -2538,7 +2538,7 @@ func (pi *PeerInstance) piHandshakeReq(_ interface{}) PeMgrErrno {
 		return PeMgrEnoInternal
 	}
 
-	log.Debugf("piHandshakeReq: inst: %s, snid: %x, dir: %d, result: %d, laddr: %s, raddr: %s",
+	log.Tracef("piHandshakeReq: inst: %s, snid: %x, dir: %d, result: %d, laddr: %s, raddr: %s",
 		pi.name,
 		pi.snid,
 		pi.dir,
@@ -2641,7 +2641,7 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 	}
 	cfmCh := *msg.(*chan int)
 
-	log.Debugf("piEstablishedInd: enter, inst: %s, snid: %x, dir: %d, state: %d",
+	log.Tracef("piEstablishedInd: enter, inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
 
 	if schEno, tid = pi.sdl.SchSetTimer(pi.ptnMe, &tmDesc); schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
@@ -2671,7 +2671,7 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 	pi.rxtxRuning = true
 	cfmCh <- PeMgrEnoNone
 
-	log.Debugf("piEstablishedInd: exit, inst: %s, snid: %x, dir: %d, state: %d",
+	log.Tracef("piEstablishedInd: exit, inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
 
 	return PeMgrEnoNone
@@ -2740,7 +2740,7 @@ func (pi *PeerInstance) piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 		return eno
 	}
 
-	log.Debugf("piHandshakeInbound: snid: %x, peer: %s, hs: %+v",
+	log.Tracef("piHandshakeInbound: snid: %x, peer: %s, hs: %+v",
 		hs.Snid, hs.IP.String(), *hs)
 
 	if pi.checkHandshakeInfo(hs) != true {
@@ -3030,7 +3030,7 @@ _txLoop:
 
 			if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
 
-				log.Debugf("piTx: SendPackage ok, " +
+				log.Tracef("piTx: SendPackage ok, " +
 					"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, " +
 					"key: %x",
 					pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq,
@@ -3216,7 +3216,7 @@ _rxLoop:
 
 			} else {
 
-				log.Debugf("piRx: put into channel, " +
+				log.Tracef("piRx: put into channel, " +
 					"sdl: %s, inst: %s, snid: %x, dir: %d, key: %x",
 					pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Key)
 

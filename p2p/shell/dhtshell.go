@@ -198,57 +198,57 @@ func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchEr
 }
 
 func (shMgr *DhtShellManager) dhtBlindConnectRsp(msg *sch.MsgDhtBlindConnectRsp) sch.SchErrno {
-	log.Debugf("dhtBlindConnectRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtBlindConnectRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtMgrFindPeerRsp(msg *sch.MsgDhtQryMgrQueryResultInd) sch.SchErrno {
-	log.Debugf("dhtMgrFindPeerRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtMgrFindPeerRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtQryMgrQueryStartRsp(msg *sch.MsgDhtQryMgrQueryStartRsp) sch.SchErrno {
-	log.Debugf("dhtQryMgrQueryStartRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtQryMgrQueryStartRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtQryMgrQueryStopRsp(msg *sch.MsgDhtQryMgrQueryStopRsp) sch.SchErrno {
-	log.Debugf("dhtQryMgrQueryStopRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtQryMgrQueryStopRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtConMgrSendCfm(msg *sch.MsgDhtConMgrSendCfm) sch.SchErrno {
-	log.Debugf("dhtConMgrSendCfm: eno: %d", msg.Eno)
+	log.Tracef("dhtConMgrSendCfm: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtMgrPutProviderRsp(msg *sch.MsgDhtPrdMgrAddProviderRsp) sch.SchErrno {
-	log.Debugf("dhtMgrPutProviderRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtMgrPutProviderRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtMgrGetProviderRsp(msg *sch.MsgDhtMgrGetProviderRsp) sch.SchErrno {
-	log.Debugf("dhtMgrGetProviderRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtMgrGetProviderRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager)dhtMgrPutValueLocalRsp(msg *sch.MsgDhtMgrPutValueLocalRsp) sch.SchErrno {
-	log.Debugf("dhtMgrPutValueLocalRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtMgrPutValueLocalRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtMgrPutValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
-	log.Debugf("dhtMgrPutValueRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtMgrPutValueRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtMgrGetValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
-	log.Debugf("dhtMgrGetValueRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtMgrGetValueRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
 func (shMgr *DhtShellManager) dhtConMgrCloseRsp(msg *sch.MsgDhtConMgrCloseRsp) sch.SchErrno {
-	log.Debugf("dhtConMgrCloseRsp: eno: %d", msg.Eno)
+	log.Tracef("dhtConMgrCloseRsp: eno: %d", msg.Eno)
 	return sch.SchEnoNone
 }
 
@@ -257,31 +257,31 @@ func (shMgr *DhtShellManager) dhtConInstStatusInd(msg *sch.MsgDhtConInstStatusIn
 	switch msg.Status {
 
 	case dht.CisNull:
-		log.Debugf("dhtConInstStatusInd: CisNull")
+		log.Tracef("dhtConInstStatusInd: CisNull")
 
 	case dht.CisConnecting:
-		log.Debugf("dhtConInstStatusInd: CisConnecting")
+		log.Tracef("dhtConInstStatusInd: CisConnecting")
 
 	case dht.CisConnected:
-		log.Debugf("dhtConInstStatusInd: CisConnected")
+		log.Tracef("dhtConInstStatusInd: CisConnected")
 
 	case dht.CisAccepted:
-		log.Debugf("dhtTestConInstStatusInd: CisAccepted")
+		log.Tracef("dhtTestConInstStatusInd: CisAccepted")
 
 	case dht.CisInHandshaking:
-		log.Debugf("dhtTestConInstStatusInd: CisInHandshaking")
+		log.Tracef("dhtTestConInstStatusInd: CisInHandshaking")
 
 	case dht.CisHandshook:
-		log.Debugf("dhtTestConInstStatusInd: CisHandshook")
+		log.Tracef("dhtTestConInstStatusInd: CisHandshook")
 
 	case dht.CisInService:
-		log.Debugf("dhtTestConInstStatusInd: CisInService")
+		log.Tracef("dhtTestConInstStatusInd: CisInService")
 
 	case dht.CisOutOfService:
-		log.Debugf("dhtTestConInstStatusInd: CisOutOfService")
+		log.Tracef("dhtTestConInstStatusInd: CisOutOfService")
 
 	case dht.CisClosed:
-		log.Debugf("dhtTestConInstStatusInd: CisClosed")
+		log.Tracef("dhtTestConInstStatusInd: CisClosed")
 
 	default:
 		log.Debugf("dhtTestConInstStatusInd: unknown status: %d", msg.Status)
@@ -311,7 +311,6 @@ func (shMgr *DhtShellManager) dhtShBlindConnectReq(req *sch.MsgDhtBlindConnectRe
 }
 
 func (shMgr *DhtShellManager) dhtShGetValueReq(req *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	log.Debugf("dhtShGetValueReq: going to dispath EvDhtMgrGetValueReq")
 	msg := sch.SchMessage{}
 	shMgr.sdl.SchMakeMessage(&msg, shMgr.ptnMe, shMgr.ptnDhtMgr, sch.EvDhtMgrGetValueReq, req)
 	if eno := shMgr.sdl.SchSendMessage(&msg); eno != sch.SchEnoNone {

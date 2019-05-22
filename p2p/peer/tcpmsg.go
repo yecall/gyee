@@ -940,5 +940,5 @@ func (pcd *PutChainData) String() string {
 }
 
 func (upkg *P2pPackage) DebugPeerPackage() {
-	log.Debugf("DebugPeerPackage: %s", upkg.String())
+	log.Tracef("DebugPeerPackage: %s", upkg.String())
 }

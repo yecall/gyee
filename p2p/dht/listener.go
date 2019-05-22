@@ -301,7 +301,7 @@ func (lsnMgr *LsnMgr) driveSelf() sch.SchErrno {
 	//
 
 	log.Debugf("driveSelf: " +
-		"listener:[%s:%d], try accept again ...",
+		"listener:[%s:%d], try accept again...",
 		lsnMgr.config.ip.String(), lsnMgr.config.port)
 
 	lsnMgr.listener.(*net.TCPListener).SetDeadline(time.Now().Add(lmAcceptTimeout))

@@ -403,8 +403,7 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 	udpReader.udpMsg.DebugMessageFromPeer()
 	msg := sch.SchMessage{}
 	udpReader.sdl.SchMakeMessage(&msg, udpReader.ptnMe, udpReader.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
-	udpReader.sdl.SchSendMessage(&msg)
-	return sch.SchEnoNone
+	return udpReader.sdl.SchSendMessage(&msg)
 }
 
 func (lsnMgr *ListenerManager) sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {

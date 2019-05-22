@@ -267,47 +267,47 @@ func (dhtPkg *DhtPackage) GetMessage(dhtMsg *DhtMessage) DhtErrno {
 	switch mid {
 
 	case pb.DhtMessage_MID_HANDSHAKE:
-		log.Debugf("GetMessage: DhtMessage_MID_HANDSHAKE")
+		log.Tracef("GetMessage: DhtMessage_MID_HANDSHAKE")
 		eno = dhtMsg.GetHandshakeMessage(pbMsg.Handshake)
 
 	case pb.DhtMessage_MID_FINDNODE:
-		log.Debugf("GetMessage: DhtMessage_MID_FINDNODE")
+		log.Tracef("GetMessage: DhtMessage_MID_FINDNODE")
 		eno = dhtMsg.GetFindNodeMessage(pbMsg.FindNode)
 
 	case pb.DhtMessage_MID_NEIGHBORS:
-		log.Debugf("GetMessage: DhtMessage_MID_NEIGHBORS")
+		log.Tracef("GetMessage: DhtMessage_MID_NEIGHBORS")
 		eno = dhtMsg.GetNeighborsMessage(pbMsg.Neighbors)
 
 	case pb.DhtMessage_MID_PUTVALUE:
-		log.Debugf("GetMessage: DhtMessage_MID_PUTVALUE")
+		log.Tracef("GetMessage: DhtMessage_MID_PUTVALUE")
 		eno = dhtMsg.GetPutValueMessage(pbMsg.PutValue)
 
 	case pb.DhtMessage_MID_GETVALUE_REQ:
-		log.Debugf("GetMessage: DhtMessage_MID_GETVALUE_REQ")
+		log.Tracef("GetMessage: DhtMessage_MID_GETVALUE_REQ")
 		eno = dhtMsg.GetGetValueReqMessage(pbMsg.GetValueReq)
 
 	case pb.DhtMessage_MID_GETVALUE_RSP:
-		log.Debugf("GetMessage: DhtMessage_MID_GETVALUE_RSP")
+		log.Tracef("GetMessage: DhtMessage_MID_GETVALUE_RSP")
 		eno = dhtMsg.GetGetValueRspMessage(pbMsg.GetValueRsp)
 
 	case pb.DhtMessage_MID_PUTPROVIDER:
-		log.Debugf("GetMessage: DhtMessage_MID_PUTPROVIDER")
+		log.Tracef("GetMessage: DhtMessage_MID_PUTPROVIDER")
 		eno = dhtMsg.GetPutProviderMessage(pbMsg.PutProvider)
 
 	case pb.DhtMessage_MID_GETPROVIDER_REQ:
-		log.Debugf("GetMessage: DhtMessage_MID_GETPROVIDER_REQ")
+		log.Tracef("GetMessage: DhtMessage_MID_GETPROVIDER_REQ")
 		eno = dhtMsg.GetGetProviderReqMessage(pbMsg.GetProviderReq)
 
 	case pb.DhtMessage_MID_GETPROVIDER_RSP:
-		log.Debugf("GetMessage: DhtMessage_MID_GETPROVIDER_RSP")
+		log.Tracef("GetMessage: DhtMessage_MID_GETPROVIDER_RSP")
 		eno = dhtMsg.GetGetProviderRspMessage(pbMsg.GetProviderRsp)
 
 	case pb.DhtMessage_MID_PING:
-		log.Debugf("GetMessage: DhtMessage_MID_PING")
+		log.Tracef("GetMessage: DhtMessage_MID_PING")
 		eno = dhtMsg.GetPingMessage(pbMsg.Ping)
 
 	case pb.DhtMessage_MID_PONG:
-		log.Debugf("GetMessage: DhtMessage_MID_PONG")
+		log.Tracef("GetMessage: DhtMessage_MID_PONG")
 		eno = dhtMsg.GetPongMessage(pbMsg.Pong)
 
 	default:
