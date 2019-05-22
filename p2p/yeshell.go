@@ -1264,7 +1264,7 @@ func (yeShMgr *YeShellManager) chainRxProc() {
 	xxCount := 0
 	subCount := make(map[string]int64, 0)
 	showStat := func() {
-		log.Debugf("chainRxProc: stat, " +
+		log.Infof("chainRxProc: stat, " +
 			"sdl: %s, " +
 			"rxCount:%d, gcdCount:%d, pcdCount:%d, dupCount:%d, " +
 			"txCount:%d, evCount:%d, bhCount:%d, bkCount:%d, xxCount:%d, subCount:%+v",
@@ -1285,7 +1285,7 @@ _rxLoop:
 				break _rxLoop
 			}
 
-			if rxCount++; rxCount & 0x3f == 0 {
+			if rxCount++; rxCount & 0x7f == 0 {
 				showStat()
 			}
 
