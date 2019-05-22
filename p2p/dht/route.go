@@ -229,7 +229,7 @@ func (rutMgr *RutMgr) rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = rutMgr.conMgrBootstrapReq()
 
 	default:
-		log.Warnf("rutMgrProc: unknown message: %d", msg.Id)
+		log.Debugf("rutMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -419,7 +419,7 @@ func (rutMgr *RutMgr) queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sc
 func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
 
 	if tskSender == nil || req == nil {
-		log.Warnf("nearestReq: invalid parameters, sdl: %s, tskSender: %p, req: %p",
+		log.Debugf("nearestReq: invalid parameters, sdl: %s, tskSender: %p, req: %p",
 			rutMgr.sdlName, tskSender, req)
 		return sch.SchEnoParameter
 	}
@@ -436,7 +436,7 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 
 	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
 	if dhtEno != DhtEnoNone {
-		log.Warnf("nearestReq: rutMgrNearest failed, sdl: %s, eno: %d", rutMgr.sdlName, dhtEno)
+		log.Debugf("nearestReq: rutMgrNearest failed, sdl: %s, eno: %d", rutMgr.sdlName, dhtEno)
 		rsp.Eno = int(dhtEno)
 		schMsg := sch.SchMessage{}
 		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)

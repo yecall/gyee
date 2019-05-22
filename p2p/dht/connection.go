@@ -893,7 +893,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	//
 
 	if msg == nil {
-		log.Warnf("sendReq: invalid parameter")
+		log.Debugf("sendReq: invalid parameter")
 		return sch.SchEnoParameter
 	}
 
@@ -909,7 +909,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 	}
 
 	if ci == nil {
-		log.Warnf("sendReq: not found, peer id: %x", msg.Peer.ID)
+		log.Debugf("sendReq: not found, peer id: %x", msg.Peer.ID)
 		return sch.SchEnoResource
 	}
 
@@ -917,7 +917,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		ci.name, ci.dir, ci.hsInfo.peer.IP.String())
 
 	if curStat := ci.getStatus(); curStat != CisInService {
-		log.Warnf("sendReq: can't send in status: %d", curStat)
+		log.Debugf("sendReq: can't send in status: %d", curStat)
 		return sch.SchEnoResource
 	}
 	conMgr.instCache.Add(ci, ci)
@@ -933,7 +933,7 @@ func (conMgr *ConMgr) sendReq(msg *sch.MsgDhtConMgrSendReq) sch.SchErrno {
 		pkg.waitSeq = msg.WaitSeq
 	}
 	if eno := ci.txPutPending(&pkg); eno != DhtEnoNone {
-		log.Warnf("sendReq: txPutPending failed, eno: %d", eno)
+		log.Debugf("sendReq: txPutPending failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 

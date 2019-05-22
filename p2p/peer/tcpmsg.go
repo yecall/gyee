@@ -261,7 +261,7 @@ func (upkg *P2pPackage) getHandshakeInbound(inst *PeerInstance) (*Handshake, PeM
 	}
 
 	if len(pbHS.NodeId) != config.NodeIDBytes {
-		log.Warnf("getHandshakeInbound:" +
+		log.Debugf("getHandshakeInbound:" +
 			"invalid node identity length: %d",
 			len(pbHS.NodeId))
 		return nil, PeMgrEnoMessage

@@ -270,7 +270,7 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 	shMgr.peerLock.Lock()
 	if _, dup := shMgr.peerActived[peerId]; dup {
-		log.Warnf("peerActiveInd: duplicated, peerId: %+v", peerId)
+		log.Debugf("peerActiveInd: duplicated, peerId: %+v", peerId)
 		shMgr.peerLock.Unlock()
 		return sch.SchEnoUserTask
 	}

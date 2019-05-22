@@ -478,7 +478,7 @@ func (qryMgr *QryMgr)dsGvbStartReq(msg *sch.MsgDhtDsGvbStartReq) sch.SchErrno {
 			break
 		}
 		if dhtEno, schEno := qryMgr.gvbStartNext(gvbCb); dhtEno != DhtEnoNone  || schEno != sch.SchEnoNone {
-			log.Warnf("dsGvbStartReq: gvbStartNext failed, sdl: %s, dhtEno: %d, schEno: %d",
+			log.Debugf("dsGvbStartReq: gvbStartNext failed, sdl: %s, dhtEno: %d, schEno: %d",
 				qryMgr.sdlName, dhtEno, schEno)
 		}
 	}
@@ -496,17 +496,17 @@ func (qryMgr *QryMgr)dsGvbStopReq(msg *sch.MsgDhtDsGvbStopReq) sch.SchErrno {
 
 	gvbCb, ok := qryMgr.gvbTab[msg.GvbId]
 	if !ok {
-		log.Warnf("dsGvbStopReq: not found, sdl: %s, id: %d", qryMgr.sdlName, msg.GvbId)
+		log.Debugf("dsGvbStopReq: not found, sdl: %s, id: %d", qryMgr.sdlName, msg.GvbId)
 		return sch.SchEnoNotFound
 	}
 	if gvbCb.status != sch.GVBS_WORKING {
-		log.Warnf("dsGvbStopReq: mismatched, sdl: %s, id: %d, status: %s",
+		log.Debugf("dsGvbStopReq: mismatched, sdl: %s, id: %d, status: %s",
 			qryMgr.sdlName, msg.GvbId, gvbCb.status)
 		return sch.SchEnoMismatched
 	}
 	for key := range gvbCb.pending {
 		if eno := qryMgr.qryMgrDelQcb(delQcb4Command, key); eno != DhtEnoNone {
-			log.Warnf("dsGvbStopReq: qryMgrDelQcb failed, sdl: %s, id: %d, eno: %d, key: %x",
+			log.Debugf("dsGvbStopReq: qryMgrDelQcb failed, sdl: %s, id: %d, eno: %d, key: %x",
 				qryMgr.sdlName, gvbCb.gvbId, eno, key)
 		}
 		delete(gvbCb.pending, key)
@@ -527,7 +527,7 @@ func (qryMgr *QryMgr) rutNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchErrn
 		msg.ForWhat != MID_FINDNODE &&
 		msg.ForWhat != MID_GETPROVIDER_REQ &&
 		msg.ForWhat != MID_GETVALUE_REQ {
-		log.Warnf("rutNearestRsp: unknown what's for, sdl: %s, forWhat: %d, target: %x",
+		log.Debugf("rutNearestRsp: unknown what's for, sdl: %s, forWhat: %d, target: %x",
 			qryMgr.sdlName, msg.ForWhat, msg.Target)
 		return sch.SchEnoMismatched
 	}
@@ -1124,7 +1124,7 @@ func (qryMgr *QryMgr) natMakeMapRsp(msg *sch.SchMessage) sch.SchErrno {
 		return qryMgr.sdl.SchSendMessage(msg)
 	}
 
-	log.Warnf("natMakeMapRsp: unknown protocol reported: %s", proto)
+	log.Debugf("natMakeMapRsp: unknown protocol reported: %s", proto)
 	return sch.SchEnoParameter
 }
 
@@ -1398,7 +1398,7 @@ func (qryMgr *QryMgr) qryMgrQcbPutActived(qcb *qryCtrlBlock) (DhtErrno, int) {
 		act = append(act, el)
 
 		if _, dup := qcb.qryActived[pending.node.ID]; dup == true {
-			log.Warnf("qryMgrQcbPutActived: duplicated, sdl: %s, forWhat: %d, target: %x",
+			log.Debugf("qryMgrQcbPutActived: duplicated, sdl: %s, forWhat: %d, target: %x",
 				qryMgr.sdlName, qcb.forWhat, qcb.target)
 			continue
 		}
@@ -1553,7 +1553,7 @@ func (qryMgr *QryMgr) qryMgrResultReport(
 		case MID_GETVALUE_REQ :
 			inst, ok := qryMgr.gvbTab[id]
 			if !ok {
-				log.Warnf("qryMgrResultReport: batch not found, sdl: %s, id: %d", qryMgr.sdlName, id)
+				log.Debugf("qryMgrResultReport: batch not found, sdl: %s, id: %d", qryMgr.sdlName, id)
 				return DhtEnoNotFound
 			}
 			if eno == int(DhtEnoNone) {
@@ -1756,7 +1756,7 @@ func (qryMgr *QryMgr)gvbStatusReport(gvbCb *gvbCtrlBlock, ctxt string) sch.SchEr
 //
 func (qryMgr *QryMgr)gvbStartNext(gvbCb *gvbCtrlBlock) (DhtErrno, sch.SchErrno) {
 	if gvbCb.remain <= 0 {
-		log.Warnf("gvbStartNext: none, sdl: %s", qryMgr.sdlName)
+		log.Debugf("gvbStartNext: none, sdl: %s", qryMgr.sdlName)
 		return DhtEnoInternal, sch.SchEnoNone
 	}
 	next := gvbCb.head
@@ -1773,13 +1773,13 @@ func (qryMgr *QryMgr)gvbStartNext(gvbCb *gvbCtrlBlock) (DhtErrno, sch.SchErrno) 
 	}
 	copy(qry.Target[0:], gvr.Key)
 	if _, dup := gvbCb.pending[qry.Target]; dup {
-		log.Warnf("gvbStartNext: duplicated target, sdl: %s, target: %x", qryMgr.sdlName, gvr.Key)
+		log.Debugf("gvbStartNext: duplicated target, sdl: %s, target: %x", qryMgr.sdlName, gvr.Key)
 		gvbCb.failed += 1
 		gvbCb.remain -= 1
 		return DhtEnoDuplicated, sch.SchEnoNone
 	}
 	if eno := qryMgr.queryStartReq(qryMgr.ptnMe, &qry); eno != sch.SchEnoNone {
-		log.Warnf("gvbStartNext: start query failed, sdl: %s, eno: %d", qryMgr.sdlName, eno)
+		log.Debugf("gvbStartNext: start query failed, sdl: %s, eno: %d", qryMgr.sdlName, eno)
 		gvbCb.failed += 1
 		gvbCb.remain -= 1
 		return DhtEnoInternal, eno

@@ -388,7 +388,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
 	if icb.status != qisWaitConnect {
-		log.Warnf("connectRsp: mismatched, " +
+		log.Debugf("connectRsp: mismatched, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 		return sch.SchEnoMismatched
@@ -437,7 +437,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	eno, pkg := qryInst.setupQryPkg()
 	if eno != DhtEnoNone {
 
-		log.Warnf("connectRsp: done for setupQryPkg failed, " +
+		log.Debugf("connectRsp: done for setupQryPkg failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -479,7 +479,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
 	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+		log.Debugf("connectRsp: send EvDhtConMgrSendReq failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
 	}
@@ -515,7 +515,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		schMsg = sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
 		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+			log.Debugf("connectRsp: send EvDhtConMgrSendReq failed, " +
 				"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
 				icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
 			return eno
@@ -539,7 +539,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+		log.Debugf("connectRsp: send EvDhtConMgrSendReq failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
 	}

@@ -677,13 +677,13 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	if pkg == nil {
-		log.Warnf("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
+		log.Debugf("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		return DhtEnoParameter
 	}
 
 	if status := conInst.getStatus(); status != CisInService {
-		log.Warnf("txPutPending: mismatched status: %d", status)
+		log.Debugf("txPutPending: mismatched status: %d", status)
 		return DhtEnoMismatched
 	}
 
@@ -693,7 +693,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 	}
 
 	if len(conInst.txChan) >= cap(conInst.txChan) {
-		log.Warnf("txPutPending: pending queue full, inst: %s, hsInfo: %s:%d",
+		log.Debugf("txPutPending: pending queue full, inst: %s, hsInfo: %s:%d",
 			conInst.name, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt & 0x1f == 0 {
 			log.Debugf("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
@@ -703,7 +703,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 	}
 
 	if len(conInst.txWaitRsp) >= ciTxMaxWaitResponseSize {
-		log.Warnf("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
+		log.Debugf("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt & 0x1f == 0 {
 			log.Debugf("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",

@@ -184,7 +184,7 @@ func (shMgr *DhtShellManager) dhtShEventInd(ind *sch.MsgDhtShEventInd) sch.SchEr
 		return shMgr.dhtConInstStatusInd(msg.(*sch.MsgDhtConInstStatusInd))
 
 	default:
-		log.Warnf("dhtShEventInd: unknown event type: %d", evt)
+		log.Debugf("dhtShEventInd: unknown event type: %d", evt)
 		return sch.SchEnoParameter
 	}
 

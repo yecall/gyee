@@ -216,7 +216,7 @@ func (dhtMgr *DhtMgr) dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 
 	default:
 		eno = sch.SchEnoParameter
-		log.Warnf("dhtMgrProc: invalid event, id: %d", msg.Id)
+		log.Debugf("dhtMgrProc: invalid event, id: %d", msg.Id)
 	}
 
 	log.Tracef("dhtMgrProc: get out, name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
