@@ -447,7 +447,7 @@ type MsgDhtMgrGetValueRsp struct {
 
 // EvDhtMgrGetValueBatchReq
 const DefaultDhtGetBatchTimeout = time.Second  * 128	// default batch get timeout
-const MaxDhtGetBatchSize = 1024							// max keys can be
+const MaxDhtGetBatchSize = 1024 * 16						// max keys can be
 type MsgDhtMgrGetValueBatchReq struct {
 	Keys	[][]byte		// batch keys
 	ValCh	chan<-[]byte	// channel to output values
