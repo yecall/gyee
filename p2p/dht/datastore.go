@@ -591,6 +591,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 
 	if len(*remain) == 0 {
 		log.Debugf("localGetValueBatchReq: all got, sdl: %s", dsMgr.sdlName)
+		close(msg.ValCh)
 		return sch.SchEnoNone
 	}
 
@@ -679,6 +680,8 @@ func (dsMgr *DsMgr) gvbTimerHandler(inst *dsMgrBatchGetInst) sch.SchErrno {
 	dsMgr.sdl.SchMakeMessage(msg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtDsGvbStopReq, &req)
 	if eno := dsMgr.sdl.SchSendMessage(msg); eno != sch.SchEnoNone {
 		log.Errorf("gvbTimerHandler: send message failed, sdl: %s, eno: %d", dsMgr.sdlName, eno)
+		close(gvbCb.bgChOutput)
+		delete(dsMgr.bgMap, gvbId)
 		return eno
 	}
 	return sch.SchEnoNone

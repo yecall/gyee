@@ -1285,7 +1285,7 @@ _rxLoop:
 				break _rxLoop
 			}
 
-			if rxCount++; rxCount & 0x7f == 0 {
+			if rxCount++; rxCount & 0x3ff == 0 {
 				showStat()
 			}
 

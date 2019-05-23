@@ -89,7 +89,7 @@ type deDupVal struct {
 
 const (
 	chkkTime = time.Second * 8
-	keyTime  = time.Second * 8
+	keyTime  = time.Second * 55
 	MID_CHKK = peer.MID_CHKK
 	MID_RPTK = peer.MID_RPTK
 	MID_GCD  = peer.MID_GCD

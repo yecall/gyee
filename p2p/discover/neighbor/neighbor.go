@@ -302,6 +302,7 @@ type NeighborManager struct {
 	ngbMap    map[string]*neighborInst // map neighbor node id to task node pointer
 	fnInstSeq int                      // findnode instance sequence number
 	ppInstSeq int                      // pingpong instance sequence number
+	checkDestNodeStat map[string] int64 // checkDestNode failed count
 }
 
 func NewNgbMgr() *NeighborManager {
@@ -310,6 +311,7 @@ func NewNgbMgr() *NeighborManager {
 		ngbMap:    make(map[string]*neighborInst),
 		fnInstSeq: 0,
 		ppInstSeq: 0,
+		checkDestNodeStat: make(map[string]int64, 0),
 	}
 	ngbMgr.tep = ngbMgr.ngbMgrProc
 	return &ngbMgr
@@ -445,7 +447,7 @@ func (ngbMgr *NeighborManager) UdpMsgInd(msg *UdpMsgInd) NgbMgrErrno {
 }
 
 func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping, from *net.UDPAddr) NgbMgrErrno {
-	if ngbMgr.checkDestNode(&ping.To, ping.SubNetId) == false {
+	if ngbMgr.checkDestNode(&ping.To, ping.SubNetId, "ping") == false {
 		log.Debugf("PingHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
@@ -522,7 +524,7 @@ func (ngbMgr *NeighborManager) PingHandler(ping *um.Ping, from *net.UDPAddr) Ngb
 
 func (ngbMgr *NeighborManager) PongHandler(pong *um.Pong, from *net.UDPAddr) NgbMgrErrno {
 	_ = from
-	if ngbMgr.checkDestNode(&pong.To, pong.SubNetId) == false {
+	if ngbMgr.checkDestNode(&pong.To, pong.SubNetId, "pong") == false {
 		log.Debugf("PongHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
@@ -553,7 +555,7 @@ func (ngbMgr *NeighborManager) PongHandler(pong *um.Pong, from *net.UDPAddr) Ngb
 }
 
 func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode, from *net.UDPAddr) NgbMgrErrno {
-	if ngbMgr.checkDestNode(&findNode.To, findNode.SubNetId) == false {
+	if ngbMgr.checkDestNode(&findNode.To, findNode.SubNetId, "findNode") == false {
 		log.Debugf("FindNodeHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
@@ -692,7 +694,7 @@ func (ngbMgr *NeighborManager) FindNodeHandler(findNode *um.FindNode, from *net.
 
 func (ngbMgr *NeighborManager) NeighborsHandler(nbs *um.Neighbors, from *net.UDPAddr) NgbMgrErrno {
 	_ = from
-	if ngbMgr.checkDestNode(&nbs.To, nbs.SubNetId) == false {
+	if ngbMgr.checkDestNode(&nbs.To, nbs.SubNetId, "neighbors") == false {
 		log.Debugf("NeighborsHandler: node identity mismatched")
 		return NgbMgrEnoParameter
 	}
@@ -967,15 +969,27 @@ func (ngbMgr *NeighborManager) setupConfig() sch.SchErrno {
 	return sch.SchEnoNone
 }
 
-func (ngbMgr *NeighborManager) checkDestNode(dst *um.Node, snid config.SubNetworkID) bool {
+func (ngbMgr *NeighborManager) checkDestNode(dst *um.Node, snid config.SubNetworkID, tag string) bool {
+	result := false
 	if ngbMgr.bootstrap {
-		return ngbMgr.cfg.ID == dst.NodeId
+		result = ngbMgr.cfg.ID == dst.NodeId
 	} else if snid == config.AnySubNet {
-		return true
+		result = true
 	} else if me, ok := ngbMgr.cfg.SubNetNodeList[snid]; ok {
-		return me.ID == dst.NodeId
+		result = me.ID == dst.NodeId
 	}
-	return false
+	if !result {
+		cnt := int64(1)
+		if cnt, ok := ngbMgr.checkDestNodeStat[tag]; ok {
+			cnt += 1
+		}
+		ngbMgr.checkDestNodeStat[tag] = cnt
+		if cnt & 0x7f == 0 {
+			log.Errorf("checkDestNode: sdl: %s, tag: %d, failed: %d",
+				ngbMgr.sdlName, tag, cnt)
+		}
+	}
+	return result
 }
 
 func (ngbMgr *NeighborManager) getSubNode(snid config.SubNetworkID) *config.Node {
