@@ -58,7 +58,7 @@ func main() {
 	}
 
 	var (
-		tps = *batch * 1000 / *batchTime
+		tps        = *batch * 1000 / *batchTime
 		resetCount = NonceResetSeconds * *batch * 1000 / *batchTime
 	)
 	log.Warn("batch send", "batchCnt", *batch, "intervalMs", *batchTime, "tps", tps, "resetCount", resetCount)
@@ -222,6 +222,9 @@ Exit:
 		// batch transfer
 		for j, toAddr := range addrs {
 			for i, signer := range signers {
+				if j == i {
+					continue
+				}
 				// reset inMem nonce if needed
 				if totalTxs%resetCount == 0 {
 					nonceResetFunc()
@@ -237,9 +240,6 @@ Exit:
 					case <-ticker.C:
 						// send txs
 					}
-				}
-				if j == i {
-					continue
 				}
 				tx := core.NewTransaction(chainID, nonces[i], &toAddr, big.NewInt(100))
 				if err := tx.Sign(signer); err != nil {
