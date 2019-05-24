@@ -28,26 +28,9 @@ import (
 	"github.com/yeeco/gyee/log"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type prdMgrLogger struct {
-	debug__ bool
-}
-
-var prdLog = prdMgrLogger{
-	debug__: false,
-}
-
-func (log prdMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Provider manager name registered in scheduler
@@ -69,6 +52,7 @@ const (
 //
 type PrdMgr struct {
 	sdl       *sch.Scheduler    // pointer to scheduler
+	sdlName   string			// scheduler instance name
 	name      string            // my name
 	tep       sch.SchUserTaskEp // task entry
 	ptnMe     interface{}       // pointer to task node of myself
@@ -108,7 +92,6 @@ func NewPrdMgr() *PrdMgr {
 	prdMgr := PrdMgr{
 		name:   PrdMgrName,
 		clrTid: sch.SchInvalidTid,
-		tmMgr:  NewTimerManager(),
 	}
 
 	prdMgr.tep = prdMgr.prdMgrProc
@@ -129,7 +112,7 @@ func (prdMgr *PrdMgr) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage) s
 func (prdMgr *PrdMgr) prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
 	if ptn == nil || msg == nil {
-		prdLog.Debug("prdMgrProc: invalid parameters")
+		log.Debugf("prdMgrProc: invalid parameters")
 		return sch.SchEnoParameter
 	}
 
@@ -166,7 +149,7 @@ func (prdMgr *PrdMgr) prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 
 	default:
 		eno = sch.SchEnoParameter
-		prdLog.Debug("prdMgrProc: unknown message: %d", msg.Id)
+		log.Debugf("prdMgrProc: unknown message: %d", msg.Id)
 	}
 
 	return eno
@@ -178,6 +161,9 @@ func (prdMgr *PrdMgr) prdMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 func (prdMgr *PrdMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	prdMgr.sdl = sch.SchGetScheduler(ptn)
+	prdMgr.sdlName = prdMgr.sdl.SchGetP2pCfgName()
+	prdMgr.tmMgr = NewTimerManager(prdMgr.sdlName, PrdMgrName)
+
 	prdMgr.ptnMe = ptn
 	_, prdMgr.ptnQryMgr = prdMgr.sdl.SchGetUserTaskNode(QryMgrName)
 	_, prdMgr.ptnDhtMgr = prdMgr.sdl.SchGetUserTaskNode(DsMgrName)
@@ -195,7 +181,7 @@ func (prdMgr *PrdMgr) poweron(ptn interface{}) sch.SchErrno {
 
 	eno, tid := prdMgr.sdl.SchSetTimer(prdMgr.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		prdLog.Debug("poweron: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("poweron: SchSetTimer failed, eno: %d", eno)
 		return eno
 	}
 	prdMgr.clrTid = tid
@@ -207,7 +193,7 @@ func (prdMgr *PrdMgr) poweron(ptn interface{}) sch.SchErrno {
 // power off handler
 //
 func (prdMgr *PrdMgr) poweroff(ptn interface{}) sch.SchErrno {
-	prdLog.Debug("poweroff: task will be done ...")
+	log.Debugf("poweroff: task will be done ...")
 	return prdMgr.sdl.SchTaskDone(ptn, prdMgr.name, sch.SchEnoKilled)
 }
 
@@ -260,7 +246,7 @@ func (prdMgr *PrdMgr) localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) s
 	//
 
 	if len(msg.Key) != DsKeyLength {
-		prdLog.Debug("localAddProviderReq: invalid key length")
+		log.Debugf("localAddProviderReq: invalid key length")
 		return sch.SchEnoParameter
 	}
 
@@ -272,7 +258,7 @@ func (prdMgr *PrdMgr) localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) s
 	//
 
 	if eno := prdMgr.cache(&k, &msg.Prd); eno != DhtEnoNone {
-		prdLog.Debug("localAddProviderReq: cache failed, eno: %d", eno)
+		log.Debugf("localAddProviderReq: cache failed, eno: %d", eno)
 		prdMgr.localAddProviderRsp(msg.Key, nil, eno)
 		return sch.SchEnoUserTask
 	}
@@ -282,7 +268,7 @@ func (prdMgr *PrdMgr) localAddProviderReq(msg *sch.MsgDhtPrdMgrAddProviderReq) s
 	//
 
 	if eno := prdMgr.store(&k, &msg.Prd); eno != DhtEnoNone {
-		prdLog.Debug("localAddProviderReq: store failed, eno: %d", eno)
+		log.Debugf("localAddProviderReq: store failed, eno: %d", eno)
 		prdMgr.localAddProviderRsp(msg.Key, nil, eno)
 		return sch.SchEnoUserTask
 	}
@@ -393,18 +379,18 @@ func (prdMgr *PrdMgr) qryMgrQueryResultInd(msg *sch.MsgDhtQryMgrQueryResultInd) 
 		for _, prd := range prds {
 
 			if prdMgr.cache(&dsk, prd) != DhtEnoNone {
-				prdLog.Debug("qryMgrQueryResultInd: cache failed")
+				log.Debugf("qryMgrQueryResultInd: cache failed")
 			}
 
 			if prdMgr.store(&dsk, prd) != DhtEnoNone {
-				prdLog.Debug("qryMgrQueryResultInd: store failed")
+				log.Debugf("qryMgrQueryResultInd: store failed")
 			}
 		}
 
 		return prdMgr.localGetProviderRsp(key, prds, DhtErrno(msg.Eno))
 
 	} else {
-		prdLog.Debug("qryMgrQueryResultInd: not matched with prdMgr")
+		log.Debugf("qryMgrQueryResultInd: not matched with prdMgr")
 	}
 
 	return sch.SchEnoMismatched
@@ -427,10 +413,10 @@ func (prdMgr *PrdMgr) putProviderReq(msg *sch.MsgDhtPrdMgrPutProviderReq) sch.Sc
 	copy(dsk[0:], prd.Key)
 	for _, n := range prd.Nodes {
 		if prdMgr.cache(&dsk, n) != DhtEnoNone {
-			prdLog.Debug("putProviderReq: cache failed")
+			log.Debugf("putProviderReq: cache failed")
 		}
 		if prdMgr.store(&dsk, n) != DhtEnoNone {
-			prdLog.Debug("putProviderReq: store failed")
+			log.Debugf("putProviderReq: store failed")
 		}
 	}
 
@@ -507,7 +493,7 @@ func (prdMgr *PrdMgr) getProviderReq(msg *sch.MsgDhtPrdMgrGetProviderReq) sch.Sc
 
 		dhtPkg := DhtPackage{}
 		if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-			prdLog.Debug("getProviderReq: GetPackage failed, eno: %d", eno)
+			log.Debugf("getProviderReq: GetPackage failed, eno: %d", eno)
 			return sch.SchEnoUserTask
 		}
 
@@ -552,7 +538,7 @@ func (prdMgr *PrdMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchE
 	//
 
 	if msg.Eno != int(DhtEnoNone) {
-		prdLog.Debug("rutMgrNearestRsp: router failed, eno: %d", msg.Eno)
+		log.Debugf("rutMgrNearestRsp: router failed, eno: %d", msg.Eno)
 		return sch.SchEnoUserTask
 	}
 	var nodes []*config.Node
@@ -581,7 +567,7 @@ func (prdMgr *PrdMgr) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.SchE
 
 	dhtPkg := DhtPackage{}
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		prdLog.Debug("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
+		log.Debugf("rutMgrNearestRsp: GetPackage failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 
@@ -658,14 +644,14 @@ func (prdMgr *PrdMgr) store(key *DsKey, peerId *config.Node) DhtErrno {
 	if eno, val := prdMgr.ds.Get(key[0:]); eno == DhtEnoNone && val != nil {
 		psr := val.(*PsRecord)
 		if eno := dpsr.DecPsRecord(psr); eno != DhtEnoNone {
-			prdLog.Debug("store: DecPsRecord failed, eno: %d", eno)
+			log.Debugf("store: DecPsRecord failed, eno: %d", eno)
 			return eno
 		}
 	}
 
 	for _, prd := range dpsr.Providers {
 		if bytes.Equal(prd.ID[0:], peerId.ID[0:]) {
-			prdLog.Debug("store: duplicated provider")
+			log.Debugf("store: duplicated provider")
 			return DhtEnoNone
 		}
 	}
@@ -673,7 +659,7 @@ func (prdMgr *PrdMgr) store(key *DsKey, peerId *config.Node) DhtErrno {
 	var psr = PsRecord{KT: prdDftKeepTime}
 	dpsr.Providers = append(dpsr.Providers, peerId)
 	if eno := dpsr.EncPsRecord(&psr); eno != DhtEnoNone {
-		prdLog.Debug("store: EncPsRecord failed, eno: %d", eno)
+		log.Debugf("store: EncPsRecord failed, eno: %d", eno)
 		return eno
 	}
 

@@ -25,6 +25,7 @@ import (
 	"github.com/huin/goupnp"
 	"github.com/huin/goupnp/dcps/internetgateway1"
 	"github.com/huin/goupnp/dcps/internetgateway2"
+	"github.com/yeeco/gyee/log"
 )
 
 // see following packages under github.com/huin/goupnp for details:
@@ -66,7 +67,7 @@ type upnpCtrlBlock struct {
 func NewUpnpInterface() *upnpCtrlBlock {
 	cb := queryUpnp()
 	if cb == nil {
-		natLog.Debug("NewUpnpInterface: queryUpnp failed")
+		log.Debugf("NewUpnpInterface: queryUpnp failed")
 		return (*upnpCtrlBlock)(nil)
 	}
 	return cb
@@ -75,7 +76,7 @@ func NewUpnpInterface() *upnpCtrlBlock {
 func (upnp *upnpCtrlBlock) makeMap(name string, proto string, locPort int, pubPort int, durKeep time.Duration) NatEno {
 	ip, eno := upnp.getLocalAddress()
 	if eno != NatEnoNone {
-		natLog.Debug("makeMap: getLocalAddress failed, error: %s", eno.Error())
+		log.Debugf("makeMap: getLocalAddress failed, error: %s", eno.Error())
 		return eno
 	}
 	proto = strings.ToUpper(proto)
@@ -85,7 +86,7 @@ func (upnp *upnpCtrlBlock) makeMap(name string, proto string, locPort int, pubPo
 	upnp.removeMap(proto, locPort, pubPort)
 	err := upnp.client.AddPortMapping("", uint16(pubPort), proto, uint16(locPort), ip.String(), true, name, seconds)
 	if err != nil {
-		natLog.Debug("makeMap: AddPortMapping failed, error: %s", err.Error())
+		log.Debugf("makeMap: AddPortMapping failed, error: %s", err.Error())
 		return NatEnoFromUpnpLib
 	}
 	return NatEnoNone
@@ -94,7 +95,7 @@ func (upnp *upnpCtrlBlock) makeMap(name string, proto string, locPort int, pubPo
 func (upnp *upnpCtrlBlock) removeMap(proto string, locPort int, pubPort int) NatEno {
 	proto = strings.ToUpper(proto)
 	if err := upnp.client.DeletePortMapping("", uint16(pubPort), proto); err != nil {
-		natLog.Debug("removeMap: DeletePortMapping failed, error: %s", err.Error())
+		log.Debugf("removeMap: DeletePortMapping failed, error: %s", err.Error())
 		return NatEnoFromUpnpLib
 	}
 	return NatEnoNone
@@ -103,12 +104,12 @@ func (upnp *upnpCtrlBlock) removeMap(proto string, locPort int, pubPort int) Nat
 func (upnp *upnpCtrlBlock) getPublicIpAddr() (net.IP, NatEno) {
 	ipStr, err := upnp.client.GetExternalIPAddress()
 	if err != nil {
-		natLog.Debug("getPublicIpAddr: GetExternalIPAddress failed, error: %s", err.Error())
+		log.Debugf("getPublicIpAddr: GetExternalIPAddress failed, error: %s", err.Error())
 		return nil, NatEnoFromUpnpLib
 	}
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
-		natLog.Debug("getPublicIpAddr: ParseIP failed, ipStr: %s", ipStr)
+		log.Debugf("getPublicIpAddr: ParseIP failed, ipStr: %s", ipStr)
 		return nil, NatEnoFromUpnpLib
 	}
 	return ip, NatEnoNone
@@ -117,18 +118,18 @@ func (upnp *upnpCtrlBlock) getPublicIpAddr() (net.IP, NatEno) {
 func (upnp *upnpCtrlBlock) getLocalAddress() (net.IP, NatEno) {
 	devaddr, err := net.ResolveUDPAddr("udp4", upnp.device.URLBase.Host)
 	if err != nil {
-		natLog.Debug("getLocalAddress: bad device address: %s", upnp.device.URLBase.Host)
+		log.Debugf("getLocalAddress: bad device address: %s", upnp.device.URLBase.Host)
 		return nil, NatEnoFromUpnpLib
 	}
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		natLog.Debug("getLocalAddress: Interfaces failed, error: %s", err.Error())
+		log.Debugf("getLocalAddress: Interfaces failed, error: %s", err.Error())
 		return nil, NatEnoFromSystem
 	}
 	for _, iface := range ifaces {
 		addrs, err := iface.Addrs()
 		if err != nil {
-			natLog.Debug("getLocalAddress: Addrs failed, error: %s", err.Error())
+			log.Debugf("getLocalAddress: Addrs failed, error: %s", err.Error())
 			return nil, NatEnoFromSystem
 		}
 		for _, addr := range addrs {

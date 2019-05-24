@@ -24,27 +24,10 @@ import (
 	"fmt"
 	"sync"
 
-	p2plog "github.com/yeeco/gyee/p2p/logger"
-	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
+	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type dhtLogger struct {
-	debug__ bool
-}
-
-var dhtLog = dhtLogger{
-	debug__: false,
-}
-
-func (log dhtLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Dht manager name registered in scheduler
@@ -233,7 +216,7 @@ func (dhtMgr *DhtMgr) dhtMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 
 	default:
 		eno = sch.SchEnoParameter
-		log.Warnf("dhtMgrProc: invalid event, id: %d", msg.Id)
+		log.Debugf("dhtMgrProc: invalid event, id: %d", msg.Id)
 	}
 
 	log.Tracef("dhtMgrProc: get out, name: %s, msg.Id: %d", dhtMgr.name, msg.Id)
@@ -538,7 +521,6 @@ func (dhtMgr *DhtMgr) putValueRsp(msg *sch.MsgDhtMgrPutValueRsp) sch.SchErrno {
 // get value request handler
 //
 func (dhtMgr *DhtMgr) getValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno {
-	log.Debugf("getValueReq: going to dispatch EvDhtMgrGetValueReq")
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueReq, msg)
 }
 
@@ -565,7 +547,6 @@ func (dhtMgr *DhtMgr) getValueRsp(msg *sch.MsgDhtMgrGetValueRsp) sch.SchErrno {
 // batch get handler
 //
 func (dhtMgr *DhtMgr) getValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch.SchErrno {
-	log.Debugf("getValueBatchReq: going to dispatch EvDhtMgrGetValueBatchReq")
 	return dhtMgr.dispMsg(dhtMgr.ptnDsMgr, sch.EvDhtMgrGetValueBatchReq, msg)
 }
 

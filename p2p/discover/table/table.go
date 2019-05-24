@@ -34,29 +34,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	um "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type tabLogger struct {
-	debug__ bool
-}
-
-var tabLog = tabLogger{
-	debug__: false,
-}
-
-func (log tabLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // errno
@@ -297,7 +281,7 @@ func (tabMgr *TableManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMess
 
 func (tabMgr *TableManager) tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	tabLog.Debug("tabMgrProc: name: %s, msg.Id: %d", tabMgr.name, msg.Id)
+	log.Tracef("tabMgrProc: name: %s, msg.Id: %d", tabMgr.name, msg.Id)
 
 	var eno TabMgrErrno = TabMgrEnoNone
 
@@ -349,11 +333,11 @@ func (tabMgr *TableManager) tabMgrProc(ptn interface{}, msg *sch.SchMessage) sch
 		eno = tabMgr.tabMgrNatPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
 
 	default:
-		tabLog.Debug("TabMgrProc: invalid message: %d", msg.Id)
+		log.Debugf("TabMgrProc: invalid message: %d", msg.Id)
 		eno = TabMgrEnoParameter
 	}
 
-	tabLog.Debug("TabMgrProc: get out, name: %s, msg.Id: %d", tabMgr.name, msg.Id)
+	log.Tracef("TabMgrProc: get out, name: %s, msg.Id: %d", tabMgr.name, msg.Id)
 
 	if eno != TabMgrEnoNone {
 		return sch.SchEnoUserTask
@@ -368,7 +352,7 @@ func (tabMgr *TableManager) tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	tabMgr.sdl = sch.SchGetScheduler(ptn)
 
 	if eno = tabMgr.tabGetConfig(&tabMgr.cfg); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPoweron: tabGetConfig failed, eno: %d", eno)
+		log.Debugf("tabMgrPoweron: tabGetConfig failed, eno: %d", eno)
 		return eno
 	}
 
@@ -377,28 +361,28 @@ func (tabMgr *TableManager) tabMgrPoweron(ptn interface{}) TabMgrErrno {
 	// try to interact with table manager for it is not exist.
 
 	if tabMgr.networkType == p2pTypeStatic {
-		tabLog.Debug("tabMgrPoweron: static type, tabMgr is not needed")
+		log.Debugf("tabMgrPoweron: static type, tabMgr is not needed")
 		tabMgr.sdl.SchTaskDone(ptn, tabMgr.name, sch.SchEnoNone)
 		return TabMgrEnoNone
 	}
 
 	if eno = tabMgr.tabNodeDbPrepare(); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPoweron: tabNodeDbPrepare failed, eno: %d", eno)
+		log.Debugf("tabMgrPoweron: tabNodeDbPrepare failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno = tabMgr.tabSetupLocalHashId(); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPoweron: tabSetupLocalHash failed, eno: %d", eno)
+		log.Debugf("tabMgrPoweron: tabSetupLocalHash failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno = tabMgr.tabRelatedTaskPrepare(ptn); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPoweron: tabRelatedTaskPrepare failed, eno: %d", eno)
+		log.Debugf("tabMgrPoweron: tabRelatedTaskPrepare failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno = tabSetupLog2DistanceLookupTable(tabMgr.dlkTab); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPoweron: tabSetupLog2DistanceLookupTable failed, eno: %d", eno)
+		log.Debugf("tabMgrPoweron: tabSetupLog2DistanceLookupTable failed, eno: %d", eno)
 		return eno
 	}
 
@@ -439,11 +423,11 @@ func (tabMgr *TableManager) tabMgrPoweron(ptn interface{}) TabMgrErrno {
 		// send messages to other tasks in system.
 
 		if eno = tabMgr.setupSubNetTabMgr(); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrPoweron: SetSubNetTabMgr failed, eno: %d", eno)
+			log.Debugf("tabMgrPoweron: SetSubNetTabMgr failed, eno: %d", eno)
 			return eno
 		}
 	} else {
-		tabLog.Debug("tabMgrPoweron: configuration mismatched")
+		log.Debugf("tabMgrPoweron: configuration mismatched")
 		return TabMgrEnoInternal
 	}
 
@@ -465,12 +449,12 @@ func (tabMgr *TableManager) startSubnetRefresh(targetId *config.NodeID) TabMgrEr
 	}
 
 	if eno := tabMgr.tabStartTimer(nil, sch.TabRefreshTimerId, cycle); eno != TabMgrEnoNone {
-		tabLog.Debug("startSubnetRefresh: tabStartTimer failed, eno: %d", eno)
+		log.Debugf("startSubnetRefresh: tabStartTimer failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := tabMgr.tabRefresh(&tabMgr.snid, targetId); eno != TabMgrEnoNone {
-		tabLog.Debug("startSubnetRefresh: tabRefresh sub network failed, eno: %d, subnet: %x", eno, tabMgr.snid)
+		log.Debugf("startSubnetRefresh: tabRefresh sub network failed, eno: %d, subnet: %x", eno, tabMgr.snid)
 		return eno
 	}
 
@@ -539,7 +523,7 @@ func (tabMgr *TableManager) setupSubNetTabMgr() TabMgrErrno {
 
 func (tabMgr *TableManager) tabMgrPoweroff(ptn interface{}) TabMgrErrno {
 
-	tabLog.Debug("tabMgrPoweroff: task will be done, name: %s", tabMgr.sdl.SchGetTaskName(ptn))
+	log.Debugf("tabMgrPoweroff: task will be done, name: %s", tabMgr.sdl.SchGetTaskName(ptn))
 
 	// close nodeDb and done the task: timers would be killed by scheduler when task done,
 	// and one could also chose to kill them himself before done the task.
@@ -569,7 +553,7 @@ func (tabMgr *TableManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMg
 			}
 			delete(tabMgr.cfg.subNetNodeList, del)
 			delete(tabMgr.subNetMgrList, del)
-			tabLog.Debug("shellReconfigReq: subnet deleted: %x", del)
+			log.Debugf("shellReconfigReq: subnet deleted: %x", del)
 		}
 		for idx, snid := range tabMgr.cfg.subNetIdList {
 			if snid == del {
@@ -584,7 +568,7 @@ func (tabMgr *TableManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMg
 		}
 	}
 
-	tabLog.Debug("shellReconfigReq: subnet mask bits, old: %d, %d, new: %d",
+	log.Debugf("shellReconfigReq: subnet mask bits, old: %d, %d, new: %d",
 		tabMgr.cfg.snidMaskBits,
 		tabMgr.sdl.SchGetP2pConfig().SnidMaskBits,
 		msg.MaskBits)
@@ -593,28 +577,28 @@ func (tabMgr *TableManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMg
 
 	for _, add := range addList {
 		if _, ok := tabMgr.subNetMgrList[add.SubNetId]; ok {
-			tabLog.Debug("shellReconfigReq: duplicated for adding")
+			log.Debugf("shellReconfigReq: duplicated for adding")
 			continue
 		}
 		tabMgr.cfg.subNetNodeList[add.SubNetId] = add.SubNetNode
 		tabMgr.cfg.subNetIdList = append(tabMgr.cfg.subNetIdList, add.SubNetId)
-		tabLog.Debug("shellReconfigReq: subnet added: %x", add.SubNetId)
+		log.Debugf("shellReconfigReq: subnet added: %x", add.SubNetId)
 	}
 
 	for _, add := range addList {
 		if _, ok := tabMgr.subNetMgrList[add.SubNetId]; ok {
-			tabLog.Debug("shellReconfigReq: duplicated for adding")
+			log.Debugf("shellReconfigReq: duplicated for adding")
 			continue
 		}
 		mgr := tabMgr.mgr4Subnet(add.SubNetId)
 		tabMgr.subNetMgrList[add.SubNetId] = mgr
-		tabLog.Debug("shellReconfigReq: subnet manager added: %x", add.SubNetId)
+		log.Debugf("shellReconfigReq: subnet manager added: %x", add.SubNetId)
 
 		if eno := mgr.startSubnetRefresh(nil); eno != TabMgrEnoNone {
-			tabLog.Debug("shellReconfigReq: failed, eno: %d, snid: %x", eno, mgr.snid)
+			log.Debugf("shellReconfigReq: failed, eno: %d, snid: %x", eno, mgr.snid)
 			return eno
 		}
-		tabLog.Debug("shellReconfigReq: refreshing started for subnet added: %x", add.SubNetId)
+		log.Debugf("shellReconfigReq: refreshing started for subnet added: %x", add.SubNetId)
 	}
 
 	return TabMgrEnoNone
@@ -623,35 +607,35 @@ func (tabMgr *TableManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) TabMg
 func (tabMgr *TableManager) tabMgrRefreshTimerHandler(snid *SubNetworkID) TabMgrErrno {
 	if mgr, ok := tabMgr.subNetMgrList[*snid]; ok {
 		if mgr.arfTid == sch.SchInvalidTid && !mgr.root.natUdpResult {
-			tabLog.Debug("tabMgrRefreshTimerHandler: arfTid: %d, natUdpResult: %t",
+			log.Debugf("tabMgrRefreshTimerHandler: arfTid: %d, natUdpResult: %t",
 				mgr.arfTid, mgr.root.natUdpResult)
 			return TabMgrEnoMismatched
 		}
 		return mgr.tabRefresh(snid, nil)
 	}
-	tabLog.Debug("tabMgrRefreshTimerHandler: invalid subnet: %x", snid)
+	log.Debugf("tabMgrRefreshTimerHandler: invalid subnet: %x", snid)
 	return TabMgrEnoParameter
 }
 
 func (tabMgr *TableManager) tabMgrPingpongTimerHandler(inst *instCtrlBlock) TabMgrErrno {
 	mgr, ok := tabMgr.subNetMgrList[inst.snid]
 	if !ok {
-		tabLog.Debug("tabMgrPingpongTimerHandler: invalid subnet: %x", inst.snid)
+		log.Debugf("tabMgrPingpongTimerHandler: invalid subnet: %x", inst.snid)
 		return TabMgrEnoParameter
 	}
 
 	if eno := mgr.tabUpdateBucket(inst, TabMgrEnoTimeout); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongTimerHandler: tabUpdateBucket failed, eno: %d", eno)
+		log.Debugf("tabMgrPingpongTimerHandler: tabUpdateBucket failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabDeleteActiveBoundInst(inst); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongTimerHandler: tabDeleteActiveQueryInst failed, eno: %d", eno)
+		log.Debugf("tabMgrPingpongTimerHandler: tabDeleteActiveQueryInst failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabActiveBoundInst(); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongTimerHandler: tabActiveQueryInst failed, eno: %d", eno)
+		log.Debugf("tabMgrPingpongTimerHandler: tabActiveQueryInst failed, eno: %d", eno)
 		return eno
 	}
 
@@ -661,29 +645,29 @@ func (tabMgr *TableManager) tabMgrPingpongTimerHandler(inst *instCtrlBlock) TabM
 func (tabMgr *TableManager) tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabMgrErrno {
 	mgr, ok := tabMgr.subNetMgrList[inst.snid]
 	if !ok {
-		tabLog.Debug("tabMgrFindNodeTimerHandler: invalid subnet: %x", inst.snid)
+		log.Debugf("tabMgrFindNodeTimerHandler: invalid subnet: %x", inst.snid)
 		return TabMgrEnoNotFound
 	}
 
 	inst.state = TabInstStateQTimeout
 	inst.rsp = nil
 	if eno := mgr.tabUpdateNodeDb4Query(inst, TabMgrEnoTimeout); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrFindNodeTimerHandler: tabUpdateNodeDb4Query failed, eno: %d", eno)
+		log.Debugf("tabMgrFindNodeTimerHandler: tabUpdateNodeDb4Query failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabUpdateBucket(inst, TabMgrEnoTimeout); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrFindNodeTimerHandler: tabUpdateBucket failed, eno: %d", eno)
+		log.Debugf("tabMgrFindNodeTimerHandler: tabUpdateBucket failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabDeleteActiveQueryInst(inst); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrFindNodeTimerHandler: tabDeleteActiveQueryInst failed, eno: %d", eno)
+		log.Debugf("tabMgrFindNodeTimerHandler: tabDeleteActiveQueryInst failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabActiveQueryInst(); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrFindNodeTimerHandler: tabActiveQueryInst failed, eno: %d", eno)
+		log.Debugf("tabMgrFindNodeTimerHandler: tabActiveQueryInst failed, eno: %d", eno)
 		return eno
 	}
 
@@ -692,7 +676,7 @@ func (tabMgr *TableManager) tabMgrFindNodeTimerHandler(inst *instCtrlBlock) TabM
 
 func (tabMgr *TableManager) tabMgrRefreshReq(msg *sch.MsgTabRefreshReq) TabMgrErrno {
 	if !tabMgr.natUdpResult {
-		tabLog.Debug("tabMgrRefreshReq: nat mapping not established")
+		log.Debugf("tabMgrRefreshReq: nat mapping not established")
 		return TabMgrEnoUdp
 	}
 	return tabMgr.tabRefresh(&msg.Snid, nil)
@@ -702,14 +686,14 @@ func (tabMgr *TableManager) tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp) TabMgrErr
 	snid := msg.FindNode.SubNetId
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
-		tabLog.Debug("tabMgrFindNodeRsp: invalid subnet: %x", snid)
+		log.Debugf("tabMgrFindNodeRsp: invalid subnet: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
 	var inst *instCtrlBlock = nil
 	inst = mgr.tabFindInst(&msg.FindNode.To, TabInstStateQuering)
 	if inst == nil {
-		tabLog.Debug("tabMgrFindNodeRsp: instance not found, subnet: %x, id: %X",
+		log.Debugf("tabMgrFindNodeRsp: instance not found, subnet: %x, id: %X",
 			snid, msg.FindNode.To.NodeId)
 		return TabMgrEnoNotFound
 	}
@@ -721,12 +705,12 @@ func (tabMgr *TableManager) tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp) TabMgrErr
 	var result = msg.Result & 0xffff
 	if result == TabMgrEnoDuplicated {
 		if eno := mgr.tabDeleteActiveQueryInst(inst); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrFindNodeRsp: tabDeleteActiveQueryInst failed, " +
+			log.Debugf("tabMgrFindNodeRsp: tabDeleteActiveQueryInst failed, " +
 				"eno: %d, subnet: %x", eno, snid)
 			return eno
 		}
 		if eno := mgr.tabActiveQueryInst(); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrFindNodeRsp: tabActiveQueryInst failed, " +
+			log.Debugf("tabMgrFindNodeRsp: tabActiveQueryInst failed, " +
 				"eno: %d, subnet: %x", eno, snid)
 			return eno
 		}
@@ -736,7 +720,7 @@ func (tabMgr *TableManager) tabMgrFindNodeRsp(msg *sch.NblFindNodeRsp) TabMgrErr
 	// update database for the neighbor node.
 	// DON'T care the result
 	if eno := mgr.tabUpdateNodeDb4Query(inst, result); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrFindNodeRsp: tabUpdateNodeDb4Query failed, " +
+		log.Debugf("tabMgrFindNodeRsp: tabUpdateNodeDb4Query failed, " +
 			"eno: %d, subnet: %x", eno, snid)
 	}
 
@@ -777,7 +761,7 @@ func (tabMgr *TableManager) tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	snid := msg.Ping.SubNetId
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
-		tabLog.Debug("tabMgrFindNodeRsp: invalid subnet: %x", snid)
+		log.Debugf("tabMgrFindNodeRsp: invalid subnet: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
@@ -807,13 +791,13 @@ func (tabMgr *TableManager) tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 
 	// delete the active instance
 	if eno := mgr.tabDeleteActiveBoundInst(inst); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongRsp: tabDeleteActiveQueryInst failed, eno: %d, subnet: %x", eno, snid)
+		log.Debugf("tabMgrPingpongRsp: tabDeleteActiveQueryInst failed, eno: %d, subnet: %x", eno, snid)
 		return eno
 	}
 
 	// try to active more BOUND instances
 	if eno := mgr.tabActiveBoundInst(); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongRsp: tabActiveBoundInst failed, eno: %d, subnet: %x", eno, snid)
+		log.Debugf("tabMgrPingpongRsp: tabActiveBoundInst failed, eno: %d, subnet: %x", eno, snid)
 		return eno
 	}
 
@@ -825,7 +809,7 @@ func (tabMgr *TableManager) tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 	// Update last pong time
 	pot := time.Now()
 	if eno := mgr.tabBucketUpdateBoundTime(NodeID(inst.req.(*um.Ping).To.NodeId), nil, &pot); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongRsp: tabBucketUpdateBoundTime failed, eno: %d, subnet: %x", eno, snid)
+		log.Debugf("tabMgrPingpongRsp: tabBucketUpdateBoundTime failed, eno: %d, subnet: %x", eno, snid)
 		return eno
 	}
 
@@ -840,14 +824,14 @@ func (tabMgr *TableManager) tabMgrPingpongRsp(msg *sch.NblPingRsp) TabMgrErrno {
 		sha: *TabNodeId2Hash(NodeID(msg.Pong.From.NodeId)),
 	}
 	if eno := mgr.tabUpdateNodeDb4Bounding(&n, nil, &pot); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrPingpongRsp: tabUpdateNodeDb4Bounding failed, eno: %d, subnet: %x", eno, snid)
+		log.Debugf("tabMgrPingpongRsp: tabUpdateNodeDb4Bounding failed, eno: %d, subnet: %x", eno, snid)
 		return eno
 	}
 
 	// response to the discover manager task
 	if tabMgr.tabIsBootstrapNode(&n.ID) == false {
 		if eno := mgr.tabDiscoverResp(&msg.Pong.From); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrPingpongRsp: tabDiscoverResp failed, eno: %d, subnet: %x", eno, snid)
+			log.Debugf("tabMgrPingpongRsp: tabDiscoverResp failed, eno: %d, subnet: %x", eno, snid)
 			return eno
 		}
 	}
@@ -859,13 +843,13 @@ func (tabMgr *TableManager) tabMgrPingedInd(ping *um.Ping) TabMgrErrno {
 	snid := ping.SubNetId
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
-		tabLog.Debug("tabMgrPingedInd: invalid snid: %x", snid)
+		log.Debugf("tabMgrPingedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
 	if mgr == nil {
 		if mgr = tabMgr.switch2RootInst(); mgr == nil {
-			tabLog.Debug("tabMgrPingedInd: invalid snid: %x", snid)
+			log.Debugf("tabMgrPingedInd: invalid snid: %x", snid)
 			return TabMgrEnoNotFound
 		}
 	}
@@ -888,13 +872,13 @@ func (tabMgr *TableManager) tabMgrPongedInd(pong *um.Pong) TabMgrErrno {
 	snid := pong.SubNetId
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
-		tabLog.Debug("tabMgrPongedInd: invalid snid: %x", snid)
+		log.Debugf("tabMgrPongedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
 	if mgr == nil {
 		if mgr = tabMgr.switch2RootInst(); mgr == nil {
-			tabLog.Debug("tabMgrPongedInd: invalid snid: %x", snid)
+			log.Debugf("tabMgrPongedInd: invalid snid: %x", snid)
 			return TabMgrEnoNotFound
 		}
 	}
@@ -917,13 +901,13 @@ func (tabMgr *TableManager) tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno 
 	snid := findNode.SubNetId
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !tabMgr.cfg.bootstrapNode && !ok {
-		tabLog.Debug("tabMgrQueriedInd: invalid snid: %x", snid)
+		log.Debugf("tabMgrQueriedInd: invalid snid: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
 	if mgr == nil {
 		if mgr = tabMgr.switch2RootInst(); mgr == nil {
-			tabLog.Debug("tabMgrQueriedInd: invalid snid: %x", snid)
+			log.Debugf("tabMgrQueriedInd: invalid snid: %x", snid)
 			return TabMgrEnoNotFound
 		}
 	}
@@ -933,7 +917,7 @@ func (tabMgr *TableManager) tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno 
 	if mgr.cfg.bootstrapNode {
 		if TabCheckPrivateIp(findNode.From.IP) {
 			if eno := mgr.tabUpdateBootstarpNode(&findNode.From); eno != TabMgrEnoNone {
-				tabLog.Debug("tabMgrQueriedInd: tabUpdateBootstarpNode failed, eno: %d", eno)
+				log.Debugf("tabMgrQueriedInd: tabUpdateBootstarpNode failed, eno: %d", eno)
 				return eno
 			}
 			return TabMgrEnoNone
@@ -945,12 +929,12 @@ func (tabMgr *TableManager) tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno 
 	}
 
 	if eno := mgr.tabAddPendingBoundInst(&findNode.From); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrQueriedInd: tabAddPendingBoundInst failed, eno: %d", eno)
+		log.Debugf("tabMgrQueriedInd: tabAddPendingBoundInst failed, eno: %d", eno)
 		return eno
 	}
 
 	if eno := mgr.tabActiveBoundInst(); eno != TabMgrEnoNone {
-		tabLog.Debug("tabMgrQueriedInd: tabActiveBoundInst failed, eno: %d", eno)
+		log.Debugf("tabMgrQueriedInd: tabActiveBoundInst failed, eno: %d", eno)
 		return eno
 	}
 
@@ -958,7 +942,7 @@ func (tabMgr *TableManager) tabMgrQueriedInd(findNode *um.FindNode) TabMgrErrno 
 }
 
 func (tabMgr *TableManager) tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgrErrno {
-	tabLog.Debug("tabMgrNatReadyInd: nat type: %s", msg.NatType)
+	log.Debugf("tabMgrNatReadyInd: nat type: %s", msg.NatType)
 	if msg.NatType == config.NATT_NONE {
 		tabMgr.pubTcpIp = tabMgr.cfg.local.IP
 		tabMgr.pubTcpPort = int(tabMgr.cfg.local.TCP)
@@ -977,7 +961,7 @@ func (tabMgr *TableManager) tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgr
 		schMsg := sch.SchMessage{}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqUdp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			log.Debugf("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 			return TabMgrEnoScheduler
 		}
 		reqTcp := reqUdp
@@ -987,7 +971,7 @@ func (tabMgr *TableManager) tabMgrNatReadyInd(msg *sch.MsgNatMgrReadyInd) TabMgr
 		schMsg = sch.SchMessage{}
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnNatMgr, sch.EvNatMgrMakeMapReq, &reqTcp)
 		if eno := tabMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			tabLog.Debug("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
+			log.Debugf("tabMgrNatReadyInd: SchSendMessage failed, eno: %d", eno)
 			return TabMgrEnoScheduler
 		}
 	}
@@ -1006,9 +990,9 @@ func (tabMgr *TableManager) tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Ta
 	// address is needed, for rebuilding about address switching, see function
 	// tabMgrNatPubAddrUpdateInd for details please.
 	if !nat.NatIsResultOk(msg.Result) {
-		tabLog.Debug("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
+		log.Debugf("tabMgrNatMakeMapRsp: fail reported, msg: %+v", *msg)
 	}
-	tabLog.Debug("tabMgrNatMakeMapRsp: proto: %s, ip:port = %s:%d",
+	log.Debugf("tabMgrNatMakeMapRsp: proto: %s, ip:port = %s:%d",
 		msg.Proto, msg.PubIp.String(), msg.PubPort)
 
 	proto := strings.ToLower(msg.Proto)
@@ -1017,7 +1001,7 @@ func (tabMgr *TableManager) tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Ta
 		if tabMgr.natUdpResult && nat.NatIsStatusOk(msg.Status) {
 			tabMgr.pubUdpIp = msg.PubIp
 			tabMgr.pubUdpPort = msg.PubPort
-			tabLog.Debug("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
+			log.Debugf("tabMgrNatMakeMapRsp: public chain udp addr: %s:%d",
 				tabMgr.pubUdpIp.String(), tabMgr.pubUdpPort)
 		} else {
 			tabMgr.pubUdpIp = net.IPv4zero
@@ -1028,7 +1012,7 @@ func (tabMgr *TableManager) tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Ta
 		if tabMgr.natTcpResult && nat.NatIsStatusOk(msg.Status) {
 			tabMgr.pubTcpIp = msg.PubIp
 			tabMgr.pubTcpPort = msg.PubPort
-			tabLog.Debug("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
+			log.Debugf("tabMgrNatMakeMapRsp: public chain tcp addr: %s:%d",
 				tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort)
 		} else {
 			tabMgr.pubTcpIp = net.IPv4zero
@@ -1038,7 +1022,7 @@ func (tabMgr *TableManager) tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Ta
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrMakeMapRsp, msg)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
-		tabLog.Debug("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
+		log.Debugf("tabMgrNatMakeMapRsp: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
@@ -1049,7 +1033,7 @@ func (tabMgr *TableManager) tabMgrNatMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) Ta
 
 	if tabMgr.natUdpResult {
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrNatMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
+			log.Debugf("tabMgrNatMakeMapRsp: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		} else if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
@@ -1065,9 +1049,9 @@ func (tabMgr *TableManager) tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrU
 	// see function nat.refreshInstance, the indication would be received after nat manager
 	// refreshed itself ok, here the msg.Result must be good.
 	if !nat.NatIsStatusOk(msg.Status) {
-		tabLog.Debug("tabMgrNatPubAddrUpdateInd: fail reported, msg: %+v", *msg)
+		log.Debugf("tabMgrNatPubAddrUpdateInd: fail reported, msg: %+v", *msg)
 	}
-	tabLog.Debug("tabMgrNatPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
+	log.Debugf("tabMgrNatPubAddrUpdateInd: proto: %s, old: %s:%d; new: %s:%d",
 		msg.Proto, tabMgr.pubTcpIp.String(), tabMgr.pubTcpPort, msg.PubIp.String(), msg.PubPort)
 
 	old := tabMgr.natUdpResult
@@ -1096,35 +1080,35 @@ func (tabMgr *TableManager) tabMgrNatPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrU
 		tabMgr.sdl.SchMakeMessage(&schMsg, tabMgr.ptnMe, tabMgr.ptnPeerMgr, sch.EvNatMgrPubAddrUpdateInd, msg)
 		tabMgr.sdl.SchSendMessage(&schMsg)
 	} else {
-		tabLog.Debug("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
+		log.Debugf("tabMgrNatPubAddrUpdateInd: unknown protocol reported: %s", proto)
 		return TabMgrEnoParameter
 	}
 
 	// check to start or stop auto-refreshing when updated
 	if tabMgr.natUdpResult {
 		if !tabMgr.pubUdpIp.Equal(oldUdpIp) || oldUdpPort != tabMgr.pubUdpPort {
-			tabLog.Debug("tabMgrNatPubAddrUpdateInd: call pubAddrSwitchPrepare")
+			log.Debugf("tabMgrNatPubAddrUpdateInd: call pubAddrSwitchPrepare")
 			if eno := tabMgr.pubAddrSwitchPrepare(); eno != TabMgrEnoNone {
-				tabLog.Debug("tabMgrNatPubAddrUpdateInd: pubAddrSwitchPrepare failed, eno: %d", eno)
+				log.Debugf("tabMgrNatPubAddrUpdateInd: pubAddrSwitchPrepare failed, eno: %d", eno)
 				return eno
 			}
 		}
-		tabLog.Debug("tabMgrNatPubAddrUpdateInd: call switch2NatAddr")
+		log.Debugf("tabMgrNatPubAddrUpdateInd: call switch2NatAddr")
 		if eno := tabMgr.switch2NatAddr(proto); eno != TabMgrEnoNone {
-			tabLog.Debug("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
+			log.Debugf("tabMgrNatPubAddrUpdateInd: switch2NatAddr failed, eno: %d", eno)
 			return eno
 		}
 		if proto == "udp" {
 			for _, mgr := range tabMgr.subNetMgrList {
 				// notice: here we start refreshing with the local node identity, so, peer would update to our
 				// new address with this identity(to overlap the old one), it can try to connect us also.
-				tabLog.Debug("tabMgrNatPubAddrUpdateInd: call startSubnetRefresh, snid: %x", mgr.snid)
+				log.Debugf("tabMgrNatPubAddrUpdateInd: call startSubnetRefresh, snid: %x", mgr.snid)
 				mgr.startSubnetRefresh(&mgr.cfg.local.ID)
 			}
 		}
 	} else if old {
 		for _, mgr := range tabMgr.subNetMgrList {
-			tabLog.Debug("tabMgrNatPubAddrUpdateInd: call stopSubnetRefresh, snid: %x", mgr.snid)
+			log.Debugf("tabMgrNatPubAddrUpdateInd: call stopSubnetRefresh, snid: %x", mgr.snid)
 			mgr.stopSubnetRefresh()
 		}
 	}
@@ -1160,28 +1144,18 @@ func (ndbc *NodeDbCleaner) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessa
 
 func (ndbc *NodeDbCleaner) ndbcProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 	var eno TabMgrErrno
-
 	switch msg.Id {
-
 	case sch.EvSchPoweron:
 		eno = ndbc.ndbcPoweron(ptn)
-
 	case sch.EvSchPoweroff:
 		eno = ndbc.ndbcPoweroff(ptn)
-
 	case sch.EvNdbCleanerTimer:
 		eno = ndbc.ndbcAutoCleanTimerHandler()
-
 	default:
-		tabLog.Debug("NdbcProc: invalid message: %d", msg.Id)
+		log.Debugf("NdbcProc: invalid message: %d", msg.Id)
 		return sch.SchEnoInternal
 	}
-
-	if eno != TabMgrEnoNone {
-		tabLog.Debug("NdbcProc: errors, eno: %d", eno)
-		return sch.SchEnoUserTask
-	}
-
+	log.Tracef("NdbcProc: get out, msg: %d, eno: %d", msg.Id, eno)
 	return sch.SchEnoNone
 }
 
@@ -1190,7 +1164,7 @@ func (ndbc *NodeDbCleaner) ndbcPoweron(ptn interface{}) TabMgrErrno {
 	// if it's a static type, no database cleaner needed
 	sdl := sch.SchGetScheduler(ptn)
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
-		tabLog.Debug("ndbcPoweron: static subnet type, nodeDbCleaner will be done ...")
+		log.Debugf("ndbcPoweron: static subnet type, nodeDbCleaner will be done ...")
 		sdl.SchTaskDone(ptn, ndbc.name, sch.SchEnoNone)
 		return TabMgrEnoNone
 	}
@@ -1211,7 +1185,7 @@ func (ndbc *NodeDbCleaner) ndbcPoweron(ptn interface{}) TabMgrErrno {
 	)
 
 	if eno, tid = ndbc.sdl.SchSetTimer(ptn, &tmd); eno != sch.SchEnoNone {
-		tabLog.Debug("ndbcPoweron: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("ndbcPoweron: SchSetTimer failed, eno: %d", eno)
 		return TabMgrEnoScheduler
 	}
 
@@ -1222,7 +1196,7 @@ func (ndbc *NodeDbCleaner) ndbcPoweron(ptn interface{}) TabMgrErrno {
 
 func (ndbc *NodeDbCleaner) ndbcPoweroff(ptn interface{}) TabMgrErrno {
 
-	tabLog.Debug("ndbcPoweroff: task will be done")
+	log.Debugf("ndbcPoweroff: task will be done")
 
 	if ndbc.tid != sch.SchInvalidTid {
 		ndbc.sdl.SchKillTimer(ptn, ndbc.tid)
@@ -1237,16 +1211,16 @@ func (ndbc *NodeDbCleaner) ndbcPoweroff(ptn interface{}) TabMgrErrno {
 }
 
 func (ndbc *NodeDbCleaner) ndbcAutoCleanTimerHandler() TabMgrErrno {
-	tabLog.Debug("ndbcAutoCleanTimerHandler: " +
+	log.Debugf("ndbcAutoCleanTimerHandler: " +
 		"auto cleanup timer expired, it's time to clean ...")
 
 	err := ndbc.tabMgr.nodeDb.expireNodes()
 	if err != nil {
-		tabLog.Debug("ndbcAutoCleanTimerHandler: cleanup failed, err: %s", err.Error())
+		log.Debugf("ndbcAutoCleanTimerHandler: cleanup failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
 
-	tabLog.Debug("ndbcAutoCleanTimerHandler: cleanup ok")
+	log.Debugf("ndbcAutoCleanTimerHandler: cleanup ok")
 
 	return TabMgrEnoNone
 }
@@ -1254,7 +1228,7 @@ func (ndbc *NodeDbCleaner) ndbcAutoCleanTimerHandler() TabMgrErrno {
 func (tabMgr *TableManager) tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 	cfg := config.P2pConfig4TabManager(tabMgr.sdl.SchGetP2pCfgName())
 	if cfg == nil {
-		tabLog.Debug("tabGetConfig: P2pConfig4TabManager failed")
+		log.Debugf("tabGetConfig: P2pConfig4TabManager failed")
 		return TabMgrEnoConfig
 	}
 
@@ -1291,7 +1265,7 @@ func (tabMgr *TableManager) tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 			tabMgr.snid = config.ZeroSubNet
 		}
 	} else {
-		tabLog.Debug("tabGetConfig: invalid network type: %d", tabMgr.networkType)
+		log.Debugf("tabGetConfig: invalid network type: %d", tabMgr.networkType)
 		return TabMgrEnoConfig
 	}
 
@@ -1300,15 +1274,15 @@ func (tabMgr *TableManager) tabGetConfig(tabCfg *tabConfig) TabMgrErrno {
 
 func (tabMgr *TableManager) tabNodeDbPrepare() TabMgrErrno {
 	if tabMgr.nodeDb != nil {
-		tabLog.Debug("tabNodeDbPrepare: node database had been opened")
+		log.Debugf("tabNodeDbPrepare: node database had been opened")
 		return TabMgrEnoDatabase
 	}
 
 	dbPath := path.Join(tabMgr.cfg.dataDir, tabMgr.cfg.name, tabMgr.cfg.nodeDb)
 	if runtime.GOOS == "windows" {
-		tabLog.Debug("tabMgr: nodeDb will be created at: %s", strings.Replace(dbPath, "/", "\\", -1))
+		log.Debugf("tabMgr: nodeDb will be created at: %s", strings.Replace(dbPath, "/", "\\", -1))
 	} else {
-		tabLog.Debug("tabMgr: nodeDb will be created at: %s", dbPath)
+		log.Debugf("tabMgr: nodeDb will be created at: %s", dbPath)
 	}
 
 	if tabMgr.cfg.noHistory {
@@ -1319,7 +1293,7 @@ func (tabMgr *TableManager) tabNodeDbPrepare() TabMgrErrno {
 
 	db, err := newNodeDB(dbPath, ndbVersion, NodeID(tabMgr.cfg.local.ID))
 	if err != nil {
-		tabLog.Debug("tabNodeDbPrepare: newNodeDB failed, err: %s", err.Error())
+		log.Debugf("tabNodeDbPrepare: newNodeDB failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
 
@@ -1334,7 +1308,7 @@ func TabNodeId2Hash(id NodeID) *Hash {
 
 func (tabMgr *TableManager) tabSetupLocalHashId() TabMgrErrno {
 	if cap(tabMgr.shaLocal) != 32 {
-		tabLog.Debug("tabSetupLocalHashId: hash identity should be 32 bytes")
+		log.Debugf("tabSetupLocalHashId: hash identity should be 32 bytes")
 		return TabMgrEnoParameter
 	}
 
@@ -1348,28 +1322,28 @@ func (tabMgr *TableManager) tabRelatedTaskPrepare(ptnMe interface{}) TabMgrErrno
 	var eno = sch.SchEnoNone
 
 	if eno, tabMgr.ptnNgbMgr = tabMgr.sdl.SchGetUserTaskNode(sch.NgbMgrName); eno != sch.SchEnoNone {
-		tabLog.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.NgbMgrName)
+		log.Debugf("tabRelatedTaskPrepare: get task node failed, name: %s", sch.NgbMgrName)
 		return TabMgrEnoScheduler
 	}
 
 	if eno, tabMgr.ptnDcvMgr = tabMgr.sdl.SchGetUserTaskNode(sch.DcvMgrName); eno != sch.SchEnoNone {
-		tabLog.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
+		log.Debugf("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
 		return TabMgrEnoScheduler
 	}
 
 	if eno, tabMgr.ptnNatMgr = tabMgr.sdl.SchGetUserTaskNode(sch.NatMgrName); eno != sch.SchEnoNone {
-		tabLog.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
+		log.Debugf("tabRelatedTaskPrepare: get task node failed, name: %s", sch.DcvMgrName)
 		return TabMgrEnoScheduler
 	}
 
 	if eno, tabMgr.ptnPeerMgr = tabMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName); eno != sch.SchEnoNone {
-		tabLog.Debug("tabRelatedTaskPrepare: get task node failed, name: %s", sch.PeerMgrName)
+		log.Debugf("tabRelatedTaskPrepare: get task node failed, name: %s", sch.PeerMgrName)
 		return TabMgrEnoScheduler
 	}
 
 	if tabMgr.ptnMe == nil || tabMgr.ptnNgbMgr == nil || tabMgr.ptnDcvMgr == nil ||
 		tabMgr.ptnNatMgr == nil || tabMgr.ptnPeerMgr == nil {
-		tabLog.Debug("tabRelatedTaskPrepare: invaid task node pointer")
+		log.Debugf("tabRelatedTaskPrepare: invaid task node pointer")
 		return TabMgrEnoInternal
 	}
 
@@ -1393,13 +1367,13 @@ func (tabMgr *TableManager) tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrEr
 	// is empty, this flag is set to false;
 	// If the "tid"(target identity) passed in is nil, we build a random one;
 	if _, ok := tabMgr.subNetMgrList[*snid]; !ok {
-		tabLog.Debug("tabRefresh: none of manager for subnet: %x", *snid)
+		log.Debugf("tabRefresh: none of manager for subnet: %x", *snid)
 		return TabMgrEnoNotFound
 	}
 	mgr := tabMgr.subNetMgrList[*snid]
 	mgr.refreshing = len(mgr.queryIcb) >= TabInstQueringMax
 	if mgr.refreshing == true {
-		tabLog.Debug("tabRefresh: already in refreshing")
+		log.Debugf("tabRefresh: already in refreshing")
 		return TabMgrEnoNone
 	}
 
@@ -1417,7 +1391,7 @@ func (tabMgr *TableManager) tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrEr
 	target[config.NodeIDBytes-1] = snid[1]
 	if nodes = mgr.tabClosest(Closest4Querying, target, -1, TabInstQPendingMax); len(nodes) == 0 {
 
-		tabLog.Debug("tabRefresh: snid: %x, seems all buckets are empty, " +
+		log.Tracef("tabRefresh: snid: %x, seems all buckets are empty, " +
 			"set local as target and try seeds from database and bootstrap nodes ...",
 			*snid)
 
@@ -1426,7 +1400,7 @@ func (tabMgr *TableManager) tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrEr
 		seedsBackup := make([]*Node, 0)
 
 		if len(seeds) == 0 {
-			tabLog.Debug("tabRefresh: empty seeds set from nodes database")
+			log.Debugf("tabRefresh: empty seeds set from nodes database")
 		} else {
 			// Check if seeds from database need to be bound, if false, means
 			// that those seeds can be connected to without bounding procedure,
@@ -1441,7 +1415,7 @@ func (tabMgr *TableManager) tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrEr
 					}
 
 					if eno := mgr.tabDiscoverResp(&umNode); eno != TabMgrEnoNone {
-						tabLog.Debug("tabRefresh: tabDiscoverResp failed, eno: %d", eno)
+						log.Debugf("tabRefresh: tabDiscoverResp failed, eno: %d", eno)
 					}
 					continue
 				}
@@ -1451,17 +1425,17 @@ func (tabMgr *TableManager) tabRefresh(snid *SubNetworkID, tid *NodeID) TabMgrEr
 		nodes = append(nodes, mgr.cfg.bootstrapNodes...)
 		nodes = append(nodes, seedsBackup...)
 		if len(nodes) == 0 {
-			tabLog.Debug("tabRefresh: we can't do refreshing without any seeds")
+			log.Debugf("tabRefresh: can't go refreshing without any seeds")
 			return TabMgrEnoResource
 		}
 		if len(nodes) > TabInstQPendingMax {
-			tabLog.Debug("tabRefresh: too much seeds, truncated: %d", len(nodes)-TabInstQPendingMax)
+			log.Debugf("tabRefresh: too much seeds, truncated: %d", len(nodes)-TabInstQPendingMax)
 			nodes = nodes[:TabInstQPendingMax]
 		}
 	}
 
 	if eno := mgr.tabQuery(&target, nodes); eno != TabMgrEnoNone {
-		tabLog.Debug("tabRefresh: tabQuery failed, eno: %d", eno)
+		log.Debugf("tabRefresh: tabQuery failed, eno: %d", eno)
 		return eno
 	}
 	mgr.refreshing = true
@@ -1489,11 +1463,11 @@ func (tabMgr *TableManager) tabClosest(forWhat int, target NodeID, mbs int, size
 	var count = 0
 
 	if size == 0 || size > maxBonding {
-		tabLog.Debug("tabClosest: invalid size: %d, min: 1, max: %d", size, maxBonding)
+		log.Debugf("tabClosest: invalid size: %d, min: 1, max: %d", size, maxBonding)
 		return nil
 	}
 	if forWhat != Closest4Queried && forWhat != Closest4Querying {
-		tabLog.Debug("tabClosest: don't know what it's for: %d", forWhat)
+		log.Debugf("tabClosest: don't know what it's for: %d", forWhat)
 		return nil
 	}
 
@@ -1514,7 +1488,7 @@ func (tabMgr *TableManager) tabClosest(forWhat int, target NodeID, mbs int, size
 		err := error(nil)
 		targetSnid, err = GetSubnetIdentity(target, mbs)
 		if err != nil {
-			tabLog.Debug("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
+			log.Debugf("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
 			return nil
 		}
 	}
@@ -1543,7 +1517,7 @@ func (tabMgr *TableManager) tabClosest(forWhat int, target NodeID, mbs int, size
 
 					snid, err := GetSubnetIdentity(ne.ID, mbs)
 					if err != nil {
-						tabLog.Debug("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
+						log.Debugf("tabClosest: GetSubnetIdentity failed, err: %s", err.Error())
 						continue
 					}
 
@@ -1607,7 +1581,7 @@ func (tabMgr *TableManager) tabClosest(forWhat int, target NodeID, mbs int, size
 
 func (tabMgr *TableManager) tabSeedsFromDb(size int, age time.Duration) []*Node {
 	if size == 0 {
-		tabLog.Debug("tabSeedsFromDb: invalid zero size")
+		log.Debugf("tabSeedsFromDb: invalid zero size")
 		return nil
 	}
 
@@ -1620,12 +1594,12 @@ func (tabMgr *TableManager) tabSeedsFromDb(size int, age time.Duration) []*Node 
 
 	nodes := tabMgr.nodeDb.querySeeds(tabMgr.snid, size, age)
 	if nodes == nil {
-		tabLog.Debug("tabSeedsFromDb: nil nodes")
+		log.Debugf("tabSeedsFromDb: nil nodes")
 		return nil
 	}
 
 	if len(nodes) == 0 {
-		tabLog.Debug("tabSeedsFromDb: empty node table")
+		log.Debugf("tabSeedsFromDb: empty node table")
 		return nil
 	}
 
@@ -1642,7 +1616,7 @@ func (tabMgr *TableManager) tabQuery(target *NodeID, nodes []*Node) TabMgrErrno 
 	remain := len(nodes)
 	actNum := len(tabMgr.queryIcb)
 	if remain == 0 {
-		tabLog.Debug("tabQuery: invalid parameters, no node to be handled")
+		log.Debugf("tabQuery: invalid parameters, no node to be handled")
 		return TabMgrEnoParameter
 	}
 
@@ -1702,7 +1676,7 @@ func (tabMgr *TableManager) tabQuery(target *NodeID, nodes []*Node) TabMgrErrno 
 			msg.Expiration = 0
 			msg.Extra = nil
 
-			tabLog.Debug("tabQuery: EvNblFindNodeReq will be sent, ip: %s, udp: %d",
+			log.Tracef("tabQuery: EvNblFindNodeReq will be sent, ip: %s, udp: %d",
 				msg.To.IP.String(), msg.To.UDP)
 
 			var schMsg = sch.SchMessage{}
@@ -1710,7 +1684,7 @@ func (tabMgr *TableManager) tabQuery(target *NodeID, nodes []*Node) TabMgrErrno 
 			tabMgr.sdl.SchSendMessage(&schMsg)
 
 			if eno := tabMgr.tabStartTimer(icb, sch.TabFindNodeTimerId, findNodeExpiration); eno != TabMgrEnoNone {
-				tabLog.Debug("tabQuery: tabStartTimer failed, eno: %d", eno)
+				log.Debugf("tabQuery: tabStartTimer failed, eno: %d", eno)
 				return eno
 			}
 
@@ -1722,7 +1696,7 @@ func (tabMgr *TableManager) tabQuery(target *NodeID, nodes []*Node) TabMgrErrno 
 	// append nodes to pending table if any
 	for ; loop < remain; loop++ {
 		if len(tabMgr.queryPending) >= TabInstQPendingMax {
-			tabLog.Debug("tabQuery: pending query table full")
+			log.Debugf("tabQuery: pending query table full")
 			break
 		}
 
@@ -1760,7 +1734,7 @@ func (tabMgr *TableManager) tabFindInst(node *um.Node, state int) *instCtrlBlock
 		state != TabInstStateBonding &&
 		state != TabInstStateQTimeout &&
 		state != TabInstStateBTimeout) {
-		tabLog.Debug("tabFindInst: invalid parameters")
+		log.Debugf("tabFindInst: invalid parameters")
 		return nil
 	}
 
@@ -1788,12 +1762,12 @@ func (tabMgr *TableManager) tabUpdateNodeDb4Query(inst *instCtrlBlock, result in
 	var fnFailUpdate = func() TabMgrErrno {
 		id := NodeID(inst.req.(*um.FindNode).To.NodeId)
 		if node := tabMgr.nodeDb.node(snid, id); node == nil {
-			tabLog.Debug("tabUpdateNodeDb4Query: fnFailUpdate: node not exist, do nothing")
+			log.Debugf("tabUpdateNodeDb4Query: fnFailUpdate: node not exist")
 			return TabMgrEnoNone
 		}
 		fails := tabMgr.nodeDb.findFails(snid, id) + 1
 		if err := tabMgr.nodeDb.updateFindFails(snid, id, fails); err != nil {
-			tabLog.Debug("tabUpdateNodeDb4Query: fnFailUpdate: updateFindFails failed, err: %s", err.Error())
+			log.Debugf("tabUpdateNodeDb4Query: fnFailUpdate: updateFindFails failed, err: %s", err.Error())
 			return TabMgrEnoDatabase
 		}
 		return TabMgrEnoNone
@@ -1812,7 +1786,7 @@ func (tabMgr *TableManager) tabUpdateNodeDb4Query(inst *instCtrlBlock, result in
 		return fnFailUpdate()
 	}
 
-	tabLog.Debug("tabUpdateNodeDb4Query: nvalid context, update nothing, state: %d, result: %d",
+	log.Debugf("tabUpdateNodeDb4Query: invalid context, state: %d, result: %d",
 		inst.state, result)
 	return TabMgrEnoInternal
 }
@@ -1821,7 +1795,7 @@ func (tabMgr *TableManager) tabUpdateNodeDb4Bounding(pn *Node, pit *time.Time, p
 	snid := tabMgr.snid
 	if node := tabMgr.nodeDb.node(snid, pn.ID); node == nil {
 		if err := tabMgr.nodeDb.updateNode(snid, pn); err != nil {
-			tabLog.Debug("tabUpdateNodeDb4Bounding: updateNode fialed, err: %s, node: %s",
+			log.Debugf("tabUpdateNodeDb4Bounding: updateNode fialed, err: %s, node: %s",
 				err.Error(), fmt.Sprintf("%X", pn.ID))
 			return TabMgrEnoDatabase
 		}
@@ -1829,7 +1803,7 @@ func (tabMgr *TableManager) tabUpdateNodeDb4Bounding(pn *Node, pit *time.Time, p
 
 	if pit != nil {
 		if err := tabMgr.nodeDb.updateLastPing(snid, pn.ID, *pit); err != nil {
-			tabLog.Debug("tabUpdateNodeDb4Bounding: updateLastPing fialed, err: %s, node: %s",
+			log.Debugf("tabUpdateNodeDb4Bounding: updateLastPing fialed, err: %s, node: %s",
 				err.Error(), fmt.Sprintf("%X", pn.ID))
 			return TabMgrEnoDatabase
 		}
@@ -1837,7 +1811,7 @@ func (tabMgr *TableManager) tabUpdateNodeDb4Bounding(pn *Node, pit *time.Time, p
 
 	if pot != nil {
 		if err := tabMgr.nodeDb.updateLastPong(snid, pn.ID, *pot); err != nil {
-			tabLog.Debug("tabUpdateNodeDb4Bounding: updateLastPong fialed, err: %s, node: %s",
+			log.Debugf("tabUpdateNodeDb4Bounding: updateLastPong fialed, err: %s, node: %s",
 				err.Error(), fmt.Sprintf("%X", pn.ID))
 			return TabMgrEnoDatabase
 		}
@@ -1845,7 +1819,7 @@ func (tabMgr *TableManager) tabUpdateNodeDb4Bounding(pn *Node, pit *time.Time, p
 
 	fails := 0
 	if err := tabMgr.nodeDb.updateFindFails(snid, pn.ID, fails); err != nil {
-		tabLog.Debug("tabUpdateNodeDb4Bounding: fnFailUpdate: updateFindFails failed, err: %s",
+		log.Debugf("tabUpdateNodeDb4Bounding: fnFailUpdate: updateFindFails failed, err: %s",
 			err.Error())
 		return TabMgrEnoDatabase
 	}
@@ -1881,7 +1855,7 @@ func (tabMgr *TableManager) tabUpdateBucket(inst *instCtrlBlock, result int) Tab
 		return tabMgr.TabBucketAddNode(tabMgr.snid, node, &inst.qrt, &inst.pit, nil)
 
 	default:
-		tabLog.Debug("tabUpdateBucket: invalid context, update nothing, state: %d, result: %d",
+		log.Debugf("tabUpdateBucket: invalid context, state: %d, result: %d",
 			inst.state, result)
 		return TabMgrEnoInternal
 	}
@@ -1907,7 +1881,7 @@ func (tabMgr *TableManager) tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 	}
 
 	if err := tabMgr.nodeDb.updateNode(snid, &node); err != nil {
-		tabLog.Debug("tabUpdateBootstarpNode: updateNode failed, err: %s", err.Error())
+		log.Debugf("tabUpdateBootstarpNode: updateNode failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
 
@@ -1923,7 +1897,7 @@ func (tabMgr *TableManager) tabUpdateBootstarpNode(n *um.Node) TabMgrErrno {
 
 func (tabMgr *TableManager) tabStartTimer(inst *instCtrlBlock, tmt int, dur time.Duration) TabMgrErrno {
 	if tmt != sch.TabRefreshTimerId && inst == nil {
-		tabLog.Debug("tabStartTimer: invalid parameters")
+		log.Debugf("tabStartTimer: invalid parameters")
 		return TabMgrEnoParameter
 	}
 
@@ -1952,7 +1926,7 @@ func (tabMgr *TableManager) tabStartTimer(inst *instCtrlBlock, tmt int, dur time
 		td.Extra = inst
 
 	default:
-		tabLog.Debug("tabStartTimer: invalid time type, type: %d", tmt)
+		log.Debugf("tabStartTimer: invalid time type, type: %d", tmt)
 		return TabMgrEnoParameter
 	}
 
@@ -1970,7 +1944,7 @@ func (tabMgr *TableManager) tabStartTimer(inst *instCtrlBlock, tmt int, dur time
 	}
 
 	if eno, tid = tabMgr.sdl.SchSetTimer(tabMgr.ptnMe, &td); eno != sch.SchEnoNone {
-		tabLog.Debug("tabStartTimer: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("tabStartTimer: SchSetTimer failed, eno: %d", eno)
 		return TabMgrEnoScheduler
 	}
 
@@ -1996,11 +1970,11 @@ func (tabMgr *TableManager) tabBucketFindNode(id NodeID) (int, int, TabMgrErrno)
 func (tabMgr *TableManager) tabBucketRemoveNode(id NodeID) TabMgrErrno {
 	bidx, nidx, eno := tabMgr.tabBucketFindNode(id)
 	if eno != TabMgrEnoNone {
-		tabLog.Debug("tabBucketRemoveNode: not found, snid: %d, node: %x", tabMgr.snid, id)
+		log.Debugf("tabBucketRemoveNode: not found, snid: %d, node: %x", tabMgr.snid, id)
 		return eno
 	}
 	nodes := tabMgr.buckets[bidx].nodes
-	tabLog.Debug("tabBucketRemoveNode: removed, sid: %d, ip: %s, port: %d, node: %x",
+	log.Debugf("tabBucketRemoveNode: removed, sid: %d, ip: %s, port: %d, node: %x",
 		tabMgr.snid, nodes[nidx].IP.String(), nodes[nidx].UDP, id)
 	if nidx != len(nodes)-1 {
 		nodes = append(nodes[0:nidx], nodes[nidx+1:]...)
@@ -2018,7 +1992,7 @@ func (tabMgr *TableManager) tabBucketUpdateFailCounter(id NodeID, delta int) Tab
 	}
 	tabMgr.buckets[bidx].nodes[nidx].failCount += delta
 	if tabMgr.buckets[bidx].nodes[nidx].failCount >= maxFindnodeFailures {
-		tabLog.Debug("tabBucketUpdateFailCounter: threshold reached")
+		log.Debugf("tabBucketUpdateFailCounter: threshold reached")
 		return TabMgrEnoRemove
 	}
 	return TabMgrEnoNone
@@ -2132,11 +2106,11 @@ func (tabMgr *TableManager) tabBucketAddNode(n *um.Node, lastQuery *time.Time, l
 	// node must be pinged can it be added into a bucket, if pong does not received
 	// while adding, we set it a very old one.
 	if n == nil || lastQuery == nil || lastPing == nil {
-		tabLog.Debug("tabBucketAddNode: snid: %x, invalid parameters", tabMgr.snid)
+		log.Debugf("tabBucketAddNode: snid: %x, invalid parameters", tabMgr.snid)
 		return TabMgrEnoParameter
 	}
 
-	tabLog.Debug("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
+	log.Tracef("tabBucketAddNode: snid: %d, ip: %s, port: %d", tabMgr.snid, n.IP.String(), n.UDP)
 
 	if lastPong == nil {
 		var veryOld = time.Time{}
@@ -2262,7 +2236,7 @@ func (tabMgr *TableManager) tabDeleteActiveQueryInst(inst *instCtrlBlock) TabMgr
 
 func (tabMgr *TableManager) tabActiveQueryInst() TabMgrErrno {
 	if len(tabMgr.queryIcb) == TabInstQueringMax {
-		tabLog.Debug("tabActiveQueryInst: active query table full")
+		log.Debugf("tabActiveQueryInst: active query table full")
 		return TabMgrEnoNone
 	}
 
@@ -2299,7 +2273,7 @@ func (tabMgr *TableManager) tabActiveQueryInst() TabMgrErrno {
 			continue
 		}
 		if eno := tabMgr.tabQuery(p.target, nodes); eno != TabMgrEnoNone {
-			tabLog.Debug("tabActiveQueryInst: tabQuery failed, eno: %d", eno)
+			log.Debugf("tabActiveQueryInst: tabQuery failed, eno: %d", eno)
 			return eno
 		}
 		if len(tabMgr.queryPending) > 1 {
@@ -2332,7 +2306,7 @@ func (tabMgr *TableManager) tabDeleteActiveBoundInst(inst *instCtrlBlock) TabMgr
 
 func (tabMgr *TableManager) tabAddPendingBoundInst(node *um.Node) TabMgrErrno {
 	if len(tabMgr.boundPending) >= TabInstBPendingMax {
-		tabLog.Debug("tabAddPendingBoundInst: pending table is full")
+		log.Debugf("tabAddPendingBoundInst: pending table is full")
 		return TabMgrEnoResource
 	}
 
@@ -2408,9 +2382,7 @@ func (tabMgr *TableManager) tabActiveBoundInst() TabMgrErrno {
 				NodeId: pn.ID,
 			}
 			if eno := tabMgr.tabDiscoverResp(&umNode); eno != TabMgrEnoNone {
-				if tabLog.debug__ {
-					tabLog.Debug("tabActiveBoundInst: tabDiscoverResp failed, eno: %d", eno)
-				}
+				log.Tracef("tabActiveBoundInst: tabDiscoverResp failed, eno: %d", eno)
 			}
 			continue
 		}
@@ -2446,12 +2418,12 @@ func (tabMgr *TableManager) tabActiveBoundInst() TabMgrErrno {
 		pot := time.Time{}
 		pit := time.Now()
 		if eno := tabMgr.tabBucketUpdateBoundTime(NodeID(pn.ID), &pit, &pot); eno != TabMgrEnoNone && eno != TabMgrEnoNotFound {
-			tabLog.Debug("tabActiveBoundInst: tabBucketUpdateBoundTime failed, eno: %d", eno)
+			log.Debugf("tabActiveBoundInst: tabBucketUpdateBoundTime failed, eno: %d", eno)
 			return eno
 		}
 
 		if eno := tabMgr.tabUpdateNodeDb4Bounding(pn, &pit, &pot); eno != TabMgrEnoNone {
-			tabLog.Debug("tabActiveBoundInst: tabUpdateNodeDb4Bounding failed, eno: %d", eno)
+			log.Debugf("tabActiveBoundInst: tabUpdateNodeDb4Bounding failed, eno: %d", eno)
 			return eno
 		}
 
@@ -2503,7 +2475,7 @@ func (tabMgr *TableManager) tabDiscoverResp(node *um.Node) TabMgrErrno {
 func (tabMgr *TableManager) tabShouldBound(id NodeID) bool {
 	snid := tabMgr.snid
 	if node := tabMgr.nodeDb.node(snid, id); node == nil {
-		tabLog.Debug("tabShouldBound: not found, bounding needed")
+		log.Tracef("tabShouldBound: not found, bounding needed")
 		return true
 	}
 	failCnt := tabMgr.nodeDb.findFails(snid, id)
@@ -2520,9 +2492,7 @@ func (tabMgr *TableManager) tabShouldBoundDbNode(id NodeID) bool {
 func (tabMgr *TableManager) TabBucketAddNode(snid SubNetworkID, n *um.Node, lastQuery *time.Time, lastPing *time.Time, lastPong *time.Time) TabMgrErrno {
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
-		if tabLog.debug__ {
-			tabLog.Debug("TabBucketAddNode: none of manager instance for subnet: %x", snid)
-		}
+		log.Debugf("TabBucketAddNode: none of manager instance for subnet: %x", snid)
 		return TabMgrEnoNotFound
 	}
 	mgr.lock.Lock()
@@ -2533,9 +2503,7 @@ func (tabMgr *TableManager) TabBucketAddNode(snid SubNetworkID, n *um.Node, last
 func (tabMgr *TableManager) TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMgrErrno {
 	mgr, ok := tabMgr.subNetMgrList[snid]
 	if !ok {
-		if tabLog.debug__ {
-			tabLog.Debug("TabUpdateNode: none of manager instance for subnet: %x", snid)
-		}
+		log.Debugf("TabUpdateNode: none of manager instance for subnet: %x", snid)
 		return TabMgrEnoNotFound
 	}
 
@@ -2552,7 +2520,7 @@ func (tabMgr *TableManager) TabUpdateNode(snid SubNetworkID, umn *um.Node) TabMg
 		sha: *TabNodeId2Hash(NodeID(umn.NodeId)),
 	}
 	if err := mgr.nodeDb.updateNode(snid, &n); err != nil {
-		tabLog.Debug("TabUpdateNode: update: updateNode failed, err: %s", err.Error())
+		log.Debugf("TabUpdateNode: update: updateNode failed, err: %s", err.Error())
 		return TabMgrEnoDatabase
 	}
 	return TabMgrEnoNone
@@ -2614,7 +2582,7 @@ func GetSubnetIdentity(id config.NodeID, maskBits int) (config.SubNetworkID, err
 	//
 
 	if !nodeId2SubnetId {
-		tabLog.Debug("GetSubnetIdentity: not supported")
+		log.Debugf("GetSubnetIdentity: not supported")
 		return SubNetworkID{}, errors.New("not supported")
 	}
 
@@ -2646,7 +2614,7 @@ func (tabMgr *TableManager) switch2RootInst() *TableManager {
 	//
 
 	if !switch2Root {
-		tabLog.Debug("switch2RootInst: not supported")
+		log.Debugf("switch2RootInst: not supported")
 		return nil
 	}
 
@@ -2691,16 +2659,16 @@ func (tabMgr *TableManager) switch2NatAddr(proto string) TabMgrErrno {
 		}
 		return TabMgrEnoNone
 	default:
-		tabLog.Debug("switch2NatAddr: invalid protocol: %s", proto)
+		log.Debugf("switch2NatAddr: invalid protocol: %s", proto)
 	}
 	return TabMgrEnoParameter
 }
 
 func (tabMgr *TableManager) pubAddrSwitchPrepare() TabMgrErrno {
 	for snid, mgr := range tabMgr.subNetMgrList {
-		tabLog.Debug("pubAddrSwitchPrepare: call subnetPubAddrSwitchPrepare, snid: %x", snid)
+		log.Debugf("pubAddrSwitchPrepare: call subnetPubAddrSwitchPrepare, snid: %x", snid)
 		if eno := mgr.subnetPubAddrSwitchPrepare(); eno != TabMgrEnoNone {
-			tabLog.Debug("pubAddrSwitchPrepare: failed, subnet: %x", snid)
+			log.Debugf("pubAddrSwitchPrepare: failed, subnet: %x", snid)
 			return eno
 		}
 	}
@@ -2713,12 +2681,12 @@ func (tabMgr *TableManager) pubAddrSwitchPrepare() TabMgrErrno {
 	msg := sch.SchMessage{}
 	tabMgr.sdl.SchMakeMessage(&msg, tabMgr.ptnMe, tabMgr.ptnNgbMgr, sch.EvNatPubAddrSwitchInd, &ind)
 	tabMgr.sdl.SchSendMessage(&msg)
-	tabLog.Debug("pubAddrSwitchPrepare: EvNatPubAddrSwitchInd sent")
+	log.Debugf("pubAddrSwitchPrepare: EvNatPubAddrSwitchInd sent")
 	return TabMgrEnoNone
 }
 
 func (tabMgr *TableManager) subnetPubAddrSwitchPrepare() TabMgrErrno {
-	tabLog.Debug("subnetPubAddrSwitchPrepare: delete arfTid, snid: %x", tabMgr.snid)
+	log.Debugf("subnetPubAddrSwitchPrepare: delete arfTid, snid: %x", tabMgr.snid)
 	if tabMgr.arfTid != sch.SchInvalidTid {
 		tabMgr.sdl.SchKillTimer(tabMgr.ptnMe, tabMgr.arfTid)
 		tabMgr.arfTid = sch.SchInvalidTid
@@ -2726,16 +2694,16 @@ func (tabMgr *TableManager) subnetPubAddrSwitchPrepare() TabMgrErrno {
 	tabMgr.queryPending = make([]*queryPendingEntry, 0)
 	tabMgr.boundPending = make([]*Node, 0)
 	for _, icb := range tabMgr.queryIcb {
-		tabLog.Debug("subnetPubAddrSwitchPrepare: call tabDeleteActiveQueryInst, snid: %x", tabMgr.snid)
+		log.Debugf("subnetPubAddrSwitchPrepare: call tabDeleteActiveQueryInst, snid: %x", tabMgr.snid)
 		if eno := tabMgr.tabDeleteActiveQueryInst(icb); eno != TabMgrEnoNone {
-			tabLog.Debug("subnetPubAddrSwitchPrepare: tabDeleteActiveQueryInst failed, eno: %d", eno)
+			log.Debugf("subnetPubAddrSwitchPrepare: tabDeleteActiveQueryInst failed, eno: %d", eno)
 			return eno
 		}
 	}
 	for _, icb := range tabMgr.boundIcb {
-		tabLog.Debug("subnetPubAddrSwitchPrepare: call tabDeleteActiveBoundInst, snid: %x", tabMgr.snid)
+		log.Debugf("subnetPubAddrSwitchPrepare: call tabDeleteActiveBoundInst, snid: %x", tabMgr.snid)
 		if eno := tabMgr.tabDeleteActiveBoundInst(icb); eno != TabMgrEnoNone {
-			tabLog.Debug("subnetPubAddrSwitchPrepare: tabDeleteActiveBoundInst failed, eno: %d", eno)
+			log.Debugf("subnetPubAddrSwitchPrepare: tabDeleteActiveBoundInst failed, eno: %d", eno)
 			return eno
 		}
 	}

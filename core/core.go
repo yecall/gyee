@@ -578,7 +578,13 @@ func (c *Core) GetChainData(kind string, key []byte) []byte {
 	case ChainDataTypeLatestH:
 		return c.blockChain.LastBlock().Hash().Bytes()
 	case ChainDataTypeLatestN:
-		return new(big.Int).SetUint64(c.blockChain.CurrentBlockHeight()).Bytes()
+		h := c.blockChain.CurrentBlockHeight()
+		if h > 0 {
+			return new(big.Int).SetUint64(c.blockChain.CurrentBlockHeight()).Bytes()
+		} else {
+			a := [1]byte{0}
+			return a[:]
+		}
 	case ChainDataTypeBlockH:
 		b := c.blockPool.GetBlockByHash(common.BytesToHash(key))
 		if b != nil {

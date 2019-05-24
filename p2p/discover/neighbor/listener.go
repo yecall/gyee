@@ -32,26 +32,9 @@ import (
 	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
 	umsg "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type lsnMgrLogger struct {
-	debug__ bool
-}
-
-var lsnLog = lsnMgrLogger{
-	debug__: false,
-}
-
-func (log lsnMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // the listener task name
 const LsnMgrName = sch.NgbLsnName
@@ -113,7 +96,7 @@ func (lsnMgr *ListenerManager) lsnMgrProc(ptn interface{}, msg *sch.SchMessage) 
 	case sch.EvNblDataReq:
 		eno = lsnMgr.nblDataReq(ptn, msg.Body)
 	default:
-		lsnLog.Debug("LsnMgrProc: unknown message: %d", msg.Id)
+		log.Debugf("LsnMgrProc: unknown message: %d", msg.Id)
 		return sch.SchEnoMismatched
 	}
 
@@ -152,10 +135,10 @@ func (lsnMgr *ListenerManager) setupUdpConn() sch.SchErrno {
 
 	realAddr = conn.LocalAddr().(*net.UDPAddr)
 	if realAddr == nil {
-		lsnLog.Debug("setupUdpConn: LocalAddr failed")
+		log.Debugf("setupUdpConn: LocalAddr failed")
 		return sch.SchEnoOS
 	}
-	lsnLog.Debug("setupUdpConn: real address: %s", realAddr.String())
+	log.Debugf("setupUdpConn: real address: %s", realAddr.String())
 
 	lsnMgr.addr = *realAddr
 	lsnMgr.conn = conn
@@ -165,7 +148,7 @@ func (lsnMgr *ListenerManager) setupUdpConn() sch.SchErrno {
 func (lsnMgr *ListenerManager) start() sch.SchErrno {
 	var eno sch.SchErrno
 	if eno = lsnMgr.canStart(); eno != sch.SchEnoNone {
-		lsnLog.Debug("start: could not start, eno: %d", eno)
+		log.Debugf("start: could not start, eno: %d", eno)
 		return eno
 	}
 	msg := sch.SchMessage{}
@@ -202,28 +185,28 @@ func (lsnMgr *ListenerManager) procPoweron(ptn interface{}) sch.SchErrno {
 	sdl := lsnMgr.sdl
 
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
-		lsnLog.Debug("procPoweron: static type, lsnMgr is not needed, done it ...")
+		log.Debugf("procPoweron: static type, lsnMgr is not needed, done it ...")
 		return sdl.SchTaskDone(ptn, lsnMgr.name, sch.SchEnoNone)
 	}
 
 	lsnMgr.nextState(LmsNull)
 	if eno = lsnMgr.setupConfig(); eno != sch.SchEnoNone {
-		lsnLog.Debug("procPoweron：setupConfig failed, eno: %d", eno)
+		log.Debugf("procPoweron：setupConfig failed, eno: %d", eno)
 		return eno
 	}
 
 	lsnMgr.nextState(LmsInited)
 	if eno = lsnMgr.start(); eno != sch.SchEnoNone {
-		lsnLog.Debug("procPoweron：start failed, eno: %d", eno)
+		log.Debugf("procPoweron：start failed, eno: %d", eno)
 	}
 
 	return eno
 }
 
 func (lsnMgr *ListenerManager) procPoweroff(ptn interface{}) sch.SchErrno {
-	lsnLog.Debug("procPoweroff: task will be done, name: %s", lsnMgr.sdl.SchGetTaskName(ptn))
+	log.Debugf("procPoweroff: task will be done, name: %s", lsnMgr.sdl.SchGetTaskName(ptn))
 	if eno := lsnMgr.procStop(); eno != sch.SchEnoNone {
-		lsnLog.Debug("procPoweroff: procStop failed, eno: %d", eno)
+		log.Debugf("procPoweroff: procStop failed, eno: %d", eno)
 		return eno
 	}
 	return lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, lsnMgr.name, sch.SchEnoKilled)
@@ -237,7 +220,7 @@ func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 	var eno = sch.SchEnoUnknown
 	var ptnLoop interface{} = nil
 	if eno = lsnMgr.setupUdpConn(); eno != sch.SchEnoNone {
-		lsnLog.Debug("procStart：setupUdpConn failed, eno: %d", eno)
+		log.Debugf("procStart：setupUdpConn failed, eno: %d", eno)
 		lsnMgr.sdl.SchTaskDone(lsnMgr.ptnMe, lsnMgr.name, eno)
 		return eno
 	}
@@ -248,7 +231,7 @@ func (lsnMgr *ListenerManager) procStart() sch.SchErrno {
 	udpReader.chkAddr = lsnMgr.cfg.CheckAddr
 	eno, ptnLoop = lsnMgr.sdl.SchCreateTask(&udpReader.desc)
 	if eno != sch.SchEnoNone {
-		lsnLog.Debug("procStart: SchCreateTask failed, eno: %d, ptn: %p", eno, ptnLoop)
+		log.Debugf("procStart: SchCreateTask failed, eno: %d, ptn: %p", eno, ptnLoop)
 		return eno
 	}
 	lsnMgr.ptnReader = ptnLoop
@@ -263,7 +246,7 @@ func (lsnMgr *ListenerManager) procStop() sch.SchErrno {
 	lsnMgr.lock.Lock()
 	defer lsnMgr.lock.Unlock()
 	if eno := lsnMgr.canStop(); eno != sch.SchEnoNone {
-		lsnLog.Debug("procStop: we can't stop, eno: %d", eno)
+		log.Debugf("procStop: we can't stop, eno: %d", eno)
 		return eno
 	}
 	lsnMgr.conn.Close()
@@ -381,7 +364,7 @@ _loop:
 	eno = udpReader.lsnMgr.procStop()
 
 _udpReaderLoop_exit:
-	lsnLog.Debug("udpReaderLoop: exit ...")
+	log.Debugf("udpReaderLoop: exit ...")
 	return eno
 }
 
@@ -414,38 +397,37 @@ func (udpReader *UdpReaderTask) msgHandler(pbuf *[]byte, len int, from *net.UDPA
 		from: from,
 	}
 	if eno = udpReader.udpMsg.CheckUdpMsgFromPeer(from, udpReader.chkAddr); eno != umsg.UdpMsgEnoNone {
-		lsnLog.Debug("msgHandler: CheckUdpMsgFromPeer failed, eno: %d", eno)
+		log.Debugf("msgHandler: CheckUdpMsgFromPeer failed, eno: %d", eno)
 		return sch.SchEnoUserTask
 	}
 	udpReader.udpMsg.DebugMessageFromPeer()
 	msg := sch.SchMessage{}
 	udpReader.sdl.SchMakeMessage(&msg, udpReader.ptnMe, udpReader.ptnNgbMgr, sch.EvNblMsgInd, &udpMsgInd)
-	udpReader.sdl.SchSendMessage(&msg)
-	return sch.SchEnoNone
+	return udpReader.sdl.SchSendMessage(&msg)
 }
 
 func (lsnMgr *ListenerManager) sendUdpMsg(buf []byte, toAddr *net.UDPAddr) sch.SchErrno {
 	lsnMgr.lock.Lock()
 	defer lsnMgr.lock.Unlock()
 	if lsnMgr.conn == nil {
-		lsnLog.Debug("sendUdpMsg: invalid UDP connection")
+		log.Debugf("sendUdpMsg: invalid UDP connection")
 		return sch.SchEnoInternal
 	}
 	if len(buf) == 0 || toAddr == nil {
-		lsnLog.Debug("sendUdpMsg: empty to send")
+		log.Debugf("sendUdpMsg: empty to send")
 		return sch.SchEnoParameter
 	}
 	if err := lsnMgr.conn.SetWriteDeadline(time.Now().Add(NgbProtoWriteTimeout)); err != nil {
-		lsnLog.Debug("sendUdpMsg: SetDeadline failed, err: %s", err.Error())
+		log.Debugf("sendUdpMsg: SetDeadline failed, err: %s", err.Error())
 		return sch.SchEnoOS
 	}
 	sent, err := lsnMgr.conn.WriteToUDP(buf, toAddr)
 	if err != nil {
-		lsnLog.Debug("sendUdpMsg: WriteToUDP failed, err: %s", err.Error())
+		log.Debugf("sendUdpMsg: WriteToUDP failed, err: %s", err.Error())
 		return sch.SchEnoOS
 	}
 	if sent != len(buf) {
-		lsnLog.Debug("sendUdpMsg: WriteToUDP failed, len: %d, sent: %d", len(buf), sent)
+		log.Debugf("sendUdpMsg: WriteToUDP failed, len: %d, sent: %d", len(buf), sent)
 		return sch.SchEnoOS
 	}
 	return sch.SchEnoNone

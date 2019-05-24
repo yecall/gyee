@@ -31,40 +31,14 @@ import (
 	"github.com/pkg/errors"
 	config "github.com/yeeco/gyee/p2p/config"
 	dht "github.com/yeeco/gyee/p2p/dht"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	peer "github.com/yeeco/gyee/p2p/peer"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type chainShellLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var chainLog = chainShellLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log chainShellLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log chainShellLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // chain shell
 //
-
 const (
 	ShMgrName  = sch.ShMgrName // name registered in scheduler
 	rxChanSize = 128           // total rx chan capacity
@@ -115,12 +89,44 @@ type deDupVal struct {
 
 const (
 	chkkTime = time.Second * 8
-	keyTime  = time.Second * 8
+	keyTime  = time.Second * 55
 	MID_CHKK = peer.MID_CHKK
 	MID_RPTK = peer.MID_RPTK
 	MID_GCD  = peer.MID_GCD
 	MID_PCD  = peer.MID_PCD
 )
+
+type shMgrBcrStat struct {
+	bcrCount		int64
+	bcrEvCount		int64
+	bcrTxCount		int64
+	bcrBhCount		int64
+	bcrBkCount		int64
+	bcrUnknown		int64
+	bcrSkmFailed	int64
+	bcrSkmOk		int64
+	bcrExclude		int64
+	bcrUnactive		int64
+	bcrSendOk		int64
+	bcrSendFailed	int64
+	bcrChkkOk		int64
+	bcrChkkFailed	int64
+}
+
+type shMgrRxStat struct {
+	rxCount			int64
+	ckOkCount		int64
+	ckFailedCount	int64
+	rkOkCount		int64
+	rkFailedCount	int64
+	gcdOkCount		int64
+	gcdFailedCount	int64
+	pcdOkCount		int64
+	pcdFailedCount	int64
+	rxChainCount	int64
+	skmFailedCount	int64
+	skmOkCount		int64
+}
 
 type ShellManager struct {
 	sdl          *sch.Scheduler                      // pointer to scheduler
@@ -145,6 +151,7 @@ type ShellManager struct {
 	deDupDone    chan bool                           // deduplication routine done channel
 	deDupLock    sync.Mutex                          // deduplication lock
 	deDupKeyLock sync.Mutex                          // deduplication key lock
+	bcrStat	 	 shMgrBcrStat						 // statistics for broadcast request
 }
 
 //
@@ -161,7 +168,7 @@ func NewShellMgr() *ShellManager {
 	}
 
 	if shMgr.deDup {
-		shMgr.tmDedup = dht.NewTimerManager()
+		shMgr.tmDedup = dht.NewTimerManager(shMgr.sdlName, ShMgrName)
 		shMgr.deDupKeyMap = make(map[config.DsKey]interface{}, 0)
 		shMgr.deDupMap = make(map[deDupKey]*deDupVal, 0)
 		shMgr.deDupTiker = time.NewTicker(dht.OneTick)
@@ -237,7 +244,7 @@ func (shMgr *ShellManager) powerOn(ptn interface{}) sch.SchErrno {
 }
 
 func (shMgr *ShellManager) powerOff(ptn interface{}) sch.SchErrno {
-	chainLog.Debug("powerOff: task will be done ...")
+	log.Debugf("powerOff: task will be done ...")
 	close(shMgr.deDupDone)
 	return shMgr.sdl.SchTaskDone(shMgr.ptnMe, shMgr.name, sch.SchEnoPowerOff)
 }
@@ -263,58 +270,106 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 	shMgr.peerLock.Lock()
 	if _, dup := shMgr.peerActived[peerId]; dup {
-		log.Warnf("peerActiveInd: duplicated, peerId: %+v", peerId)
+		log.Debugf("peerActiveInd: duplicated, peerId: %+v", peerId)
 		shMgr.peerLock.Unlock()
 		return sch.SchEnoUserTask
 	}
 	shMgr.peerActived[peerId] = &peerInst
 	shMgr.peerLock.Unlock()
 
-	log.Infof("peerActiveInd: peer: sdl: %s, snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
+	log.Debugf("peerActiveInd: peer: " +
+		"sdl: %s, snid: %x, dir: %d, peer ip: %s, port: %d, id: %x",
 		shMgr.sdlName, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP, peerInfo.NodeId)
+
 	if local, ok := shMgr.localNode[peerInfo.Snid]; !ok {
-		log.Infof("peerActiveInd: not found, sdl: %s, subnet: %x", shMgr.sdlName,  peerInfo.Snid)
+		log.Debugf("peerActiveInd: not found, " +
+			"sdl: %s, subnet: %x",
+			shMgr.sdlName,  peerInfo.Snid)
 	} else {
-		log.Infof("peerActiveInd: local: sdl: %s, snid: %x, ip: %s, port: %d, id: %x",
+		log.Debugf("peerActiveInd: local: " +
+			"sdl: %s, snid: %x, ip: %s, port: %d, id: %x",
 			shMgr.sdlName, peerInfo.Snid, local.IP.String(), local.TCP, local.ID)
 	}
 
-	approc := func() {
+	rxProc := func() {
+
+		stat := shMgrRxStat{}
+		showStat := func() {
+			log.Debugf("peerActiveInd: rxProc: " +
+				"sdl: %s, snid: %x, dir: %d, peer ip: %s, port: %d, " +
+				"rxStat: %+v",
+				shMgr.sdlName, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP,
+				stat)
+		}
+
 		for {
 			select {
 			case rxPkg, ok := <-peerInst.rxChan:
 				if !ok {
-					log.Debugf("approc: exit, peer info: %+v", *peerInfo)
+					log.Debugf("rxProc: exit, peer info: %+v", *peerInfo)
 					return
+				}
+
+				if stat.rxCount++; stat.rxCount & 0x3f == 0 {
+					showStat()
 				}
 
 				if shMgr.deDup == false {
 					shMgr.rxChan <- rxPkg
+					stat.rxChainCount++
 					continue
 				}
 
+				log.Tracef("peerActiveInd: rxProc, from rxChan, " +
+					"sdl: %s, peer: %s, mid: %d, key: %x",
+					shMgr.sdlName, peerInfo.IP.String(), rxPkg.MsgId, rxPkg.Key)
+
 				if rxPkg.MsgId == int(MID_CHKK) {
 
-					shMgr.checkKeyFromPeer(rxPkg)
+					if eno := shMgr.checkKeyFromPeer(rxPkg); eno != sch.SchEnoNone {
+						log.Debugf("peerActiveInd: rxProc: CHKK from peer discarded, " +
+							"sdl: %s, eno: %d, key: %x",
+							shMgr.sdlName, eno, rxPkg.Key)
+						stat.ckFailedCount++
+					} else {
+						stat.ckOkCount++
+					}
 
 				} else if rxPkg.MsgId == int(MID_RPTK) {
 
-					shMgr.reportKeyFromPeer(rxPkg)
+					if eno := shMgr.reportKeyFromPeer(rxPkg); eno != sch.SchEnoNone {
+						log.Debugf("peerActiveInd: rxProc: RPTK from peer discarded, " +
+							"sdl: %s, eno: %d, key: %x",
+							shMgr.sdlName, eno, rxPkg.Key)
+						stat.rkFailedCount++
+					} else {
+						stat.rkOkCount++
+					}
 
 				} else if rxPkg.MsgId == int(MID_GCD) {
 
 					if eno := shMgr.getChainDataFromPeer(rxPkg); eno != sch.SchEnoNone {
-						log.Debugf("approc: GCD from peer discarded, eno: %d", eno)
+						log.Debugf("peerActiveInd: rxProc: GCD from peer discarded, " +
+							"sdl: %s, eno: %d, key: %x",
+							shMgr.sdlName, eno, rxPkg.Key)
+						stat.gcdFailedCount++
 					} else {
 						shMgr.rxChan <- rxPkg
+						stat.gcdOkCount++
+						stat.rxChainCount++
 					}
 
 				} else if rxPkg.MsgId == int(MID_PCD) {
 
 					if eno := shMgr.putChainDataFromPeer(rxPkg); eno != sch.SchEnoNone {
-						log.Debugf("approc: PCD from peer discarded, eno: %d", eno)
+						log.Debugf("peerActiveInd: rxProc: PCD from peer discarded, " +
+							"sdl: %s, eno: %d, key: %x",
+							shMgr.sdlName, eno, rxPkg.Key)
+						stat.pcdFailedCount++
 					} else {
 						shMgr.rxChan <- rxPkg
+						stat.pcdOkCount++
+						stat.rxChainCount++
 					}
 
 				} else {
@@ -325,22 +380,34 @@ func (shMgr *ShellManager) peerActiveInd(ind *sch.MsgShellPeerActiveInd) sch.Sch
 
 					if skm == SKM_OK {
 
+						log.Tracef("peerActiveInd: rxProc, to shMgr.rxChan, " +
+							"sdl: %s, key: %x",
+							shMgr.sdlName, k)
+
 						shMgr.rxChan <- rxPkg
+						stat.skmOkCount++
+						stat.rxChainCount++
 
 					} else if skm == SKM_DUPLICATED {
 
-						log.Debugf("approc: duplicated, key: %x", k)
+						log.Tracef("peerActiveInd: rxProc: duplicated, " +
+							"sdl: %s, key: %x",
+							shMgr.sdlName,k)
+						stat.skmFailedCount++
 
 					} else if skm == SKM_FAILED {
 
-						log.Debugf("approc: setKeyMap failed")
+						log.Debugf("peerActiveInd: rxProc: setKeyMap failed, " +
+							"sdl: %s, key: %x",
+							shMgr.sdlName,k)
+						stat.skmFailedCount++
 					}
 				}
 			}
 		}
 	}
 
-	go approc()
+	go rxProc()
 
 	return sch.SchEnoNone
 }
@@ -355,15 +422,15 @@ func (shMgr *ShellManager) peerCloseCfm(cfm *sch.MsgShellPeerCloseCfm) sch.SchEr
 		dir:    cfm.Dir,
 	}
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		log.Infof("peerCloseCfm: peer not found, sdl: %s, peerId: %+v", shMgr.sdlName, peerId)
+		log.Debugf("peerCloseCfm: peer not found, sdl: %s, peerId: %+v", shMgr.sdlName, peerId)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisClosing {
-		log.Infof("peerCloseCfm: status mismatched, sdl: %s, status: %d, peerId: %+v",
+		log.Debugf("peerCloseCfm: status mismatched, sdl: %s, status: %d, peerId: %+v",
 			shMgr.sdlName, peerInst.status, peerId)
 		return sch.SchEnoMismatched
 	} else {
 		hsInfo := peerInst.hsInfo
-		log.Infof("peerCloseCfm: sdl: %s, snid: %x, dir: %d, ip: %s, port: %d",
+		log.Debugf("peerCloseCfm: sdl: %s, snid: %x, dir: %d, ip: %s, port: %d",
 			shMgr.sdlName, hsInfo.Snid, hsInfo.Dir, hsInfo.IP.String(), hsInfo.TCP)
 		delete(shMgr.peerActived, peerId)
 		return sch.SchEnoNone
@@ -374,7 +441,8 @@ func (shMgr *ShellManager) peerCloseInd(ind *sch.MsgShellPeerCloseInd) sch.SchEr
 	// this would never happen since a peer instance would never kill himself in
 	// current implement, instead, event EvShellPeerAskToCloseInd should be sent
 	// to us to do this.
-	panic("peerCloseInd: should never be called!!!")
+	log.Errorf("peerCloseInd: should never be called, sdl: %s", shMgr.sdlName)
+	return sch.SchEnoUserTask
 }
 
 func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd) sch.SchErrno {
@@ -389,16 +457,16 @@ func (shMgr *ShellManager) peerAskToCloseInd(ind *sch.MsgShellPeerAskToCloseInd)
 	}
 
 	if peerInst, ok := shMgr.peerActived[peerId]; !ok {
-		log.Infof("peerAskToCloseInd: not found, sdl: %s, why: %s, snid: %x, dir: %d",
+		log.Debugf("peerAskToCloseInd: not found, sdl: %s, why: %s, snid: %x, dir: %d",
 			shMgr.sdlName, why, ind.Snid, ind.Dir)
 		return sch.SchEnoNotFound
 	} else if peerInst.status != pisActive {
-		log.Infof("peerAskToCloseInd: status mismatched, sdl: %s, why: %s, snid: %x, dir: %d, status: %d",
+		log.Debugf("peerAskToCloseInd: status mismatched, sdl: %s, why: %s, snid: %x, dir: %d, status: %d",
 			shMgr.sdlName, why, ind.Snid, ind.Dir, peerInst.status)
 		return sch.SchEnoMismatched
 	} else {
 		peerInfo := peerInst.hsInfo
-		log.Infof("peerAskToCloseInd: sdl: %s, why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
+		log.Debugf("peerAskToCloseInd: sdl: %s, why: %s, snid: %x, dir: %d, peer ip: %s, port: %d",
 			shMgr.sdlName, why, peerInfo.Snid, peerInfo.Dir, peerInfo.IP.String(), peerInfo.TCP)
 		req := sch.MsgPeCloseReq{
 			Ptn:  nil,
@@ -438,31 +506,91 @@ func (shMgr *ShellManager) reconfigReq(req *sch.MsgShellReconfigReq) sch.SchErrn
 }
 
 func (shMgr *ShellManager) broadcastReq(req *sch.MsgShellBroadcastReq) sch.SchErrno {
+	mt := req.MsgType
+	skmFailed := 0
+	skmOk := 0
+	exclude := 0
+	unactive := 0
+	sendOk := 0
+	sendFailed := 0
+	chkkOk := 0
+	chkkFailed := 0
+	doStat := func() {
+		shMgr.bcrStat.bcrCount++
+		if mt == sch.MSBR_MT_EV {
+			shMgr.bcrStat.bcrEvCount++
+		} else if mt == sch.MSBR_MT_TX {
+			shMgr.bcrStat.bcrTxCount++
+		} else if mt == sch.MSBR_MT_BLKH {
+			shMgr.bcrStat.bcrBhCount++
+		} else if mt == sch.MSBR_MT_BLK {
+			shMgr.bcrStat.bcrBkCount++
+		} else {
+			shMgr.bcrStat.bcrUnknown++
+		}
+		shMgr.bcrStat.bcrSkmFailed = shMgr.bcrStat.bcrSkmFailed + int64(skmFailed)
+		shMgr.bcrStat.bcrSkmOk = shMgr.bcrStat.bcrSkmOk + int64(skmFailed)
+		shMgr.bcrStat.bcrExclude = shMgr.bcrStat.bcrExclude + int64(exclude)
+		shMgr.bcrStat.bcrUnactive = shMgr.bcrStat.bcrUnactive + int64(unactive)
+		shMgr.bcrStat.bcrSendOk = shMgr.bcrStat.bcrSendOk + int64(sendOk)
+		shMgr.bcrStat.bcrSendFailed = shMgr.bcrStat.bcrSendFailed + int64(sendFailed)
+		shMgr.bcrStat.bcrChkkOk = shMgr.bcrStat.bcrChkkOk + int64(chkkOk)
+		shMgr.bcrStat.bcrChkkFailed = shMgr.bcrStat.bcrChkkFailed + int64(chkkFailed)
+		if shMgr.bcrStat.bcrCount & 0x3f == 0 {
+			log.Debugf("broadcastReq: sdl: %s, %+v", shMgr.sdlName, shMgr.bcrStat)
+		}
+	}
+	defer doStat()
+
 	switch req.MsgType {
 	case sch.MSBR_MT_EV, sch.MSBR_MT_TX, sch.MSBR_MT_BLKH, sch.MSBR_MT_BLK:
+		key := config.DsKey{}
+		copy(key[0:], req.Key)
 		if shMgr.deDup {
-			key := config.DsKey{}
-			copy(key[0:], req.Key)
 			skm := shMgr.setKeyMap(&key)
-			log.Debugf("broadcastReq: setKeyMap result skm: %d", skm)
 			if skm == SKM_DUPLICATED || skm == SKM_FAILED {
+				log.Debugf("broadcastReq: setKeyMap failed, " +
+					"sdl: %s, skm: %d, key: %x",
+					shMgr.sdlName, skm, key)
+				skmFailed++
 				return sch.SchEnoUserTask
 			}
+			skmOk++
 		}
 
 		for id, pe := range shMgr.peerActived {
 			if pe.status != pisActive {
-				log.Debugf("broadcastReq: not active, snid: %x, peer: %s", id.snid, pe.hsInfo.IP.String())
-			} else {
-				if req.Exclude == nil || (req.Exclude != nil && bytes.Compare(id.nodeId[0:], req.Exclude[0:]) != 0) {
+				log.Debugf("broadcastReq: not active, " +
+					"sdl: %s, snid: %x, peer: %s, key: %x",
+					shMgr.sdlName, id.snid, pe.hsInfo.IP.String(), key)
+				unactive++
+			} else 	if req.Exclude == nil || (req.Exclude != nil && bytes.Compare(id.nodeId[0:], req.Exclude[0:]) != 0) {
 					if shMgr.deDup == false {
 						eno := shMgr.send2Peer(pe, req)
-						log.Debugf("broadcastReq: send2Peer result eno: %d", eno)
+						if eno == sch.SchEnoNone {
+							sendOk++
+						} else {
+							sendFailed++
+						}
+						log.Tracef("broadcastReq: send2Peer result, " +
+							"sdl: %s, eno: %d, key: %x",
+							shMgr.sdlName, eno, key)
 					} else {
 						eno := shMgr.checkKey(pe, id, req)
-						log.Debugf("broadcastReq: checkKey result eno: %d", eno)
+						if eno == sch.SchEnoNone {
+							chkkOk++
+						} else {
+							chkkFailed++
+						}
+						log.Tracef("broadcastReq: checkKey result, " +
+							"sdl: %s, eno: %d, key: %x",
+							shMgr.sdlName, eno, key)
 					}
-				}
+			} else {
+				log.Tracef("broadcastReq: excluded, " +
+					"sdl: %s, key: %x",
+					shMgr.sdlName, key)
+				exclude++
 			}
 		}
 	default:
@@ -590,7 +718,7 @@ func (shMgr *ShellManager) checkKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchErr
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("checkKeyFromPeer: %s", msg.Chkk.String())
+	log.Tracef("checkKeyFromPeer: %s", msg.Chkk.String())
 
 	key := config.DsKey{}
 	copy(key[0:], rxPkg.Key)
@@ -649,7 +777,7 @@ func (shMgr *ShellManager) reportKeyFromPeer(rxPkg *peer.P2pPackageRx) sch.SchEr
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("reportKeyFromPeer: %s", msg.Rptk.String())
+	log.Tracef("reportKeyFromPeer: %s", msg.Rptk.String())
 
 	spid := shellPeerID{
 		snid:   rxPkg.PeerInfo.Snid,
@@ -727,29 +855,38 @@ func (shMgr *ShellManager) deDupTimerCb(el *list.Element, data interface{}) inte
 	// manager when any timer get expired. See function startDedup.
 	ddk, ok := data.(*deDupKey)
 	if !ok {
-		log.Errorf("deDupTimerCb: invalid timer data")
-		panic("deDupTimerCb: invalid data")
+		log.Errorf("deDupTimerCb: invalid timer data, sdl: %s", shMgr.sdlName)
+		return errors.New("deDupTimerCb: invalid data")
 	}
-
-	if ddv, ok := shMgr.deDupMap[*ddk]; ok {
-		shMgr.tmDedup.KillTimer(ddv.timer)
+	if _, ok := shMgr.deDupMap[*ddk]; ok {
+		log.Tracef("deDupTimerCb: sdl: %s, key: %x, peer: %x",
+			shMgr.sdlName, ddk.key, ddk.peer)
 		delete(shMgr.deDupMap, *ddk)
 		return nil
 	}
-
-	return errors.New(fmt.Sprintf("deDupTimerCb: not found, ddk: %+v", *ddk))
+	return errors.New(fmt.Sprintf("deDupTimerCb: not found, " +
+		"sdl: %s, key: %x, peer: %x",
+		shMgr.sdlName, ddk.key, ddk.peer))
 }
 
 func (shMgr *ShellManager) checkKey2Peer(spi *shellPeerInst, ddk *deDupKey) error {
 	if len(spi.txChan) >= cap(spi.txChan) {
-		log.Debugf("checkKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
-			spi.snid, spi.dir, spi.nodeId)
+
+		log.Debugf("checkKey2Peer: discarded, tx queue full, " +
+			"sdl: %s, snid: %x, dir: %d, peer: %x",
+
+			shMgr.sdlName, spi.snid, spi.dir, spi.nodeId)
+
 		if spi.txDiscrd += 1; spi.txDiscrd&0x1f == 0 {
-			log.Debugf("checkKey2Peer：sind: %x, dir: %d, txDiscrd: %d",
-				spi.snid, spi.dir, spi.txDiscrd)
+
+			log.Debugf("checkKey2Peer：" +
+				"sdl: %s, sind: %x, dir: %d, txDiscrd: %d",
+
+				shMgr.sdlName, spi.snid, spi.dir, spi.nodeId)
 		}
 		return sch.SchEnoResource
 	}
+
 	chkk := peer.CheckKey{}
 	chkk.Key = append(chkk.Key, ddk.key[0:]...)
 	upkg := new(peer.P2pPackage)
@@ -762,7 +899,6 @@ func (shMgr *ShellManager) checkKey2Peer(spi *shellPeerInst, ddk *deDupKey) erro
 }
 
 func (shMgr *ShellManager) reportKey2Peer(spi *shellPeerInst, key *config.DsKey, status int32) error {
-
 	if len(spi.txChan) >= cap(spi.txChan) {
 		log.Debugf("reportKey2Peer: discarded, tx queue full, snid: %x, dir: %d, peer: %x",
 			spi.hsInfo.Snid, spi.hsInfo.Dir, spi.hsInfo.NodeId)
@@ -878,6 +1014,7 @@ func (shMgr *ShellManager)getChainInfoRsp(msg *sch.MsgShellGetChainInfoRsp) sch.
 	peerInfo, ok := msg.Peer.(*peer.PeerInfo)
 	if !ok {
 		panic("getChainInfoRsp: invalid peer info pointer")
+		return sch.SchEnoUserTask
 	}
 	pid := shellPeerID {
 		snid: peerInfo.Snid,
@@ -955,7 +1092,7 @@ func (shMgr *ShellManager) deDupKeyCb(el *list.Element, data interface{}) interf
 	k, ok := data.(*config.DsKey)
 	if !ok {
 		log.Errorf("deDupKeyCb: invalid timer data")
-		panic("deDupKeyCb: invalid timer data")
+		return errors.New("deDupKeyCb: invalid timer data")
 	}
 	delete(shMgr.deDupKeyMap, *k)
 	return nil

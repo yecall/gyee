@@ -21,27 +21,10 @@
 package discover
 
 import (
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
-
-//
-// debug
-//
-type dcvLogger struct {
-	debug__ bool
-}
-
-var dcvLog = dcvLogger{
-	debug__: false,
-}
-
-func (log dcvLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // errno
 const (
@@ -85,10 +68,7 @@ func (dcvMgr *DiscoverManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchM
 }
 
 func (dcvMgr *DiscoverManager) dcvMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
-	if dcvLog.debug__ {
-		dcvLog.Debug("dcvMgrProc: msg: %d", msg.Id)
-	}
-
+	log.Tracef("dcvMgrProc: msg: %d", msg.Id)
 	var eno DcvMgrErrno
 	switch msg.Id {
 	case sch.EvSchPoweron:
@@ -102,18 +82,10 @@ func (dcvMgr *DiscoverManager) dcvMgrProc(ptn interface{}, msg *sch.SchMessage) 
 	case sch.EvDcvReconfigReq:
 		eno = dcvMgr.DcvMgrReconfigReq(msg.Body.(*sch.MsgDcvReconfigReq))
 	default:
-		dcvLog.Debug("DcvMgrProc: invalid message: %d", msg.Id)
+		log.Debugf("DcvMgrProc: invalid message: %d", msg.Id)
 		return sch.SchEnoUserTask
 	}
-
-	if dcvLog.debug__ {
-		dcvLog.Debug("dcvMgrProc: get out, msg: %d", msg.Id)
-	}
-
-	if eno != DcvMgrEnoNone {
-		dcvLog.Debug("DcvMgrProc: errors, eno: %d", eno)
-		return sch.SchEnoUserTask
-	}
+	log.Tracef("dcvMgrProc: get out, msg: %d, eno: %d", msg.Id, eno)
 	return sch.SchEnoNone
 }
 
@@ -125,23 +97,23 @@ func (dcvMgr *DiscoverManager) DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 
 	// if it's a static type, no discover manager needed
 	if sdl.SchGetP2pConfig().NetworkType == config.P2pNetworkTypeStatic {
-		dcvLog.Debug("DcvMgrPoweron: static type, dcvMgr is not needed")
+		log.Debugf("DcvMgrPoweron: static type, dcvMgr is not needed")
 		sdl.SchTaskDone(ptn, dcvMgr.name, sch.SchEnoNone)
 		return DcvMgrEnoNone
 	}
 
 	if eno, dcvMgr.ptnTab = sdl.SchGetUserTaskNode(sch.TabMgrName); eno != sch.SchEnoNone {
-		dcvLog.Debug("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
+		log.Debugf("DcvMgrPoweron: get task node failed, task: %s", sch.TabMgrName)
 		return DcvMgrEnoScheduler
 	}
 
 	if eno, dcvMgr.ptnPeMgr = dcvMgr.sdl.SchGetUserTaskNode(sch.PeerMgrName); eno != sch.SchEnoNone {
-		dcvLog.Debug("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
+		log.Debugf("DcvMgrPoweron: get task node failed, task: %s", sch.PeerMgrName)
 		return DcvMgrEnoScheduler
 	}
 
 	if dcvMgr.ptnMe == nil || dcvMgr.ptnTab == nil || dcvMgr.ptnPeMgr == nil {
-		dcvLog.Debug("DcvMgrPoweron: internal errors, invalid task node pointers")
+		log.Debugf("DcvMgrPoweron: internal errors, invalid task node pointers")
 		return DcvMgrEnoScheduler
 	}
 
@@ -149,7 +121,7 @@ func (dcvMgr *DiscoverManager) DcvMgrPoweron(ptn interface{}) DcvMgrErrno {
 }
 
 func (dcvMgr *DiscoverManager) DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
-	dcvLog.Debug("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.name)
+	log.Debugf("DcvMgrPoweroff: task will be done, name: %s", dcvMgr.name)
 	if dcvMgr.sdl.SchTaskDone(ptn, dcvMgr.name, sch.SchEnoKilled) != sch.SchEnoNone {
 		return DcvMgrEnoScheduler
 	}
@@ -159,7 +131,7 @@ func (dcvMgr *DiscoverManager) DcvMgrPoweroff(ptn interface{}) DcvMgrErrno {
 func (dcvMgr *DiscoverManager) DcvMgrFindNodeReq(req *sch.MsgDcvFindNodeReq) DcvMgrErrno {
 	var reqRefresh = sch.MsgTabRefreshReq{req.Snid, nil, nil}
 	if dcvMgr.more = req.More; dcvMgr.more <= 0 {
-		dcvLog.Debug("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
+		log.Debugf("DcvMgrFindNodeReq: no more needed, subnet: %x, more: %d",
 			reqRefresh.Snid, dcvMgr.more)
 		return DcvMgrEnoNone
 	}
@@ -178,12 +150,12 @@ func (dcvMgr *DiscoverManager) DcvMgrTabRefreshRsp(rsp *sch.MsgTabRefreshRsp) Dc
 	}
 
 	if _, inDeling := dcvMgr.reCfg.DelList[rsp.Snid]; inDeling {
-		dcvLog.Debug("DcvMgrTabRefreshRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
+		log.Debugf("DcvMgrTabRefreshRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
 		return DcvMgrEnoNone
 	}
 
 	if _, inAdding := dcvMgr.reCfg.AddList[rsp.Snid]; !inAdding {
-		dcvLog.Debug("DcvMgrTabRefreshRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
+		log.Debugf("DcvMgrTabRefreshRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
 		return DcvMgrEnoNone
 	}
 

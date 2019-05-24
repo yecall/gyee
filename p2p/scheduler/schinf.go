@@ -26,6 +26,7 @@ import (
 	"time"
 
 	config "github.com/yeeco/gyee/p2p/config"
+	"github.com/yeeco/gyee/log"
 )
 
 // Scheduler interface errnos
@@ -78,7 +79,7 @@ var SchErrnoDescription = []string{
 // Errno string
 func (eno SchErrno) SchErrnoString() string {
 	if eno < SchEnoNone || eno >= SchEnoInvalid {
-		panic("invalid scheduler errno")
+		return fmt.Sprintf("invalid scheduler errno: %d", eno)
 	}
 	return SchErrnoDescription[eno]
 }
@@ -152,7 +153,7 @@ const (
 // when MbSize is set to (-1) for a task. In extreme case when system load is very heavy,
 // the queue might be full so tasks can be blocked in sending messages.
 const SchDftMbSize = 1024 * (1)
-const SchMaxMbSize = 1024 * (32)
+const SchMaxMbSize = 1024 * (256)
 
 type SchTaskDescription struct {
 	Name   string                     // user task name
@@ -219,7 +220,7 @@ func (sdl *Scheduler) SchStartTaskEx(ptn interface{}) SchErrno {
 // Stop caller task or other task in async
 func (sdl *Scheduler) SchStopTask(ptn interface{}, name string) SchErrno {
 	if eno := sdl.SchTaskDone(ptn.(*schTaskNode), name, SchEnoKilled); eno != SchEnoNone {
-		schLog.Debug("SchStopTask: SchTaskDone failed, eno: %d", eno)
+		log.Debugf("SchStopTask: SchTaskDone failed, eno: %d", eno)
 		return eno
 	}
 	return SchEnoNone
@@ -305,7 +306,7 @@ func (sdl *Scheduler) SchMakeMessage(msg *SchMessage, s, r interface{}, id int, 
 	// to access the body again after this function called, or the body will be
 	// modified(corrupted).
 	if msg == nil || s == nil || r == nil {
-		panic(fmt.Sprintf("SchMakeMessage: invalid message, sdl: %s", sdl.p2pCfg.CfgName))
+		log.Debugf("SchMakeMessage: invalid message, sdl: %s", sdl.p2pCfg.CfgName)
 		return SchEnoParameter
 	}
 	msg.sender = s.(*schTaskNode)
@@ -356,7 +357,7 @@ func (sdl *Scheduler) SchSetUserDataArea(ptn interface{}, uda interface{}) SchEr
 
 // Set the power off stage flag to tell the scheduler it's going to be turn off
 func (sdl *Scheduler) SchSetPoweroffStage() SchErrno {
-	schLog.Debug("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
+	log.Debugf("SchSetPoweroffStage: prepare to power off, sdl: %s", sdl.p2pCfg.Name)
 	return sdl.schSetPoweroffStage()
 }
 

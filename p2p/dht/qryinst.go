@@ -26,35 +26,9 @@ import (
 	"time"
 
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
-
-//
-// debug
-//
-type qiMgrLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var qiLog = qiMgrLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log qiMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log qiMgrLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // timeout value
@@ -147,33 +121,33 @@ func (qryInst *QryInst) powerOn(ptn interface{}) sch.SchErrno {
 	var icb *qryInstCtrlBlock
 
 	if sdl == nil {
-		qiLog.Debug("powerOn: SchGetScheduler failed")
+		log.Debugf("powerOn: SchGetScheduler failed")
 		return sch.SchEnoInternal
 	}
 
 	if icb = sdl.SchGetUserDataArea(ptn).(*qryInstCtrlBlock); icb == nil {
-		qiLog.Debug("powerOn: impossible nil instance control block, " +
+		log.Debugf("powerOn: impossible nil instance control block, " +
 			"sdl: %s, inst: %s",
 			icb.sdlName, icb.name)
 		return sch.SchEnoInternal
 	}
 
 	if _, ptnQryMgr = sdl.SchGetUserTaskNode(QryMgrName); ptnQryMgr == nil {
-		qiLog.Debug("powerOn: nil query manager, " +
+		log.Debugf("powerOn: nil query manager, " +
 			"sdl: %s, inst: %s",
 			icb.sdlName, icb.name)
 		return sch.SchEnoInternal
 	}
 
 	if _, ptnConMgr = sdl.SchGetUserTaskNode(ConMgrName); ptnConMgr == nil {
-		qiLog.Debug("powerOn: nil connection manager, " +
+		log.Debugf("powerOn: nil connection manager, " +
 			"sdl: %s, inst: %s",
 			icb.sdlName, icb.name)
 		return sch.SchEnoInternal
 	}
 
 	if _, ptnRutMgr = sdl.SchGetUserTaskNode(RutMgrName); ptnRutMgr == nil {
-		qiLog.Debug("powerOn: nil route manager, " +
+		log.Debugf("powerOn: nil route manager, " +
 			"sdl: %s, inst: %s",
 			icb.sdlName, icb.name)
 		return sch.SchEnoInternal
@@ -203,7 +177,7 @@ func (qryInst *QryInst) powerOn(ptn interface{}) sch.SchErrno {
 // Power off handler
 //
 func (qryInst *QryInst) powerOff(ptn interface{}) sch.SchErrno {
-	qiLog.ForceDebug("powerOff: task will be done, " +
+	log.Tracef("powerOff: task will be done, " +
 		"sdl: %s, inst: %s",
 		qryInst.icb.sdlName, qryInst.icb.name)
 	return qryInst.icb.sdl.SchTaskDone(qryInst.icb.ptnInst, qryInst.icb.name, sch.SchEnoKilled)
@@ -222,7 +196,7 @@ func (qryInst *QryInst) startReq() sch.SchErrno {
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("startReq: ask connection manager for peer, " +
+	log.Tracef("startReq: ask connection manager for peer, " +
 		"sdl: %s, inst: %s, ForWhat: %d",
 		icb.sdlName, icb.name, icb.qryReq.ForWhat)
 
@@ -409,12 +383,12 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	icb := qryInst.icb
 	sdl := icb.sdl
 
-	log.Debugf("connectRsp: " +
+	log.Tracef("connectRsp: " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
 	if icb.status != qisWaitConnect {
-		log.Warnf("connectRsp: mismatched, " +
+		log.Debugf("connectRsp: mismatched, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 		return sch.SchEnoMismatched
@@ -463,7 +437,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	eno, pkg := qryInst.setupQryPkg()
 	if eno != DhtEnoNone {
 
-		log.Warnf("connectRsp: done for setupQryPkg failed, " +
+		log.Debugf("connectRsp: done for setupQryPkg failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -476,7 +450,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		return sch.SchEnoUserTask
 	}
 
-	log.Debugf("connectRsp: setupQryPkg ok, " +
+	log.Tracef("connectRsp: setupQryPkg ok, " +
 		"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 		icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, msg.Eno)
 
@@ -505,7 +479,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	schMsg := sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnConMgr, sch.EvDhtConMgrSendReq, &sendReq)
 	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+		log.Debugf("connectRsp: send EvDhtConMgrSendReq failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
 	}
@@ -541,13 +515,13 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 		schMsg = sch.SchMessage{}
 		sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstResultInd, &indResult)
 		if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-			log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+			log.Debugf("connectRsp: send EvDhtConMgrSendReq failed, " +
 				"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
 				icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
 			return eno
 		}
 
-		log.Debug("connectRsp: send EvDhtConMgrSendReq ok, " +
+		log.Tracef("connectRsp: send EvDhtConMgrSendReq ok, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d, from: %x",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno, indResult.From.ID)
 
@@ -565,7 +539,7 @@ func (qryInst *QryInst) connectRsp(msg *sch.MsgDhtConMgrConnectRsp) sch.SchErrno
 	schMsg = sch.SchMessage{}
 	sdl.SchMakeMessage(&schMsg, icb.ptnInst, icb.ptnQryMgr, sch.EvDhtQryInstStatusInd, &ind)
 	if eno := sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		log.Warnf("connectRsp: send EvDhtConMgrSendReq failed, " +
+		log.Debugf("connectRsp: send EvDhtConMgrSendReq failed, " +
 			"sdl: %s, inst: %s, dir: %d, status: %d, ForWhat: %d, eno: %d",
 			icb.sdlName, icb.name, icb.dir, icb.status, icb.qryReq.ForWhat, eno)
 	}
@@ -615,7 +589,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 
 		nbs, ok := msg.Msg.(*Neighbors)
 		if !ok {
-			qiLog.Debug("protoMsgInd: mismatched type Neighbors, " +
+			log.Debugf("protoMsgInd: mismatched type Neighbors, " +
 				"sdl: %s, inst: %s",
 				icb.sdlName, icb.name)
 			return sch.SchEnoMismatched
@@ -645,7 +619,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 
 		gvr, ok := msg.Msg.(*GetValueRsp)
 		if !ok {
-			qiLog.Debug("protoMsgInd: mismatched type GetValueRsp, " +
+			log.Debugf("protoMsgInd: mismatched type GetValueRsp, " +
 				"sdl: %s, inst: %s",
 				icb.sdlName, icb.name)
 			return sch.SchEnoMismatched
@@ -654,7 +628,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 		if gvr.Value != nil {
 
 			if bytes.Equal(gvr.Value.Key, icb.target[0:]) == false {
-				qiLog.Debug("protoMsgInd: key mismatched, " +
+				log.Debugf("protoMsgInd: key mismatched, " +
 					"sdl: %s, inst: %s",
 					icb.sdlName, icb.name)
 				return sch.SchEnoMismatched
@@ -697,7 +671,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 
 		gpr, ok := msg.Msg.(*GetProviderRsp)
 		if !ok {
-			qiLog.Debug("protoMsgInd: mismatched type GetProviderRsp, " +
+			log.Debugf("protoMsgInd: mismatched type GetProviderRsp, " +
 				"sdl: %s, inst: %s",
 				icb.sdlName, icb.name)
 			return sch.SchEnoMismatched
@@ -706,7 +680,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 		if gpr.Provider != nil {
 
 			if bytes.Equal(gpr.Key, icb.target[0:]) == false {
-				qiLog.Debug("protoMsgInd: key mismatched, " +
+				log.Debugf("protoMsgInd: key mismatched, " +
 					"sdl: %s, inst: %s",
 					icb.sdlName, icb.name)
 				return sch.SchEnoMismatched
@@ -742,7 +716,7 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 		}
 
 	default:
-		qiLog.Debug("protoMsgInd: mismatched, " +
+		log.Debugf("protoMsgInd: mismatched, " +
 			"sdl: %s, inst: %d, ForWhat: %d",
 			icb.sdlName, icb.name, msg.ForWhat)
 		return sch.SchEnoMismatched
@@ -776,12 +750,12 @@ func (qryInst *QryInst) protoMsgInd(msg *sch.MsgDhtQryInstProtoMsgInd) sch.SchEr
 //
 func (qryInst *QryInst) conInstTxInd(msg *sch.MsgDhtConInstTxInd) sch.SchErrno {
 	if msg == nil {
-		qiLog.Debug("conInstTxInd： invalid parameter, " +
+		log.Tracef("conInstTxInd: invalid parameter, " +
 			"sdl: %s, inst: %s",
 			qryInst.icb.sdlName, qryInst.icb.name)
 		return sch.SchEnoParameter
 	}
-	qiLog.Debug("conInstTxInd：" +
+	log.Tracef("conInstTxInd: " +
 		"sdl: %s, inst: %s, msg: %+v",
 		qryInst.icb.sdlName, qryInst.icb.name, *msg)
 	return sch.SchEnoNone
@@ -865,14 +839,14 @@ func (qryInst *QryInst) setupQryPkg() (DhtErrno, *DhtPackage) {
 		dhtMsg.GetProviderReq = &gpr
 
 	} else {
-		qiLog.Debug("setupQryPkg: unknown what's for, " +
+		log.Debugf("setupQryPkg: unknown what's for, " +
 			"sdl: %s, inst: %s, forWhat: %d",
 			icb.sdlName, icb.name, forWhat)
 		return DhtEnoMismatched, nil
 	}
 
 	if eno := dhtMsg.GetPackage(&dhtPkg); eno != DhtEnoNone {
-		qiLog.Debug("setupQryPkg: GetPackage failed, " +
+		log.Debugf("setupQryPkg: GetPackage failed, " +
 			"sdl: %s, inst: %s, eno: %d",
 			icb.sdlName, icb.name, eno)
 		return eno, nil

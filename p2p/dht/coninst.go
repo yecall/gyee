@@ -32,34 +32,9 @@ import (
 	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	pb "github.com/yeeco/gyee/p2p/dht/pb"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type coninstLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var ciLog = coninstLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log coninstLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log coninstLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // package identity
@@ -378,7 +353,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 
 	if conInst.dir == ConInstDirOutbound {
 		if conInst.con != nil {
-			panic("handshakeReq: dirty connection")
+			log.Errorf("handshakeReq: dirty connection, sdl: %s", conInst.sdlName)
 		}
 		conInst.updateStatus(CisConnecting)
 		conInst.statusReport()
@@ -432,7 +407,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 		} else {
 			log.Debugf("handshakeReq: sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
-			panic("handshakeReq: invalid direction")
+			hsCh<-DhtEnoInternal
 		}
 	}()
 
@@ -450,7 +425,8 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 		return rsp2ConMgr()
 	case hsEno, ok := <-hsCh:
 		if !ok {
-			panic("handshakeReq: impossible result")
+			log.Errorf("handshakeReq: impossible result, sdl: %s", conInst.sdlName)
+			hsEno = DhtEnoInternal
 		}
 		if hsEno != DhtEnoNone {
 			cleanUp()
@@ -485,7 +461,7 @@ func (conInst *ConInst) handshakeReq(msg *sch.MsgDhtConInstHandshakeReq) sch.Sch
 // service startup
 //
 func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrno {
-	log.Debugf("startUpReq: enter, start rx/tx and confrim peMgr, " +
+	log.Debugf("startUpReq: enter, start rx/tx and confirm peMgr, " +
 		"sdl: %s, inst: %s, dir: %d, localAddr: %s, remoteAddr: %s",
 		conInst.sdlName, conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String())
 
@@ -507,19 +483,6 @@ func (conInst *ConInst) startUpReq(msg *sch.MsgDhtConInstStartupReq) sch.SchErrn
 // Instance-close-request handler
 //
 func (conInst *ConInst) closeReq(msg *sch.MsgDhtConInstCloseReq) sch.SchErrno {
-
-	if ciLog.debugForce__ {
-		conInst.doneCnt++
-		if len(conInst.doneWhy) == 0 {
-			conInst.doneWhy = make([]int, 0)
-		}
-		conInst.doneWhy = append(conInst.doneWhy, msg.Why)
-		if conInst.doneCnt > 1 {
-			log.Debugf("closeReq: sdl: %s, inst: %s, doneCnt: %d, doneWhy: %d",
-				conInst.sdlName, conInst.name, conInst.doneCnt, conInst.doneWhy)
-		}
-	}
-
 	if status := conInst.getStatus(); status >= CisClosed {
 		log.Debugf("closeReq: sdl: %s, inst: %s, dir: %d, why: %d, status mismatched: %d",
 			conInst.sdlName, conInst.name, conInst.dir, msg.Why, status)
@@ -611,7 +574,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 		log.Errorf("rutMgrNearestRsp: invalid parameters")
 		return sch.SchEnoParameter
 	}
-	log.Debugf("rutMgrNearestRsp: msg: %+v", msg)
+	log.Tracef("rutMgrNearestRsp: msg: %+v", msg)
 
 	var dhtMsg = DhtMessage{
 		Mid: MID_UNKNOWN,
@@ -630,7 +593,7 @@ func (conInst *ConInst) rutMgrNearestRsp(msg *sch.MsgDhtRutMgrNearestRsp) sch.Sc
 	if msg.ForWhat == MID_FINDNODE {
 
 		if msg.Msg == nil {
-			ciLog.Debug("rutMgrNearestRsp: original message is nil")
+			log.Debugf("rutMgrNearestRsp: original message is nil")
 			return sch.SchEnoMismatched
 		}
 
@@ -714,23 +677,23 @@ func conInstStatus2PCS(cis conInstStatus) conMgrPeerConnStat {
 func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	if pkg == nil {
-		log.Warnf("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
+		log.Debugf("txPutPending: invalid parameter, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		return DhtEnoParameter
 	}
 
 	if status := conInst.getStatus(); status != CisInService {
-		log.Warnf("txPutPending: mismatched status: %d", status)
+		log.Debugf("txPutPending: mismatched status: %d", status)
 		return DhtEnoMismatched
 	}
 
-	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0xff == 0 {
+	if conInst.trySendingCnt += 1; conInst.trySendingCnt & 0x3ff == 0 {
 		log.Debugf("txPutPending: trySendingCnt: %d, peer: %s:%d",
 			conInst.trySendingCnt, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 	}
 
 	if len(conInst.txChan) >= cap(conInst.txChan) {
-		log.Warnf("txPutPending: pending queue full, inst: %s, hsInfo: %s:%d",
+		log.Debugf("txPutPending: pending queue full, inst: %s, hsInfo: %s:%d",
 			conInst.name, conInst.hsInfo.peer.IP.String(), conInst.hsInfo.peer.TCP)
 		if conInst.txqDiscardCnt += 1; conInst.txqDiscardCnt & 0x1f == 0 {
 			log.Debugf("txPutPending: txqDiscardCnt: %d, peer: %s:%d",
@@ -740,7 +703,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 	}
 
 	if len(conInst.txWaitRsp) >= ciTxMaxWaitResponseSize {
-		log.Warnf("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
+		log.Debugf("txPutPending: waiting response queue full, inst: %s, hsInfo: %+v, local: %+v",
 			conInst.name, conInst.hsInfo, *conInst.local)
 		if conInst.wrqDiscardCnt += 1; conInst.wrqDiscardCnt & 0x1f == 0 {
 			log.Debugf("txPutPending: wrqDiscardCnt: %d, peer: %s:%d",
@@ -751,7 +714,7 @@ func (conInst *ConInst) txPutPending(pkg *conInstTxPkg) DhtErrno {
 
 	conInst.txChan <- pkg
 
-	log.Debugf("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
+	log.Tracef("txPutPending: put, inst: %s, hsInfo: %+v, local: %+v, waitMid: %d, waitSeq: %d",
 		conInst.name, conInst.hsInfo, *conInst.local, pkg.waitMid, pkg.waitSeq)
 
 	return DhtEnoNone
@@ -1183,9 +1146,17 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 			hs.Dir)
 		return DhtEnoMismatched
 	}
+	if hs.NodeId != conInst.hsInfo.peer.ID {
+		log.Debugf("outboundHandshake: mismatched node identity, " +
+			"inst: %s, dir: %d, local: %s, remote: %s, " +
+			"hsdir: %d, req-id: %x, hs-id: %x",
+			conInst.name, conInst.dir, conInst.con.LocalAddr().String(), conInst.con.RemoteAddr().String(),
+			hs.Dir, conInst.hsInfo.peer.ID, hs.NodeId)
+		return DhtEnoMismatched
+	}
 
 	//
-	// notice: when try outbound, the peer(conInst.hsInfo.peer) is alway known
+	// notice0: when try outbound, the peer(conInst.hsInfo.peer) is always known
 	// before the handshaking, but here after the handshaking ok, we update the
 	// peer according what we obtained in the procedure as following, and this
 	// can be different from that we had believed it would be. the connection
@@ -1193,6 +1164,8 @@ func (conInst *ConInst) outboundHandshake() DhtErrno {
 	// it's the case, we return failed, so the connection manager would drop
 	// this connection later). see function handshakeRsp in connection.go for
 	// detail please.
+	// notice1: we had filter out those node identities which are mismatched to
+	// what's wanted, see above statements.
 	//
 
 	conInst.hsInfo.peer = config.Node{
@@ -1400,9 +1373,9 @@ _txLoop:
 
 		txPkg = inf.(*conInstTxPkg)
 		if dhtPkg, ok = txPkg.payload.(*DhtPackage); !ok {
-			log.Debugf("txProc: mismatched type, sdl: %s, inst: %s, dir: %d",
+			log.Errorf("txProc: mismatched type, sdl: %s, inst: %s, dir: %d",
 				conInst.sdlName, conInst.name, conInst.dir)
-			panic("txProc: internal errors")
+			goto _checkDone
 		}
 
 		pbPkg = new(pb.DhtPackage)
@@ -1428,7 +1401,7 @@ _txLoop:
 			break _txLoop
 		}
 
-		if conInst.txPkgCnt++; conInst.txPkgCnt & 0xff == 0 {
+		if conInst.txPkgCnt++; conInst.txPkgCnt & 0x3ff == 0 {
 			log.Debugf("txProc: sdl: %s, inst: %s, dir: %d, txPkgCnt: %d",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.txPkgCnt)
 		}
@@ -1536,7 +1509,7 @@ _rxLoop:
 			break _rxLoop
 		}
 
-		if conInst.rxPkgCnt++; conInst.rxPkgCnt & 0xff == 0 {
+		if conInst.rxPkgCnt++; conInst.rxPkgCnt & 0x3ff == 0 {
 			log.Debugf("rxProc: sdl: %s, inst: %s, dir: %d, rxPkgCnt: %d",
 				conInst.sdlName, conInst.name, conInst.dir, conInst.rxPkgCnt)
 		}
@@ -1646,93 +1619,93 @@ func (conInst *ConInst) dispatch(msg *DhtMessage) DhtErrno {
 
 	case MID_HANDSHAKE:
 
-		log.Debugf("dispatch: MID_HANDSHAKE is not supported now")
+		log.Tracef("dispatch: MID_HANDSHAKE is not supported now")
 		eno = DhtEnoProtocol
 
 	case MID_FINDNODE:
 
-		log.Debugf("dispatch: MID_FINDNODE, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_FINDNODE, inst: %s", conInst.name)
 		eno = conInst.findNode(msg.FindNode)
 
 	case MID_NEIGHBORS:
 
-		log.Debugf("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_NEIGHBORS, inst: %s", conInst.name)
 		eno = conInst.neighbors(msg.Neighbors)
 
 	case MID_PUTVALUE:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_PUTVALUE discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PUTVALUE, inst: %s", conInst.name)
 		eno = conInst.putValue(msg.PutValue)
 
 	case MID_GETVALUE_REQ:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETVALUE_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETVALUE_REQ, inst: %s", conInst.name)
 		eno = conInst.getValueReq(msg.GetValueReq)
 
 	case MID_GETVALUE_RSP:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETVALUE_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETVALUE_RSP, inst: %s", conInst.name)
 		eno = conInst.getValueRsp(msg.GetValueRsp)
 
 	case MID_PUTPROVIDER:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_PUTPROVIDER discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PUTPROVIDER, inst: %s", conInst.name)
 		eno = conInst.putProvider(msg.PutProvider)
 
 	case MID_GETPROVIDER_REQ:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETPROVIDER_REQ discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETPROVIDER_REQ, inst: %s", conInst.name)
 		eno = conInst.getProviderReq(msg.GetProviderReq)
 
 	case MID_GETPROVIDER_RSP:
 
 		if conInst.bootstrapNode {
-			log.Debugf("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
+			log.Tracef("dispatch: MID_GETPROVIDER_RSP discarded, inst: %s", conInst.name)
 			eno = DhtEnoBootstrapNode
 			break
 		}
 
-		log.Debugf("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_GETPROVIDER_RSP, inst: %s", conInst.name)
 		eno = conInst.getProviderRsp(msg.GetProviderRsp)
 
 	case MID_PING:
 
-		log.Debugf("dispatch: MID_PING, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PING, inst: %s", conInst.name)
 		eno = conInst.getPing(msg.Ping)
 
 	case MID_PONG:
 
-		log.Debugf("dispatch: MID_PONG, inst: %s", conInst.name)
+		log.Tracef("dispatch: MID_PONG, inst: %s", conInst.name)
 		eno = conInst.getPong(msg.Pong)
 
 	default:
@@ -1909,7 +1882,7 @@ func (conInst *ConInst) checkTxWaitResponse(mid int, seq int64) (DhtErrno, *conI
 		close(txPkg.responsed)
 	}
 
-	log.Debugf("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
+	log.Tracef("checkTxWaitResponse: it's found, mid: %d, seq: %d", mid, seq)
 	if txPkg.responsed != nil && txPkg.txTid != nil {
 		conInst.txDtm.delTimer(txPkg.txTid)
 		txPkg.txTid = nil
@@ -2036,7 +2009,8 @@ func (dtm *DiffTimerManager) setTimer(ud interface{}, tv int) (tid interface{}, 
 			el = el.Next()
 		}
 		if tid == nil {
-			panic("setTimer: tell me why...")
+			log.Debugf("setTimer: impossible nil timer")
+			err = errors.New("setTimer: impossible nil timer")
 		}
 	}
 	return tid, err

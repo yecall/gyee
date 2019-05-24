@@ -31,27 +31,10 @@ import (
 	mrand "math/rand"
 
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type rutMgrLogger struct {
-	debug__ bool
-}
-
-var rutLog = rutMgrLogger{
-	debug__: false,
-}
-
-func (log rutMgrLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Constants
@@ -246,7 +229,7 @@ func (rutMgr *RutMgr) rutMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchEr
 		eno = rutMgr.conMgrBootstrapReq()
 
 	default:
-		log.Warnf("rutMgrProc: unknown message: %d", msg.Id)
+		log.Debugf("rutMgrProc: unknown message: %d", msg.Id)
 		eno = sch.SchEnoParameter
 	}
 
@@ -391,7 +374,7 @@ func (rutMgr *RutMgr) queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sc
 	// a specific peer but just created randomly).
 	//
 
-	log.Debugf("queryResultInd: " +
+	log.Tracef("queryResultInd: " +
 		"bootstrap result indication, eno: %d, target: %x",
 		ind.Eno, ind.Target)
 
@@ -436,7 +419,7 @@ func (rutMgr *RutMgr) queryResultInd(ind *sch.MsgDhtQryMgrQueryResultInd) sch.Sc
 func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNearestReq) sch.SchErrno {
 
 	if tskSender == nil || req == nil {
-		log.Warnf("nearestReq: invalid parameters, sdl: %s, tskSender: %p, req: %p",
+		log.Debugf("nearestReq: invalid parameters, sdl: %s, tskSender: %p, req: %p",
 			rutMgr.sdlName, tskSender, req)
 		return sch.SchEnoParameter
 	}
@@ -453,7 +436,7 @@ func (rutMgr *RutMgr) nearestReq(tskSender interface{}, req *sch.MsgDhtRutMgrNea
 
 	dhtEno, nearest, nearestDist := rutMgr.rutMgrNearest(&req.Target, req.Max)
 	if dhtEno != DhtEnoNone {
-		log.Warnf("nearestReq: rutMgrNearest failed, sdl: %s, eno: %d", rutMgr.sdlName, dhtEno)
+		log.Debugf("nearestReq: rutMgrNearest failed, sdl: %s, eno: %d", rutMgr.sdlName, dhtEno)
 		rsp.Eno = int(dhtEno)
 		schMsg := sch.SchMessage{}
 		rutMgr.sdl.SchMakeMessage(&schMsg, rutMgr.ptnMe, tskSender, sch.EvDhtRutMgrNearestRsp, &rsp)
@@ -600,7 +583,7 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	if why == rutMgrUpdate4Handshake && eno == DhtEnoNone.GetEno() {
 
-		log.Debugf("updateReq: why: rutMgrUpdate4Handshake, eno: DhtEnoNone")
+		log.Tracef("updateReq: why: rutMgrUpdate4Handshake, eno: DhtEnoNone")
 
 		//
 		// new peer picked ok
@@ -628,7 +611,7 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Handshake && eno != DhtEnoNone.GetEno() {
 
-		log.Debugf("updateReq: why: rutMgrUpdate4Handshake, eno: %d", eno)
+		log.Tracef("updateReq: why: rutMgrUpdate4Handshake, eno: %d", eno)
 
 		//
 		// handshake failed for outbound, check fail counter
@@ -659,7 +642,7 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoTimeout.GetEno() {
 
-		log.Debugf("updateReq: why: rutMgrUpdate4Query, eno: %d", eno)
+		log.Tracef("updateReq: why: rutMgrUpdate4Query, eno: %d", eno)
 
 		//
 		// query peer time out, check fail counter
@@ -690,7 +673,7 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Query && eno == DhtEnoNone.GetEno() {
 
-		log.Debugf("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoNone")
+		log.Tracef("updateReq: why: rutMgrUpdate4Query, eno: DhtEnoNone")
 
 		//
 		// query ok, apply latency sample and clear fail counter
@@ -727,7 +710,7 @@ func (rutMgr *RutMgr) updateReq(req *sch.MsgDhtRutMgrUpdateReq) sch.SchErrno {
 
 	} else if why == rutMgrUpdate4Closed {
 
-		log.Debugf("updateReq: why: rutMgrUpdate4Closed")
+		log.Tracef("updateReq: why: rutMgrUpdate4Closed")
 
 		//
 		// update peer connection status to be CisClosed, but do not remove it from

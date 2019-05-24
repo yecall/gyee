@@ -19,13 +19,15 @@ package core
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/yeeco/gyee/common"
 	"github.com/yeeco/gyee/core/state"
 	"github.com/yeeco/gyee/log"
 )
 
-func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
+func organizeTxs(state state.AccountTrie, txs Transactions) (out Transactions, dropped Transactions) {
 	txsRoot := DeriveHash(txs)
 	log.Info("organizeTxs", "cnt", len(txs), "txsRoot", txsRoot)
 	var (
@@ -72,10 +74,29 @@ func organizeTxs(state state.AccountTrie, txs Transactions) Transactions {
 			break
 		}
 		if txCount == len(txs) {
-			log.Warn("engine output nonce not possible",
-				fmt.Sprintf("remain[%d/%d]", len(txs), len(txs)+len(output)), txs)
+			sort.Slice(txs, func(i, j int) bool {
+				a := *txs[i].from
+				b := *txs[j].from
+				for k := 0; k < common.AddressLength; k++ {
+					switch {
+					case a[k] < b[k]:
+						return true
+					case a[k] > b[k]:
+						return false
+					}
+				}
+				return txs[i].Nonce() < txs[j].Nonce()
+			})
+			var sb = new(strings.Builder)
+			for _, tx := range txs {
+				f := *tx.from
+				_, _ = fmt.Fprintf(sb, "\n%5d / %5d @%v %v", tx.Nonce(), nonceMap[f], f, tx.Hash().Hex())
+			}
+			log.Warn(fmt.Sprintf("output nonce not possible, remain[%d/%d]",
+				len(txs), len(txs)+len(output)))
+			log.Info("nonce not possible", sb.String())
 			break
 		}
 	}
-	return output
+	return output, txs
 }

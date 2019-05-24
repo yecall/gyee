@@ -31,38 +31,14 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/yeeco/gyee/log"
 	config "github.com/yeeco/gyee/p2p/config"
 	tab "github.com/yeeco/gyee/p2p/discover/table"
 	um "github.com/yeeco/gyee/p2p/discover/udpmsg"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	nat "github.com/yeeco/gyee/p2p/nat"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 )
 
-//
-// debug
-//
-type peerLogger struct {
-	debug__      bool
-	debugForce__ bool
-}
-
-var peerLog = peerLogger{
-	debug__:      false,
-	debugForce__: false,
-}
-
-func (log peerLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
-
-func (log peerLogger) ForceDebug(fmt string, args ...interface{}) {
-	if log.debugForce__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 // Peer manager errno
 const (
@@ -294,10 +270,10 @@ func (peMgr *PeerManager) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessag
 
 func (peMgr *PeerManager) peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	peerLog.Debug("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
+	log.Tracef("peerMgrProc: name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
 	if peMgr.msgFilter(msg) != PeMgrEnoNone {
-		peerLog.Debug("peerMgrProc: filtered out, id: %d", msg.Id)
+		log.Debugf("peerMgrProc: filtered out, id: %d", msg.Id)
 		return sch.SchEnoNone
 	}
 
@@ -366,11 +342,11 @@ func (peMgr *PeerManager) peerMgrProc(ptn interface{}, msg *sch.SchMessage) sch.
 		eno = peMgr.natPubAddrUpdateInd(msg.Body.(*sch.MsgNatMgrPubAddrUpdateInd))
 
 	default:
-		peerLog.Debug("PeerMgrProc: invalid message: %d", msg.Id)
+		log.Debugf("PeerMgrProc: invalid message: %d", msg.Id)
 		eno = PeMgrEnoParameter
 	}
 
-	peerLog.Debug("peerMgrProc: get out, name: %s, msg.Id: %d", peMgr.name, msg.Id)
+	log.Tracef("peerMgrProc: get out, name: %s, msg.Id: %d", peMgr.name, msg.Id)
 
 	if eno != PeMgrEnoNone {
 		schEno = sch.SchEnoUserTask
@@ -385,12 +361,12 @@ func (peMgr *PeerManager) peMgrPoweron(ptn interface{}) PeMgrErrno {
 	_, peMgr.ptnLsn = peMgr.sdl.SchGetUserTaskNode(PeerLsnMgrName)
 
 
-	peerLog.Debug("peMgrPoweron: inst: %s", peMgr.sdl.SchGetP2pCfgName())
+	log.Debugf("peMgrPoweron: inst: %s", peMgr.sdl.SchGetP2pCfgName())
 
 
 	var cfg *config.Cfg4PeerManager
 	if cfg = config.P2pConfig4PeerManager(peMgr.sdl.SchGetP2pCfgName()); cfg == nil {
-		peerLog.Debug("peMgrPoweron: inited, inst: %s", peMgr.sdl.SchGetP2pCfgName())
+		log.Debugf("peMgrPoweron: inited, inst: %s", peMgr.sdl.SchGetP2pCfgName())
 		peMgr.inited <- PeMgrEnoConfig
 		return PeMgrEnoConfig
 	}
@@ -405,7 +381,7 @@ func (peMgr *PeerManager) peMgrPoweron(ptn interface{}) PeMgrErrno {
 	var ok sch.SchErrno
 	ok, peMgr.ptnShell = peMgr.sdl.SchGetUserTaskNode(sch.ShMgrName)
 	if ok != sch.SchEnoNone || peMgr.ptnShell == nil {
-		peerLog.Debug("peMgrPoweron: shell not found")
+		log.Debugf("peMgrPoweron: shell not found")
 		return PeMgrEnoScheduler
 	}
 
@@ -499,13 +475,13 @@ func (peMgr *PeerManager) peMgrPoweron(ptn interface{}) PeMgrErrno {
 		peMgr.ibpNum[staticSnid] = 0
 		peMgr.obpNum[staticSnid] = 0
 	} else {
-		peerLog.Debug("peMgrPoweron: invalid network type: %d", peMgr.cfg.networkType)
+		log.Debugf("peMgrPoweron: invalid network type: %d", peMgr.cfg.networkType)
 		return PeMgrEnoConfig
 	}
 
 	// tell initialization result, and EvPeMgrStartReq would be sent to us
 	// some moment later.
-	peerLog.Debug("peMgrPoweron: inited, inst: %s", peMgr.sdl.SchGetP2pCfgName())
+	log.Debugf("peMgrPoweron: inited, inst: %s", peMgr.sdl.SchGetP2pCfgName())
 	peMgr.isInited = true
 	peMgr.inited <- PeMgrEnoNone
 
@@ -517,7 +493,7 @@ func (peMgr *PeerManager) PeMgrInited() PeMgrErrno {
 }
 
 func (peMgr *PeerManager) PeMgrStart() PeMgrErrno {
-	peerLog.Debug("PeMgrStart: EvPeMgrStartReq will be sent, target: %s", sch.PeerMgrName)
+	log.Debugf("PeMgrStart: EvPeMgrStartReq will be sent, target: %s", sch.PeerMgrName)
 	msg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeMgrStartReq, nil)
 	peMgr.sdl.SchSendMessage(&msg)
@@ -525,13 +501,13 @@ func (peMgr *PeerManager) PeMgrStart() PeMgrErrno {
 }
 
 func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
-	peerLog.Debug("peMgrPoweroff: task will be done, name: %s", sch.PeerMgrName)
+	log.Debugf("peMgrPoweroff: task will be done, name: %s", sch.PeerMgrName)
 	close(peMgr.indChan)
 	for _, pi := range peMgr.peers {
-		peerLog.ForceDebug("peMgrPoweroff: send EvSchPoweroff to inst: %s, dir: %d, state: %d",
+		log.Debugf("peMgrPoweroff: send EvSchPoweroff to inst: %s, dir: %d, state: %d",
 			pi.name, pi.dir, pi.state)
 		if eno, ptn := peMgr.sdl.SchGetUserTaskNode(pi.name); eno != sch.SchEnoNone || ptn != pi.ptnMe {
-			peerLog.ForceDebug("peMgrPoweroff: not found, inst: %s, dir: %d, state: %d",
+			log.Debugf("peMgrPoweroff: not found, inst: %s, dir: %d, state: %d",
 				pi.name, pi.dir, pi.state)
 			continue
 		}
@@ -544,7 +520,7 @@ func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&po)
 	}
 	if peMgr.sdl.SchTaskDone(ptn, peMgr.name, sch.SchEnoKilled) != sch.SchEnoNone {
-		peerLog.ForceDebug("peMgrPoweroff: SchTaskDone faled")
+		log.Debugf("peMgrPoweroff: SchTaskDone faled")
 		return PeMgrEnoScheduler
 	}
 	return PeMgrEnoNone
@@ -553,10 +529,10 @@ func (peMgr *PeerManager) peMgrPoweroff(ptn interface{}) PeMgrErrno {
 func (peMgr *PeerManager) peMgrStartReq(_ interface{}) PeMgrErrno {
 	peMgr.inStartup = peMgrInStartup
 	if !peMgr.natResult {
-		peerLog.Debug("peMgrStartReq: still not mapped by nat")
+		log.Debugf("peMgrStartReq: still not mapped by nat")
 		return PeMgrEnoNone
 	}
-	peerLog.Debug("peMgrStartReq: task: %s", peMgr.name)
+	log.Debugf("peMgrStartReq: task: %s", peMgr.name)
 	return peMgr.start()
 }
 
@@ -577,32 +553,24 @@ func (peMgr *PeerManager) ocrTimestampCleanup() {
 
 func (peMgr *PeerManager) peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 	if peMgr.inStartup != peMgrInStartup || !peMgr.natResult {
-		peerLog.Debug("peMgrDcvFindNodeRsp: not ready, inStartup: %d, natResult: %t",
+		log.Debugf("peMgrDcvFindNodeRsp: not ready, inStartup: %d, natResult: %t",
 			peMgr.inStartup, peMgr.natResult)
 		return PeMgrEnoNone
 	}
 
 	var rsp, _ = msg.(*sch.MsgDcvFindNodeRsp)
 	if rsp == nil {
-		peerLog.Debug("peMgrDcvFindNodeRsp: invalid message")
+		log.Debugf("peMgrDcvFindNodeRsp: invalid message")
 		return PeMgrEnoParameter
 	}
 
-	if peerLog.debug__ {
-		dbgStr := fmt.Sprintf("peMgrDcvFindNodeRsp: snid: %x, nodes: ", rsp.Snid)
-		for idx := 0; idx < len(rsp.Nodes); idx++ {
-			dbgStr = dbgStr + rsp.Nodes[idx].IP.String() + ","
-		}
-		peerLog.Debug(dbgStr)
-	}
-
 	if peMgr.dynamicSubNetIdExist(&rsp.Snid) != true {
-		peerLog.Debug("peMgrDcvFindNodeRsp: subnet not exist")
+		log.Debugf("peMgrDcvFindNodeRsp: subnet not exist")
 		return PeMgrEnoNotfound
 	}
 
 	if _, ok := peMgr.reCfg.delList[rsp.Snid]; ok {
-		peerLog.Debug("peMgrDcvFindNodeRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
+		log.Debugf("peMgrDcvFindNodeRsp: discarded for reconfiguration, snid: %x", rsp.Snid)
 		return PeMgrEnoRecofig
 	}
 
@@ -654,7 +622,7 @@ func (peMgr *PeerManager) peMgrDcvFindNodeRsp(msg interface{}) PeMgrErrno {
 		}
 
 		if len(peMgr.randoms[snid]) >= peMgr.cfg.subNetMaxPeers[snid] {
-			peerLog.Debug("peMgrDcvFindNodeRsp: too much, some are truncated")
+			log.Debugf("peMgrDcvFindNodeRsp: too much, some are truncated")
 			continue
 		}
 
@@ -676,26 +644,26 @@ func (peMgr *PeerManager) peMgrDcvFindNodeTimerHandler(msg interface{}) PeMgrErr
 	nwt := peMgr.cfg.networkType
 	snid := msg.(*SubNetworkID)
 
-	peerLog.Debug("peMgrDcvFindNodeTimerHandler: nwt: %d, snid: %x", nwt, *snid)
+	log.Debugf("peMgrDcvFindNodeTimerHandler: nwt: %d, snid: %x", nwt, *snid)
 
 	if _, ok := peMgr.tidFindNode[*snid]; ok {
 		peMgr.tidFindNode[*snid] = sch.SchInvalidTid
 	} else {
-		peerLog.Debug("peMgrDcvFindNodeTimerHandler: no timer for snid: %x", *snid)
+		log.Debugf("peMgrDcvFindNodeTimerHandler: no timer for snid: %x", *snid)
 	}
 
 	if nwt == config.P2pNetworkTypeStatic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.staticMaxOutbounds {
-			peerLog.Debug("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
+			log.Debugf("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
 			return PeMgrEnoNone
 		}
 	} else if nwt == config.P2pNetworkTypeDynamic {
 		if peMgr.obpNum[*snid] >= peMgr.cfg.subNetMaxOutbounds[*snid] {
-			peerLog.Debug("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
+			log.Debugf("peMgrDcvFindNodeTimerHandler: reach threshold: %d", peMgr.obpNum[*snid])
 			return PeMgrEnoNone
 		}
 	} else {
-		peerLog.Debug("peMgrDcvFindNodeTimerHandler: invalid network type: %d", nwt)
+		log.Debugf("peMgrDcvFindNodeTimerHandler: invalid network type: %d", nwt)
 		return PeMgrEnoParameter
 	}
 
@@ -713,6 +681,7 @@ func (peMgr *PeerManager) peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 	*peInst = peerInstDefault
 	peInst.sdl = peMgr.sdl
+	peInst.sdlName = peMgr.sdl.SchGetP2pCfgName()
 	peInst.peMgr = peMgr
 	peInst.tep = peInst.peerInstProc
 	peInst.ptnMgr = peMgr.ptnMe
@@ -748,11 +717,11 @@ func (peMgr *PeerManager) peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 		UserDa: peInst,
 	}
 
-	peerLog.ForceDebug("peMgrLsnConnAcceptedInd: inst: %s, peer: %s",
+	log.Debugf("peMgrLsnConnAcceptedInd: inst: %s, peer: %s",
 		peInst.name, peInst.raddr.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc); eno != sch.SchEnoNone || ptnInst == nil {
-		peerLog.Debug("peMgrLsnConnAcceptedInd: SchCreateTask failed, eno: %d", eno)
+		log.Debugf("peMgrLsnConnAcceptedInd: SchCreateTask failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
 	peInst.ptnMe = ptnInst
@@ -779,7 +748,7 @@ func (peMgr *PeerManager) peMgrLsnConnAcceptedInd(msg interface{}) PeMgrErrno {
 
 func (peMgr *PeerManager) peMgrOutboundReq(msg interface{}) PeMgrErrno {
 	if peMgr.cfg.noDial || peMgr.cfg.bootstrapNode {
-		peerLog.Debug("PeerManager: no outbound for noDial or boostrapNode: %t, %t")
+		log.Debugf("PeerManager: no outbound for noDial or boostrapNode: %t, %t")
 		return PeMgrEnoNone
 	}
 	// if sub network identity is not specified, means all are wanted
@@ -789,13 +758,13 @@ func (peMgr *PeerManager) peMgrOutboundReq(msg interface{}) PeMgrErrno {
 	}
 	if snid == nil {
 		if eno := peMgr.peMgrStaticSubNetOutbound(); eno != PeMgrEnoNone {
-			peerLog.Debug("peMgrOutboundReq: peMgrStaticSubNetOutbound failed, eno: %d", eno)
+			log.Debugf("peMgrOutboundReq: peMgrStaticSubNetOutbound failed, eno: %d", eno)
 			return eno
 		}
 		if peMgr.cfg.networkType != config.P2pNetworkTypeStatic {
 			for _, id := range peMgr.cfg.subNetIdList {
 				if eno := peMgr.peMgrDynamicSubNetOutbound(&id); eno != PeMgrEnoNone {
-					peerLog.Debug("peMgrOutboundReq: peMgrDynamicSubNetOutbound failed, eno: %d", eno)
+					log.Debugf("peMgrOutboundReq: peMgrDynamicSubNetOutbound failed, eno: %d", eno)
 					return eno
 				}
 			}
@@ -913,7 +882,7 @@ func (peMgr *PeerManager) peMgrDynamicSubNetOutbound(snid *SubNetworkID) PeMgrEr
 		if tmPeers, exist := peMgr.tmLastOCR[*snid]; exist {
 			if t, ok := tmPeers[n.ID]; ok {
 				if time.Now().Sub(t) <= minDuration4OutboundConnectReq {
-					peerLog.Debug("peMgrDynamicSubNetOutbound: too early, " +
+					log.Tracef("peMgrDynamicSubNetOutbound: too early, " +
 						"snid: %x, peer: %x", *snid, n.IP.String())
 					continue
 				}
@@ -957,7 +926,7 @@ func (peMgr *PeerManager) peMgrConnOutRsp(msg interface{}) PeMgrErrno {
 				name:  pi.name,
 			}
 			if eno := peMgr.peMgrKillInst(&kip, PKI_FOR_BOUNDOUT_FAILED); eno != PeMgrEnoNone {
-				peerLog.Debug("peMgrConnOutRsp: peMgrKillInst failed, eno: %d", eno)
+				log.Debugf("peMgrConnOutRsp: peMgrKillInst failed, eno: %d", eno)
 				return eno
 			}
 			// drive ourselves to startup outbound
@@ -984,30 +953,31 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	var lived bool
 
 	if inst, lived = peMgr.peers[rsp.ptn]; inst == nil || !lived {
-		peerLog.ForceDebug("peMgrHandshakeRsp: instance not found")
-		panic("peMgrHandshakeRsp: instance not found")
+		log.Debugf("peMgrHandshakeRsp: instance not found")
+		return PeMgrEnoNotfound
 	}
 
 	if inst.ptnMe != rsp.ptn || inst.dir != rsp.dir {
-		peerLog.ForceDebug("peMgrHandshakeRsp: mismatched with instance, inst: %x, %d, %x",
+		log.Debugf("peMgrHandshakeRsp: mismatched with instance, inst: %x, %d, %x",
 			inst.name, inst.snid, inst.dir)
-		panic("peMgrHandshakeRsp: mismatched with instance")
+		return PeMgrEnoMismatched
 	}
 
 	if inst.dir == PeInstDirOutbound &&
 		(inst.snid != rsp.snid || !bytes.Equal(inst.node.ID[0:], rsp.peNode.ID[0:])) {
-		peerLog.ForceDebug("peMgrHandshakeRsp: mismatched with instance, inst: %x, %d, %x",
+		log.Debugf("peMgrHandshakeRsp: mismatched with instance, inst: %x, %d, %x",
 			inst.name, inst.snid, inst.dir)
-		panic("peMgrHandshakeRsp: mismatched with instance")
+		return PeMgrEnoMismatched
 	}
 
 	if rsp.result != PeMgrEnoNone {
 		if rsp.dir == PeInstDirInbound && !(rsp.peNode == nil && rsp.snid == config.AnySubNet) {
 			// rsp.peNode must be nil, since the handshake procedure failed, see event
 			// EvPeHandshakeReq handler for details pls.
-			panic("peMgrHandshakeRsp: internal errors")
+			log.Debugf("peMgrHandshakeRsp: internal errors")
+			return PeMgrEnoInternal
 		}
-		peerLog.ForceDebug("peMgrHandshakeRsp: failed, inst: %s, snid: %x, dir: %d, result: %d",
+		log.Debugf("peMgrHandshakeRsp: failed, inst: %s, snid: %x, dir: %d, result: %d",
 			inst.name, inst.snid, inst.dir, rsp.result)
 		kip := kiParameters{
 			ptn:   inst.ptnMe,
@@ -1035,7 +1005,8 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	if rsp.peNode == nil || rsp.snid != inst.snid {
 		// must not fulfil since handshake ok
-		panic("peMgrHandshakeRsp: internal errors")
+		log.Debugf("peMgrHandshakeRsp: internal errors")
+		return PeMgrEnoInternal
 	}
 
 	var maxInbound = 0
@@ -1057,7 +1028,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	if _, ok := peMgr.reCfg.delList[rsp.snid]; ok {
-		peerLog.ForceDebug("peMgrHandshakeRsp: kill for reconfiguration, inst: %s, snid: %x, dir: %d",
+		log.Debugf("peMgrHandshakeRsp: kill for reconfiguration, inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_RECONFIG)
 		return PeMgrEnoRecofig
@@ -1087,7 +1058,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	}
 
 	if peMgr.wrkNum[snid] >= maxPeers {
-		peerLog.ForceDebug("peMgrHandshakeRsp: too much workers, inst: %s, snid: %x, dir: %d",
+		log.Debugf("peMgrHandshakeRsp: too much workers, inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.updateStaticStatus(snid, idEx, peerKilling)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_WORKERS)
@@ -1097,7 +1068,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	idExTemp := idEx
 	idExTemp.Dir = PeInstDirInbound
 	if _, dup := peMgr.workers[snid][idExTemp]; dup {
-		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to inbound worker, " +
+		log.Debugf("peMgrHandshakeRsp: duplicated to inbound worker, " +
 			"inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_IBW_DUPLICATED)
@@ -1106,7 +1077,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 
 	idExTemp.Dir = PeInstDirOutbound
 	if _, dup := peMgr.workers[snid][idExTemp]; dup {
-		peerLog.ForceDebug("peMgrHandshakeRsp: duplicated to outbound worker, " +
+		log.Debugf("peMgrHandshakeRsp: duplicated to outbound worker, " +
 			"inst: %s, snid: %x, dir: %d",
 			inst.name, inst.snid, inst.dir)
 		peMgr.peMgrKillInst(&kip, PKI_FOR_OBW_DUPLICATED)
@@ -1118,7 +1089,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			peMgr.workers[snid][idEx] = inst
 		} else {
 			if peMgr.ibpNum[snid] >= maxInbound {
-				peerLog.ForceDebug("peMgrHandshakeRsp: inbound too much, " +
+				log.Debugf("peMgrHandshakeRsp: inbound too much, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_INBOUNDS)
@@ -1129,7 +1100,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 				// this duplicated case, we kill one instance here, but the peer might kill
 				// what he saw there also at the "same time", then two connections are lost,
 				// protection needed for this case.
-				peerLog.ForceDebug("peMgrHandshakeRsp: inbound conflict to outbound, " +
+				log.Debugf("peMgrHandshakeRsp: inbound conflict to outbound, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_IB2OB_DUPLICATED)
@@ -1145,7 +1116,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			peMgr.workers[snid][idEx] = inst
 		} else {
 			if peMgr.obpNum[snid] >= maxOutbound {
-				peerLog.ForceDebug("peMgrHandshakeRsp: outbound, too much workers, " +
+				log.Debugf("peMgrHandshakeRsp: outbound, too much workers, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_TOOMUCH_OUTBOUNDS)
@@ -1154,7 +1125,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 			idExTemp.Dir = PeInstDirInbound
 			if _, dup := peMgr.nodes[snid][idExTemp]; dup {
 				// conflict
-				peerLog.ForceDebug("peMgrHandshakeRsp: outbound conflicts to inbound, " +
+				log.Debugf("peMgrHandshakeRsp: outbound conflicts to inbound, " +
 					"inst: %s, snid: %x, dir: %d",
 					inst.name, inst.snid, inst.dir)
 				peMgr.peMgrKillInst(&kip, PKI_FOR_OB2IB_DUPLICATED)
@@ -1174,7 +1145,7 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, rsp.ptn, sch.EvPeEstablishedInd, &cfmCh)
 	peMgr.sdl.SchSendMessage(&schMsg)
 	if eno, ok := <-cfmCh; eno != PeMgrEnoNone || !ok {
-		peerLog.ForceDebug("peMgrHandshakeRsp: confirm failed, " +
+		log.Debugf("peMgrHandshakeRsp: confirm failed, " +
 			"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
 			inst.name, inst.snid, inst.dir, inst.state, eno)
 		if ok {
@@ -1213,13 +1184,13 @@ func (peMgr *PeerManager) peMgrHandshakeRsp(msg interface{}) PeMgrErrno {
 		}
 		tabEno := peMgr.tabMgr.TabBucketAddNode(snid, &n, &lastQuery, &lastPing, &lastPong)
 		if tabEno != tab.TabMgrEnoNone {
-			peerLog.Debug("peMgrHandshakeRsp: TabBucketAddNode failed, " +
+			log.Debugf("peMgrHandshakeRsp: TabBucketAddNode failed, " +
 				"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
 				inst.name, inst.snid, inst.dir, inst.state, tabEno)
 		}
 		tabEno = peMgr.tabMgr.TabUpdateNode(snid, &n)
 		if tabEno != tab.TabMgrEnoNone {
-			peerLog.Debug("peMgrHandshakeRsp: TabUpdateNode failed, " +
+			log.Debugf("peMgrHandshakeRsp: TabUpdateNode failed, " +
 				"inst: %s, snid: %x, dir: %d, state: %d, eno: %d",
 				inst.name, inst.snid, inst.dir, inst.state, tabEno)
 		}
@@ -1273,11 +1244,11 @@ func (peMgr *PeerManager) peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 	why, _ := req.Why.(string)
 	inst := peMgr.getWorkerInst(snid, &idEx)
 	if inst == nil {
-		peerLog.ForceDebug("peMgrCloseReq: worker not found")
+		log.Debugf("peMgrCloseReq: worker not found")
 		return PeMgrEnoNotfound
 	}
 	if inst.state < peInstStateNull {
-		peerLog.Debug("peMgrCloseReq: already in killing or killed, state: %d", inst.state)
+		log.Debugf("peMgrCloseReq: already in killing or killed, state: %d", inst.state)
 		return PeMgrEnoDuplicated
 	}
 	if ptnSender := peMgr.sdl.SchGetSender(msg); ptnSender != peMgr.ptnShell {
@@ -1291,7 +1262,7 @@ func (peMgr *PeerManager) peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 				Why:    req.Why,
 			}
 
-			peerLog.ForceDebug("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
+			log.Debugf("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
 				why, inst.name, req.Snid, req.Dir, req.Node.IP.String(), req.Node.TCP)
 
 			schMsg := sch.SchMessage{}
@@ -1301,7 +1272,7 @@ func (peMgr *PeerManager) peMgrCloseReq(msg *sch.SchMessage) PeMgrErrno {
 		}
 	}
 
-	peerLog.ForceDebug("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
+	log.Debugf("peMgrCloseReq: why: %s, inst: %s, snid: %x, dir: %d, ip: %s, port: %d",
 		why, inst.name, inst.snid, inst.dir, inst.node.IP.String(), inst.node.TCP)
 
 	peMgr.updateStaticStatus(snid, idEx, peerKilling)
@@ -1323,11 +1294,11 @@ func (peMgr *PeerManager) peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 		dir:   cfm.dir,
 	}
 
-	peerLog.ForceDebug("peMgrConnCloseCfm: inst: %s, snid: %x, dir: %d, state: %d",
+	log.Debugf("peMgrConnCloseCfm: inst: %s, snid: %x, dir: %d, state: %d",
 		cfm.name, cfm.snid, cfm.dir, cfm.state)
 
 	if eno := peMgr.peMgrKillInst(&kip, PKI_FOR_CLOSE_CFM); eno != PeMgrEnoNone {
-		peerLog.ForceDebug("peMgrConnCloseCfm: peMgrKillInst failed, inst: %s, snid: %x, dir: %d, state: %d",
+		log.Debugf("peMgrConnCloseCfm: peMgrKillInst failed, inst: %s, snid: %x, dir: %d, state: %d",
 			cfm.name, cfm.snid, cfm.dir, cfm.state)
 		return PeMgrEnoScheduler
 	}
@@ -1353,7 +1324,7 @@ func (peMgr *PeerManager) peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 
 	if peMgr.inStartup == peMgrInStartup {
 
-		peerLog.Debug("peMgrConnCloseCfm: send EvPeOutboundReq")
+		log.Debugf("peMgrConnCloseCfm: send EvPeOutboundReq")
 		schMsg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, &cfm.snid)
 		peMgr.sdl.SchSendMessage(&schMsg)
@@ -1365,19 +1336,19 @@ func (peMgr *PeerManager) peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 			if peMgr.pasStatus == peMgrPubAddrInSwitching ||
 				peMgr.pasStatus == peMgrPubAddrDelaySwitching {
 
-				peerLog.Debug("peMgrConnCloseCfm: calll pubAddrSwitch")
+				log.Debugf("peMgrConnCloseCfm: calll pubAddrSwitch")
 				peMgr.pubAddrSwitch()
 
 			} else {
 
-				peerLog.Debug("peMgrConnCloseCfm: transfer to peMgrInStopped")
+				log.Debugf("peMgrConnCloseCfm: transfer to peMgrInStopped")
 				peMgr.inStartup = peMgrInStopped
 			}
 		}
 
 	} else if peMgr.inStartup == peMgrInStopped {
 
-		peerLog.Debug("peMgrConnCloseCfm: confirmed while in peMgrInStopped")
+		log.Debugf("peMgrConnCloseCfm: confirmed while in peMgrInStopped")
 		return PeMgrEnoMismatched
 	}
 
@@ -1387,7 +1358,8 @@ func (peMgr *PeerManager) peMgrConnCloseCfm(msg interface{}) PeMgrErrno {
 func (peMgr *PeerManager) peMgrConnCloseInd(msg interface{}) PeMgrErrno {
 	// this would never happen since a peer instance would never
 	// kill himself in current implement.
-	panic("peMgrConnCloseInd: should never come here!!!")
+	log.Errorf("peMgrConnCloseInd: should never come here!!!")
+	return PeMgrEnoInternal
 }
 
 func (peMgr *PeerManager) natMgrReadyInd(msg *sch.MsgNatMgrReadyInd) PeMgrErrno {
@@ -1426,7 +1398,7 @@ func (peMgr *PeerManager) natMakeMapRsp(msg *sch.MsgNatMgrMakeMapRsp) PeMgrErrno
 
 func (peMgr *PeerManager) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd) PeMgrErrno {
 
-	peerLog.Debug("natPubAddrUpdateInd: entered")
+	log.Debugf("natPubAddrUpdateInd: entered")
 
 	oldNatResult := peMgr.natResult
 	oldIp := peMgr.pubTcpIp
@@ -1436,21 +1408,21 @@ func (peMgr *PeerManager) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd
 		if !peMgr.pubTcpIp.Equal(oldIp) || peMgr.pubTcpPort != oldTcp {
 			if peMgr.pasStatus == pwMgrPubAddrOutofSwitching {
 				if peMgr.reCfgTid != sch.SchInvalidTid {
-					peerLog.Debug("natMapRecovered: enter peMgrPubAddrDelaySwitching")
+					log.Debugf("natMapRecovered: enter peMgrPubAddrDelaySwitching")
 					peMgr.pasStatus = peMgrPubAddrDelaySwitching
 				} else {
-					peerLog.Debug("natMapRecovered: enter peMgrPubAddrInSwitching")
+					log.Debugf("natMapRecovered: enter peMgrPubAddrInSwitching")
 					peMgr.pasStatus = peMgrPubAddrInSwitching
 
-					peerLog.Debug("natMapRecovered: call pubAddrSwitchPrepare")
+					log.Debugf("natMapRecovered: call pubAddrSwitchPrepare")
 					peMgr.pubAddrSwitchPrepare()
 
-					peerLog.Debug("natMapRecovered: call stop")
+					log.Debugf("natMapRecovered: call stop")
 					peMgr.stop(PEMGR_STOP4NAT)
 				}
 			}
 		} else if peMgr.inStartup == peMgrInStartup {
-			peerLog.Debug("natMapRecovered: call PeMgrStart")
+			log.Debugf("natMapRecovered: call PeMgrStart")
 			peMgr.PeMgrStart()
 		}
 	}
@@ -1459,7 +1431,7 @@ func (peMgr *PeerManager) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd
 
 	natMapLost := func() {
 		if oldNatResult {
-			peerLog.Debug("natMapLost: call stop")
+			log.Debugf("natMapLost: call stop")
 			peMgr.stop(PEMGR_STOP4NAT)
 		}
 	}
@@ -1469,10 +1441,10 @@ func (peMgr *PeerManager) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd
 			peMgr.pubTcpIp = msg.PubIp
 			peMgr.pubTcpPort = msg.PubPort
 			if !oldNatResult {
-				peerLog.Debug("natPubAddrUpdateInd: call natMapRecovered")
+				log.Debugf("natPubAddrUpdateInd: call natMapRecovered")
 				natMapRecovered()
 			} else if !msg.PubIp.Equal(oldIp) || oldTcp != msg.PubPort {
-				peerLog.Debug("natPubAddrUpdateInd: call natMapChanged")
+				log.Debugf("natPubAddrUpdateInd: call natMapChanged")
 				natMapChanged()
 			}
 		}
@@ -1481,7 +1453,7 @@ func (peMgr *PeerManager) natPubAddrUpdateInd(msg *sch.MsgNatMgrPubAddrUpdateInd
 		peMgr.pubTcpIp = net.IPv4zero
 		peMgr.pubTcpPort = 0
 		if oldNatResult {
-			peerLog.Debug("natPubAddrUpdateInd: call natMapLost")
+			log.Debugf("natPubAddrUpdateInd: call natMapLost")
 			natMapLost()
 		}
 	}
@@ -1493,7 +1465,7 @@ func (peMgr *PeerManager) start() PeMgrErrno {
 		msg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStartReq, nil)
 		peMgr.sdl.SchSendMessage(&msg)
-		peerLog.Debug("start: EvPeLsnStartReq sent")
+		log.Debugf("start: EvPeLsnStartReq sent")
 	}
 
 	tdOcr := sch.TimerDescription{
@@ -1506,26 +1478,26 @@ func (peMgr *PeerManager) start() PeMgrErrno {
 	eno := sch.SchEnoNone
 	eno, peMgr.ocrTid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &tdOcr)
 	if eno != sch.SchEnoNone || peMgr.ocrTid == sch.SchInvalidTid {
-		peerLog.Debug("start: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("start: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
-	peerLog.Debug("start: ocrTid start ok")
+	log.Debugf("start: ocrTid start ok")
 
 	msg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeOutboundReq, nil)
 	peMgr.sdl.SchSendMessage(&msg)
-	peerLog.Debug("start: EvPeOutboundReq sent")
+	log.Debugf("start: EvPeOutboundReq sent")
 
 	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager) stop(why interface{}) PeMgrErrno {
 	if peMgr.reCfgTid != sch.SchInvalidTid {
-		peerLog.Debug("stop: faied, in reconfiguring")
+		log.Debugf("stop: faied, in reconfiguring")
 		return PeMgrEnoRecofig
 	}
 
-	peerLog.Debug("stop: kill caTids")
+	log.Debugf("stop: kill caTids")
 	for _, tid := range peMgr.caTids {
 		if tid != sch.SchInvalidTid {
 			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
@@ -1537,19 +1509,19 @@ func (peMgr *PeerManager) stop(why interface{}) PeMgrErrno {
 		msg := sch.SchMessage{}
 		peMgr.sdl.SchMakeMessage(&msg, peMgr.ptnMe, peMgr.ptnLsn, sch.EvPeLsnStopReq, nil)
 		peMgr.sdl.SchSendMessage(&msg)
-		peerLog.Debug("stop: EvPeLsnStopReq sent")
+		log.Debugf("stop: EvPeLsnStopReq sent")
 	}
 
-	peerLog.Debug("stop: randoms cleared")
+	log.Debugf("stop: randoms cleared")
 	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
 
-	peerLog.Debug("stop: kill ocrTid")
+	log.Debugf("stop: kill ocrTid")
 	if peMgr.ocrTid != sch.SchInvalidTid {
 		peMgr.sdl.SchKillTimer(peMgr.ptnMe, peMgr.ocrTid)
 		peMgr.ocrTid = sch.SchInvalidTid
 	}
 
-	peerLog.Debug("stop: kill tidFindNode")
+	log.Debugf("stop: kill tidFindNode")
 	for _, tid := range peMgr.tidFindNode {
 		if tid != sch.SchInvalidTid {
 			peMgr.sdl.SchKillTimer(peMgr.ptnMe, tid)
@@ -1559,10 +1531,10 @@ func (peMgr *PeerManager) stop(why interface{}) PeMgrErrno {
 
 	// try to close all peer instances: need to check the state of the instance to
 	// be closed.
-	peerLog.Debug("stop: try to kill all peer instances")
+	log.Debugf("stop: try to kill all peer instances")
 	for ptn, pi := range peMgr.peers {
 
-		peerLog.Debug("stop: peer, inst: %s, snid: %x, dir: %d, ip: %s",
+		log.Debugf("stop: peer, inst: %s, snid: %x, dir: %d, ip: %s",
 			pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		node := pi.node
@@ -1578,7 +1550,7 @@ func (peMgr *PeerManager) stop(why interface{}) PeMgrErrno {
 			if _, ok := piOfSubnet[idex]; ok {
 				if pi.state == peInstStateActivated {
 
-					peerLog.Debug("stop: send EvShellPeerAskToCloseInd, inst: %s, snid: %x, ip: %s, dir: %d",
+					log.Debugf("stop: send EvShellPeerAskToCloseInd, inst: %s, snid: %x, ip: %s, dir: %d",
 						pi.name, snid, pi.node.IP.String(), pi.dir)
 
 					ind := sch.MsgShellPeerAskToCloseInd{
@@ -1597,7 +1569,7 @@ func (peMgr *PeerManager) stop(why interface{}) PeMgrErrno {
 
 		// else kill directly since these instances are not reported to other
 		// modules at all, and piTx/piRx must not start for them.
-		peerLog.ForceDebug("stop: send EvPeCloseReq, inst: %s, snid: %x, ip: %s, dir: %d",
+		log.Debugf("stop: send EvPeCloseReq, inst: %s, snid: %x, ip: %s, dir: %d",
 			pi.name, snid, pi.node.IP.String(), pi.dir)
 		req := sch.MsgPeCloseReq{
 			Ptn:  ptn,
@@ -1611,7 +1583,7 @@ func (peMgr *PeerManager) stop(why interface{}) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&msg)
 	}
 
-	peerLog.Debug("stop: transfer to peMgrInStoping")
+	log.Debugf("stop: transfer to peMgrInStoping")
 	peMgr.inStartup = peMgrInStoping
 	return PeMgrEnoNone
 }
@@ -1626,7 +1598,7 @@ func (peMgr *PeerManager) msgFilter(msg *sch.SchMessage) PeMgrErrno {
 		case sch.EvNatMgrMakeMapRsp:
 		case sch.EvPeMgrStartReq:
 		default:
-			peerLog.Debug("msgFilter: filtered out for peMgrInNull, msg.Id: %d", msg.Id)
+			log.Debugf("msgFilter: filtered out for peMgrInNull, msg.Id: %d", msg.Id)
 			eno = PeMgrEnoMismatched
 		}
 	} else if peMgr.inStartup != peMgrInStartup {
@@ -1636,7 +1608,7 @@ func (peMgr *PeerManager) msgFilter(msg *sch.SchMessage) PeMgrErrno {
 		case sch.EvPeCloseCfm:
 		case sch.EvPeCloseInd:
 		default:
-			peerLog.Debug("msgFilter: filtered out for inStartup: %d, msg.Id: %d", peMgr.inStartup, msg.Id)
+			log.Debugf("msgFilter: filtered out for inStartup: %d, msg.Id: %d", peMgr.inStartup, msg.Id)
 			eno = PeMgrEnoMismatched
 		}
 	}
@@ -1652,7 +1624,7 @@ func (peMgr *PeerManager) pubAddrSwitchPrepare() PeMgrErrno {
 					snid: pi.snid,
 					node: pi.node,
 				}
-				peerLog.Debug("pubAddrSwitchPrepare: peer backup, name, snid: %x, ip: %s",
+				log.Debugf("pubAddrSwitchPrepare: peer backup, name, snid: %x, ip: %s",
 					pi.name, pi.snid, pi.node.IP.String())
 				peMgr.pasBackup = append(peMgr.pasBackup, item)
 			}
@@ -1662,11 +1634,11 @@ func (peMgr *PeerManager) pubAddrSwitchPrepare() PeMgrErrno {
 }
 
 func (peMgr *PeerManager) pubAddrSwitch() PeMgrErrno {
-	peerLog.Debug("pubAddrSwitch: transfer to peMgrInStartup and pwMgrPubAddrOutofSwitching")
+	log.Debugf("pubAddrSwitch: transfer to peMgrInStartup and pwMgrPubAddrOutofSwitching")
 	peMgr.inStartup = peMgrInStartup
 	peMgr.pasStatus = pwMgrPubAddrOutofSwitching
 
-	peerLog.Debug("pubAddrSwitch: restore peers in bakup list")
+	log.Debugf("pubAddrSwitch: restore peers in bakup list")
 	peMgr.randoms = make(map[SubNetworkID][]*config.Node, 0)
 	for _, item := range peMgr.pasBackup {
 		snid := item.snid
@@ -1674,11 +1646,11 @@ func (peMgr *PeerManager) pubAddrSwitch() PeMgrErrno {
 			peMgr.randoms[snid] = make([]*config.Node, 0)
 		}
 		peMgr.randoms[snid] = append(peMgr.randoms[snid], &item.node)
-		peerLog.Debug("pubAddrSwitch: backup one, snid: %x, ip: %s",
+		log.Debugf("pubAddrSwitch: backup one, snid: %x, ip: %s",
 			item.snid, item.node.IP.String())
 	}
 
-	peerLog.Debug("pubAddrSwitch: switch to new ip: %s, port: %d",
+	log.Debugf("pubAddrSwitch: switch to new ip: %s, port: %d",
 		peMgr.pubTcpIp.String(), peMgr.pubTcpPort)
 
 	peMgr.cfg.ip = peMgr.pubTcpIp
@@ -1694,7 +1666,7 @@ func (peMgr *PeerManager) pubAddrSwitch() PeMgrErrno {
 		peMgr.cfg.subNetNodeList[k] = n
 	}
 
-	peerLog.Debug("pubAddrSwitch: call start")
+	log.Debugf("pubAddrSwitch: call start")
 	return peMgr.start()
 }
 
@@ -1728,13 +1700,13 @@ func (peMgr *PeerManager) peMgrDataReq(msg interface{}) PeMgrErrno {
 	}
 
 	if inst.state != peInstStateActivated {
-		peerLog.Debug("peMgrDataReq: discarded, not activated, inst: %s, snid: %x, dir: %d, state: %d",
+		log.Debugf("peMgrDataReq: discarded, not activated, inst: %s, snid: %x, dir: %d, state: %d",
 			inst.name, inst.snid, inst.dir, inst.state)
 		return PeMgrEnoNotfound
 	}
 
 	if len(inst.txChan) >= cap(inst.txChan) {
-		peerLog.Debug("peMgrDataReq: discarded, tx queue full, inst: %s, snid: %x, dir: %d,",
+		log.Debugf("peMgrDataReq: discarded, tx queue full, inst: %s, snid: %x, dir: %d,",
 			inst.name, inst.snid, inst.dir)
 		return PeMgrEnoResource
 	}
@@ -1754,6 +1726,7 @@ func (peMgr *PeerManager) peMgrCreateOutboundInst(snid *config.SubNetworkID, nod
 
 	*peInst = peerInstDefault
 	peInst.sdl = peMgr.sdl
+	peInst.sdlName = peMgr.sdl.SchGetP2pCfgName()
 	peInst.peMgr = peMgr
 	peInst.tep = peInst.peerInstProc
 	peInst.ptnMgr = peMgr.ptnMe
@@ -1795,11 +1768,11 @@ func (peMgr *PeerManager) peMgrCreateOutboundInst(snid *config.SubNetworkID, nod
 		UserDa: peInst,
 	}
 
-	peerLog.ForceDebug("peMgrCreateOutboundInst: inst: %s, snid: %x, peer: %s",
+	log.Tracef("peMgrCreateOutboundInst: inst: %s, snid: %x, peer: %s",
 		peInst.name, *snid, node.IP.String())
 
 	if eno, ptnInst = peMgr.sdl.SchCreateTask(&tskDesc); eno != sch.SchEnoNone || ptnInst == nil {
-		peerLog.Debug("peMgrCreateOutboundInst: SchCreateTask failed, eno: %d", eno)
+		log.Debugf("peMgrCreateOutboundInst: SchCreateTask failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
 
@@ -1855,24 +1828,25 @@ func (peMgr *PeerManager) peMgrKillInst(kip *kiParameters, why interface{}) PeMg
 	dir := kip.dir
 	why = why.(string)
 
-	peerLog.ForceDebug("peMgrKillInst: inst: %s, dir: %d, state: %d, why: %s",
+	log.Tracef("peMgrKillInst: inst: %s, dir: %d, state: %d, why: %s",
 		kip.name, kip.dir, kip.state, why)
 
 	if why == PKI_FOR_FAILED_INST_CFM {
 		// notice: in current implement, this kind of "why" must not come out,
 		// see function peMgrHandshakeRsp and piEstablishedInd for details pls.
-		panic("peMgrKillInst: impossible")
+		log.Errorf("peMgrKillInst: impossible")
+		return PeMgrEnoInternal
 	}
 
 	peInst := peMgr.peers[ptn]
 	if peInst == nil {
-		peerLog.ForceDebug("peMgrKillInst: instance not found, inst: %s, kip: %s", peInst.name, kip.name)
-		panic("peMgrKillInst: instance not found")
+		log.Debugf("peMgrKillInst: instance not found, inst: %s, kip: %s", peInst.name, kip.name)
+		return PeMgrEnoInternal
 	}
 
 	if peInst.dir != dir {
-		peerLog.ForceDebug("peMgrKillInst: invalid parameters, inst: %s, kip: %s", peInst.name, kip.name)
-		panic("peMgrKillInst: direction mismatched")
+		log.Debugf("peMgrKillInst: invalid parameters, inst: %s, kip: %s", peInst.name, kip.name)
+		return PeMgrEnoInternal
 	}
 
 	if peInst.ppTid != sch.SchInvalidTid {
@@ -1890,8 +1864,8 @@ func (peMgr *PeerManager) peMgrKillInst(kip *kiParameters, why interface{}) PeMg
 		if _, exist := peMgr.workers[snid][idEx]; exist {
 			delete(peMgr.workers[snid], idEx)
 			if peMgr.wrkNum[snid]--; peMgr.wrkNum[snid] < 0 {
-				peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
-				panic("peMgrKillInst: internal errors")
+				log.Debugf("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
+				return PeMgrEnoInternal
 			}
 		}
 	}
@@ -1902,21 +1876,21 @@ func (peMgr *PeerManager) peMgrKillInst(kip *kiParameters, why interface{}) PeMg
 		delete(peMgr.nodes[snid], idEx)
 		delete(peMgr.peers, ptn)
 		if peMgr.obpNum[snid]--; peMgr.obpNum[snid] < 0 {
-			peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
-			panic("peMgrKillInst: internal errors")
+			log.Debugf("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
+			return PeMgrEnoInternal
 		}
 	} else if peInst.dir == PeInstDirInbound {
 		delete(peMgr.peers, ptn)
 		if peMgr.ibpTotalNum--; peMgr.ibpTotalNum < 0 {
-			peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
-			panic("peMgrKillInst: internal errors")
+			log.Debugf("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
+			return PeMgrEnoInternal
 		}
 		snid := peInst.snid
 		idEx := PeerIdEx{Id: peInst.node.ID, Dir: peInst.dir}
 		if why != PKI_FOR_HANDSHAKE_FAILED {
 			if peMgr.ibpNum[snid]--; peMgr.ibpNum[snid] < 0 {
-				peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
-				panic("peMgrKillInst: internal errors")
+				log.Debugf("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
+				return PeMgrEnoInternal
 			}
 		}
 		if why == PKI_FOR_CLOSE_CFM || why == PKI_FOR_RECONFIG {
@@ -1928,8 +1902,8 @@ func (peMgr *PeerManager) peMgrKillInst(kip *kiParameters, why interface{}) PeMg
 			}
 		}
 	} else {
-		peerLog.ForceDebug("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
-		panic("peMgrKillInst: internal errors")
+		log.Debugf("peMgrKillInst: inst: %s, kip: %s", peInst.name, kip.name)
+		return PeMgrEnoInternal
 	}
 
 	if why != PKI_FOR_HANDSHAKE_FAILED || peInst.dir == PeInstDirOutbound {
@@ -1967,11 +1941,11 @@ func (peMgr *PeerManager) peMgrConflictAccessProtect(snid config.SubNetworkID, p
 		Extra: &idexx,
 	}
 
-	peerLog.Debug("peMgrConflictAccessProtect: set timer, utid: %d, dur: %d, idexx: %+v", td.Utid, td.Dur, idexx)
+	log.Debugf("peMgrConflictAccessProtect: set timer, utid: %d, dur: %d, idexx: %+v", td.Utid, td.Dur, idexx)
 
 	eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td)
 	if eno != sch.SchEnoNone {
-		peerLog.Debug("peMgrConflictAccessProtect: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("peMgrConflictAccessProtect: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
 	idexx.toString()
@@ -1989,7 +1963,7 @@ func (peMgr *PeerManager) peMgrCatHandler(msg interface{}) PeMgrErrno {
 	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvDcvFindNodeRsp, &r)
 	peMgr.sdl.SchSendMessage(&schMsg)
-	peerLog.Debug("peMgrCatHandler: EvDcvFindNodeRsp sent, peer: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
+	log.Tracef("peMgrCatHandler: EvDcvFindNodeRsp sent, peer: %s, idexx: %+v", idexx.Node.IP.String(), idexx)
 	return PeMgrEnoNone
 }
 
@@ -2003,7 +1977,7 @@ func (peMgr *PeerManager) reconfigTimerHandler() PeMgrErrno {
 		why := sch.PEC_FOR_RECONFIG
 		for _, peerInst := range wks {
 
-			peerLog.ForceDebug("reconfigTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
+			log.Debugf("reconfigTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
 				peerInst.name, peerInst.snid, peerInst.dir, peerInst.node.IP.String())
 
 			req := sch.MsgPeCloseReq{
@@ -2046,7 +2020,7 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 	// and the adding list of "msg" pass to this function.
 
 	if peMgr.reCfgTid != sch.SchInvalidTid {
-		peerLog.Debug("shellReconfigReq: previous reconfiguration not completed")
+		log.Debugf("shellReconfigReq: previous reconfiguration not completed")
 		return PeMgrEnoRecofig
 	}
 
@@ -2102,7 +2076,7 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 				break
 			}
 
-			peerLog.ForceDebug("shellReconfigReq: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+			log.Debugf("shellReconfigReq: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
 				peerInst.name, peerInst.snid, peerInst.dir, peerInst.node.IP.String())
 
 			why := sch.PEC_FOR_RECONFIG_REQ
@@ -2116,8 +2090,8 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 			schMsg := sch.SchMessage{}
 			peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnMe, sch.EvPeCloseReq, &req)
 			if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-				peerLog.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
-				panic("shellReconfigReq: SchSendMessage failed")
+				log.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
+				return PeMgrEnoInternal
 			}
 		}
 
@@ -2136,8 +2110,8 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 		Extra: nil,
 	}
 	if eno, tid := peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone {
-		peerLog.Debug("shellReconfigReq: SchSetTimer failed, eno: %d", eno)
-		panic("shellReconfigReq: SchSendMessage failed")
+		log.Debugf("shellReconfigReq: SchSetTimer failed, eno: %d", eno)
+		return PeMgrEnoInternal
 	} else {
 		peMgr.reCfgTid = tid
 	}
@@ -2151,15 +2125,15 @@ func (peMgr *PeerManager) shellReconfigReq(msg *sch.MsgShellReconfigReq) PeMgrEr
 
 	// tell discover manager that sub networks changed
 	if eno := peMgr.peMgrRecfg2DcvMgr(); eno != PeMgrEnoNone {
-		peerLog.Debug("shellReconfigReq: peMgrRecfg2DcvMgr failed, eno: %d", eno)
-		panic("shellReconfigReq: SchSendMessage failed")
+		log.Debugf("shellReconfigReq: peMgrRecfg2DcvMgr failed, eno: %d", eno)
+		return PeMgrEnoInternal
 	}
 
 	// tell shell manager to update subnet info
 	schMsg := sch.SchMessage{}
 	peMgr.sdl.SchMakeMessage(&schMsg, peMgr.ptnMe, peMgr.ptnShell, sch.EvShellSubnetUpdateReq, nil)
 	if eno := peMgr.sdl.SchSendMessage(&schMsg); eno != sch.SchEnoNone {
-		peerLog.Debug("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
+		log.Debugf("shellReconfigReq: SchSendMessage failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
 
@@ -2203,7 +2177,7 @@ func (peMgr *PeerManager) peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		more := peMgr.cfg.subNetMaxOutbounds[*snid] - peMgr.obpNum[*snid]
 
 		if more <= 0 {
-			peerLog.Debug("peMgrAsk4More: no more needed, obpNum: %d, max: %d",
+			log.Debugf("peMgrAsk4More: no more needed, obpNum: %d, max: %d",
 				peMgr.obpNum[*snid],
 				peMgr.cfg.subNetMaxOutbounds[*snid])
 			return PeMgrEnoNone
@@ -2220,7 +2194,7 @@ func (peMgr *PeerManager) peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 		peMgr.sdl.SchSendMessage(&schMsg)
 		timerName = fmt.Sprintf("%s%x", sch.PeerMgrName+"_DcvFindNodeTimer_", *snid)
 
-		peerLog.Debug("peMgrAsk4More: " +
+		log.Debugf("peMgrAsk4More: " +
 			"cfgName: %s, subnet: %x, obpNum: %d, ibpNum: %d, ibpTotalNum: %d, wrkNum: %d, more: %d",
 			peMgr.cfg.cfgName,
 			*snid,
@@ -2253,28 +2227,18 @@ func (peMgr *PeerManager) peMgrAsk4More(snid *SubNetworkID) PeMgrErrno {
 	}
 
 	if eno, tid = peMgr.sdl.SchSetTimer(peMgr.ptnMe, &td); eno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		peerLog.Debug("peMgrAsk4More: SchSetTimer failed, eno: %d", eno)
+		log.Debugf("peMgrAsk4More: SchSetTimer failed, eno: %d", eno)
 		return PeMgrEnoScheduler
 	}
 
 	peMgr.tidFindNode[*snid] = tid
-
-	if peerLog.debug__ {
-		dbgStr := fmt.Sprintf("peMgrAsk4More: ptn: %p, updated snid_tid: [%x,%d], now: ",
-			peMgr.ptnMe, *snid, tid)
-		for k, v := range peMgr.tidFindNode {
-			snid_tid := fmt.Sprintf("[%x,%d],", k, v)
-			dbgStr = dbgStr + snid_tid
-		}
-		peerLog.Debug(dbgStr)
-	}
-
 	return PeMgrEnoNone
 }
 
 func (peMgr *PeerManager) peMgrIndEnque(ind interface{}) PeMgrErrno {
 	if len(peMgr.indChan) >= cap(peMgr.indChan) {
-		panic("peMgrIndEnque: system overload")
+		log.Debugf("peMgrIndEnque: system overload")
+		return PeMgrEnoResource
 	}
 	peMgr.indChan <- ind
 	return PeMgrEnoNone
@@ -2303,13 +2267,14 @@ const PeInstDirInbound = 0  // inbound connection
 const PeInstDirOutbound = 1 // outbound connection
 
 const PeInstMailboxSize = 512                // mailbox size
-const PeInstMaxP2packages = 512              // max p2p packages pending to be sent
+const PeInstMaxP2packages = 1024              // max p2p packages pending to be sent
 const PeInstMaxPings = 8                     // max pings pending to be sent
 const PeInstMaxPingpongCnt = 4               // max pingpong counter value
 const PeInstPingpongCycle = time.Second * 16 // pingpong period
 
 type PeerInstance struct {
 	sdl    *sch.Scheduler      // pointer to scheduler
+	sdlName	string			   // scheduler instance name
 	peMgr  *PeerManager        // pointer to peer manager
 	name   string              // name
 	chainId uint32			   // chain identity
@@ -2428,7 +2393,7 @@ func (pi *PeerInstance) TaskProc4Scheduler(ptn interface{}, msg *sch.SchMessage)
 
 func (pi *PeerInstance) peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.SchErrno {
 
-	peerLog.ForceDebug("peerInstProc: inst: %s, msg.Id: %d", pi.name, msg.Id)
+	log.Tracef("peerInstProc: inst: %s, msg.Id: %d", pi.name, msg.Id)
 
 	var eno PeMgrErrno
 
@@ -2461,11 +2426,11 @@ func (pi *PeerInstance) peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.S
 		eno = pi.piRxDataInd(msg.Body)
 
 	default:
-		peerLog.Debug("PeerInstProc: invalid message: %d", msg.Id)
+		log.Debugf("PeerInstProc: invalid message: %d", msg.Id)
 		eno = PeMgrEnoParameter
 	}
 
-	peerLog.ForceDebug("peerInstProc: get out, inst: %s, msg.Id: %d", pi.name, msg.Id)
+	log.Tracef("peerInstProc: get out, inst: %s, msg.Id: %d", pi.name, msg.Id)
 
 	if eno != PeMgrEnoNone {
 		return sch.SchEnoUserTask
@@ -2477,7 +2442,7 @@ func (pi *PeerInstance) peerInstProc(ptn interface{}, msg *sch.SchMessage) sch.S
 func (pi *PeerInstance) piPoweroff(ptn interface{}) PeMgrErrno {
 
 	if pi.state < peInstStateNull {
-		peerLog.ForceDebug("piPoweroff: already in killing or killed, inst: %s, snid: %x, dir: %d, state: %d",
+		log.Debugf("piPoweroff: already in killing or killed, inst: %s, snid: %x, dir: %d, state: %d",
 			pi.name, pi.snid, pi.dir, pi.state)
 		if pi.sdl.SchTaskDone(pi.ptnMe, pi.name, sch.SchEnoKilled) != sch.SchEnoNone {
 			return PeMgrEnoScheduler
@@ -2485,7 +2450,7 @@ func (pi *PeerInstance) piPoweroff(ptn interface{}) PeMgrErrno {
 		return PeMgrEnoNone
 	}
 
-	peerLog.ForceDebug("piPoweroff: task will be done, inst: %s, snid: %x, dir: %d, state: %d",
+	log.Debugf("piPoweroff: task will be done, inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
 
 	pi.stopRxTx()
@@ -2500,7 +2465,7 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 	if pi.dialer == nil ||
 		pi.dir != PeInstDirOutbound ||
 		pi.state != peInstStateConnOut {
-		peerLog.Debug("piConnOutReq: instance mismatched, pi: %s", pi.name)
+		log.Debugf("piConnOutReq: instance mismatched, pi: %s", pi.name)
 		return PeMgrEnoInternal
 	}
 
@@ -2511,12 +2476,12 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 		eno  PeMgrErrno = PeMgrEnoNone
 	)
 
-	peerLog.ForceDebug("piConnOutReq: outbound inst: %s, snid: %x, try to dial target: %s",
+	log.Tracef("piConnOutReq: outbound inst: %s, snid: %x, try to dial target: %s",
 		pi.name, pi.snid, addr.String())
 
 	pi.dialer.Timeout = pi.cto
 	if conn, err = pi.dialer.Dial("tcp", addr.String()); err != nil {
-		peerLog.Debug("piConnOutReq: dial failed, local: %s, to: %s, err: %s",
+		log.Debugf("piConnOutReq: dial failed, local: %s, to: %s, err: %s",
 			fmt.Sprintf("%s:%d", pi.node.IP.String(), pi.node.TCP),
 			addr.String(), err.Error())
 		eno = PeMgrEnoOs
@@ -2526,7 +2491,7 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 		pi.raddr = conn.RemoteAddr().(*net.TCPAddr)
 		pi.state = peInstStateConnected
 
-		peerLog.Debug("piConnOutReq: dial ok, laddr: %s, raddr: %s",
+		log.Tracef("piConnOutReq: dial ok, laddr: %s, raddr: %s",
 			pi.laddr.String(),
 			pi.raddr.String())
 	}
@@ -2547,21 +2512,21 @@ func (pi *PeerInstance) piConnOutReq(_ interface{}) PeMgrErrno {
 func (pi *PeerInstance) piHandshakeReq(_ interface{}) PeMgrErrno {
 	var eno PeMgrErrno
 	if pi == nil {
-		peerLog.Debug("piHandshakeReq: invalid instance")
-		panic("piHandshakeReq: invalid instance")
+		log.Debugf("piHandshakeReq: invalid instance")
+		return PeMgrEnoInternal
 	}
 
-	peerLog.ForceDebug("piHandshakeReq: inst: %s, dir: %d", pi.name, pi.dir)
+	log.Tracef("piHandshakeReq: inst: %s, dir: %d", pi.name, pi.dir)
 
 	if pi.state != peInstStateConnected && pi.state != peInstStateAccepted {
-		peerLog.Debug("piHandshakeReq: instance mismatched, inst: %s, dir: %d, state: %d",
+		log.Debugf("piHandshakeReq: instance mismatched, inst: %s, dir: %d, state: %d",
 			pi.name, pi.dir, pi.state)
-		panic("piHandshakeReq: instance mismatched")
+		return PeMgrEnoInternal
 	}
 
 	if pi.conn == nil {
-		peerLog.Debug("piHandshakeReq: invalid connection, inst: %s, dir: %d", pi.name, pi.dir)
-		panic("piHandshakeReq: invalid connection")
+		log.Debugf("piHandshakeReq: invalid connection, inst: %s, dir: %d", pi.name, pi.dir)
+		return PeMgrEnoInternal
 	}
 
 	if pi.dir == PeInstDirInbound {
@@ -2569,11 +2534,11 @@ func (pi *PeerInstance) piHandshakeReq(_ interface{}) PeMgrErrno {
 	} else if pi.dir == PeInstDirOutbound {
 		eno = pi.piHandshakeOutbound(pi)
 	} else {
-		peerLog.Debug("piHandshakeReq: invalid instance direction: %d", pi.dir)
-		panic("piHandshakeReq: invalid direction")
+		log.Debugf("piHandshakeReq: invalid instance direction: %d", pi.dir)
+		return PeMgrEnoInternal
 	}
 
-	peerLog.Debug("piHandshakeReq: inst: %s, snid: %x, dir: %d, result: %d, laddr: %s, raddr: %s",
+	log.Tracef("piHandshakeReq: inst: %s, snid: %x, dir: %d, result: %d, laddr: %s, raddr: %s",
 		pi.name,
 		pi.snid,
 		pi.dir,
@@ -2607,16 +2572,16 @@ func (pi *PeerInstance) piPingpongReq(msg interface{}) PeMgrErrno {
 	// notice: here in this function we must check the queue(channel) for pingpong
 	// data to avoid be blocked.
 	if pi.ppEno != PeMgrEnoNone || pi.state != peInstStateActivated {
-		peerLog.Debug("piPingpongReq: discarded, inst: %s, ppEno: %d, state: %d",
+		log.Debugf("piPingpongReq: discarded, inst: %s, ppEno: %d, state: %d",
 			pi.name, pi.ppEno, pi.state)
 		return PeMgrEnoResource
 	}
 	if pi.conn == nil {
-		peerLog.Debug("piPingpongReq: connection had been closed, inst: %s", pi.name)
+		log.Debugf("piPingpongReq: connection had been closed, inst: %s", pi.name)
 		return PeMgrEnoResource
 	}
 	if len(pi.ppChan) >= cap(pi.ppChan) {
-		peerLog.ForceDebug("piPingpongReq: queue full, inst: %s, dir: %d", pi.name, pi.dir)
+		log.Debugf("piPingpongReq: queue full, inst: %s, dir: %d", pi.name, pi.dir)
 		return PeMgrEnoResource
 	}
 	pi.ppSeq = msg.(*MsgPingpongReq).seq
@@ -2626,7 +2591,7 @@ func (pi *PeerInstance) piPingpongReq(msg interface{}) PeMgrErrno {
 	}
 	upkg := new(P2pPackage)
 	if eno := upkg.ping(pi, &ping, false); eno != PeMgrEnoNone {
-		peerLog.Debug("piPingpongReq: ping failed, inst: %s, eno: %d", pi.name, eno)
+		log.Debugf("piPingpongReq: ping failed, inst: %s, eno: %d", pi.name, eno)
 		return eno
 	}
 	pi.ppChan <- upkg
@@ -2635,12 +2600,12 @@ func (pi *PeerInstance) piPingpongReq(msg interface{}) PeMgrErrno {
 
 func (pi *PeerInstance) piCloseReq(_ interface{}) PeMgrErrno {
 	if pi.state < peInstStateNull {
-		peerLog.ForceDebug("piCloseReq: already in killing, inst: %s, snid: %x, dir: %d, state: %d",
+		log.Debugf("piCloseReq: already in killing, inst: %s, snid: %x, dir: %d, state: %d",
 			pi.name, pi.snid, pi.dir, pi.state)
 		return PeMgrEnoDuplicated
 	}
 
-	peerLog.ForceDebug("piCloseReq: inst: %s, snid: %x, dir: %d, state: %d",
+	log.Debugf("piCloseReq: inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
 
 	pi.state = peInstStateKilling
@@ -2676,11 +2641,11 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 	}
 	cfmCh := *msg.(*chan int)
 
-	peerLog.ForceDebug("piEstablishedInd: enter, inst: %s, snid: %x, dir: %d, state: %d",
+	log.Tracef("piEstablishedInd: enter, inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
 
 	if schEno, tid = pi.sdl.SchSetTimer(pi.ptnMe, &tmDesc); schEno != sch.SchEnoNone || tid == sch.SchInvalidTid {
-		peerLog.Debug("piEstablishedInd: SchSetTimer failed, pi: %s, eno: %d", pi.name, schEno)
+		log.Debugf("piEstablishedInd: SchSetTimer failed, pi: %s, eno: %d", pi.name, schEno)
 		cfmCh <- PeMgrEnoScheduler
 		return PeMgrEnoScheduler
 	}
@@ -2691,7 +2656,7 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 	pi.ppEno = PeMgrEnoNone
 
 	if err := pi.conn.SetDeadline(time.Time{}); err != nil {
-		peerLog.ForceDebug("piEstablishedInd: SetDeadline failed, inst: %s, snid: %x, dir: %d,  ip: %s",
+		log.Debugf("piEstablishedInd: SetDeadline failed, inst: %s, snid: %x, dir: %d,  ip: %s",
 			pi.name, pi.snid, pi.dir, pi.node.IP.String())
 		pi.sdl.SchKillTimer(pi.ptnMe, pi.ppTid)
 		pi.ppTid = sch.SchInvalidTid
@@ -2706,7 +2671,7 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 	pi.rxtxRuning = true
 	cfmCh <- PeMgrEnoNone
 
-	peerLog.ForceDebug("piEstablishedInd: exit, inst: %s, snid: %x, dir: %d, state: %d",
+	log.Tracef("piEstablishedInd: exit, inst: %s, snid: %x, dir: %d, state: %d",
 		pi.name, pi.snid, pi.dir, pi.state)
 
 	return PeMgrEnoNone
@@ -2715,7 +2680,7 @@ func (pi *PeerInstance) piEstablishedInd(msg interface{}) PeMgrErrno {
 func (pi *PeerInstance) piPingpongTimerHandler() PeMgrErrno {
 	if pi.ppCnt++; pi.ppCnt > PeInstMaxPingpongCnt {
 
-		peerLog.ForceDebug("piPingpongTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
+		log.Debugf("piPingpongTimerHandler: send EvPeCloseReq, inst: %s, snid: %x, dir: %d,  ip: %s",
 			pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		pi.ppEno = PeMgrEnoPingpongTh
@@ -2771,15 +2736,15 @@ func (pi *PeerInstance) piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 	var hs *Handshake
 
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
-		peerLog.Debug("piHandshakeInbound: read inbound Handshake message failed, eno: %d", eno)
+		log.Debugf("piHandshakeInbound: read inbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
 
-	peerLog.Debug("piHandshakeInbound: snid: %x, peer: %s, hs: %+v",
+	log.Tracef("piHandshakeInbound: snid: %x, peer: %s, hs: %+v",
 		hs.Snid, hs.IP.String(), *hs)
 
 	if pi.checkHandshakeInfo(hs) != true {
-		peerLog.Debug("piHandshakeInbound: checkHandshakeInfo failed, snid: %x, peer: %s, hs: %+v",
+		log.Debugf("piHandshakeInbound: checkHandshakeInfo failed, snid: %x, peer: %s, hs: %+v",
 			hs.Snid, hs.IP.String(), *hs)
 		return PeMgrEnoNotfound
 	}
@@ -2809,7 +2774,7 @@ func (pi *PeerInstance) piHandshakeInbound(inst *PeerInstance) PeMgrErrno {
 	hs2peer.Protocols = inst.localProtocols
 
 	if eno = pkg.putHandshakeOutbound(inst, &hs2peer); eno != PeMgrEnoNone {
-		peerLog.Debug("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
+		log.Debugf("piHandshakeInbound: write outbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
 
@@ -2832,26 +2797,26 @@ func (pi *PeerInstance) piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 	hs.Protocols = append(hs.Protocols, pi.localProtocols...)
 
 	if eno = pkg.putHandshakeOutbound(inst, hs); eno != PeMgrEnoNone {
-		peerLog.Debug("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
+		log.Debugf("piHandshakeOutbound: write outbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
 
 	// read inbound handshake from remote peer
 	if hs, eno = pkg.getHandshakeInbound(inst); hs == nil || eno != PeMgrEnoNone {
-		peerLog.Debug("piHandshakeOutbound: read inbound Handshake message failed, eno: %d", eno)
+		log.Debugf("piHandshakeOutbound: read inbound Handshake message failed, eno: %d", eno)
 		return eno
 	}
 
 	// check handshake
 	if pi.checkHandshakeInfo(hs) != true {
-		peerLog.Debug("piHandshakeOutbound: checkHandshakeInfo failed, snid: %x, peer: %s, hs: %+v",
+		log.Debugf("piHandshakeOutbound: checkHandshakeInfo failed, snid: %x, peer: %s, hs: %+v",
 			hs.Snid, hs.IP.String(), *hs)
 		return PeMgrEnoNotfound
 	}
 
 	// check sub network identity
 	if hs.Snid != inst.snid {
-		peerLog.Debug("piHandshakeOutbound: subnet identity mismathced")
+		log.Debugf("piHandshakeOutbound: subnet identity mismathced")
 		return PeMgrEnoMessage
 	}
 
@@ -2860,7 +2825,7 @@ func (pi *PeerInstance) piHandshakeOutbound(inst *PeerInstance) PeMgrErrno {
 	if hs.NodeId != inst.node.ID ||
 		inst.node.TCP != uint16(hs.TCP) ||
 		bytes.Compare(inst.node.IP, hs.IP) != 0 {
-		peerLog.Debug("piHandshakeOutbound: handshake mismathced, ip: %s, port: %d, id: %x",
+		log.Debugf("piHandshakeOutbound: handshake mismathced, ip: %s, port: %d, id: %x",
 			hs.IP.String(), hs.TCP, hs.NodeId)
 		return PeMgrEnoMessage
 	}
@@ -2876,12 +2841,12 @@ func SendPackage(pkg *P2pPackage2Peer) PeMgrErrno {
 	// only method to send messages, since active peers are backup in shell manager
 	// of chain, see function ShellManager.broadcastReq for details please.
 	if len(pkg.IdList) == 0 {
-		peerLog.Debug("SendPackage: invalid parameter")
+		log.Debugf("SendPackage: invalid parameter")
 		return PeMgrEnoParameter
 	}
 	pem := pkg.P2pInst.SchGetTaskObject(sch.PeerMgrName)
 	if pem == nil {
-		peerLog.Debug("SendPackage: nil peer manager, might be in power off stage")
+		log.Debugf("SendPackage: nil peer manager, might be in power off stage")
 		return PeMgrEnoNotfound
 	}
 	peMgr := pem.(*PeerManager)
@@ -2910,7 +2875,7 @@ func (peMgr *PeerManager) ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	idExList := []PeerIdEx{idExOut, idExIn}
 	why := sch.PEC_FOR_COMMAND
 	for _, idEx := range idExList {
-		peerLog.ForceDebug("ClosePeer: why: %d, snid: %x, dir: %d, id: %x",
+		log.Debugf("ClosePeer: why: %d, snid: %x, dir: %d, id: %x",
 			why, *snid, idEx.Dir, idEx.Id)
 		var req = sch.MsgPeCloseReq{
 			Ptn:  nil,
@@ -2928,6 +2893,18 @@ func (peMgr *PeerManager) ClosePeer(snid *SubNetworkID, id *PeerId) PeMgrErrno {
 	return PeMgrEnoNone
 }
 
+type txPkgKey struct {
+	pid	uint32
+	mid	uint32
+}
+type txStat struct {
+	txTryCnt		int64
+	txppOkCnt		int64
+	txppFailedCnt	int64
+	txdatOkCnt		int64
+	txdatFailedCnt	int64
+	txPkgCnt		map[txPkgKey]int64
+}
 func piTx(pi *PeerInstance) PeMgrErrno {
 	// This function is "go" when an instance of peer is activated to work,
 	// inbound or outbound. When user try to close the peer, this routine
@@ -2935,7 +2912,7 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 
 	defer func() {
 		if err := recover(); err != nil {
-			peerLog.Debug("piTx: exception raised, wait done...")
+			log.Debugf("piTx: exception raised, wait done...")
 		}
 	}()
 
@@ -2947,8 +2924,9 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		// might had fired pi.txDone and been blocked by pi.txExit. panic is called
 		// for such a overload system, see scheduler please.
 
-		peerLog.ForceDebug("piTx: ask4Close, send EvPeCloseReq. inst: %s snid: %x, dir: %d, peer: %s",
-			pi.name, pi.snid, pi.dir, pi.node.IP.String())
+		log.Debugf("piTx: ask4Close, send EvPeCloseReq, " +
+			"sdl: %s, inst: %s snid: %x, dir: %d, peer: %s",
+			pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 		pi.txEno = eno
 		why := sch.PEC_FOR_TXERROR
@@ -2972,6 +2950,9 @@ func piTx(pi *PeerInstance) PeMgrErrno {
 		okData bool
 		ppkg   *P2pPackage
 		upkg   *P2pPackage
+		stat	= txStat {
+			txPkgCnt: make(map[txPkgKey]int64, 0),
+		}
 	)
 
 _txLoop:
@@ -2981,8 +2962,9 @@ _txLoop:
 		isData = false
 		okPP = false
 		okData = false
-		ppkg = (*P2pPackage)(nil)
-		upkg = (*P2pPackage)(nil)
+		ppkg = nil
+		upkg = nil
+		txpk := txPkgKey{}
 
 		select {
 		case ppkg, okPP = <-pi.ppChan:
@@ -2994,6 +2976,7 @@ _txLoop:
 		}
 
 		// check if any pendings or done
+		stat.txTryCnt++
 		if isPP {
 
 			if pi.rxEno != PeMgrEnoNone || pi.txEno != PeMgrEnoNone {
@@ -3007,26 +2990,33 @@ _txLoop:
 
 				if eno := ppkg.SendPackage(pi); eno == PeMgrEnoNone {
 
-					pi.txOkCnt += 1
+					pi.txOkCnt++
+					stat.txppOkCnt++
 
 				} else {
 
-					pi.txFailedCnt += 1
+					pi.txFailedCnt++
+					stat.txppFailedCnt++
 					ask4Close(eno)
 				}
+
+				txpk.pid = ppkg.Pid
+				txpk.mid = ppkg.Mid
 			}
 
 		} else if isData {
 
 			if !okData {
-				peerLog.ForceDebug("piTx: done, inst: %s, snid: %x, dir: %d",
-					pi.name, pi.snid, pi.dir)
+				log.Debugf("piTx: done, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d",
+					pi.sdlName, pi.name, pi.snid, pi.dir)
 				break _txLoop
 			}
 
 			if upkg == nil {
-				peerLog.Debug("piTx: nil package, inst: %s, snid: %x, dir: %d",
-					pi.name, pi.snid, pi.dir)
+				log.Debugf("piTx: nil package, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d",
+					pi.sdlName, pi.name, pi.snid, pi.dir)
 				continue
 			}
 
@@ -3040,25 +3030,64 @@ _txLoop:
 
 			if eno := upkg.SendPackage(pi); eno == PeMgrEnoNone {
 
-				pi.txOkCnt += 1
+				log.Tracef("piTx: SendPackage ok, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, " +
+					"key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq,
+					upkg.Key)
 
+				pi.txOkCnt++
+				stat.txdatOkCnt++
 			} else {
 
-				pi.txFailedCnt += 1
+				log.Debugf("piTx: SendPackage failed, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, " +
+					"key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq,
+					upkg.Key)
+
+				pi.txFailedCnt++
+				stat.txdatFailedCnt++
 				ask4Close(eno)
 			}
+
+			txpk.pid = upkg.Pid
+			txpk.mid = upkg.Mid
 		}
 
-		if pi.txSeq&0x3ff == 0 {
-			peerLog.Debug("piTx: inst: %s, snid: %x, dir: %d, txSeq: %d, txOkCnt: %d, txFailedCnt: %d",
-				pi.name, pi.snid, pi.dir, pi.txSeq, pi.txOkCnt, pi.txFailedCnt)
+		if cnt, ok := stat.txPkgCnt[txpk]; ok {
+			stat.txPkgCnt[txpk] = cnt + 1
+		} else {
+			stat.txPkgCnt[txpk] = 1
+		}
+
+		if stat.txTryCnt & 0x3ff == 0 {
+			log.Debugf("piTx: stat, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d, txSeq: %d, txOkCnt: %d, txFailedCnt: %d " +
+				"stat: %+v",
+				pi.sdlName, pi.name, pi.snid, pi.dir, pi.txSeq, pi.txOkCnt, pi.txFailedCnt,
+				stat)
 		}
 	}
 
-	peerLog.ForceDebug("piTx: exit, inst: %s, snid: %x, dir: %d", pi.name, pi.snid, pi.dir)
+	log.Debugf("piTx: exit, " +
+		"sdl: %s, inst: %s, snid: %x, dir: %d",
+		pi.sdlName, pi.name, pi.snid, pi.dir)
+
 	return PeMgrEnoNone
 }
 
+type rxPkgKey = txPkgKey
+type rxStat struct {
+	rxTryCnt		int64
+	rxTmpErrCnt		int64
+	rxErrCnt		int64
+	rxOkCnt			int64
+	rxDiscardCnt	int64
+	rxPidErrCnt		int64
+	rxChCnt			int64
+	rxPkgCnt		map[rxPkgKey]int64
+}
 func piRx(pi *PeerInstance) PeMgrErrno {
 
 	// This function is "go" when an instance of peer is activated to work,
@@ -3067,19 +3096,23 @@ func piRx(pi *PeerInstance) PeMgrErrno {
 
 	defer func() {
 		if err := recover(); err != nil {
-			peerLog.Debug("piRx: exception raised, wait done...")
+			log.Debugf("piRx: exception raised, wait done...")
 		}
 	}()
 
 	var done PeMgrErrno = PeMgrEnoNone
 	var ok = true
+	var stat = rxStat{
+		rxPkgCnt: make(map[rxPkgKey]int64, 0),
+	}
 
 _rxLoop:
 	for {
 		select {
 		case done, ok = <-pi.rxDone:
-			peerLog.ForceDebug("piRx: done, inst: %s, snid: %x, dir: %d, done with: %d",
-				pi.name, pi.snid, pi.dir, done)
+			log.Debugf("piRx: done, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d, done with: %d",
+				pi.sdlName, pi.name, pi.snid, pi.dir, done)
 			if ok {
 				close(pi.rxDone)
 			}
@@ -3094,13 +3127,21 @@ _rxLoop:
 		}
 
 		// try reading the peer
+		if stat.rxTryCnt++; stat.rxTryCnt & 0x3ff == 0 {
+			log.Debugf("piRx: stat, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d, ip: %s, stat: %+v",
+				pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String(), stat)
+		}
+
 		upkg := new(P2pPackage)
 		if eno := upkg.RecvPackage(pi); eno != PeMgrEnoNone {
 
 			if eno == PeMgrEnoNetTemporary {
 
-				peerLog.ForceDebug("piRx: PeMgrEnoNetTemporary, inst: %s, snid: %x, dir: %d, ip: %s",
-					pi.name, pi.snid, pi.dir, pi.node.IP.String())
+				log.Debugf("piRx: PeMgrEnoNetTemporary, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, ip: %s",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String())
+				stat.rxTmpErrCnt++
 
 			} else {
 				// 1) if failed, ask the user to done, so he can close this peer seems in troubles,
@@ -3109,8 +3150,9 @@ _rxLoop:
 				// is closed for some reasons(for example the user close the peer), in this case,
 				// we would get an error;
 
-				peerLog.ForceDebug("piRx: error, send EvPeCloseReq, inst: %s, snid: %x, dir: %d, ip: %s",
-					pi.name, pi.snid, pi.dir, pi.node.IP.String())
+				log.Debugf("piRx: error, send EvPeCloseReq, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, ip: %s",
+					pi.sdlName, pi.name, pi.snid, pi.dir, pi.node.IP.String())
 
 				why := sch.PEC_FOR_RXERROR
 				pi.rxEno = eno
@@ -3131,6 +3173,7 @@ _rxLoop:
 				msg := sch.SchMessage{}
 				pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMgr, sch.EvPeCloseReq, &req)
 				pi.sdl.SchSendMessage(&msg)
+				stat.rxErrCnt++
 			}
 
 			continue
@@ -3138,25 +3181,44 @@ _rxLoop:
 
 		upkg.DebugPeerPackage()
 
+		rxpk := rxPkgKey{
+			pid: upkg.Pid,
+			mid: upkg.Mid,
+		}
+		stat.rxOkCnt++
+
 		if upkg.Pid == uint32(PID_P2P) {
 
 			msg := sch.SchMessage{}
 			pi.sdl.SchMakeMessage(&msg, pi.ptnMe, pi.ptnMe, sch.EvPeRxDataInd, upkg)
 			pi.sdl.SchSendMessage(&msg)
 
+			if cnt, ok := stat.rxPkgCnt[rxpk]; ok {
+				stat.rxPkgCnt[rxpk] = cnt + 1
+			} else {
+				stat.rxPkgCnt[rxpk] = 1
+			}
+
 		} else if upkg.Pid == uint32(PID_EXT) {
 
 			if len(pi.rxChan) >= cap(pi.rxChan) {
 
-				peerLog.Debug("piRx: queue full, inst: %s, snid: %x, dir: %d",
-					pi.name, pi.snid, pi.dir)
+				log.Debugf("piRx: queue full, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Key)
 
-				if pi.rxDiscard += 1; pi.rxDiscard&0x1f == 0 {
-					peerLog.Debug("piRx: inst: %s, snid: %x, dir: %d, rxDiscard: %d",
-						pi.name, pi.snid, pi.dir, pi.rxDiscard)
+				if pi.rxDiscard += 1; pi.rxDiscard & 0x1f == 0 {
+					log.Debugf("piRx: stat, discarded, " +
+						"sdl: %s, inst: %s, snid: %x, dir: %d, rxDiscard: %d, key: %x",
+						pi.sdlName, pi.name, pi.snid, pi.dir, pi.rxDiscard, upkg.Key)
 				}
+				stat.rxDiscardCnt++
 
 			} else {
+
+				log.Tracef("piRx: put into channel, " +
+					"sdl: %s, inst: %s, snid: %x, dir: %d, key: %x",
+					pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Key)
 
 				peerInfo := PeerInfo{}
 				pkgCb := P2pPackageRx{}
@@ -3180,41 +3242,52 @@ _rxLoop:
 
 				pi.rxChan <- &pkgCb
 
-				if pi.rxOkCnt += 1; pi.rxOkCnt&0x3ff == 0 {
-					peerLog.Debug("piRx: inst: %s, snid: %x, dir: %d, rxOkCnt: %d",
-						pi.name, pi.snid, pi.dir, pi.rxOkCnt)
+				if pi.rxOkCnt += 1; pi.rxOkCnt & 0x3ff == 0 {
+					log.Debugf("piRx: stat, " +
+						"sdl: %s, inst: %s, snid: %x, dir: %d, rxOkCnt: %d",
+						pi.sdlName, pi.name, pi.snid, pi.dir, pi.rxOkCnt)
+				}
+
+				stat.rxChCnt++
+				if cnt, ok := stat.rxPkgCnt[rxpk]; ok {
+					stat.rxPkgCnt[rxpk] = cnt + 1
+				} else {
+					stat.rxPkgCnt[rxpk] = 1
 				}
 			}
 		} else {
-			peerLog.Debug("piRx: discarded, inst: %s, snid: %x, dir: %d,  pid: %d",
-				pi.name, pi.snid, pi.dir, upkg.Pid)
+			log.Debugf("piRx: invalid pid, " +
+				"sdl: %s, inst: %s, snid: %x, dir: %d,  pid: %d",
+				pi.sdlName, pi.name, pi.snid, pi.dir, upkg.Pid)
+			stat.rxPidErrCnt++
 		}
 	}
 
-	peerLog.ForceDebug("piRx: exit, inst: %s, snid: %x, dir: %d", pi.name, pi.snid, pi.dir)
+	log.Debugf("piRx: exit, sdl: %s, inst: %s, snid: %x, dir: %d",
+		pi.sdlName, pi.name, pi.snid, pi.dir)
 	return done
 }
 
 func (pi *PeerInstance) piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 	if upkg.Pid != uint32(PID_P2P) {
-		peerLog.Debug("piP2pPkgProc: not a p2p package, pid: %d", upkg.Pid)
+		log.Debugf("piP2pPkgProc: not a p2p package, pid: %d", upkg.Pid)
 		return PeMgrEnoMessage
 	}
 
 	if upkg.PayloadLength <= 0 {
-		peerLog.Debug("piP2pPkgProc: invalid payload length: %d", upkg.PayloadLength)
+		log.Debugf("piP2pPkgProc: invalid payload length: %d", upkg.PayloadLength)
 		return PeMgrEnoMessage
 	}
 
 	if len(upkg.Payload) != int(upkg.PayloadLength) {
-		peerLog.Debug("piP2pPkgProc: payload length mismatched, PlLen: %d, real: %d",
+		log.Debugf("piP2pPkgProc: payload length mismatched, PlLen: %d, real: %d",
 			upkg.PayloadLength, len(upkg.Payload))
 		return PeMgrEnoMessage
 	}
 
 	msg := P2pMessage{}
 	if eno := upkg.GetMessage(&msg); eno != PeMgrEnoNone {
-		peerLog.Debug("piP2pPkgProc: GetMessage failed, eno: %d", eno)
+		log.Debugf("piP2pPkgProc: GetMessage failed, eno: %d", eno)
 		return eno
 	}
 
@@ -3225,7 +3298,7 @@ func (pi *PeerInstance) piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 	switch msg.Mid {
 
 	case uint32(MID_HANDSHAKE):
-		peerLog.Debug("piP2pPkgProc: MID_HANDSHAKE, discarded")
+		log.Debugf("piP2pPkgProc: MID_HANDSHAKE, discarded")
 		return PeMgrEnoMessage
 
 	case uint32(MID_PING):
@@ -3235,7 +3308,7 @@ func (pi *PeerInstance) piP2pPkgProc(upkg *P2pPackage) PeMgrErrno {
 		return pi.piP2pPongProc(msg.Pong)
 
 	default:
-		peerLog.Debug("piP2pPkgProc: unknown mid: %d", msg.Mid)
+		log.Debugf("piP2pPkgProc: unknown mid: %d", msg.Mid)
 		return PeMgrEnoMessage
 	}
 
@@ -3247,16 +3320,16 @@ func (pi *PeerInstance) piP2pPingProc(ping *Pingpong) PeMgrErrno {
 	// while sending. this function is running in piRx context, so if it is
 	// blocked here, means that piRx is blocked.
 	if pi.ppEno != PeMgrEnoNone || pi.state != peInstStateActivated {
-		peerLog.Debug("piP2pPingProc: discarded, inst: %s, ppEno: %d, state: %d",
+		log.Debugf("piP2pPingProc: discarded, inst: %s, ppEno: %d, state: %d",
 			pi.name, pi.ppEno, pi.state)
 		return PeMgrEnoResource
 	}
 	if pi.conn == nil {
-		peerLog.Debug("piP2pPingProc: connection had been closed, inst: %s", pi.name)
+		log.Debugf("piP2pPingProc: connection had been closed, inst: %s", pi.name)
 		return PeMgrEnoResource
 	}
 	if len(pi.ppChan) >= cap(pi.ppChan) {
-		peerLog.ForceDebug("piP2pPingProc: queue full, inst: %s, dir: %d", pi.name, pi.dir)
+		log.Debugf("piP2pPingProc: queue full, inst: %s, dir: %d", pi.name, pi.dir)
 		return PeMgrEnoResource
 	}
 	pong := Pingpong{
@@ -3266,7 +3339,7 @@ func (pi *PeerInstance) piP2pPingProc(ping *Pingpong) PeMgrErrno {
 	pi.ppCnt = 0
 	upkg := new(P2pPackage)
 	if eno := upkg.pong(pi, &pong, false); eno != PeMgrEnoNone {
-		peerLog.Debug("piP2pPingProc: pong failed, eno: %d, pi: %s",
+		log.Debugf("piP2pPingProc: pong failed, eno: %d, pi: %s",
 			eno, fmt.Sprintf("%+v", *pi))
 		return eno
 	}
@@ -3282,10 +3355,6 @@ func (pi *PeerInstance) piP2pPongProc(pong *Pingpong) PeMgrErrno {
 }
 
 func (pis peerInstState) compare(s peerInstState) int {
-	// See definition about peerInstState pls.
-	if pis < 0 {
-		panic(fmt.Sprintf("compare: exception, pis: %d", pis))
-	}
 	return int(pis - s)
 }
 
@@ -3361,20 +3430,20 @@ func (peMgr *PeerManager) RegisterInstIndCallback(cb interface{}, userData inter
 	// in this function to pull indications, check what indication type it is and
 	// call the function registered.
 	if peMgr.ptnShell != nil {
-		peerLog.Debug("RegisterInstIndCallback: register failed for shell task in running")
+		log.Debugf("RegisterInstIndCallback: register failed for shell task in running")
 		return PeMgrEnoMismatched
 	}
 	if peMgr.indCb != nil {
-		peerLog.Debug("RegisterInstIndCallback: callback duplicated")
+		log.Debugf("RegisterInstIndCallback: callback duplicated")
 		return PeMgrEnoDuplicated
 	}
 	if cb == nil {
-		peerLog.Debug("RegisterInstIndCallback: try to register nil callback")
+		log.Debugf("RegisterInstIndCallback: try to register nil callback")
 		return PeMgrEnoParameter
 	}
 	icb, ok := cb.(P2pIndCallback)
 	if !ok {
-		peerLog.Debug("RegisterInstIndCallback: invalid callback interface")
+		log.Debugf("RegisterInstIndCallback: invalid callback interface")
 		return PeMgrEnoParameter
 	}
 
@@ -3386,7 +3455,7 @@ func (peMgr *PeerManager) RegisterInstIndCallback(cb interface{}, userData inter
 			select {
 			case ind, ok := <-peMgr.indChan:
 				if !ok {
-					peerLog.Debug("P2pIndCallback: indication channel closed, done")
+					log.Debugf("P2pIndCallback: indication channel closed, done")
 					return
 				}
 				indType := reflect.TypeOf(ind).Elem().Name()
@@ -3396,7 +3465,7 @@ func (peMgr *PeerManager) RegisterInstIndCallback(cb interface{}, userData inter
 				case "P2pIndPeerClosedPara":
 					peMgr.indCb(P2pIndPeerClosed, ind, peMgr.indCbUserData)
 				default:
-					peerLog.Debug("P2pIndCallback: discard unknown indication type: %s", indType)
+					log.Debugf("P2pIndCallback: discard unknown indication type: %s", indType)
 				}
 			}
 		}

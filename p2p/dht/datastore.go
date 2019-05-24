@@ -31,27 +31,10 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	config "github.com/yeeco/gyee/p2p/config"
-	p2plog "github.com/yeeco/gyee/p2p/logger"
 	sch "github.com/yeeco/gyee/p2p/scheduler"
 	log "github.com/yeeco/gyee/log"
 )
 
-//
-// debug
-//
-type dsLogger struct {
-	debug__ bool
-}
-
-var dsLog = dsLogger{
-	debug__: false,
-}
-
-func (log dsLogger) Debug(fmt string, args ...interface{}) {
-	if log.debug__ {
-		p2plog.Debug(fmt, args...)
-	}
-}
 
 //
 // Datastore key
@@ -191,7 +174,6 @@ func NewDsMgr() *DsMgr {
 		getfromPeer: false,
 		fdsCfg:      FileDatastoreConfig{},
 		ldsCfg:      LeveldbDatastoreConfig{},
-		tmMgr:       NewTimerManager(),
 		tidTick:     sch.SchInvalidTid,
 		bgMap:		 make(map[int]*dsMgrBatchGetInst, 0),
 	}
@@ -374,6 +356,8 @@ func (dsMgr *DsMgr) poweron(ptn interface{}) sch.SchErrno {
 	sdl := sch.SchGetScheduler(ptn)
 	dsMgr.sdl = sdl
 	dsMgr.sdlName = sdl.SchGetP2pCfgName()
+	dsMgr.tmMgr = NewTimerManager(dsMgr.sdlName, DsMgrName)
+
 	if sdl == nil {
 		log.Errorf("poweron: invalid sdl")
 		return sch.SchEnoInternal
@@ -505,7 +489,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 		}
 		return sch.SchEnoUserTask
 	} else {
-		log.Debugf("localAddValReq: store ok, eno: %d", eno)
+		log.Tracef("localAddValReq: store ok, eno: %d", eno)
 		dsMgr.localAddValRsp(sch.EvDhtMgrPutValueLocalRsp, k[0:], nil, eno)
 	}
 
@@ -513,7 +497,7 @@ func (dsMgr *DsMgr) localAddValReq(msg *sch.MsgDhtDsMgrAddValReq) sch.SchErrno {
 	// publish it to our neighbors
 	//
 
-	log.Debugf("localAddValReq: publish (key,value) to neighbors")
+	log.Tracef("localAddValReq: publish (key,value) to neighbors")
 
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
@@ -558,7 +542,7 @@ func (dsMgr *DsMgr) localGetValueReq(msg *sch.MsgDhtMgrGetValueReq) sch.SchErrno
 	// try to fetch the value from peers
 	//
 
-	log.Debugf("localGetValueReq: try to get from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
+	log.Tracef("localGetValueReq: try to get from peer, sdl: %s, key: %x", dsMgr.sdlName, k)
 
 	qry := sch.MsgDhtQryMgrQueryStartReq{
 		Target:  k,
@@ -585,7 +569,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 	// try local datastore first
 	//
 
-	log.Infof("localGetValueBatchReq: batch get, sdl: %s", dsMgr.sdlName)
+	log.Tracef("localGetValueBatchReq: batch get, sdl: %s", dsMgr.sdlName)
 
 	var remain *[][]byte
 	if dsMgr.getfromPeer {
@@ -596,7 +580,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 		for _, k := range msg.Keys {
 			copy(dsk[0:], k)
 			if val := dsMgr.fromStore(&dsk); val != nil && len(val) > 0 {
-				log.Debugf("localGetValueBatchReq: get from local ok, sdl: %s, key: %x",
+				log.Tracef("localGetValueBatchReq: get from local ok, sdl: %s, key: %x",
 					dsMgr.sdlName, dsk)
 				msg.ValCh<-val
 			} else {
@@ -607,6 +591,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 
 	if len(*remain) == 0 {
 		log.Debugf("localGetValueBatchReq: all got, sdl: %s", dsMgr.sdlName)
+		close(msg.ValCh)
 		return sch.SchEnoNone
 	}
 
@@ -656,7 +641,7 @@ func (dsMgr *DsMgr)localGetValueBatchReq(msg *sch.MsgDhtMgrGetValueBatchReq) sch
 	bg.status = DsGVBS_WORKING
 	dsMgr.bgMap[bg.bgId] = &bg
 
-	log.Debugf("localGetValueBatchReq: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
+	log.Tracef("localGetValueBatchReq: sdl: %s, bgId: %d, bgSize: %d, bgTimeout: %d",
 		dsMgr.sdlName, bg.bgId, bg.bgSize, bg.bgTimeout)
 
 	return sch.SchEnoNone
@@ -695,6 +680,8 @@ func (dsMgr *DsMgr) gvbTimerHandler(inst *dsMgrBatchGetInst) sch.SchErrno {
 	dsMgr.sdl.SchMakeMessage(msg, dsMgr.ptnMe, dsMgr.ptnQryMgr, sch.EvDhtDsGvbStopReq, &req)
 	if eno := dsMgr.sdl.SchSendMessage(msg); eno != sch.SchEnoNone {
 		log.Errorf("gvbTimerHandler: send message failed, sdl: %s, eno: %d", dsMgr.sdlName, eno)
+		close(gvbCb.bgChOutput)
+		delete(dsMgr.bgMap, gvbId)
 		return eno
 	}
 	return sch.SchEnoNone
@@ -810,7 +797,7 @@ func (dsMgr *DsMgr) putValReq(msg *sch.MsgDhtDsMgrPutValReq) sch.SchErrno {
 	for _, v := range pv.Values {
 
 		copy(dsk[0:], v.Key)
-		log.Debugf("putValReq: key: %x", dsk)
+		log.Tracef("putValReq: key: %x", dsk)
 
 		if eno := dsMgr.store(&dsk, v.Val, pv.KT); eno != DhtEnoNone {
 			log.Warnf("putValReq: store failed, eno: %d", eno)
@@ -844,7 +831,7 @@ func (dsMgr *DsMgr) getValReq(msg *sch.MsgDhtDsMgrGetValReq) sch.SchErrno {
 	dsk := DsKey{}
 	copy(dsk[0:], gvReq.Key)
 
-	log.Debugf("getValReq: key: %x", dsk)
+	log.Tracef("getValReq: key: %x", dsk)
 
 	rsp2Peer := func() sch.SchErrno {
 

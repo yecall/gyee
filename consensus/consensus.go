@@ -54,6 +54,8 @@ type Engine interface {
 
 	// inform engine txs has been sealed in block
 	OnTxSealed(uint64, []common.Hash)
+	// inform engine txs has been dropped
+	OnTxDropped([]common.Hash)
 }
 
 func (o Output) String() string {
