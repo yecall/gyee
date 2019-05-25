@@ -25,7 +25,9 @@ import (
 
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/log"
 	"github.com/yeeco/gyee/node"
+	"github.com/yeeco/gyee/utils/fdlimit"
 	"github.com/yeeco/gyee/utils/logging"
 	"github.com/yeeco/gyee/version"
 )
@@ -89,6 +91,10 @@ func gyee(ctx *cli.Context) error {
 	//logging.Logger.SetLevel(logrus.WarnLevel)
 
 	conf := config.GetConfig(ctx)
+	if err := fdlimit.FixFdLimit(); err != nil {
+		log.Error("failed to update fd limit", err)
+	}
+
 	n, err := node.NewNode(conf)
 	if err != nil {
 		logging.Logger.Fatal(err)
