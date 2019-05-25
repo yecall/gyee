@@ -70,7 +70,7 @@ func (ct *consensusTrie) Commit() (common.Hash, error) {
 	if err != nil {
 		return common.EmptyHash, err
 	}
-	if err := ct.db.TrieDB().Commit(root, true); err != nil {
+	if err := ct.db.TrieDB().Commit(root, reportTriePersistence); err != nil {
 		return common.EmptyHash, err
 	}
 	return root, nil

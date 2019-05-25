@@ -75,7 +75,7 @@ func (at *accountTrie) Commit() (common.Hash, error) {
 	if err != nil {
 		return common.EmptyHash, err
 	}
-	if err := at.db.TrieDB().Commit(root, true); err != nil {
+	if err := at.db.TrieDB().Commit(root, reportTriePersistence); err != nil {
 		return common.EmptyHash, err
 	}
 	return root, nil
