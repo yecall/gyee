@@ -19,3 +19,7 @@
  */
 
 package state
+
+var (
+	reportTriePersistence = false
+)
