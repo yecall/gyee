@@ -239,6 +239,12 @@ func (c *Core) loop() {
 	defer c.wg.Done()
 	defer func() { c.running = false }()
 
+	var (
+		lastHeight = c.Chain().CurrentBlockHeight()
+		syncTicker = time.NewTicker(time.Minute)
+	)
+	defer syncTicker.Stop()
+
 	log.Trace("Core loop...")
 	for {
 		var (
@@ -256,6 +262,12 @@ func (c *Core) loop() {
 		case <-c.quitCh:
 			log.Info("Core loop end.")
 			return
+		case <-syncTicker.C:
+			nowHeight := c.Chain().CurrentBlockHeight()
+			if nowHeight == lastHeight {
+				c.TriggerSync()
+			}
+			lastHeight = nowHeight
 		case event := <-chanEventSend:
 			log.Trace("engine send event")
 			go c.handleEngineEventSend(event)
