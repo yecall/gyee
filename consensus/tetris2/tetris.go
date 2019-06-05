@@ -166,8 +166,9 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 		minTxPerEvent:     1,
 		maxEventPerEvent:  len(validatorList),
 		minEventPerEvent:  2,
+		maxTxDelay:        1000 * time.Millisecond,
 		maxPeriodForEvent: 10 * time.Second,
-		minPeriodForEvent: 100 * time.Millisecond,
+		minPeriodForEvent: 1000 * time.Millisecond,
 	}
 
 	//tetris.prepare()
@@ -344,25 +345,60 @@ func (t *Tetris) sendHeartbeat() {
 }
 
 func (t *Tetris) receiveTicker(ttime time.Time) {
-	if ttime.Sub(t.lastSendTime) > 1*time.Second {
+	timeSinceLast := ttime.Sub(t.lastSendTime)
+	// check if we have to send event
+	if t.MajorityBeatReceived() {
+		// too long time not sent
+		if timeSinceLast >= t.params.maxPeriodForEvent {
+			t.sendEvent()
+			return
+		}
+		// some tx waited long enough
+		// imprecisely, cause tx receive time != last sent time
+		// enough for QOS reasoning
+		if timeSinceLast >= t.params.maxTxDelay {
+			needSend := len(t.txsAccepted) > 0
+			if !needSend {
+				for _, e := range t.eventAccepted {
+					// accepted event has tx pending
+					if len(e.Body.Tx) > 0 {
+						needSend = true
+						break
+					}
+				}
+			}
+			if needSend {
+				t.sendEvent()
+				return
+			}
+		}
+	}
+	// no event is sent, check if we need a heartbeat
+	if timeSinceLast > 1*time.Second {
 		t.sendHeartbeat()
-		//t.sendEvent()
 	}
 }
 
 func (t *Tetris) receiveTx(tx common.Hash) {
-	if !t.txsCache.Contains(tx) {
-		t.Metrics.AddTxIn(1)
-		t.txsCache.Add(tx, true)
-		t.txsAccepted = append(t.txsAccepted, tx)
-
-		if len(t.txsAccepted) >= t.params.maxTxPerEvent {
-			if t.MajorityBeatReceived() {
-				t.sendEvent()
-			} else {
-				//t.txsAccepted = t.txsAccepted[10:]
-			}
+	if t.txsCache.Contains(tx) {
+		// drop duplicated
+		return
+	}
+	var eventFull = len(t.txsAccepted) >= t.params.maxTxPerEvent
+	if eventFull {
+		timeSinceLast := time.Now().Sub(t.lastSendTime)
+		if timeSinceLast < t.params.minPeriodForEvent {
+			// too many tx in a short time, drop
+			// TODO: metrics
+			return
 		}
+	}
+	t.Metrics.AddTxIn(1)
+	t.txsCache.Add(tx, true)
+	t.txsAccepted = append(t.txsAccepted, tx)
+
+	if eventFull && t.MajorityBeatReceived() {
+		t.sendEvent()
 	}
 }
 

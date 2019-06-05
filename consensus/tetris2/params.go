@@ -28,6 +28,7 @@ type Params struct {
 	minTxPerEvent     int
 	maxEventPerEvent  int
 	minEventPerEvent  int
+	maxTxDelay        time.Duration
 	maxPeriodForEvent time.Duration
 	minPeriodForEvent time.Duration
 }
