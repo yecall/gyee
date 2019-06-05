@@ -39,6 +39,7 @@ package node
 
 import (
 	"errors"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -60,6 +61,7 @@ type Node struct {
 	core           *core.Core
 	accountManager *accounts.AccountManager
 	p2p            p2p.Service
+	ipc            rpc.RPCServer
 	rpc            rpc.RPCServer
 
 	lock        sync.RWMutex
@@ -139,6 +141,11 @@ func (n *Node) Start() (err error) {
 	}
 	log.Info("IPC Started")
 
+	if err = n.startRPC(); err != nil {
+		return err
+	}
+	log.Info("RPC Started")
+
 	return nil
 }
 
@@ -210,11 +217,30 @@ func (n *Node) startIPC() error {
 		return err
 	}
 
-	n.rpc = rpc.NewServer(n.config, n)
+	n.ipc = rpc.NewServer(n.config, n)
 
 	go func() {
-		if err := n.rpc.Serve(listener); err != nil {
+		if err := n.ipc.Serve(listener); err != nil {
 			log.Error("IPC exited", "err", err)
+		}
+	}()
+
+	return nil
+}
+
+func (n *Node) startRPC() error {
+	// TODO: remove hardcoded listen param after connection security handled
+	rpcListen := "127.0.0.1:7353"
+
+	listener, err := net.Listen("tcp", rpcListen)
+	if err != nil {
+		return err
+	}
+
+	n.rpc = rpc.NewServer(n.config, n)
+	go func() {
+		if err := n.rpc.Serve(listener); err != nil {
+			log.Error("RPC exited", err)
 		}
 	}()
 
