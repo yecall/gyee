@@ -162,13 +162,13 @@ func NewTetris(core ICore, vid string, validatorList []string, blockHeight uint6
 	tetris.params = &Params{
 		f:                 (len(validatorList) - 1) / 3,
 		superMajority:     2*len(validatorList)/3 + 1,
-		maxTxPerEvent:     1000,
+		maxTxPerEvent:     2000,
 		minTxPerEvent:     1,
 		maxEventPerEvent:  len(validatorList),
 		minEventPerEvent:  2,
-		maxTxDelay:        1000 * time.Millisecond,
-		maxPeriodForEvent: 10 * time.Second,
-		minPeriodForEvent: 1000 * time.Millisecond,
+		maxTxDelay:        2000 * time.Millisecond,
+		maxPeriodForEvent: 60 * time.Second,
+		minPeriodForEvent: 2000 * time.Millisecond,
 	}
 
 	//tetris.prepare()
