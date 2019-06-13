@@ -20,13 +20,21 @@
 package node
 
 import (
+	"context"
 	"net"
+
+	"github.com/Microsoft/go-winio"
 )
 
 func ipcListen(endpoint string) (net.Listener, error) {
-	return nil, nil
+	l, err := winio.ListenPipe(endpoint, nil)
+	if err != nil {
+		return  nil, err
+	}
+
+	return l, nil
 }
 
 func NewIPCConn(ctx context.Context, endpoint string) (conn net.Conn, e error) {
-	return nil, nil
+	return winio.DialPipeContext(ctx, endpoint)
 }
