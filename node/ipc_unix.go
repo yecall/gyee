@@ -15,9 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the gyee library.  If not, see <http://www.gnu.org/licenses/>.
 
+// +build darwin dragonfly freebsd linux nacl netbsd openbsd solaris
+
 package node
 
 import (
+	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -34,4 +37,9 @@ func ipcListen(endpoint string) (net.Listener, error) {
 	}
 	_ = os.Chmod(endpoint, 0600)
 	return l, nil
+}
+
+func NewIPCConn(ctx context.Context, endpoint string) (conn net.Conn, e error) {
+	d := net.Dialer{}
+	return d.DialContext(ctx, "unix", endpoint)
 }

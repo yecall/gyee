@@ -27,6 +27,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yeeco/gyee/cmd/gyee/console"
 	"github.com/yeeco/gyee/config"
+	"github.com/yeeco/gyee/node"
 	"google.golang.org/grpc"
 )
 
@@ -65,8 +66,7 @@ func consoleAttach(ctx *cli.Context) error {
 	// grpc connection
 	conn, err := grpc.Dial(target, grpc.WithInsecure(),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (conn net.Conn, e error) {
-			d := net.Dialer{}
-			return d.DialContext(ctx, "unix", addr)
+			return node.NewIPCConn(ctx, addr)
 		}),
 	)
 	if err != nil {
