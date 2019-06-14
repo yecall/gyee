@@ -22,6 +22,7 @@ package node
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/Microsoft/go-winio"
 )
@@ -36,5 +37,12 @@ func ipcListen(endpoint string) (net.Listener, error) {
 }
 
 func NewIPCConn(ctx context.Context, endpoint string) (conn net.Conn, e error) {
-	return winio.DialPipeContext(ctx, endpoint)
+	timeout := 2 * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout = deadline.Sub(time.Now())
+		if timeout < 0 {
+			timeout = 0
+		}
+	}
+	return winio.DialPipe(endpoint, &timeout)
 }
