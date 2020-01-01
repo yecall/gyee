@@ -1,6 +1,3 @@
-# gyee
+# gyee (Deprecated)
 
-Official Go implementation of the YeeChain
-
-WIP......
-(It's still very early stage, all codes here are for testing purpose only...)
+Go to the new YeeCo chain project: [yeeroot](https://github.com/yeeco/yeeroot)
